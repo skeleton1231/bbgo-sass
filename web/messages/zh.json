@@ -1,0 +1,78 @@
+{
+  "Auth": {
+    "email": "邮箱",
+    "emailPlaceholder": "you@example.com",
+    "password": "密码",
+    "login": "登录",
+    "loggingIn": "登录中...",
+    "forgotPassword": "忘记密码？",
+    "invalidCredentials": "邮箱或密码错误",
+    "passwordTooShort": "密码至少需要6个字符",
+    "passwordsDontMatch": "两次输入的密码不一致"
+  },
+  "Nav": {
+    "dashboard": "仪表盘",
+    "bots": "交易机器人",
+    "backtest": "回测",
+    "settings": "设置",
+    "apiKeys": "API 密钥",
+    "billing": "账单",
+    "signOut": "退出登录"
+  },
+  "Dashboard": {
+    "title": "仪表盘",
+    "totalBalance": "总资产",
+    "activeBots": "运行中机器人",
+    "todayPnl": "今日盈亏",
+    "recentTrades": "最近交易",
+    "noTrades": "暂无交易"
+  },
+  "Bots": {
+    "title": "交易机器人",
+    "create": "创建机器人",
+    "start": "启动",
+    "stop": "停止",
+    "delete": "删除",
+    "status": {
+      "running": "运行中",
+      "stopped": "已停止",
+      "error": "错误"
+    },
+    "strategyParams": "策略参数",
+    "mode": {
+      "live": "实盘",
+      "paper": "模拟",
+      "backtest": "回测"
+    }
+  },
+  "Backtest": {
+    "title": "回测",
+    "run": "运行回测",
+    "results": "结果",
+    "totalProfit": "总收益",
+    "maxDrawdown": "最大回撤",
+    "sharpeRatio": "夏普比率",
+    "winRate": "胜率",
+    "trades": "交易次数",
+    "noResults": "暂无回测结果"
+  },
+  "Settings": {
+    "apiKeys": {
+      "title": "交易所 API 密钥",
+      "add": "添加 API 密钥",
+      "exchange": "交易所",
+      "apiKey": "API Key",
+      "apiSecret": "API Secret",
+      "testnet": "使用测试网",
+      "passphrase": "口令",
+      "empty": "尚未配置 API 密钥。",
+      "delete": "删除",
+      "verified": "已验证",
+      "verificationFailed": "验证失败"
+    }
+  },
+  "Errors": {
+    "serverError": "服务器错误，请重试。",
+    "fetchFailed": "获取数据失败，请重试。"
+  }
+}

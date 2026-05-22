@@ -1,0 +1,78 @@
+{
+  "Auth": {
+    "email": "이메일",
+    "emailPlaceholder": "you@example.com",
+    "password": "비밀번호",
+    "login": "로그인",
+    "loggingIn": "로그인 중...",
+    "forgotPassword": "비밀번호를 잊으셨나요?",
+    "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다",
+    "passwordTooShort": "비밀번호는 6자 이상이어야 합니다",
+    "passwordsDontMatch": "비밀번호가 일치하지 않습니다"
+  },
+  "Nav": {
+    "dashboard": "대시보드",
+    "bots": "트레이딩 봇",
+    "backtest": "백테스트",
+    "settings": "설정",
+    "apiKeys": "API 키",
+    "billing": "결제",
+    "signOut": "로그아웃"
+  },
+  "Dashboard": {
+    "title": "대시보드",
+    "totalBalance": "총 자산",
+    "activeBots": "실행 중인 봇",
+    "todayPnl": "오늘 P&L",
+    "recentTrades": "최근 거래",
+    "noTrades": "거래 내역 없음"
+  },
+  "Bots": {
+    "title": "트레이딩 봇",
+    "create": "봇 만들기",
+    "start": "시작",
+    "stop": "중지",
+    "delete": "삭제",
+    "status": {
+      "running": "실행 중",
+      "stopped": "중지됨",
+      "error": "오류"
+    },
+    "strategyParams": "전략 매개변수",
+    "mode": {
+      "live": "실거래",
+      "paper": "모의",
+      "backtest": "백테스트"
+    }
+  },
+  "Backtest": {
+    "title": "백테스트",
+    "run": "백테스트 실행",
+    "results": "결과",
+    "totalProfit": "총 수익",
+    "maxDrawdown": "최대 낙폭",
+    "sharpeRatio": "샤프 비율",
+    "winRate": "승률",
+    "trades": "거래 수",
+    "noResults": "백테스트 결과 없음"
+  },
+  "Settings": {
+    "apiKeys": {
+      "title": "거래소 API 키",
+      "add": "API 키 추가",
+      "exchange": "거래소",
+      "apiKey": "API 키",
+      "apiSecret": "API 시크릿",
+      "testnet": "테스트넷 사용",
+      "passphrase": "패스프레이즈",
+      "empty": "API 키가 설정되지 않았습니다.",
+      "delete": "삭제",
+      "verified": "인증 완료",
+      "verificationFailed": "인증 실패"
+    }
+  },
+  "Errors": {
+    "serverError": "서버 오류. 다시 시도해 주세요.",
+    "fetchFailed": "데이터를 가져오지 못했습니다."
+  }
+}

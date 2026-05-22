@@ -1,0 +1,36 @@
+# Stage 1: Build bbgo with CGO (for sqlite3 support)
+FROM golang:1.26-bookworm AS bbgo-builder
+
+RUN apt-get update && apt-get install -y gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 go build -tags release -o /usr/local/bin/bbgo ./cmd/bbgo
+
+# Stage 2: Build manager (pure Go)
+FROM golang:1.26-bookworm AS manager-builder
+
+WORKDIR /src/manager
+COPY saas/manager/go.mod saas/manager/go.sum ./
+RUN go mod download
+
+COPY saas/manager/ .
+RUN CGO_ENABLED=0 go build -o /usr/local/bin/manager .
+
+# Stage 3: Runtime
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates curl tzdata && rm -rf /var/lib/apt/lists/*
+
+COPY --from=bbgo-builder /usr/local/bin/bbgo /usr/local/bin/bbgo
+COPY --from=manager-builder /usr/local/bin/manager /usr/local/bin/manager
+
+RUN mkdir -p /data
+WORKDIR /app
+
+EXPOSE 8090
+
+CMD ["manager"]

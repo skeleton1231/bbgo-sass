@@ -1,0 +1,78 @@
+{
+  "Auth": {
+    "email": "メールアドレス",
+    "emailPlaceholder": "you@example.com",
+    "password": "パスワード",
+    "login": "ログイン",
+    "loggingIn": "ログイン中...",
+    "forgotPassword": "パスワードをお忘れですか？",
+    "invalidCredentials": "メールアドレスまたはパスワードが正しくありません",
+    "passwordTooShort": "パスワードは6文字以上必要です",
+    "passwordsDontMatch": "パスワードが一致しません"
+  },
+  "Nav": {
+    "dashboard": "ダッシュボード",
+    "bots": "トレードボット",
+    "backtest": "バックテスト",
+    "settings": "設定",
+    "apiKeys": "API キー",
+    "billing": "請求",
+    "signOut": "ログアウト"
+  },
+  "Dashboard": {
+    "title": "ダッシュボード",
+    "totalBalance": "総資産",
+    "activeBots": "稼働中ボット",
+    "todayPnl": "本日P&L",
+    "recentTrades": "最近の取引",
+    "noTrades": "取引履歴なし"
+  },
+  "Bots": {
+    "title": "トレードボット",
+    "create": "ボット作成",
+    "start": "開始",
+    "stop": "停止",
+    "delete": "削除",
+    "status": {
+      "running": "稼働中",
+      "stopped": "停止",
+      "error": "エラー"
+    },
+    "strategyParams": "ストラテジーパラメータ",
+    "mode": {
+      "live": "リアル",
+      "paper": "デモ",
+      "backtest": "バックテスト"
+    }
+  },
+  "Backtest": {
+    "title": "バックテスト",
+    "run": "バックテスト実行",
+    "results": "結果",
+    "totalProfit": "総利益",
+    "maxDrawdown": "最大ドローダウン",
+    "sharpeRatio": "シャープレシオ",
+    "winRate": "勝率",
+    "trades": "取引数",
+    "noResults": "バックテスト結果なし"
+  },
+  "Settings": {
+    "apiKeys": {
+      "title": "取引所 API キー",
+      "add": "API キー追加",
+      "exchange": "取引所",
+      "apiKey": "API キー",
+      "apiSecret": "API シークレット",
+      "testnet": "テストネットを使用",
+      "passphrase": "パスフレーズ",
+      "empty": "API キーが設定されていません。",
+      "delete": "削除",
+      "verified": "検証済み",
+      "verificationFailed": "検証失敗"
+    }
+  },
+  "Errors": {
+    "serverError": "サーバーエラー。もう一度お試しください。",
+    "fetchFailed": "データの取得に失敗しました。"
+  }
+}

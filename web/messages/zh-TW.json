@@ -1,0 +1,78 @@
+{
+  "Auth": {
+    "email": "電子郵件",
+    "emailPlaceholder": "you@example.com",
+    "password": "密碼",
+    "login": "登入",
+    "loggingIn": "登入中...",
+    "forgotPassword": "忘記密碼？",
+    "invalidCredentials": "電子郵件或密碼錯誤",
+    "passwordTooShort": "密碼至少需要6個字元",
+    "passwordsDontMatch": "兩次輸入的密碼不一致"
+  },
+  "Nav": {
+    "dashboard": "儀表板",
+    "bots": "交易機器人",
+    "backtest": "回測",
+    "settings": "設定",
+    "apiKeys": "API 金鑰",
+    "billing": "帳單",
+    "signOut": "登出"
+  },
+  "Dashboard": {
+    "title": "儀表板",
+    "totalBalance": "總資產",
+    "activeBots": "運行中機器人",
+    "todayPnl": "今日盈虧",
+    "recentTrades": "最近交易",
+    "noTrades": "暫無交易"
+  },
+  "Bots": {
+    "title": "交易機器人",
+    "create": "建立機器人",
+    "start": "啟動",
+    "stop": "停止",
+    "delete": "刪除",
+    "status": {
+      "running": "運行中",
+      "stopped": "已停止",
+      "error": "錯誤"
+    },
+    "strategyParams": "策略參數",
+    "mode": {
+      "live": "實盤",
+      "paper": "模擬",
+      "backtest": "回測"
+    }
+  },
+  "Backtest": {
+    "title": "回測",
+    "run": "執行回測",
+    "results": "結果",
+    "totalProfit": "總收益",
+    "maxDrawdown": "最大回撤",
+    "sharpeRatio": "夏普比率",
+    "winRate": "勝率",
+    "trades": "交易次數",
+    "noResults": "暫無回測結果"
+  },
+  "Settings": {
+    "apiKeys": {
+      "title": "交易所 API 金鑰",
+      "add": "新增 API 金鑰",
+      "exchange": "交易所",
+      "apiKey": "API Key",
+      "apiSecret": "API Secret",
+      "testnet": "使用測試網",
+      "passphrase": "密碼短語",
+      "empty": "尚未設定 API 金鑰。",
+      "delete": "刪除",
+      "verified": "已驗證",
+      "verificationFailed": "驗證失敗"
+    }
+  },
+  "Errors": {
+    "serverError": "伺服器錯誤，請重試。",
+    "fetchFailed": "取得資料失敗，請重試。"
+  }
+}

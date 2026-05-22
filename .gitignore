@@ -1,0 +1,13 @@
+.env
+.env.local
+.env.*.local
+manager/manager
+manager/manager.exe
+manager/data/
+web/node_modules/
+web/.next/
+.pids
+bash.exe.stackdump
+.DS_Store
+Thumbs.db
+*.swp
