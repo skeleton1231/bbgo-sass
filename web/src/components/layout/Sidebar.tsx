@@ -30,7 +30,7 @@ export function Sidebar() {
             href={href}
             className={cn(
               'block rounded-md px-3 py-2 text-sm transition-colors',
-              pathname === href
+              pathname === href || (key !== "dashboard" && pathname.startsWith(href))
                 ? 'bg-primary/10 text-primary font-medium'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             )}

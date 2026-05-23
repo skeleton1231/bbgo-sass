@@ -8,6 +8,7 @@ import { EXCHANGES, EXCHANGES_REQUIRING_PASSPHRASE } from '@/lib/bbgo/constants'
 
 export function ApiKeyList() {
   const t = useTranslations('Settings.apiKeys')
+  const bt = useTranslations('Bots')
   const [userId, setUserId] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [exchange, setExchange] = useState('binance')
@@ -57,7 +58,7 @@ export function ApiKeyList() {
     <div className="space-y-4">
       {isLoading && (
         <div className="rounded-lg border bg-card p-6 text-center text-muted-foreground">
-          Loading...
+          {bt('loading')}
         </div>
       )}
 
@@ -68,7 +69,12 @@ export function ApiKeyList() {
               <div className="flex items-center gap-3">
                 <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium uppercase">{cred.exchange}</span>
                 {cred.is_testnet && (
-                  <span className="rounded-md bg-yellow-100 text-yellow-800 px-2 py-1 text-xs">Testnet</span>
+                  <span className="rounded-md bg-yellow-100 text-yellow-800 px-2 py-1 text-xs">{bt('testnet')}</span>
+                )}
+                {cred.is_verified ? (
+                  <span className="rounded-md bg-green-100 text-green-700 px-2 py-1 text-xs">{t('verified')}</span>
+                ) : (
+                  <span className="rounded-md bg-gray-100 text-gray-500 px-2 py-1 text-xs">{t('verificationFailed')}</span>
                 )}
               </div>
               <button
@@ -163,14 +169,14 @@ export function ApiKeyList() {
 
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setShowAdd(false)} className="rounded-md border px-4 py-2 text-sm">
-              Cancel
+              {bt('cancel')}
             </button>
             <button
               type="submit"
               disabled={createMut.isPending}
               className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              {createMut.isPending ? 'Saving...' : 'Save'}
+              {createMut.isPending ? bt('saving') : bt('save')}
             </button>
           </div>
         </form>

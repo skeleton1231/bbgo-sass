@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -12,13 +13,22 @@ const (
 	StatusError   = "error"
 )
 
+type SessionRoleConfig struct {
+	Name         string `json:"name"`
+	Exchange     string `json:"exchange"`
+	EnvVarPrefix string `json:"envVarPrefix"`
+	Futures      bool   `json:"futures"`
+}
+
 type StrategyEntry struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Exchange string          `json:"exchange"`
-	Strategy string          `json:"strategy"`
-	Config   json.RawMessage `json:"config"`
-	Mode     string          `json:"mode"`
+	ID            string              `json:"id"`
+	Name          string              `json:"name"`
+	Exchange      string              `json:"exchange"`
+	Strategy      string              `json:"strategy"`
+	Config        json.RawMessage     `json:"config"`
+	Mode          string              `json:"mode"`
+	CrossExchange bool                `json:"crossExchange"`
+	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
 }
 
 type UserContainer struct {
@@ -36,21 +46,6 @@ func NewUserContainerManager() *UserContainerManager {
 	return &UserContainerManager{users: make(map[string]*UserContainer)}
 }
 
-func (m *UserContainerManager) getOrCreate(userID string) *UserContainer {
-	uc := &UserContainer{
-		UserID:     userID,
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{},
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if existing, ok := m.users[userID]; ok {
-		return existing
-	}
-	m.users[userID] = uc
-	return uc
-}
-
 func (m *UserContainerManager) Get(userID string) (*UserContainer, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -66,12 +61,22 @@ func (m *UserContainerManager) UpdateStatus(userID, status string) {
 	}
 }
 
-func (m *UserContainerManager) AddStrategy(userID string, entry StrategyEntry) *UserContainer {
-	uc := m.getOrCreate(userID)
+func (m *UserContainerManager) AddStrategy(userID string, entry StrategyEntry) (*UserContainer, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	uc, ok := m.users[userID]
+	created := !ok
+	if !ok {
+		uc = &UserContainer{
+			UserID:     userID,
+			Status:     StatusStopped,
+			Strategies: []StrategyEntry{},
+		}
+		m.users[userID] = uc
+	}
 	uc.Strategies = append(uc.Strategies, entry)
-	return uc
+	return uc, created
 }
 
 func (m *UserContainerManager) RemoveStrategy(userID, strategyID string) bool {
@@ -108,21 +113,56 @@ func (m *UserContainerManager) Restore(users []*UserContainer) {
 	}
 }
 
-func buildUserYAML(uc *UserContainer) string {
-	type exchangeConf struct {
-		Symbol string
-	}
-	exchanges := map[string]*exchangeConf{}
-	var strategyLines string
-	seenKeys := map[string]int{}
+type bbgoConfig struct {
+	Sessions               map[string]sessionConfig    `yaml:"sessions,omitempty"`
+	Exchange               map[string]exchangeConfig   `yaml:"exchange"`
+	Environment            *environmentConfig          `yaml:"environment,omitempty"`
+	ExchangeStrategies     []map[string]interface{}    `yaml:"exchangeStrategies,omitempty"`
+	CrossExchangeStrategies []map[string]interface{}   `yaml:"crossExchangeStrategies,omitempty"`
+}
+
+type sessionConfig struct {
+	Exchange     string `yaml:"exchange"`
+	EnvVarPrefix string `yaml:"envVarPrefix"`
+	Futures      bool   `yaml:"futures,omitempty"`
+	PublicOnly   bool   `yaml:"publicOnly,omitempty"`
+}
+
+type exchangeConfig struct {
+	Symbol string `yaml:"symbol"`
+}
+
+type environmentConfig struct {
+	PaperTrade                string `yaml:"PAPER_TRADE,omitempty"`
+	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery"`
+}
+
+func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool) string {
+	exchanges := map[string]exchangeConfig{}
+	sessions := map[string]sessionConfig{}
+	var exchangeStrategies []map[string]interface{}
+	var crossStrategies []map[string]interface{}
+	hasPaper := false
 
 	for _, s := range uc.Strategies {
 		var params map[string]interface{}
 		if err := json.Unmarshal(s.Config, &params); err != nil {
 			var rawStr string
 			if err2 := json.Unmarshal(s.Config, &rawStr); err2 == nil {
-				strategyLines += rawStr + "\n"
-				continue
+				entry := map[string]interface{}{
+					"on":         s.Exchange,
+					s.Strategy:   rawStr,
+				}
+				exchangeStrategies = append(exchangeStrategies, entry)
+			}
+			continue
+		}
+
+		if s.CrossExchange {
+			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials)
+			crossStrategies = append(crossStrategies, csEntry)
+			if s.Mode == "paper" {
+				hasPaper = true
 			}
 			continue
 		}
@@ -132,48 +172,133 @@ func buildUserYAML(uc *UserContainer) string {
 			symbol = v
 		}
 		if _, exists := exchanges[s.Exchange]; !exists {
-			exchanges[s.Exchange] = &exchangeConf{Symbol: symbol}
-		}
-
-		key := s.Strategy
-		if count, exists := seenKeys[key]; exists {
-			key = fmt.Sprintf("%s_%d", key, count)
-		}
-		seenKeys[s.Strategy]++
-
-		var lines string
-		for k, v := range params {
-			if k == "symbol" || k == "interval" {
-				continue
-			}
-			switch val := v.(type) {
-			case float64:
-				if val == float64(int(val)) {
-					lines += fmt.Sprintf("      %s: %d\n", k, int(val))
-				} else {
-					lines += fmt.Sprintf("      %s: %g\n", k, val)
-				}
-			case bool:
-				lines += fmt.Sprintf("      %s: %v\n", k, val)
-			default:
-				lines += fmt.Sprintf("      %s: %v\n", k, val)
+			exchanges[s.Exchange] = exchangeConfig{Symbol: symbol}
+			prefix := exchangeEnvPrefix(s.Exchange)
+			sessions[s.Exchange] = sessionConfig{
+				Exchange:     s.Exchange,
+				EnvVarPrefix: prefix,
+				PublicOnly:   !hasCredentials(s.Exchange),
 			}
 		}
-		strategyLines += fmt.Sprintf("    %s:\n%s", key, lines)
-	}
 
-	exchangeYAML := ""
-	for name, conf := range exchanges {
-		exchangeYAML += fmt.Sprintf("  %s:\n    symbol: %s\n", name, conf.Symbol)
-	}
+		entry := map[string]interface{}{
+				"on":         s.Exchange,
+				s.Strategy:   params,
+			}
+		exchangeStrategies = append(exchangeStrategies, entry)
 
-	paperTrade := ""
-	for _, s := range uc.Strategies {
 		if s.Mode == "paper" {
-			paperTrade = "\nenvironment:\n  PAPER_TRADE: \"1\"\n"
-			break
+			hasPaper = true
 		}
 	}
 
-	return fmt.Sprintf("exchange:\n%s%sstrategy:\n%s", exchangeYAML, paperTrade, strategyLines)
+	cfg := bbgoConfig{
+		Sessions:                sessions,
+		Exchange:                exchanges,
+		ExchangeStrategies:      exchangeStrategies,
+		CrossExchangeStrategies: crossStrategies,
+	}
+	cfg.Environment = &environmentConfig{DisableStartupBalanceQuery: true}
+	if hasPaper {
+		cfg.Environment.PaperTrade = "1"
+	}
+
+	out, err := yaml.Marshal(cfg)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
+func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool) map[string]interface{} {
+	for _, sr := range s.Sessions {
+		if _, exists := sessions[sr.Name]; !exists {
+			sessions[sr.Name] = sessionConfig{
+				Exchange:     sr.Exchange,
+				EnvVarPrefix: sr.EnvVarPrefix,
+				Futures:      sr.Futures,
+				PublicOnly:   !hasCredentials(sr.Exchange),
+			}
+		}
+		symbol := "BTCUSDT"
+		if v, ok := params["symbol"].(string); ok && v != "" {
+			symbol = v
+		}
+		if _, exists := exchanges[sr.Exchange]; !exists {
+			exchanges[sr.Exchange] = exchangeConfig{Symbol: symbol}
+		}
+	}
+
+	return map[string]interface{}{
+		s.Strategy: params,
+	}
+}
+
+func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime string) ([]byte, error) {
+	var allParams map[string]interface{}
+	if err := json.Unmarshal(rawConfig, &allParams); err != nil {
+		return nil, err
+	}
+
+	exchange := "binance"
+	if v, ok := allParams["exchange"].(string); ok && v != "" {
+		exchange = v
+	}
+
+	if startTime == "" {
+		startTime = "2024-01-01"
+	}
+	if endTime == "" {
+		endTime = "2024-06-01"
+	}
+
+	prefix := exchangeEnvPrefix(exchange)
+
+	btCfg := struct {
+		Sessions map[string]struct {
+			Exchange     string `yaml:"exchange"`
+			EnvVarPrefix string `yaml:"envVarPrefix"`
+		} `yaml:"sessions"`
+		ExchangeStrategies []map[string]interface{} `yaml:"exchangeStrategies"`
+		Backtest struct {
+			Sessions  []string `yaml:"sessions"`
+			StartTime string   `yaml:"startTime"`
+			EndTime   string   `yaml:"endTime"`
+			Accounts  map[string]struct {
+				Balances map[string]string `yaml:"balances"`
+			} `yaml:"accounts"`
+		} `yaml:"backtest"`
+	}{
+		Sessions: map[string]struct {
+			Exchange     string `yaml:"exchange"`
+			EnvVarPrefix string `yaml:"envVarPrefix"`
+		}{
+			exchange: {Exchange: exchange, EnvVarPrefix: prefix},
+		},
+		ExchangeStrategies: []map[string]interface{}{
+			{
+				"on":     exchange,
+				strategy: allParams,
+			},
+		},
+		Backtest: struct {
+			Sessions  []string `yaml:"sessions"`
+			StartTime string   `yaml:"startTime"`
+			EndTime   string   `yaml:"endTime"`
+			Accounts  map[string]struct {
+				Balances map[string]string `yaml:"balances"`
+			} `yaml:"accounts"`
+		}{
+			Sessions:  []string{exchange},
+			StartTime: startTime,
+			EndTime:   endTime,
+			Accounts: map[string]struct {
+				Balances map[string]string `yaml:"balances"`
+			}{
+				exchange: {Balances: map[string]string{"USDT": "10000", "BTC": "0.1"}},
+			},
+		},
+	}
+
+	return yaml.Marshal(btCfg)
 }

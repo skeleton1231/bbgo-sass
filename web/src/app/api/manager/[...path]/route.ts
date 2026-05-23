@@ -1,23 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/server'
 
 const MANAGER_URL = process.env.MANAGER_API_URL || 'http://localhost:8090'
-
-async function verifyAuth(request: NextRequest): Promise<string | null> {
-  const cookieStore = request.cookies
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
-  )
-  const { data } = await supabase.auth.getUser()
-  return data.user?.id ?? null
-}
+const MANAGER_TOKEN = process.env.MANAGER_TOKEN || ''
 
 function forwardRequest(
   method: string,
@@ -31,6 +16,7 @@ function forwardRequest(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-User-Id': userId,
+    'X-Manager-Token': MANAGER_TOKEN,
   }
 
   const init: RequestInit = { method, headers }
@@ -50,15 +36,25 @@ async function handleRequest(
   request: NextRequest,
   params: Promise<{ path: string[] }>
 ) {
-  const userId = await verifyAuth(request)
-  if (!userId) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { path } = await params
-  const res = await forwardRequest(method, request, path, userId)
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  const res = await forwardRequest(method, request, path, user.id)
+  const text = await res.text()
+
+  try {
+    const data = JSON.parse(text)
+    return NextResponse.json(data, { status: res.status })
+  } catch {
+    return NextResponse.json(
+      { error: `Manager returned non-JSON: ${text.slice(0, 200)}` },
+      { status: res.status }
+    )
+  }
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
@@ -71,4 +67,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   return handleRequest('DELETE', request, params)
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  return handleRequest('PUT', request, params)
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  return handleRequest('PATCH', request, params)
 }

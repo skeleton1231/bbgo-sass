@@ -25,7 +25,14 @@
     "activeBots": "运行中机器人",
     "todayPnl": "今日盈亏",
     "recentTrades": "最近交易",
-    "noTrades": "暂无交易"
+    "noTrades": "暂无交易",
+    "sessions": "会话",
+    "portfolioValue": "投资组合价值",
+    "strategies": "策略",
+    "manage": "管理",
+    "viewAll": "在仪表盘中查看全部",
+    "noStrategies": "尚未配置策略。",
+    "createStrategy": "创建策略"
   },
   "Bots": {
     "title": "交易机器人",
@@ -33,17 +40,56 @@
     "start": "启动",
     "stop": "停止",
     "delete": "删除",
+    "backToBots": "返回机器人列表",
+    "tradingDashboard": "交易仪表盘",
+    "balances": "余额",
+    "openOrders": "挂单",
+    "closedOrders": "历史订单",
+    "recentTrades": "最近成交",
+    "strategies": "策略",
+    "activeCount": "{count} 个活跃",
+    "maker": "Maker",
+    "locked": "{amount} 冻结",
+    "errorBanner": "容器遇到错误，请尝试重启。",
+    "stoppedBanner": "容器已停止，启动后可查看实时交易数据。",
+    "noBalances": "暂无余额",
+    "startToSeeData": "启动容器以查看实时数据",
+    "noOpenOrders": "暂无挂单",
+    "noClosedOrders": "暂无历史订单",
+    "noTrades": "暂无成交",
     "status": {
       "running": "运行中",
       "stopped": "已停止",
       "error": "错误"
     },
-    "strategyParams": "策略参数",
+    "strategyStatus": {
+      "running": "运行中",
+      "idle": "空闲"
+    },
+    "loading": "加载中...",
+    "noStrategies": "暂无策略，创建一个开始。",
+    "userContainer": "用户容器",
+    "dashboard": "仪表盘",
+    "remove": "移除",
+    "removeConfirm": "确定要移除此策略吗？",
+    "strategiesCount": "{count} 个策略",
+    "containerName": "容器: bbgo-{id}",
+    "name": "名称",
     "mode": {
       "live": "实盘",
       "paper": "模拟",
       "backtest": "回测"
-    }
+    },
+    "sessionRoles": "会话角色",
+    "cancel": "取消",
+    "creating": "创建中...",
+    "futures": "期货",
+    "strategyParams": "策略参数",
+    "errorLoading": "数据加载失败，请重试。",
+    "save": "保存",
+    "saving": "保存中...",
+    "testnet": "测试网",
+    "containerLogs": "容器日志"
   },
   "Backtest": {
     "title": "回测",
@@ -54,7 +100,14 @@
     "sharpeRatio": "夏普比率",
     "winRate": "胜率",
     "trades": "交易次数",
-    "noResults": "暂无回测结果"
+    "noResults": "暂无回测结果",
+    "strategy": "策略",
+    "exchange": "交易所",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "running": "运行中...",
+    "backtestOutput": "回测输出",
+    "backtestDuration": "回测可能需要 30-60 秒，取决于日期范围..."
   },
   "Settings": {
     "apiKeys": {

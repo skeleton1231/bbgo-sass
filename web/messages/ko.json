@@ -25,7 +25,14 @@
     "activeBots": "실행 중인 봇",
     "todayPnl": "오늘 P&L",
     "recentTrades": "최근 거래",
-    "noTrades": "거래 내역 없음"
+    "noTrades": "거래 내역 없음",
+    "sessions": "세션",
+    "portfolioValue": "포트폴리오 가치",
+    "strategies": "전략",
+    "manage": "관리",
+    "viewAll": "대시보드에서 전체 보기",
+    "noStrategies": "아직 설정된 전략이 없습니다.",
+    "createStrategy": "전략 만들기"
   },
   "Bots": {
     "title": "트레이딩 봇",
@@ -33,17 +40,56 @@
     "start": "시작",
     "stop": "중지",
     "delete": "삭제",
+    "backToBots": "봇 목록으로 돌아가기",
+    "tradingDashboard": "트레이딩 대시보드",
+    "balances": "잔고",
+    "openOrders": "미체결 주문",
+    "closedOrders": "체결된 주문",
+    "recentTrades": "최근 거래",
+    "strategies": "전략",
+    "activeCount": "{count}개 활성",
+    "maker": "Maker",
+    "locked": "{amount} 동결",
+    "errorBanner": "컨테이너에 오류가 발생했습니다. 다시 시작해 보세요.",
+    "stoppedBanner": "컨테이너가 중지되었습니다. 시작하면 실시간 데이터를 볼 수 있습니다.",
+    "noBalances": "잔고 없음",
+    "startToSeeData": "컨테이너를 시작하여 실시간 데이터 보기",
+    "noOpenOrders": "미체결 주문 없음",
+    "noClosedOrders": "체결된 주문 없음",
+    "noTrades": "거래 내역 없음",
     "status": {
       "running": "실행 중",
       "stopped": "중지됨",
       "error": "오류"
     },
+    "strategyStatus": {
+      "running": "실행 중",
+      "idle": "대기"
+    },
     "strategyParams": "전략 매개변수",
     "mode": {
       "live": "실거래",
-      "paper": "모의",
+      "paper": "시뮬레이션",
       "backtest": "백테스트"
-    }
+    },
+    "loading": "로딩 중...",
+    "noStrategies": "전략이 없습니다. 하나를 만들어 시작하세요.",
+    "userContainer": "사용자 컨테이너",
+    "dashboard": "대시보드",
+    "remove": "제거",
+    "removeConfirm": "이 전략을 제거하시겠습니까?",
+    "strategiesCount": "{count}개 전략",
+    "containerName": "컨테이너: bbgo-{id}",
+    "name": "이름",
+    "sessionRoles": "세션 역할",
+    "cancel": "취소",
+    "creating": "생성 중...",
+    "futures": "선물",
+    "errorLoading": "데이터를 불러오지 못했습니다. 다시 시도해 주세요.",
+    "save": "저장",
+    "saving": "저장 중...",
+    "testnet": "테스트넷",
+    "containerLogs": "컨테이너 로그"
   },
   "Backtest": {
     "title": "백테스트",
@@ -54,7 +100,14 @@
     "sharpeRatio": "샤프 비율",
     "winRate": "승률",
     "trades": "거래 수",
-    "noResults": "백테스트 결과 없음"
+    "noResults": "백테스트 결과 없음",
+    "strategy": "전략",
+    "exchange": "거래소",
+    "startDate": "시작 날짜",
+    "endDate": "종료 날짜",
+    "running": "실행 중...",
+    "backtestOutput": "백테스트 출력",
+    "backtestDuration": "날짜 범위에 따라 30-60초가 걸릴 수 있습니다..."
   },
   "Settings": {
     "apiKeys": {

@@ -25,7 +25,14 @@
     "activeBots": "運行中機器人",
     "todayPnl": "今日盈虧",
     "recentTrades": "最近交易",
-    "noTrades": "暫無交易"
+    "noTrades": "暫無交易",
+    "sessions": "會話",
+    "portfolioValue": "投資組合價值",
+    "strategies": "策略",
+    "manage": "管理",
+    "viewAll": "在儀表板中檢視全部",
+    "noStrategies": "尚未配置策略。",
+    "createStrategy": "建立策略"
   },
   "Bots": {
     "title": "交易機器人",
@@ -33,17 +40,56 @@
     "start": "啟動",
     "stop": "停止",
     "delete": "刪除",
+    "backToBots": "返回機器人列表",
+    "tradingDashboard": "交易儀表板",
+    "balances": "餘額",
+    "openOrders": "掛單",
+    "closedOrders": "歷史訂單",
+    "recentTrades": "最近成交",
+    "strategies": "策略",
+    "activeCount": "{count} 個活躍",
+    "maker": "Maker",
+    "locked": "{amount} 凍結",
+    "errorBanner": "容器發生錯誤，請嘗試重啟。",
+    "stoppedBanner": "容器已停止，啟動後可檢視即時交易資料。",
+    "noBalances": "暫無餘額",
+    "startToSeeData": "啟動容器以檢視即時資料",
+    "noOpenOrders": "暫無掛單",
+    "noClosedOrders": "暫無歷史訂單",
+    "noTrades": "暫無成交",
     "status": {
       "running": "運行中",
       "stopped": "已停止",
       "error": "錯誤"
+    },
+    "strategyStatus": {
+      "running": "運行中",
+      "idle": "閒置"
     },
     "strategyParams": "策略參數",
     "mode": {
       "live": "實盤",
       "paper": "模擬",
       "backtest": "回測"
-    }
+    },
+    "loading": "載入中...",
+    "noStrategies": "暫無策略，建立一個開始。",
+    "userContainer": "使用者容器",
+    "dashboard": "儀表板",
+    "remove": "移除",
+    "removeConfirm": "確定要移除此策略嗎？",
+    "strategiesCount": "{count} 個策略",
+    "containerName": "容器: bbgo-{id}",
+    "name": "名稱",
+    "sessionRoles": "會話角色",
+    "cancel": "取消",
+    "creating": "建立中...",
+    "futures": "期貨",
+    "errorLoading": "資料載入失敗，請重試。",
+    "save": "儲存",
+    "saving": "儲存中...",
+    "testnet": "測試網",
+    "containerLogs": "容器日誌"
   },
   "Backtest": {
     "title": "回測",
@@ -54,7 +100,14 @@
     "sharpeRatio": "夏普比率",
     "winRate": "勝率",
     "trades": "交易次數",
-    "noResults": "暫無回測結果"
+    "noResults": "暫無回測結果",
+    "strategy": "策略",
+    "exchange": "交易所",
+    "startDate": "開始日期",
+    "endDate": "結束日期",
+    "running": "執行中...",
+    "backtestOutput": "回測輸出",
+    "backtestDuration": "回測可能需要 30-60 秒，取決於日期範圍..."
   },
   "Settings": {
     "apiKeys": {

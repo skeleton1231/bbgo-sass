@@ -5,20 +5,35 @@ import {
   deleteStrategy as apiDeleteStrategy,
   startUser as apiStartUser,
   stopUser as apiStopUser,
-  fetchUserStatus,
   runBacktest as apiRunBacktest,
   fetchCredentials as apiFetchCredentials,
   createCredential as apiCreateCredential,
   deleteCredential as apiDeleteCredential,
+  fetchBotPing,
   fetchBotSessions,
+  fetchBotSessionTrades,
   fetchBotOpenOrders,
+  fetchBotSessionBalances,
+  fetchBotSessionSymbols,
   fetchBotTrades,
-  fetchBotAccount,
+  fetchBotClosedOrders,
+  fetchBotTradingVolume,
+  fetchBotAssets,
+  fetchBotStrategies,
+  fetchContainerLogs,
   type StrategyEntry,
   type UserContainer,
   type BacktestResult,
   type CredentialInfo,
+  type BBGoSession,
+  type BBGoTrade,
+  type BBGoOrder,
+  type BBGoBalance,
+  type BBGoAsset,
+  type BBGoStrategyState,
 } from './manager'
+
+// --- Strategy & container queries ---
 
 export function useUserStrategies(userId: string) {
   return useQuery<UserContainer>({
@@ -69,8 +84,19 @@ export function useRunBacktest() {
   })
 }
 
+// --- Bot data queries (real-time from bbgo container) ---
+
+export function useBotPing(userId: string) {
+  return useQuery<{ status: string }>({
+    queryKey: ['bot-ping', userId],
+    queryFn: () => fetchBotPing(userId),
+    enabled: !!userId,
+    refetchInterval: 30_000,
+  })
+}
+
 export function useBotSessions(userId: string) {
-  return useQuery({
+  return useQuery<{ sessions: BBGoSession[] }>({
     queryKey: ['bot-sessions', userId],
     queryFn: () => fetchBotSessions(userId),
     enabled: !!userId,
@@ -78,8 +104,17 @@ export function useBotSessions(userId: string) {
   })
 }
 
+export function useBotSessionTrades(userId: string, session: string) {
+  return useQuery<{ trades: BBGoTrade[] }>({
+    queryKey: ['bot-session-trades', userId, session],
+    queryFn: () => fetchBotSessionTrades(userId, session),
+    enabled: !!userId && !!session,
+    refetchInterval: 10_000,
+  })
+}
+
 export function useBotOpenOrders(userId: string, session: string) {
-  return useQuery({
+  return useQuery<{ orders: BBGoOrder[] }>({
     queryKey: ['bot-orders', userId, session],
     queryFn: () => fetchBotOpenOrders(userId, session),
     enabled: !!userId && !!session,
@@ -87,23 +122,79 @@ export function useBotOpenOrders(userId: string, session: string) {
   })
 }
 
-export function useBotTrades(userId: string) {
-  return useQuery({
-    queryKey: ['bot-trades', userId],
-    queryFn: () => fetchBotTrades(userId),
+export function useBotSessionBalances(userId: string, session: string) {
+  return useQuery<{ balances: Record<string, BBGoBalance> }>({
+    queryKey: ['bot-balances', userId, session],
+    queryFn: () => fetchBotSessionBalances(userId, session),
+    enabled: !!userId && !!session,
+    refetchInterval: 15_000,
+  })
+}
+
+export function useBotSessionSymbols(userId: string, session: string) {
+  return useQuery<{ symbols: string[] }>({
+    queryKey: ['bot-symbols', userId, session],
+    queryFn: () => fetchBotSessionSymbols(userId, session),
+    enabled: !!userId && !!session,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useBotTrades(userId: string, exchange?: string, symbol?: string) {
+  return useQuery<{ trades: BBGoTrade[] }>({
+    queryKey: ['bot-trades', userId, exchange, symbol],
+    queryFn: () => fetchBotTrades(userId, exchange, symbol),
     enabled: !!userId,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotAccount(userId: string, session: string) {
-  return useQuery({
-    queryKey: ['bot-account', userId, session],
-    queryFn: () => fetchBotAccount(userId, session),
-    enabled: !!userId && !!session,
+export function useBotClosedOrders(userId: string, exchange?: string, symbol?: string) {
+  return useQuery<{ orders: BBGoOrder[] }>({
+    queryKey: ['bot-closed-orders', userId, exchange, symbol],
+    queryFn: () => fetchBotClosedOrders(userId, exchange, symbol),
+    enabled: !!userId,
     refetchInterval: 15_000,
   })
 }
+
+export function useBotTradingVolume(userId: string, period?: string) {
+  return useQuery<{ tradingVolumes: unknown }>({
+    queryKey: ['bot-trading-volume', userId, period],
+    queryFn: () => fetchBotTradingVolume(userId, period),
+    enabled: !!userId,
+    refetchInterval: 60_000,
+  })
+}
+
+export function useBotAssets(userId: string) {
+  return useQuery<{ assets: Record<string, BBGoAsset> }>({
+    queryKey: ['bot-assets', userId],
+    queryFn: () => fetchBotAssets(userId),
+    enabled: !!userId,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useBotStrategiesState(userId: string) {
+  return useQuery<{ strategies: BBGoStrategyState[] }>({
+    queryKey: ['bot-strategies-state', userId],
+    queryFn: () => fetchBotStrategies(userId),
+    enabled: !!userId,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useContainerLogs(userId: string, tail?: string) {
+  return useQuery<{ logs: string }>({
+    queryKey: ['container-logs', userId, tail],
+    queryFn: () => fetchContainerLogs(userId, tail),
+    enabled: !!userId,
+    refetchInterval: 15_000,
+  })
+}
+
+// --- Credentials ---
 
 export function useCredentials(userId: string) {
   return useQuery<CredentialInfo[]>({
@@ -129,42 +220,15 @@ export function useDeleteCredential() {
   })
 }
 
-export function useSupabaseOrders(userId: string) {
-  return useQuery({
-    queryKey: ['orders', userId],
-    queryFn: async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('sync_orders')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      return data ?? []
-    },
-    enabled: !!userId,
-    refetchInterval: 15_000,
-  })
+export type {
+  StrategyEntry,
+  UserContainer,
+  CredentialInfo,
+  BacktestResult,
+  BBGoSession,
+  BBGoTrade,
+  BBGoOrder,
+  BBGoBalance,
+  BBGoAsset,
+  BBGoStrategyState,
 }
-
-export function useSupabaseTrades(userId: string) {
-  return useQuery({
-    queryKey: ['trades', userId],
-    queryFn: async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('sync_trades')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      return data ?? []
-    },
-    enabled: !!userId,
-    refetchInterval: 15_000,
-  })
-}
-
-export type { StrategyEntry, UserContainer, CredentialInfo, BacktestResult }

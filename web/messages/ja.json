@@ -25,7 +25,14 @@
     "activeBots": "稼働中ボット",
     "todayPnl": "本日P&L",
     "recentTrades": "最近の取引",
-    "noTrades": "取引履歴なし"
+    "noTrades": "取引履歴なし",
+    "sessions": "セッション",
+    "portfolioValue": "ポートフォリオ価値",
+    "strategies": "ストラテジー",
+    "manage": "管理",
+    "viewAll": "ダッシュボードですべて表示",
+    "noStrategies": "ストラテジーが設定されていません。",
+    "createStrategy": "ストラテジーを作成"
   },
   "Bots": {
     "title": "トレードボット",
@@ -33,17 +40,56 @@
     "start": "開始",
     "stop": "停止",
     "delete": "削除",
+    "backToBots": "ボット一覧に戻る",
+    "tradingDashboard": "トレーディングダッシュボード",
+    "balances": "残高",
+    "openOrders": "未約定注文",
+    "closedOrders": "約定済み注文",
+    "recentTrades": "最近の取引",
+    "strategies": "ストラテジー",
+    "activeCount": "{count}件アクティブ",
+    "maker": "Maker",
+    "locked": "{amount} ロック",
+    "errorBanner": "コンテナでエラーが発生しました。再起動をお試しください。",
+    "stoppedBanner": "コンテナは停止しています。開始するとリアルタイムデータを確認できます。",
+    "noBalances": "残高なし",
+    "startToSeeData": "コンテナを開始してリアルタイムデータを表示",
+    "noOpenOrders": "未約定注文なし",
+    "noClosedOrders": "約定済み注文なし",
+    "noTrades": "取引履歴なし",
     "status": {
       "running": "稼働中",
       "stopped": "停止",
       "error": "エラー"
     },
+    "strategyStatus": {
+      "running": "稼働中",
+      "idle": "待機"
+    },
     "strategyParams": "ストラテジーパラメータ",
     "mode": {
-      "live": "リアル",
-      "paper": "デモ",
+      "live": "ライブ",
+      "paper": "ペーパー",
       "backtest": "バックテスト"
-    }
+    },
+    "loading": "読み込み中...",
+    "noStrategies": "ストラテジーがありません。作成して始めましょう。",
+    "userContainer": "ユーザーコンテナ",
+    "dashboard": "ダッシュボード",
+    "remove": "削除",
+    "removeConfirm": "このストラテジーを削除しますか？",
+    "strategiesCount": "{count}件のストラテジー",
+    "containerName": "コンテナ: bbgo-{id}",
+    "name": "名前",
+    "sessionRoles": "セッションロール",
+    "cancel": "キャンセル",
+    "creating": "作成中...",
+    "futures": "先物",
+    "errorLoading": "データの読み込みに失敗しました。もう一度お試しください。",
+    "save": "保存",
+    "saving": "保存中...",
+    "testnet": "テストネット",
+    "containerLogs": "コンテナログ"
   },
   "Backtest": {
     "title": "バックテスト",
@@ -54,7 +100,14 @@
     "sharpeRatio": "シャープレシオ",
     "winRate": "勝率",
     "trades": "取引数",
-    "noResults": "バックテスト結果なし"
+    "noResults": "バックテスト結果なし",
+    "strategy": "ストラテジー",
+    "exchange": "取引所",
+    "startDate": "開始日",
+    "endDate": "終了日",
+    "running": "実行中...",
+    "backtestOutput": "バックテスト出力",
+    "backtestDuration": "日付範囲により30-60秒かかる場合があります..."
   },
   "Settings": {
     "apiKeys": {

@@ -25,7 +25,14 @@
     "activeBots": "Active Bots",
     "todayPnl": "Today P&L",
     "recentTrades": "Recent Trades",
-    "noTrades": "No trades yet"
+    "noTrades": "No trades yet",
+    "sessions": "Sessions",
+    "portfolioValue": "Portfolio Value",
+    "strategies": "Strategies",
+    "manage": "Manage",
+    "viewAll": "View all in dashboard",
+    "noStrategies": "No strategies configured yet.",
+    "createStrategy": "Create a strategy"
   },
   "Bots": {
     "title": "Trading Bots",
@@ -33,17 +40,56 @@
     "start": "Start",
     "stop": "Stop",
     "delete": "Delete",
+    "backToBots": "Back to bots",
+    "tradingDashboard": "Trading Dashboard",
+    "balances": "Balances",
+    "openOrders": "Open Orders",
+    "closedOrders": "Closed Orders",
+    "recentTrades": "Recent Trades",
+    "strategies": "Strategies",
+    "activeCount": "{count} active",
+    "maker": "Maker",
+    "locked": "{amount} locked",
+    "errorBanner": "Container encountered an error. Try restarting it.",
+    "stoppedBanner": "Container is stopped. Start it to see live trading data.",
+    "noBalances": "No non-zero balances",
+    "startToSeeData": "Start the container to see live data",
+    "noOpenOrders": "No open orders",
+    "noClosedOrders": "No closed orders",
+    "noTrades": "No trades yet",
     "status": {
       "running": "Running",
       "stopped": "Stopped",
       "error": "Error"
     },
-    "strategyParams": "Strategy Parameters",
+    "strategyStatus": {
+      "running": "running",
+      "idle": "idle"
+    },
+    "loading": "Loading...",
+    "noStrategies": "No strategies yet. Create one to get started.",
+    "userContainer": "User Container",
+    "dashboard": "Dashboard",
+    "remove": "Remove",
+    "removeConfirm": "Are you sure you want to remove this strategy?",
+    "strategiesCount": "{count} strategies",
+    "containerName": "Container: bbgo-{id}",
+    "name": "Name",
     "mode": {
       "live": "Live",
       "paper": "Paper",
       "backtest": "Backtest"
-    }
+    },
+    "sessionRoles": "Session Roles",
+    "cancel": "Cancel",
+    "creating": "Creating...",
+    "futures": "Futures",
+    "strategyParams": "Strategy Parameters",
+    "errorLoading": "Failed to load data. Please try again.",
+    "save": "Save",
+    "saving": "Saving...",
+    "testnet": "Testnet",
+    "containerLogs": "Container Logs"
   },
   "Backtest": {
     "title": "Backtest",
@@ -54,7 +100,14 @@
     "sharpeRatio": "Sharpe Ratio",
     "winRate": "Win Rate",
     "trades": "Trades",
-    "noResults": "No backtest results yet"
+    "noResults": "No backtest results yet",
+    "strategy": "Strategy",
+    "exchange": "Exchange",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "running": "Running...",
+    "backtestOutput": "Backtest Output",
+    "backtestDuration": "Backtest may take 30-60 seconds depending on date range..."
   },
   "Settings": {
     "apiKeys": {

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from './types'
 import { routing } from '@/i18n/routing'
-import { LOGIN_PATH, USER_PATH } from '@/lib/routes'
+import { LOGIN_PATH, SIGNUP_PATH, USER_PATH } from '@/lib/routes'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -88,7 +88,7 @@ export async function updateSession(request: NextRequest, response: NextResponse
   const locale = detectLocale(pathname)
 
   const isProtectedRoute = barePath.startsWith(USER_PATH)
-  const isAuthRoute = barePath === LOGIN_PATH
+  const isAuthRoute = barePath === LOGIN_PATH || barePath === SIGNUP_PATH
 
   if (isProtectedRoute && !user) {
     return redirectWithCookies(request, reply, LOGIN_PATH, locale)

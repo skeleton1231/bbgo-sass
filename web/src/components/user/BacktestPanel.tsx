@@ -1,49 +1,44 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRunBacktest } from '@/lib/bbgo/queries'
-import { getStrategySchema, getStrategyDefaults, getAllStrategies } from '@/lib/bbgo/strategies'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory } from '@/lib/bbgo/strategies'
 import { StrategyConfigForm } from './StrategyConfigForm'
 
-interface BacktestReport {
-  id: string
-  strategy: string
-  total_profit: string
-  win_rate: string
-  total_trades: number
-  start_date: string
-  end_date: string
-  created_at: string
+const CATEGORY_LABELS: Record<string, string> = {
+  grid: 'Grid',
+  maker: 'Market Maker',
+  trend: 'Trend Following',
+  'mean-reversion': 'Mean Reversion',
+  dca: 'DCA',
+  volatility: 'Volatility',
+  indicator: 'Indicator',
+  'cross-exchange': 'Cross-Exchange',
+  utility: 'Utility',
+  other: 'Other',
 }
+
+const EXCHANGES = [
+  { id: 'binance', label: 'Binance' },
+  { id: 'okex', label: 'OKX' },
+  { id: 'bybit', label: 'Bybit' },
+  { id: 'bitget', label: 'Bitget' },
+  { id: 'kucoin', label: 'KuCoin' },
+]
 
 export function BacktestPanel({ userId }: { userId: string }) {
   const t = useTranslations('Backtest')
   const runBacktest = useRunBacktest()
-  const strategies = getAllStrategies()
+  const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true })
 
   const [strategy, setStrategy] = useState('grid2')
+  const [exchange, setExchange] = useState('binance')
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
-  const [history, setHistory] = useState<BacktestReport[]>([])
+  const [startTime, setStartTime] = useState('2024-01-01')
+  const [endTime, setEndTime] = useState('2024-03-01')
 
   const schema = getStrategySchema(strategy)
-
-  useEffect(() => {
-    loadHistory()
-  }, [userId])
-
-  const loadHistory = async () => {
-    if (!userId) return
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('backtest_reports')
-      .select('id, strategy, total_profit, win_rate, total_trades, start_date, end_date, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-    if (data) setHistory(data)
-  }
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
@@ -54,81 +49,106 @@ export function BacktestPanel({ userId }: { userId: string }) {
     e.preventDefault()
     await runBacktest.mutateAsync({
       strategy,
-      config,
+      config: { ...config, exchange },
+      start_time: startTime,
+      end_time: endTime,
     })
-    loadHistory()
   }
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border bg-card p-6">
-        <div className="grid gap-4 md:grid-cols-2">
+      <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border bg-card p-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Strategy</label>
+            <label className="block text-sm font-medium mb-1">{t('strategy')}</label>
             <select
               value={strategy}
               onChange={(e) => handleStrategyChange(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
-              {strategies.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
+              {Object.entries(strategiesByCategory).map(([cat, items]) => (
+                <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
+                  {items.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {schema && (
+              <p className="mt-1 text-xs text-muted-foreground">{schema.description}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('exchange')}</label>
+            <select
+              value={exchange}
+              onChange={(e) => setExchange(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {EXCHANGES.map((ex) => (
+                <option key={ex.id} value={ex.id}>{ex.label}</option>
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('startDate')}</label>
+            <input
+              type="date"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('endDate')}</label>
+            <input
+              type="date"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
         </div>
 
-        {schema && (
-          <StrategyConfigForm
-            fields={schema.fields}
-            values={config}
-            onChange={setConfig}
-          />
+        {schema && schema.fields.length > 0 && (
+          <div className="border-t pt-4">
+            <StrategyConfigForm
+              fields={schema.fields}
+              values={config}
+              onChange={setConfig}
+            />
+          </div>
         )}
 
-        <button
-          type="submit"
-          disabled={runBacktest.isPending}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {runBacktest.isPending ? 'Running...' : t('run')}
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="submit"
+            disabled={runBacktest.isPending}
+            className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {runBacktest.isPending ? t('running') : t('run')}
+          </button>
+          {runBacktest.isPending && (
+            <span className="text-xs text-muted-foreground">{t('backtestDuration')}</span>
+          )}
+        </div>
       </form>
 
       {runBacktest.data && (
         <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold mb-2">Backtest Output</h3>
-          <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-96 overflow-y-auto">
-            {runBacktest.data.output}
+          <h3 className="text-sm font-semibold mb-2">{t('backtestOutput')}</h3>
+          <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
+            {runBacktest.data.output.replace(/\x1b\[[0-9;]*m/g, '')}
           </pre>
         </div>
       )}
 
       {runBacktest.isError && (
-        <p className="text-sm text-destructive">{(runBacktest.error as Error).message}</p>
-      )}
-
-      {history.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">{t('results')}</h2>
-          </div>
-          <div className="divide-y">
-            {history.map((report) => (
-              <div key={report.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">{report.strategy}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {report.start_date} ~ {report.end_date}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span>Profit: <strong>{report.total_profit}</strong></span>
-                  <span>Win: <strong>{report.win_rate}</strong></span>
-                  <span>Trades: {report.total_trades}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{(runBacktest.error as Error).message}</p>
         </div>
       )}
     </div>

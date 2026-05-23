@@ -42,33 +42,47 @@ func (cm *ContainerManager) userDir(userID string) string {
 	return fmt.Sprintf("/data/%s", userID)
 }
 
+func (cm *ContainerManager) hostDir(userID string) string {
+	return cm.cfg.DataDir + "/" + userID
+}
+
+// APIURL returns the internal Docker DNS URL for the user's bbgo container.
+// Works when manager and containers share the same Docker network.
+func (cm *ContainerManager) APIURL(userID string) string {
+	return fmt.Sprintf("http://%s:%d", cm.containerName(userID), cm.cfg.BBGOPort)
+}
+
 func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 	name := cm.containerName(uc.UserID)
 	cm.StopAndRemove(uc.UserID)
 
-	dir := cm.userDir(uc.UserID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	hostDir := cm.hostDir(uc.UserID)
+	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	dbPath := dir + "/bbgo.db"
+	dbPath := hostDir + "/bbgo.db"
 	if _, err := os.Stat(dbPath); err == nil {
-		backup := dbPath + ".backup." + time.Now().Format("20060102-150405")
+		backup := dbPath + ".backup." + time.Now().Format("20060122-150405")
 		os.Rename(dbPath, backup)
-		log.Printf("backed up %s → %s", dbPath, backup)
+		log.Printf("backed up %s -> %s", dbPath, backup)
 	}
 
-	yamlContent := buildUserYAML(uc)
-	if err := os.WriteFile(dir+"/bbgo.yaml", []byte(yamlContent), 0o644); err != nil {
+	yamlContent := buildUserYAML(uc, func(exchange string) bool {
+		_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
+		return err == nil
+	})
+	if err := os.WriteFile(hostDir+"/bbgo.yaml", []byte(yamlContent), 0o644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
+	containerDir := cm.userDir(uc.UserID)
 	args := []string{
 		"run", "-d",
 		"--name", name,
 		"--network", cm.cfg.DockerNetwork,
-		"-v", cm.cfg.DataVolume + ":/data",
-		"--workdir", dir,
+		"-v", cm.cfg.DataDir + ":/data",
+		"--workdir", containerDir,
 		"--restart", "unless-stopped",
 	}
 	args = append(args, cm.envArgs(uc)...)
@@ -76,6 +90,7 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		cm.cfg.BBGOImage,
 		"run",
 		"--config", "bbgo.yaml",
+		"--no-sync",
 		"--enable-webserver",
 		"--webserver-bind", fmt.Sprintf(":%d", cm.cfg.BBGOPort),
 		"--enable-grpc",
@@ -92,9 +107,12 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 }
 
 func (cm *ContainerManager) Restart(uc *UserContainer) error {
-	dir := cm.userDir(uc.UserID)
-	yamlContent := buildUserYAML(uc)
-	if err := os.WriteFile(dir+"/bbgo.yaml", []byte(yamlContent), 0o644); err != nil {
+	hostDir := cm.hostDir(uc.UserID)
+	yamlContent := buildUserYAML(uc, func(exchange string) bool {
+		_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
+		return err == nil
+	})
+	if err := os.WriteFile(hostDir+"/bbgo.yaml", []byte(yamlContent), 0o644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
@@ -108,24 +126,28 @@ func (cm *ContainerManager) Restart(uc *UserContainer) error {
 }
 
 func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]byte, error) {
-	tmpDir := fmt.Sprintf("/data/%s/backtest", userID)
-	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+	hostBacktestDir := cm.hostDir(userID) + "/backtest"
+	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
 
-	configPath := fmt.Sprintf("%s/bbgo.yaml", tmpDir)
+	os.Remove(hostBacktestDir + "/backtest.db")
+
+	configPath := hostBacktestDir + "/bbgo.yaml"
 	if err := os.WriteFile(configPath, yamlContent, 0o644); err != nil {
 		return nil, fmt.Errorf("write backtest config: %w", err)
 	}
 
-	name := fmt.Sprintf("bbgo-backtest-%d", os.Getpid())
+	containerDir := cm.userDir(userID) + "/backtest"
+	name := fmt.Sprintf("bbgo-bt-%d-%s", os.Getpid(), time.Now().Format("20060102-150405"))
 	args := []string{
 		"run", "--rm",
 		"--name", name,
-		"-v", cm.cfg.DataVolume + ":/data",
-		"--workdir", tmpDir,
+		"--network", cm.cfg.DockerNetwork,
+		"-v", cm.cfg.DataDir + ":/data",
+		"--workdir", containerDir,
 		"-e", "DB_DRIVER=sqlite3",
-		"-e", fmt.Sprintf("DB_DSN=%s/backtest.db", tmpDir),
+		"-e", fmt.Sprintf("DB_DSN=%s/backtest.db", containerDir),
 		cm.cfg.BBGOImage,
 		"backtest",
 		"--config", "bbgo.yaml",
@@ -140,8 +162,11 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 
 func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 	args := []string{}
-	if len(uc.Strategies) > 0 && uc.Strategies[0].Mode == "paper" {
-		args = append(args, "-e", "PAPER_TRADE=1")
+	for _, s := range uc.Strategies {
+		if s.Mode == "paper" {
+			args = append(args, "-e", "PAPER_TRADE=1")
+			break
+		}
 	}
 
 	dir := cm.userDir(uc.UserID)
@@ -150,16 +175,32 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 		"-e", fmt.Sprintf("DB_DSN=%s/bbgo.db", dir),
 	)
 
-	if cm.creds != nil && len(uc.Strategies) > 0 {
-		exchange := uc.Strategies[0].Exchange
-		if apiKey, apiSecret, passphrase, err := cm.creds.GetDecrypted(uc.UserID, exchange); err == nil {
-			prefix := exchangeEnvPrefix(exchange)
-			args = append(args,
-				"-e", prefix+"_API_KEY="+apiKey,
-				"-e", prefix+"_API_SECRET="+apiSecret,
-			)
-			if passphrase != "" {
-				args = append(args, "-e", prefix+"_PASSPHRASE="+passphrase)
+	if cm.creds != nil {
+		injected := map[string]bool{}
+		for _, s := range uc.Strategies {
+			exchanges := []string{}
+			if s.CrossExchange {
+				for _, sr := range s.Sessions {
+					exchanges = append(exchanges, sr.Exchange)
+				}
+			} else if s.Exchange != "" {
+				exchanges = append(exchanges, s.Exchange)
+			}
+			for _, ex := range exchanges {
+				if injected[ex] {
+					continue
+				}
+				if apiKey, apiSecret, passphrase, err := cm.creds.GetDecrypted(uc.UserID, ex); err == nil {
+					prefix := exchangeEnvPrefix(ex)
+					args = append(args,
+						"-e", prefix+"_API_KEY="+apiKey,
+						"-e", prefix+"_API_SECRET="+apiSecret,
+					)
+					if passphrase != "" {
+						args = append(args, "-e", prefix+"_PASSPHRASE="+passphrase)
+					}
+					injected[ex] = true
+				}
 			}
 		}
 	}
@@ -184,14 +225,26 @@ func (cm *ContainerManager) StopAndRemove(userID string) {
 }
 
 func (cm *ContainerManager) IsRunning(userID string) bool {
-	name := cm.containerName(userID)
-	out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
-	return out == "true"
+	running, _ := cm.CheckRunning(userID)
+	return running
 }
 
-func (cm *ContainerManager) APIURL(userID string) string {
+func (cm *ContainerManager) CheckRunning(userID string) (bool, error) {
 	name := cm.containerName(userID)
-	return fmt.Sprintf("http://%s:%d", name, cm.cfg.BBGOPort)
+	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
+	if err != nil {
+		return false, err
+	}
+	return out == "true", nil
+}
+
+func (cm *ContainerManager) Logs(userID string, tail string) (string, error) {
+	name := cm.containerName(userID)
+	out, err := cm.docker("logs", "--tail", tail, name)
+	if err != nil {
+		return "", fmt.Errorf("docker logs %s: %w", name, err)
+	}
+	return out, nil
 }
 
 func (cm *ContainerManager) RecoverUsers(users []*UserContainer) {

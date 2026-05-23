@@ -2,20 +2,17 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
 type Syncer struct {
 	users     *UserContainerManager
 	cfg       *Config
 	container *ContainerManager
+	creds     *CredentialStore
 	client    *http.Client
 }
 
@@ -24,17 +21,35 @@ func NewSyncer(users *UserContainerManager, cfg *Config, cm *ContainerManager) *
 		users:     users,
 		cfg:       cfg,
 		container: cm,
-		client:    &http.Client{Timeout: 5 * time.Second},
+		client:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
-	url := s.cfg.SupabaseURL + "/rest/v1/user_containers?select=*"
-	req, _ := http.NewRequest("GET", url, nil)
+func NewSyncerWithCreds(users *UserContainerManager, cfg *Config, cm *ContainerManager, creds *CredentialStore) *Syncer {
+	s := NewSyncer(users, cfg, cm)
+	s.creds = creds
+	return s
+}
+
+func (s *Syncer) bbgoClient(userID string) *BBGoClient {
+	return NewBBGoClient(s.container.APIURL(userID))
+}
+
+func (s *Syncer) supabaseRequest(method, path string, body []byte) (*http.Response, error) {
+	url := s.cfg.SupabaseURL + "/rest/v1/" + path
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("apikey", s.cfg.SupabaseKey)
 	req.Header.Set("Authorization", "Bearer "+s.cfg.SupabaseKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "resolution=merge-duplicates")
+	return s.client.Do(req)
+}
 
-	resp, err := s.client.Do(req)
+func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
+	resp, err := s.supabaseRequest("GET", "user_containers?select=*", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +75,9 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 			Status: r.Status,
 		}
 		if len(r.Strategies) > 0 {
-			json.Unmarshal(r.Strategies, &uc.Strategies)
+			if err := json.Unmarshal(r.Strategies, &uc.Strategies); err != nil {
+				log.Printf("unmarshal strategies for user %s: %v", r.UserID, err)
+			}
 		}
 		users[i] = uc
 	}
@@ -68,25 +85,45 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 }
 
 func (s *Syncer) UpsertUser(uc *UserContainer) {
-	payload, _ := json.Marshal(map[string]interface{}{
+	payload, err := json.Marshal(map[string]interface{}{
+		"status":     uc.Status,
+		"strategies": uc.Strategies,
+	})
+	if err != nil {
+		log.Printf("marshal user %s: %v", uc.UserID, err)
+		return
+	}
+
+	resp, err := s.supabaseRequest("PATCH", "user_containers?user_id=eq."+uc.UserID, payload)
+	if err != nil {
+		log.Printf("upsert user %s patch failed: %v", uc.UserID, err)
+		return
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		return
+	}
+
+	insPayload, err := json.Marshal(map[string]interface{}{
 		"user_id":    uc.UserID,
 		"status":     uc.Status,
 		"strategies": uc.Strategies,
 	})
-
-	url := s.cfg.SupabaseURL + "/rest/v1/user_containers"
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(payload))
-	req.Header.Set("apikey", s.cfg.SupabaseKey)
-	req.Header.Set("Authorization", "Bearer "+s.cfg.SupabaseKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Prefer", "resolution=merge-duplicate")
-
-	resp, err := s.client.Do(req)
 	if err != nil {
-		log.Printf("upsert user %s failed: %v", uc.UserID, err)
+		log.Printf("marshal insert user %s: %v", uc.UserID, err)
 		return
 	}
-	resp.Body.Close()
+
+	insResp, err := s.supabaseRequest("POST", "user_containers", insPayload)
+	if err != nil {
+		log.Printf("upsert user %s insert failed: %v", uc.UserID, err)
+		return
+	}
+	insResp.Body.Close()
+	if insResp.StatusCode >= 400 {
+		log.Printf("upsert user %s skipped (status %d)", uc.UserID, insResp.StatusCode)
+	}
 }
 
 func (s *Syncer) SyncUser(userID string) {
@@ -109,115 +146,243 @@ func (s *Syncer) SyncAll() {
 }
 
 func (s *Syncer) syncUserData(uc *UserContainer) {
-	dir := s.container.userDir(uc.UserID)
-	dbPath := dir + "/bbgo.db"
-
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+	if uc.Status != StatusRunning {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
+	client := s.bbgoClient(uc.UserID)
+	if err := client.Ping(); err != nil {
+		log.Printf("sync user %s: bbgo api not reachable: %v", uc.UserID, err)
 		return
 	}
-	defer db.Close()
 
-	s.syncOrders(uc.UserID, db)
-	s.syncTrades(uc.UserID, db)
+	if s.creds != nil {
+		s.markCredentialsVerified(uc)
+	}
+
+	s.syncOrdersViaAPI(uc.UserID, client)
+	s.syncTradesViaAPI(uc.UserID, client)
 }
 
-func (s *Syncer) syncOrders(userID string, db *sql.DB) {
-	rows, err := db.Query("SELECT exchange, order_id, symbol, side, price, quantity, executed_quantity, status, order_type, created_at FROM orders ORDER BY created_at DESC LIMIT 200")
+func (s *Syncer) getCursor(userID, table string) int64 {
+	resp, err := s.supabaseRequest("GET", "sync_cursors?user_id=eq."+userID+"&table_name=eq."+table+"&select=last_gid", nil)
 	if err != nil {
-		log.Printf("sync orders query failed for user %s: %v", userID, err)
+		return 0
+	}
+	defer resp.Body.Close()
+
+	var rows []struct {
+		LastGID int64 `json:"last_gid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil || len(rows) == 0 {
+		return 0
+	}
+	return rows[0].LastGID
+}
+
+func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"user_id":    userID,
+		"table_name": table,
+		"last_gid":   lastGID,
+	})
+	resp, err := s.supabaseRequest("POST", "sync_cursors", payload)
+	if err != nil {
 		return
 	}
-	defer rows.Close()
+	resp.Body.Close()
+}
 
-	var orders []map[string]interface{}
-	for rows.Next() {
-		var exchange, symbol, side, status, orderType, createdAt string
-		var orderID, price, quantity, executedQuantity string
-		rows.Scan(&exchange, &orderID, &symbol, &side, &price, &quantity, &executedQuantity, &status, &orderType, &createdAt)
-		orders = append(orders, map[string]interface{}{
-			"user_id":           userID,
-			"exchange":          exchange,
-			"order_id":          orderID,
-			"symbol":            symbol,
-			"side":              side,
-			"price":             price,
-			"quantity":          quantity,
-			"executed_quantity": executedQuantity,
-			"status":            status,
-			"order_type":        orderType,
-			"created_at":        createdAt,
-		})
+func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
+	lastGID := s.getCursor(userID, "sync_orders")
+	orders, err := client.GetClosedOrders("", "", lastGID)
+	if err != nil {
+		log.Printf("sync orders via api for user %s failed: %v", userID, err)
+		return
 	}
 
 	if len(orders) == 0 {
 		return
 	}
 
-	payload, _ := json.Marshal(orders)
-	url := s.cfg.SupabaseURL + "/rest/v1/sync_orders"
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(payload))
-	req.Header.Set("apikey", s.cfg.SupabaseKey)
-	req.Header.Set("Authorization", "Bearer "+s.cfg.SupabaseKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Prefer", "resolution=merge-duplicate")
-	resp, err := s.client.Do(req)
+	rows := make([]map[string]interface{}, len(orders))
+	for i, o := range orders {
+		rows[i] = map[string]interface{}{
+			"user_id":  userID,
+			"bot_id":   userID,
+			"order_id": json.Number(formatUint(o.OrderID)),
+			"symbol":   o.Symbol,
+			"side":     o.Side,
+			"price":    o.Price,
+			"quantity": o.Quantity,
+			"status":   o.Status,
+			"type":     o.Type,
+			"executed_quantity": o.ExecutedQuantity,
+			"creation_time": o.CreationTime,
+		}
+	}
+
+	payload, err := json.Marshal(rows)
+	if err != nil {
+		log.Printf("marshal orders for user %s: %v", userID, err)
+		return
+	}
+
+	resp, err := s.supabaseRequest("POST", "sync_orders", payload)
 	if err != nil {
 		log.Printf("sync orders for user %s failed: %v", userID, err)
 		return
 	}
 	resp.Body.Close()
-	log.Printf("synced %d orders for user %s", len(orders), userID)
+
+	maxGID := lastGID
+	for _, o := range orders {
+		if int64(o.GID) > maxGID {
+			maxGID = int64(o.GID)
+		}
+	}
+	s.updateCursor(userID, "sync_orders", maxGID)
+	log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", len(orders), userID, lastGID, maxGID)
 }
 
-func (s *Syncer) syncTrades(userID string, db *sql.DB) {
-	rows, err := db.Query("SELECT id, exchange, symbol, side, price, quantity, quote_quantity, fee, fee_currency, is_buyer, traded_at FROM trades ORDER BY traded_at DESC LIMIT 200")
+func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
+	lastGID := s.getCursor(userID, "sync_trades")
+	trades, err := client.GetTrades("", "", lastGID)
 	if err != nil {
-		log.Printf("sync trades query failed for user %s: %v", userID, err)
+		log.Printf("sync trades via api for user %s failed: %v", userID, err)
 		return
-	}
-	defer rows.Close()
-
-	var trades []map[string]interface{}
-	for rows.Next() {
-		var id, exchange, symbol, side, price, quantity, quoteQuantity, fee, feeCurrency, isBuyer, tradedAt string
-		rows.Scan(&id, &exchange, &symbol, &side, &price, &quantity, &quoteQuantity, &fee, &feeCurrency, &isBuyer, &tradedAt)
-		trades = append(trades, map[string]interface{}{
-			"user_id":        userID,
-			"trade_id":       id,
-			"exchange":       exchange,
-			"symbol":         symbol,
-			"side":           side,
-			"price":          price,
-			"quantity":       quantity,
-			"quote_quantity": quoteQuantity,
-			"fee":            fee,
-			"fee_currency":   feeCurrency,
-			"is_buyer":       isBuyer,
-			"traded_at":      tradedAt,
-		})
 	}
 
 	if len(trades) == 0 {
 		return
 	}
 
-	payload, _ := json.Marshal(trades)
-	url := s.cfg.SupabaseURL + "/rest/v1/sync_trades"
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(payload))
-	req.Header.Set("apikey", s.cfg.SupabaseKey)
-	req.Header.Set("Authorization", "Bearer "+s.cfg.SupabaseKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Prefer", "resolution=merge-duplicate")
-	resp, err := s.client.Do(req)
+	rows := make([]map[string]interface{}, len(trades))
+	for i, t := range trades {
+		rows[i] = map[string]interface{}{
+			"user_id":      userID,
+			"bot_id":       userID,
+			"trade_id":     json.Number(formatUint(t.ID)),
+			"order_id":     json.Number(formatUint(t.OrderID)),
+			"symbol":       t.Symbol,
+			"side":         t.Side,
+			"price":        t.Price,
+			"quantity":     t.Quantity,
+			"fee":          t.Fee,
+			"fee_currency": t.FeeCurrency,
+			"quote_quantity": t.QuoteQuantity,
+		}
+	}
+
+	payload, err := json.Marshal(rows)
+	if err != nil {
+		log.Printf("marshal trades for user %s: %v", userID, err)
+		return
+	}
+
+	resp, err := s.supabaseRequest("POST", "sync_trades", payload)
 	if err != nil {
 		log.Printf("sync trades for user %s failed: %v", userID, err)
 		return
 	}
 	resp.Body.Close()
-	log.Printf("synced %d trades for user %s", len(trades), userID)
+
+	maxGID := lastGID
+	for _, t := range trades {
+		if t.GID > maxGID {
+			maxGID = t.GID
+		}
+	}
+	s.updateCursor(userID, "sync_trades", maxGID)
+	log.Printf("synced %d trades for user %s via api (cursor %d -> %d)", len(trades), userID, lastGID, maxGID)
+}
+
+func (s *Syncer) SyncCredential(cred ExchangeCredential) {
+	if s.creds == nil {
+		return
+	}
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"user_id":              cred.UserID,
+		"exchange":             cred.Exchange,
+		"api_key_encrypted":    cred.APIKeyEncrypted,
+		"api_secret_encrypted": cred.APISecretEncrypted,
+		"passphrase_encrypted": cred.PassphraseEncrypted,
+		"is_testnet":           cred.IsTestnet,
+		"is_verified":          cred.IsVerified,
+	})
+	if err != nil {
+		log.Printf("marshal credential for user %s: %v", cred.UserID, err)
+		return
+	}
+
+	path := "exchange_credentials?user_id=eq." + cred.UserID + "&exchange=eq." + cred.Exchange
+	resp, err := s.supabaseRequest("PATCH", path, payload)
+	if err != nil {
+		log.Printf("sync credential patch for user %s %s: %v", cred.UserID, cred.Exchange, err)
+		return
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		log.Printf("synced credential %s for user %s", cred.Exchange, cred.UserID)
+		return
+	}
+
+	insResp, err := s.supabaseRequest("POST", "exchange_credentials", payload)
+	if err != nil {
+		log.Printf("sync credential insert for user %s %s: %v", cred.UserID, cred.Exchange, err)
+		return
+	}
+	insResp.Body.Close()
+
+	if insResp.StatusCode >= 400 {
+		log.Printf("sync credential for user %s %s skipped (status %d)", cred.UserID, cred.Exchange, insResp.StatusCode)
+	} else {
+		log.Printf("synced credential %s for user %s (inserted)", cred.Exchange, cred.UserID)
+	}
+}
+
+func (s *Syncer) markCredentialsVerified(uc *UserContainer) {
+	creds, err := s.creds.List(uc.UserID)
+	if err != nil {
+		return
+	}
+	for _, c := range creds {
+		if c.IsVerified {
+			continue
+		}
+		exchanges := []string{}
+		for _, strat := range uc.Strategies {
+			if strat.CrossExchange {
+				for _, sr := range strat.Sessions {
+					exchanges = append(exchanges, sr.Exchange)
+				}
+			} else if strat.Exchange != "" {
+				exchanges = append(exchanges, strat.Exchange)
+			}
+		}
+		for _, ex := range exchanges {
+			if ex == c.Exchange {
+				c.IsVerified = true
+				s.creds.Update(uc.UserID, c)
+				log.Printf("credential %s for user %s marked as verified", c.Exchange, uc.UserID)
+				break
+			}
+		}
+	}
+}
+
+func (s *Syncer) DeleteCredential(userID, exchange string) {
+	if s.creds == nil {
+		return
+	}
+	path := "exchange_credentials?user_id=eq." + userID + "&exchange=eq." + exchange
+	resp, err := s.supabaseRequest("DELETE", path, nil)
+	if err != nil {
+		log.Printf("delete credential for user %s %s: %v", userID, exchange, err)
+		return
+	}
+	resp.Body.Close()
+	log.Printf("deleted credential %s for user %s from supabase", exchange, userID)
 }

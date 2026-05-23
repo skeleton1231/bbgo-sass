@@ -77,6 +77,22 @@ func (cs *CredentialStore) List(userID string) ([]ExchangeCredential, error) {
 	return cs.loadAll(userID)
 }
 
+func (cs *CredentialStore) Update(userID string, cred ExchangeCredential) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	creds, err := cs.loadAll(userID)
+	if err != nil {
+		return err
+	}
+	for i, c := range creds {
+		if c.ID == cred.ID {
+			creds[i] = cred
+			return cs.saveAll(userID, creds)
+		}
+	}
+	return fmt.Errorf("credential %s not found", cred.ID)
+}
+
 func (cs *CredentialStore) Delete(userID, id string) error {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()

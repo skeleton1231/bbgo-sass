@@ -3,26 +3,40 @@ package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 )
 
 type BotProxy struct {
-	cm *ContainerManager
+	cm     *ContainerManager
+	client *http.Client
 }
 
 func NewBotProxy(cm *ContainerManager) *BotProxy {
-	return &BotProxy{cm: cm}
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+		Proxy:      func(_ *http.Request) (*url.URL, error) { return nil, nil },
+	}
+	return &BotProxy{
+		cm: cm,
+		client: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
+	}
 }
 
 func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID string) {
-	name := bp.cm.containerName(userID)
 	targetPath := strings.TrimPrefix(r.URL.Path, "/api/bbgo/"+userID)
 	if targetPath == "" || targetPath == "/" {
 		targetPath = "/"
 	}
 
-	targetURL := fmt.Sprintf("http://%s:%d/api%s", name, bp.cm.cfg.BBGOPort, targetPath)
+	baseURL := bp.cm.APIURL(userID)
+	targetURL := fmt.Sprintf("%s/api%s", baseURL, targetPath)
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery
 	}
@@ -34,7 +48,7 @@ func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID st
 	}
 	proxyReq.Header = r.Header.Clone()
 
-	resp, err := http.DefaultClient.Do(proxyReq)
+	resp, err := bp.client.Do(proxyReq)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]interface{}{
 			"error":   "bot api unavailable",
