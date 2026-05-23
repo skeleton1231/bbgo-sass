@@ -246,9 +246,24 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if api.container.IsRunning(userID) {
+		api.users.UpdateStatus(userID, StatusRunning)
+		uc.Status = StatusRunning
+		writeJSON(w, http.StatusOK, uc)
+		return
+	}
+
 	if err := api.container.CreateAndStart(uc); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	for i := 0; i < 30; i++ {
+		client := api.newBBGoClient(api.container.APIURL(userID))
+		if err := client.Ping(); err == nil {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	api.users.UpdateStatus(userID, StatusRunning)

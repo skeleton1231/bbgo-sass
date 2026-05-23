@@ -47,12 +47,16 @@ export function BacktestPanel({ userId }: { userId: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await runBacktest.mutateAsync({
-      strategy,
-      config: { ...config, exchange },
-      start_time: startTime,
-      end_time: endTime,
-    })
+    try {
+      await runBacktest.mutateAsync({
+        strategy,
+        config: { ...config, exchange },
+        start_time: startTime,
+        end_time: endTime,
+      })
+    } catch {
+      // Error is available via runBacktest.error
+    }
   }
 
   return (
@@ -136,6 +140,12 @@ export function BacktestPanel({ userId }: { userId: string }) {
           )}
         </div>
       </form>
+
+      {runBacktest.isError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{runBacktest.error instanceof Error ? runBacktest.error.message : t('error')}</p>
+        </div>
+      )}
 
       {runBacktest.data && (
         <div className="rounded-lg border bg-card p-4">
