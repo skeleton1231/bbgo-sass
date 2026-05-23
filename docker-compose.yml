@@ -17,9 +17,9 @@ services:
       - BBGO_IMAGE=bbgo-base:latest
       - BBGO_PORT=8080
       - BBGO_GRPC_PORT=9090
-      - SUPABASE_URL=http://host.docker.internal:54321
+      - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - SUPABASE_DB_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@host.docker.internal:54322/postgres
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - MANAGER_TOKEN=${MANAGER_TOKEN}
     networks:

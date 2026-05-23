@@ -81,7 +81,7 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		"run", "-d",
 		"--name", name,
 		"--network", cm.cfg.DockerNetwork,
-		"-v", cm.cfg.DataDir + ":/data",
+		"-v", cm.cfg.DataVolume + ":/data",
 		"--workdir", containerDir,
 		"--restart", "unless-stopped",
 	}
@@ -144,7 +144,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		"run", "--rm",
 		"--name", name,
 		"--network", cm.cfg.DockerNetwork,
-		"-v", cm.cfg.DataDir + ":/data",
+		"-v", cm.cfg.DataVolume + ":/data",
 		"--workdir", containerDir,
 		"-e", "DB_DRIVER=sqlite3",
 		"-e", fmt.Sprintf("DB_DSN=%s/backtest.db", containerDir),

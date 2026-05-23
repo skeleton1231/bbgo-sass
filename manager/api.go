@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"log"
 	"strconv"
 	"time"
 
@@ -395,6 +396,16 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 
 	if api.syncer != nil { go api.syncer.SyncCredential(cred) }
 
+	// Restart user container to pick up new credentials
+	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
+		go func() {
+			log.Printf("restarting container for user %s after credential update", userID)
+			if err := api.container.CreateAndStart(uc); err != nil {
+				log.Printf("restart after credential update failed for user %s: %v", userID, err)
+			}
+		}()
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"id":         cred.ID,
 		"user_id":    cred.UserID,
@@ -451,6 +462,14 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 
 	if exchange != "" {
 		if api.syncer != nil { go api.syncer.DeleteCredential(userID, exchange) }
+	}
+	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
+		go func() {
+			log.Printf("restarting container for user %s after credential deletion", userID)
+			if err := api.container.CreateAndStart(uc); err != nil {
+				log.Printf("restart after credential deletion failed for user %s: %v", userID, err)
+			}
+		}()
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
