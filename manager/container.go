@@ -151,6 +151,57 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 	return []byte(out), nil
 }
 
+func (cm *ContainerManager) SyncBacktest(exchange, symbol, startTime, endTime string) (string, error) {
+	cm.ensureBacktestSharedDir()
+
+	yaml := fmt.Sprintf(`sessions:
+  %s:
+    exchange: %s
+
+backtest:
+  sessions:
+    - %s
+  symbols:
+    - %s
+  startTime: "%s"
+  endTime: "%s"
+`, exchange, exchange, exchange, symbol, startTime, endTime)
+
+	hostDir := cm.cfg.DataDir + "/backtest-sync"
+	if err := os.MkdirAll(hostDir, 0o755); err != nil {
+		return "", fmt.Errorf("mkdir: %w", err)
+	}
+	configPath := hostDir + "/bbgo.yaml"
+	if err := os.WriteFile(configPath, []byte(yaml), 0o644); err != nil {
+		return "", fmt.Errorf("write config: %w", err)
+	}
+
+	name := fmt.Sprintf("bbgo-sync-%d", time.Now().UnixNano())
+	args := []string{
+		"run", "--rm",
+		"--name", name,
+		"--network", cm.cfg.DockerNetwork,
+		"-v", cm.cfg.DataVolume + ":/data",
+		"--workdir", "/data/backtest-sync",
+		"-e", "DB_DRIVER=sqlite3",
+		"-e", "DB_DSN=/data/backtest-shared/backtest.db",
+	}
+	args = append(args,
+		cm.cfg.BBGOImage,
+		"backtest",
+		"--sync",
+		"--sync-only",
+		"--sync-from", startTime,
+		"--config", "bbgo.yaml",
+	)
+
+	out, err := cm.docker(args...)
+	if err != nil {
+		return out, fmt.Errorf("sync failed: %w", err)
+	}
+	return out, nil
+}
+
 func (cm *ContainerManager) ensureBacktestSharedDir() {
 	args := []string{
 		"run", "--rm",

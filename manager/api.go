@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"log"
+	"os"
 	"strconv"
 	"time"
 
@@ -81,6 +82,8 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
 
 	r.Post("/api/backtest", api.RunBacktest)
+	r.Post("/api/backtest/sync", api.SyncBacktestData)
+	r.Get("/api/backtest/status", api.BacktestSyncStatus)
 
 	r.Post("/api/credentials", api.CreateCredential)
 	r.Get("/api/credentials", api.ListCredentials)
@@ -378,6 +381,67 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"output": string(result),
+	})
+}
+
+func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Exchange  string   `json:"exchange"`
+		Symbols   []string `json:"symbols"`
+		StartTime string   `json:"start_time"`
+		EndTime   string   `json:"end_time"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Exchange == "" {
+		req.Exchange = "binance"
+	}
+	if len(req.Symbols) == 0 {
+		req.Symbols = []string{"BTCUSDT", "ETHUSDT"}
+	}
+	if req.StartTime == "" {
+		req.StartTime = "2024-01-01"
+	}
+	if req.EndTime == "" {
+		req.EndTime = "2025-12-31"
+	}
+
+	type syncResult struct {
+		Symbol string `json:"symbol"`
+		Output string `json:"output"`
+		Error  string `json:"error,omitempty"`
+	}
+	var results []syncResult
+	for _, sym := range req.Symbols {
+		out, err := api.container.SyncBacktest(req.Exchange, sym, req.StartTime, req.EndTime)
+		r := syncResult{Symbol: sym, Output: out}
+		if err != nil {
+			r.Error = err.Error()
+		}
+		results = append(results, r)
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"exchange":  req.Exchange,
+		"synced":    results,
+	})
+}
+
+func (api *API) BacktestSyncStatus(w http.ResponseWriter, _ *http.Request) {
+	dbPath := api.container.cfg.DataDir + "/../backtest-shared/backtest.db"
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"available": false,
+			"error":     err.Error(),
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"available": true,
+		"size":      info.Size(),
+		"modified":  info.ModTime().Format(time.RFC3339),
 	})
 }
 
