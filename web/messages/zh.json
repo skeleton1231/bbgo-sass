@@ -77,6 +77,7 @@
     "strategiesCount": "{count} 个策略",
     "containerName": "容器: bbgo-{id}",
     "name": "名称",
+    "modeLabel": "模式",
     "mode": {
       "live": "实盘",
       "paper": "模拟",
@@ -85,6 +86,7 @@
     "sessionRoles": "会话角色",
     "cancel": "取消",
     "creating": "创建中...",
+    "createError": "创建策略失败，请重试。",
     "futures": "期货",
     "strategyParams": "策略参数",
     "errorLoading": "数据加载失败，请重试。",
@@ -107,6 +109,7 @@
     "crossExchange": "跨交易所",
     "live": {
       "connected": "实时",
+      "connecting": "连接中...",
       "disconnected": "离线"
     }
   },

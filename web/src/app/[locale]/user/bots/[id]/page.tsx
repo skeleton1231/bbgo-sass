@@ -94,16 +94,16 @@ export default function BotDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {isRunning && (
-            <span className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-              wsConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-            )}>
-              <span className={cn(
-                'h-1.5 w-1.5 rounded-full',
-                wsConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-              )} />
-              {wsConnected ? t('live.connected') : t('live.disconnected')}
+          {isRunning && !wsConnected && (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+              {t('live.connecting')}
+            </span>
+          )}
+          {isRunning && wsConnected && (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              {t('live.connected')}
             </span>
           )}
           <span
@@ -161,7 +161,7 @@ export default function BotDetailPage() {
                   : 'border hover:bg-muted'
               )}
             >
-              {s.exchangeName} ({s.name})
+              {s.exchangeName || s.name}{s.exchangeName && s.name !== s.exchangeName ? ` (${s.name})` : ''}
             </button>
           ))}
         </div>

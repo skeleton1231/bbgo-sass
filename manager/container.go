@@ -116,7 +116,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
 
-	os.Remove(hostBacktestDir + "/backtest.db")
+	cm.ensureBacktestSharedDir()
 
 	configPath := hostBacktestDir + "/bbgo.yaml"
 	if err := os.WriteFile(configPath, yamlContent, 0o644); err != nil {
@@ -132,17 +132,36 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		"-v", cm.cfg.DataVolume + ":/data",
 		"--workdir", containerDir,
 		"-e", "DB_DRIVER=sqlite3",
-		"-e", fmt.Sprintf("DB_DSN=%s/backtest.db", containerDir),
+		"-e", "DB_DSN=/data/backtest-shared/backtest.db",
+	}
+	if cm.cfg.MarketDataAddr != "" {
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
+	}
+	args = append(args,
 		cm.cfg.BBGOImage,
 		"backtest",
+		"--sync",
 		"--config", "bbgo.yaml",
-	}
+	)
 
 	out, err := cm.docker(args...)
 	if err != nil {
 		return nil, fmt.Errorf("backtest failed: %s: %w", out, err)
 	}
 	return []byte(out), nil
+}
+
+func (cm *ContainerManager) ensureBacktestSharedDir() {
+	args := []string{
+		"run", "--rm",
+		"-v", cm.cfg.DataVolume + ":/data",
+		"--entrypoint", "sh",
+		cm.cfg.BBGOImage,
+		"-c", "mkdir -p /data/backtest-shared",
+	}
+	if _, err := cm.docker(args...); err != nil {
+		log.Printf("backtest-shared dir ensure (may already exist): %v", err)
+	}
 }
 
 func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
@@ -159,6 +178,10 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 		"-e", "DB_DRIVER=sqlite3",
 		"-e", fmt.Sprintf("DB_DSN=%s/bbgo.db", dir),
 	)
+
+	if cm.cfg.MarketDataAddr != "" {
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
+	}
 
 	if cm.creds != nil {
 		injected := map[string]bool{}

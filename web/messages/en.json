@@ -77,6 +77,7 @@
     "strategiesCount": "{count} strategies",
     "containerName": "Container: bbgo-{id}",
     "name": "Name",
+    "modeLabel": "Mode",
     "mode": {
       "live": "Live",
       "paper": "Paper",
@@ -85,6 +86,7 @@
     "sessionRoles": "Session Roles",
     "cancel": "Cancel",
     "creating": "Creating...",
+    "createError": "Failed to create strategy. Please try again.",
     "futures": "Futures",
     "strategyParams": "Strategy Parameters",
     "errorLoading": "Failed to load data. Please try again.",
@@ -107,6 +109,7 @@
     "crossExchange": "cross-exchange",
     "live": {
       "connected": "Live",
+      "connecting": "Connecting...",
       "disconnected": "Offline"
     }
   },

@@ -16,6 +16,14 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
     onChange({ ...values, [key]: value })
   }
 
+  function formatNumberValue(val: unknown, fallback: unknown): string {
+    const raw = val ?? fallback
+    if (raw === '' || raw === undefined) return ''
+    const num = Number(raw)
+    if (!Number.isFinite(num)) return String(raw)
+    return parseFloat(num.toPrecision(12)).toString()
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -55,7 +63,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
           ) : (
             <input
               type={field.type === 'number' ? 'number' : 'text'}
-              value={String(values[field.key] ?? field.default)}
+              value={field.type === 'number' ? formatNumberValue(values[field.key], field.default) : String(values[field.key] ?? field.default)}
               onChange={(e) => {
                 const val = field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value
                 handleChange(field.key, val)

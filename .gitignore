@@ -6,6 +6,9 @@ manager/manager.exe
 manager/data/
 web/node_modules/
 web/.next/
+web/next-env.d.ts
+web/tsconfig.tsbuildinfo
+web/messages/en.d.json.ts
 .pids
 bash.exe.stackdump
 .DS_Store

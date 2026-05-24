@@ -91,8 +91,9 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <form
+        onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4 rounded-lg bg-card p-6 shadow-lg"
       >
@@ -163,7 +164,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
         )}
 
         <div>
-          <label className="block text-sm font-medium mb-1">{t('mode')}</label>
+          <label className="block text-sm font-medium mb-1">{t('modeLabel')}</label>
           <div className="flex gap-4">
             {(['live', 'paper'] as const).map((m) => (
               <label key={m} className="flex items-center gap-2 text-sm">
@@ -200,6 +201,12 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
             values={config}
             onChange={setConfig}
           />
+        )}
+
+        {createStrategy.isError && (
+          <p className="text-sm text-destructive">
+            {t('createError')}
+          </p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">
