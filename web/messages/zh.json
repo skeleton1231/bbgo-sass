@@ -130,7 +130,11 @@
     "running": "运行中...",
     "backtestOutput": "回测输出",
     "backtestDuration": "回测可能需要 30-60 秒，取决于日期范围...",
-    "error": "回测失败，请重试。"
+    "error": "回测失败，请重试。",
+    "downloadingData": "正在下载市场数据...",
+    "runningBacktest": "正在运行回测...",
+    "waitingToStart": "等待开始...",
+    "recentJobs": "最近回测"
   },
   "Settings": {
     "title": "设置",

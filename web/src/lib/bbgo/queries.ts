@@ -6,6 +6,9 @@ import {
   startUser as apiStartUser,
   stopUser as apiStopUser,
   runBacktest as apiRunBacktest,
+  submitBacktest as apiSubmitBacktest,
+  getBacktestJob as apiGetBacktestJob,
+  listBacktestJobs as apiListBacktestJobs,
   fetchCredentials as apiFetchCredentials,
   createCredential as apiCreateCredential,
   deleteCredential as apiDeleteCredential,
@@ -25,6 +28,8 @@ import {
   type StrategyEntry,
   type UserContainer,
   type BacktestResult,
+  type BacktestJob,
+  type SubmitBacktestResponse,
   type CredentialInfo,
   type BBGoSession,
   type BBGoTrade,
@@ -83,6 +88,35 @@ export function useStopUser() {
 export function useRunBacktest() {
   return useMutation<BacktestResult, Error, Parameters<typeof apiRunBacktest>[0]>({
     mutationFn: apiRunBacktest,
+  })
+}
+
+export function useSubmitBacktest() {
+  return useMutation<SubmitBacktestResponse, Error, Parameters<typeof apiSubmitBacktest>[0]>({
+    mutationFn: apiSubmitBacktest,
+  })
+}
+
+export function useBacktestJob(jobId: string | null) {
+  return useQuery<BacktestJob>({
+    queryKey: ['backtest-job', jobId],
+    queryFn: () => apiGetBacktestJob(jobId!),
+    enabled: !!jobId,
+    refetchInterval: (query) => {
+      const data = query.state.data
+      if (data && (data.status === 'pending' || data.status === 'downloading' || data.status === 'running')) {
+        return 2_000
+      }
+      return false
+    },
+  })
+}
+
+export function useBacktestJobs() {
+  return useQuery<{ jobs: BacktestJob[] }>({
+    queryKey: ['backtest-jobs'],
+    queryFn: apiListBacktestJobs,
+    refetchInterval: 10_000,
   })
 }
 
@@ -236,6 +270,8 @@ export type {
   UserContainer,
   CredentialInfo,
   BacktestResult,
+  BacktestJob,
+  SubmitBacktestResponse,
   BBGoSession,
   BBGoTrade,
   BBGoOrder,

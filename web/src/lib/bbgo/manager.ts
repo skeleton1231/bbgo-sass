@@ -45,6 +45,25 @@ export interface BacktestResult {
   output: string
 }
 
+export interface BacktestJob {
+  id: string
+  user_id: string
+  strategy: string
+  config: Record<string, unknown>
+  exchange: string
+  symbol: string
+  start_time: string
+  end_time: string
+  status: 'pending' | 'downloading' | 'running' | 'completed' | 'failed'
+  progress?: string
+  output?: string
+  error?: string
+  created_at: string
+  started_at?: string
+  completed_at?: string
+  need_sync: boolean
+}
+
 // --- BBGo bot data types (from bbgo container REST API) ---
 
 export interface BBGoSession {
@@ -191,6 +210,36 @@ export function runBacktest(data: {
     method: 'POST',
     body: JSON.stringify(data),
   })
+}
+
+// --- Async Backtest ---
+
+export interface SubmitBacktestResponse {
+  job_id: string
+  status: string
+  need_sync: boolean
+}
+
+export function submitBacktest(data: {
+  strategy: string
+  config: Record<string, unknown>
+  exchange?: string
+  symbol?: string
+  start_time?: string
+  end_time?: string
+}) {
+  return request<SubmitBacktestResponse>('/backtest/submit', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function getBacktestJob(jobId: string) {
+  return request<BacktestJob>(`/backtest/jobs/${jobId}`)
+}
+
+export function listBacktestJobs() {
+  return request<{ jobs: BacktestJob[] }>('/backtest/jobs')
 }
 
 // --- Bot data via Manager → bbgo container REST API ---

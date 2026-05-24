@@ -23,12 +23,14 @@ type API struct {
 	hub       *MarketDataHub
 	notifier  *Notifier
 	wsTickets *WSTicketStore
-	btSyncSem chan struct{} // limits concurrent backtest sync operations
+	btExec    *BacktestExecutor
+	btJobs    *BacktestJobStore
+	btSyncSem chan struct{}
 
 	newBBGoClient func(baseURL string) *BBGoClient
 }
 
-func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier) *API {
+func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore) *API {
 	return &API{
 		cfg:           cfg,
 		users:         users,
@@ -40,6 +42,8 @@ func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, prox
 		hub:           hub,
 		notifier:      notifier,
 		wsTickets:     NewWSTicketStore(),
+		btExec:        btExec,
+		btJobs:        btJobs,
 		btSyncSem:     make(chan struct{}, 2),
 		newBBGoClient: NewBBGoClient,
 	}
@@ -88,7 +92,11 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	// Generic proxy for any other bbgo API calls
 	r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
 
-	r.Post("/api/backtest", api.RunBacktest)
+	// Backtest endpoints
+	r.Post("/api/backtest", api.RunBacktest)                  // legacy sync
+	r.Post("/api/backtest/submit", api.SubmitBacktest)        // async submit
+	r.Get("/api/backtest/jobs", api.ListBacktestJobs)          // list user jobs
+	r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)   // get job status
 	r.Post("/api/backtest/sync", api.SyncBacktestData)
 	r.Get("/api/backtest/status", api.BacktestSyncStatus)
 
@@ -1030,4 +1038,137 @@ func (api *API) TestNotification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+
+	var req struct {
+		Strategy  string          `json:"strategy"`
+		Config    json.RawMessage `json:"config"`
+		Exchange  string          `json:"exchange"`
+		Symbol    string          `json:"symbol"`
+		StartTime string          `json:"start_time"`
+		EndTime   string          `json:"end_time"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Strategy == "" {
+		writeError(w, http.StatusBadRequest, "strategy is required")
+		return
+	}
+	if req.Exchange == "" {
+		req.Exchange = "binance"
+	}
+	if req.Symbol == "" {
+		var cfg map[string]interface{}
+		if err := json.Unmarshal(req.Config, &cfg); err == nil {
+			if s, ok := cfg["symbol"].(string); ok && s != "" {
+				req.Symbol = s
+			}
+		}
+		if req.Symbol == "" {
+			req.Symbol = "BTCUSDT"
+		}
+	}
+	if req.StartTime == "" {
+		req.StartTime = "2024-01-01"
+	}
+	if req.EndTime == "" {
+		req.EndTime = "2024-06-01"
+	}
+
+	needSync := !api.hasDataForRange(req.Exchange, req.Symbol, req.StartTime, req.EndTime)
+
+	job := &BacktestJob{
+		ID:        fmt.Sprintf("bt-%d", time.Now().UnixNano()),
+		UserID:    userID,
+		Strategy:  req.Strategy,
+		Config:    req.Config,
+		Exchange:  req.Exchange,
+		Symbol:    req.Symbol,
+		StartTime: req.StartTime,
+		EndTime:   req.EndTime,
+		NeedSync:  needSync,
+	}
+
+	if err := api.btExec.Submit(job); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+		"job_id":    job.ID,
+		"status":    job.Status,
+		"need_sync": needSync,
+	})
+}
+
+func (api *API) GetBacktestJob(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+
+	jobID := chi.URLParam(r, "jobID")
+	job, found := api.btJobs.Get(jobID)
+	if !found {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+	if job.UserID != userID {
+		writeError(w, http.StatusForbidden, "access denied")
+		return
+	}
+	writeJSON(w, http.StatusOK, job)
+}
+
+func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	jobs := api.btJobs.ListByUser(userID)
+	if jobs == nil {
+		jobs = []*BacktestJob{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"jobs": jobs,
+	})
+}
+
+// hasDataForRange checks if the backtest database likely contains data for
+// the given exchange/symbol/time range. This is a heuristic — it inspects
+// the shared backtest DB file size and modification time.
+func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
+	dbPath := api.container.cfg.BacktestSharedDir
+	if dbPath == "" {
+		dbPath = api.container.cfg.DataDir + "/backtest-shared"
+	}
+	dbPath += "/backtest.db"
+
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		return false
+	}
+	if info.Size() < 1<<20 {
+		return false
+	}
+
+	start, err := time.Parse("2006-01-02", startTime)
+	if err != nil {
+		return info.Size() > 10<<20
+	}
+	if info.ModTime().Before(start) {
+		return false
+	}
+	return true
 }

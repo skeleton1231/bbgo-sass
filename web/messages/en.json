@@ -130,7 +130,11 @@
     "running": "Running...",
     "backtestOutput": "Backtest Output",
     "backtestDuration": "Backtest may take 30-60 seconds depending on date range...",
-    "error": "Backtest failed. Please try again."
+    "error": "Backtest failed. Please try again.",
+    "downloadingData": "Downloading market data...",
+    "runningBacktest": "Running backtest...",
+    "waitingToStart": "Waiting to start...",
+    "recentJobs": "Recent Backtests"
   },
   "Settings": {
     "title": "Settings",

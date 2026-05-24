@@ -201,6 +201,8 @@ func (n *Notifier) ruleEnabled(rules NotificationRule, eventType string) bool {
 		return rules.OrderEvents
 	case "container":
 		return rules.ContainerHealth
+	case "backtest":
+		return true
 	case "test":
 		return true
 	}

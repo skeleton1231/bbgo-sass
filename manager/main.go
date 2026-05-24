@@ -107,7 +107,18 @@ func main() {
 		hub = h
 	}
 
-	api := NewAPI(cfg, users, containerMgr, proxy, credStore, enc, syncer, hub, notifier)
+	btJobStore := NewBacktestJobStore(cfg.DataDir)
+	btExecutor := NewBacktestExecutor(btJobStore, containerMgr, notifier)
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			btJobStore.Prune(24 * time.Hour)
+		}
+	}()
+
+	api := NewAPI(cfg, users, containerMgr, proxy, credStore, enc, syncer, hub, notifier, btExecutor, btJobStore)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

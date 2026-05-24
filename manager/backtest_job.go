@@ -1,0 +1,275 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+)
+
+const (
+	JobPending    = "pending"
+	JobDownloading = "downloading"
+	JobRunning    = "running"
+	JobCompleted  = "completed"
+	JobFailed     = "failed"
+)
+
+type BacktestJob struct {
+	ID          string          `json:"id"`
+	UserID      string          `json:"user_id"`
+	Strategy    string          `json:"strategy"`
+	Config      json.RawMessage `json:"config"`
+	Exchange    string          `json:"exchange"`
+	Symbol      string          `json:"symbol"`
+	StartTime   string          `json:"start_time"`
+	EndTime     string          `json:"end_time"`
+	Status      string          `json:"status"`
+	Progress    string          `json:"progress,omitempty"`
+	Output      string          `json:"output,omitempty"`
+	Error       string          `json:"error,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
+	StartedAt   *time.Time      `json:"started_at,omitempty"`
+	CompletedAt *time.Time      `json:"completed_at,omitempty"`
+	NeedSync    bool            `json:"need_sync"`
+}
+
+type BacktestJobStore struct {
+	mu   sync.RWMutex
+	jobs map[string]*BacktestJob
+	dir  string
+	sem  chan struct{}
+}
+
+func NewBacktestJobStore(dataDir string) *BacktestJobStore {
+	dir := filepath.Join(dataDir, "backtest-jobs")
+	os.MkdirAll(dir, 0o755)
+
+	s := &BacktestJobStore{
+		jobs: make(map[string]*BacktestJob),
+		dir:  dir,
+		sem:  make(chan struct{}, 1),
+	}
+
+	s.loadPersisted()
+	return s
+}
+
+func (s *BacktestJobStore) Create(job *BacktestJob) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job.CreatedAt = time.Now()
+	job.Status = JobPending
+	s.jobs[job.ID] = job
+	s.persist(job)
+}
+
+func (s *BacktestJobStore) Get(jobID string) (*BacktestJob, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	j, ok := s.jobs[jobID]
+	if !ok {
+		return nil, false
+	}
+	cp := *j
+	return &cp, true
+}
+
+func (s *BacktestJobStore) ListByUser(userID string) []*BacktestJob {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []*BacktestJob
+	for _, j := range s.jobs {
+		if j.UserID == userID {
+			cp := *j
+			result = append(result, &cp)
+		}
+	}
+	return result
+}
+
+func (s *BacktestJobStore) UpdateStatus(jobID, status, progress string) *BacktestJob {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	j, ok := s.jobs[jobID]
+	if !ok {
+		return nil
+	}
+	j.Status = status
+	j.Progress = progress
+	now := time.Now()
+	if status == JobDownloading || status == JobRunning {
+		if j.StartedAt == nil {
+			j.StartedAt = &now
+		}
+	}
+	if status == JobCompleted || status == JobFailed {
+		j.CompletedAt = &now
+	}
+	s.persist(j)
+	cp := *j
+	return &cp
+}
+
+func (s *BacktestJobStore) SetOutput(jobID, output string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if j, ok := s.jobs[jobID]; ok {
+		j.Output = output
+		s.persist(j)
+	}
+}
+
+func (s *BacktestJobStore) SetError(jobID, err string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if j, ok := s.jobs[jobID]; ok {
+		j.Error = err
+		s.persist(j)
+	}
+}
+
+func (s *BacktestJobStore) AcquireSlot() bool {
+	select {
+	case s.sem <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *BacktestJobStore) ReleaseSlot() {
+	<-s.sem
+}
+
+func (s *BacktestJobStore) persist(job *BacktestJob) {
+	path := s.jobPath(job.ID)
+	data, err := json.MarshalIndent(job, "", "  ")
+	if err != nil {
+		log.Printf("persist backtest job %s: %v", job.ID, err)
+		return
+	}
+	os.WriteFile(path, data, 0o644)
+}
+
+func (s *BacktestJobStore) jobPath(id string) string {
+	return filepath.Join(s.dir, id+".json")
+}
+
+func (s *BacktestJobStore) loadPersisted() {
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var job BacktestJob
+		if err := json.Unmarshal(data, &job); err != nil {
+			continue
+		}
+		if job.Status == JobDownloading || job.Status == JobRunning {
+			job.Status = JobPending
+			job.Progress = ""
+		}
+		s.jobs[job.ID] = &job
+	}
+	log.Printf("loaded %d persisted backtest jobs", len(s.jobs))
+}
+
+func (s *BacktestJobStore) Prune(olderThan time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cutoff := time.Now().Add(-olderThan)
+	for id, j := range s.jobs {
+		if j.Status == JobCompleted || j.Status == JobFailed {
+			if j.CompletedAt != nil && j.CompletedAt.Before(cutoff) {
+				delete(s.jobs, id)
+				os.Remove(s.jobPath(id))
+			}
+		}
+	}
+}
+
+type BacktestExecutor struct {
+	store     *BacktestJobStore
+	container *ContainerManager
+	notifier  *Notifier
+}
+
+func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier *Notifier) *BacktestExecutor {
+	return &BacktestExecutor{
+		store:     store,
+		container: cm,
+		notifier:  notifier,
+	}
+}
+
+func (ex *BacktestExecutor) Submit(job *BacktestJob) error {
+	ex.store.Create(job)
+
+	if !ex.store.AcquireSlot() {
+		ex.store.UpdateStatus(job.ID, JobFailed, "too many concurrent backtest jobs")
+		ex.store.SetError(job.ID, "server busy, try again later")
+		return fmt.Errorf("server busy")
+	}
+
+	go ex.execute(job)
+	return nil
+}
+
+func (ex *BacktestExecutor) execute(job *BacktestJob) {
+	defer ex.store.ReleaseSlot()
+
+	if job.NeedSync {
+		ex.store.UpdateStatus(job.ID, JobDownloading, "syncing market data...")
+		out, err := ex.container.SyncBacktest(job.Exchange, job.Symbol, job.StartTime, job.EndTime)
+		if err != nil {
+			ex.store.UpdateStatus(job.ID, JobFailed, "data sync failed")
+			ex.store.SetError(job.ID, fmt.Sprintf("data sync failed: %s (output: %s)", err, out))
+			ex.notify(job, "Backtest Data Sync Failed", fmt.Sprintf("Strategy %s on %s/%s: data sync failed", job.Strategy, job.Exchange, job.Symbol))
+			return
+		}
+		log.Printf("backtest data synced for job %s: %s", job.ID, out)
+	}
+
+	ex.store.UpdateStatus(job.ID, JobRunning, "running backtest...")
+
+	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime)
+	if err != nil {
+		ex.store.UpdateStatus(job.ID, JobFailed, "config error")
+		ex.store.SetError(job.ID, fmt.Sprintf("invalid config: %v", err))
+		return
+	}
+
+	result, err := ex.container.RunBacktest(job.UserID, yamlContent)
+	if err != nil {
+		ex.store.UpdateStatus(job.ID, JobFailed, "backtest failed")
+		ex.store.SetError(job.ID, err.Error())
+		ex.notify(job, "Backtest Failed", fmt.Sprintf("Strategy %s: %s", job.Strategy, err.Error()))
+		return
+	}
+
+	ex.store.SetOutput(job.ID, string(result))
+	ex.store.UpdateStatus(job.ID, JobCompleted, "done")
+	ex.notify(job, "Backtest Completed", fmt.Sprintf("Strategy %s on %s/%s completed successfully", job.Strategy, job.Exchange, job.Symbol))
+}
+
+func (ex *BacktestExecutor) notify(job *BacktestJob, title, message string) {
+	if ex.notifier == nil {
+		return
+	}
+	ex.notifier.Dispatch(job.UserID, NotificationEvent{
+		Type:    "backtest",
+		Title:   title,
+		Message: message,
+	})
+}

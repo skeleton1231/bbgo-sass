@@ -127,7 +127,11 @@
     "running": "실행 중...",
     "backtestOutput": "백테스트 출력",
     "backtestDuration": "날짜 범위에 따라 30-60초가 걸릴 수 있습니다...",
-    "error": "백테스트에 실패했습니다. 다시 시도해 주세요."
+    "error": "백테스트에 실패했습니다. 다시 시도해 주세요.",
+    "downloadingData": "시장 데이터 다운로드 중...",
+    "runningBacktest": "백테스트 실행 중...",
+    "waitingToStart": "시작 대기 중...",
+    "recentJobs": "최근 백테스트"
   },
   "Settings": {
     "title": "설정",

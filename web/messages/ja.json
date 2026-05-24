@@ -127,7 +127,11 @@
     "running": "実行中...",
     "backtestOutput": "バックテスト出力",
     "backtestDuration": "日付範囲により30-60秒かかる場合があります...",
-    "error": "バックテストに失敗しました。もう一度お試しください。"
+    "error": "バックテストに失敗しました。もう一度お試しください。",
+    "downloadingData": "市場データをダウンロード中...",
+    "runningBacktest": "バックテストを実行中...",
+    "waitingToStart": "開始を待機中...",
+    "recentJobs": "最近のバックテスト"
   },
   "Settings": {
     "title": "設定",
