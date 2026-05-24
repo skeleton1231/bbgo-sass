@@ -60,13 +60,11 @@ func main() {
 
 	// Auto-sync backtest data on startup (background, non-blocking)
 	go func() {
-		time.Sleep(30 * time.Second) // wait for other services to stabilize
-		symbols := []string{"BTCUSDT", "ETHUSDT"}
-		exchanges := []string{"binance"}
-		for _, ex := range exchanges {
-			for _, sym := range symbols {
+		time.Sleep(30 * time.Second)
+		for _, ex := range cfg.BacktestExchanges {
+			for _, sym := range cfg.BacktestSymbols {
 				log.Printf("auto-syncing backtest data: %s/%s", ex, sym)
-				if out, err := containerMgr.SyncBacktest(ex, sym, "2023-12-01", "2025-12-31"); err != nil {
+				if out, err := containerMgr.SyncBacktest(ex, sym, cfg.BacktestStartTime, cfg.BacktestEndTime); err != nil {
 					log.Printf("backtest auto-sync %s/%s failed: %v (output: %s)", ex, sym, err, out)
 				} else {
 					log.Printf("backtest auto-sync %s/%s done", ex, sym)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -19,7 +20,11 @@ type Config struct {
 	BBGOPort      int
 	BBGOGRPCPort    int
 	ManagerToken    string
-	MarketDataAddr  string
+	MarketDataAddr      string
+	BacktestSymbols     []string
+	BacktestExchanges   []string
+	BacktestStartTime   string
+	BacktestEndTime     string
 }
 
 func LoadConfig() (*Config, error) {
@@ -36,7 +41,11 @@ func LoadConfig() (*Config, error) {
 		BBGOPort:      getEnvInt("BBGO_PORT", 8080),
 		BBGOGRPCPort:  getEnvInt("BBGO_GRPC_PORT", 9090),
 		ManagerToken:   getEnv("MANAGER_TOKEN", ""),
-		MarketDataAddr: getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),
+		MarketDataAddr:    getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),
+		BacktestSymbols:   getEnvSlice("BACKTEST_SYMBOLS", []string{"BTCUSDT", "ETHUSDT"}),
+		BacktestExchanges: getEnvSlice("BACKTEST_EXCHANGES", []string{"binance"}),
+		BacktestStartTime: getEnv("BACKTEST_START_TIME", "2023-12-01"),
+		BacktestEndTime:   getEnv("BACKTEST_END_TIME", "2025-12-31"),
 	}
 
 	if cfg.SupabaseURL == "" || cfg.SupabaseKey == "" {
@@ -65,4 +74,16 @@ func getEnvInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func getEnvSlice(key string, fallback []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parts := strings.Split(v, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }
