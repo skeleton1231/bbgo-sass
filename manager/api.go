@@ -18,11 +18,13 @@ type API struct {
 	creds     *CredentialStore
 	encryptor *Encryptor
 	syncer    *Syncer
+	hub       *MarketDataHub
+	notifier  *Notifier
 
 	newBBGoClient func(baseURL string) *BBGoClient
 }
 
-func NewAPI(users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer) *API {
+func NewAPI(users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier) *API {
 	return &API{
 		users:         users,
 		container:     cm,
@@ -30,6 +32,8 @@ func NewAPI(users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, 
 		creds:         creds,
 		encryptor:     enc,
 		syncer:        syncer,
+		hub:           hub,
+		notifier:      notifier,
 		newBBGoClient: NewBBGoClient,
 	}
 }
@@ -59,9 +63,19 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	r.Get("/api/users/{userID}/bbgo/trades", api.BBGoTrades)
 	r.Get("/api/users/{userID}/bbgo/orders/closed", api.BBGoClosedOrders)
 	r.Get("/api/users/{userID}/bbgo/trading-volume", api.BBGoTradingVolume)
+	r.Get("/api/users/{userID}/bbgo/pnl", api.BBGoPnL)
 
 	// Container logs
 	r.Get("/api/users/{userID}/logs", api.ContainerLogs)
+
+	// Notifications
+	r.Post("/api/notifications/config", api.CreateNotificationConfig)
+	r.Get("/api/notifications/config", api.ListNotificationConfigs)
+	r.Delete("/api/notifications/config/{id}", api.DeleteNotificationConfig)
+	r.Post("/api/notifications/test", api.TestNotification)
+
+	// WebSocket for real-time data
+	r.Get("/api/ws", api.HandleWebSocket)
 
 	// Generic proxy for any other bbgo API calls
 	r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
@@ -715,6 +729,24 @@ func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"tradingVolumes": volumes})
 }
 
+func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+
+	exchange := r.URL.Query().Get("exchange")
+	symbol := r.URL.Query().Get("symbol")
+	trades, err := client.GetTrades(exchange, symbol, 0)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	report := calculatePnL(trades)
+	writeJSON(w, http.StatusOK, report)
+}
+
 // refreshContainerStatus checks Docker for the actual container state and updates
 // the in-memory UserContainer status. If Docker is unreachable, the in-memory
 // status is left unchanged.
@@ -754,4 +786,133 @@ func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+}
+
+func (api *API) CreateNotificationConfig(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+
+	var req struct {
+		Type       string `json:"type"`
+		Token      string `json:"token"`
+		ChatID     string `json:"chat_id"`
+		WebhookURL string `json:"webhook_url"`
+		Rules      struct {
+			TradeEvents     bool `json:"trade_events"`
+			OrderEvents     bool `json:"order_events"`
+			ContainerHealth bool `json:"container_health"`
+		} `json:"rules"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Type != "telegram" && req.Type != "slack" {
+		writeError(w, http.StatusBadRequest, "type must be telegram or slack")
+		return
+	}
+
+	ch := NotificationChannel{
+		ID:      fmt.Sprintf("notif-%d", time.Now().UnixNano()),
+		UserID:  userID,
+		Type:    req.Type,
+		ChatID:  req.ChatID,
+		Enabled: true,
+	}
+
+	switch req.Type {
+	case "telegram":
+		if req.Token == "" || req.ChatID == "" {
+			writeError(w, http.StatusBadRequest, "token and chat_id are required for telegram")
+			return
+		}
+		enc, err := api.notifier.EncryptToken(req.Token)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "encryption failed")
+			return
+		}
+		ch.TokenEnc = enc
+	case "slack":
+		if req.WebhookURL == "" {
+			writeError(w, http.StatusBadRequest, "webhook_url is required for slack")
+			return
+		}
+		enc, err := api.notifier.EncryptToken(req.WebhookURL)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "encryption failed")
+			return
+		}
+		ch.WebhookURL = enc
+	}
+
+	cfg := NotificationConfig{
+		Channel: ch,
+		Rules: NotificationRule{
+			TradeEvents:     req.Rules.TradeEvents,
+			OrderEvents:     req.Rules.OrderEvents,
+			ContainerHealth: req.Rules.ContainerHealth,
+		},
+	}
+
+	if err := api.notifier.Create(userID, cfg); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":      ch.ID,
+		"type":    ch.Type,
+		"enabled": ch.Enabled,
+		"rules":   cfg.Rules,
+	})
+}
+
+func (api *API) ListNotificationConfigs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	configs := api.notifier.List(userID)
+	safe := make([]map[string]interface{}, len(configs))
+	for i, c := range configs {
+		safe[i] = map[string]interface{}{
+			"id":      c.Channel.ID,
+			"type":    c.Channel.Type,
+			"enabled": c.Channel.Enabled,
+			"rules":   c.Rules,
+		}
+	}
+	writeJSON(w, http.StatusOK, safe)
+}
+
+func (api *API) DeleteNotificationConfig(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if err := api.notifier.Delete(userID, id); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (api *API) TestNotification(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	api.notifier.Dispatch(userID, NotificationEvent{
+		Type:    "test",
+		Title:   "BBGO Test Notification",
+		Message: "If you see this, notifications are working!",
+	})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
 }

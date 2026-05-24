@@ -250,7 +250,7 @@ func TestAPI_StartUser_NoStrategies(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(users, cm, proxy, nil, nil, nil)
+	api := NewAPI(users, cm, proxy, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -356,6 +356,6 @@ func setupStoppedTestAPI(t *testing.T) *API {
 	}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(users, cm, proxy, nil, nil, nil)
+	api := NewAPI(users, cm, proxy, nil, nil, nil, nil, nil)
 	return api
 }

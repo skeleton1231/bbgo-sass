@@ -31,6 +31,9 @@ func SharedSecretAuth(sharedSecret string) func(http.Handler) http.Handler {
 				return
 			}
 			token := r.Header.Get("X-Manager-Token")
+			if token == "" {
+				token = r.URL.Query().Get("token")
+			}
 			if subtle.ConstantTimeCompare([]byte(token), []byte(sharedSecret)) != 1 {
 				writeError(w, http.StatusUnauthorized, "invalid or missing manager token")
 				return

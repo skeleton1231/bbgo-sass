@@ -15,10 +15,12 @@ import {
   useBotStrategiesState,
   useBotPing,
   useContainerLogs,
+  useBotPnL,
   type BBGoOrder,
   type BBGoTrade,
   type BBGoBalance,
 } from '@/lib/bbgo/queries'
+import { useMarketData } from '@/lib/bbgo/useWebSocket'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -51,6 +53,8 @@ export default function BotDetailPage() {
   const { data: strategyStatesData } = useBotStrategiesState(userId)
   const { data: pingData } = useBotPing(userId)
   const { data: logsData } = useContainerLogs(userId, '100')
+  const { data: pnlData } = useBotPnL(userId)
+  const { connected: wsConnected } = useMarketData({ userId, enabled: isRunning })
 
   if (isLoading) {
     return <div className="text-muted-foreground">{t('loading')}</div>
@@ -89,6 +93,18 @@ export default function BotDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {isRunning && (
+            <span className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+              wsConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            )}>
+              <span className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                wsConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+              )} />
+              {wsConnected ? t('live.connected') : t('live.disconnected')}
+            </span>
+          )}
           <span
             className={cn(
               'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
@@ -147,6 +163,76 @@ export default function BotDetailPage() {
               {s.exchangeName} ({s.name})
             </button>
           ))}
+        </div>
+      )}
+
+      {/* PnL Dashboard */}
+      {botReachable && pnlData && pnlData.totalTrades > 0 && (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs text-muted-foreground">{t('pnl.realized')}</p>
+              <p className={cn(
+                'text-xl font-bold',
+                pnlData.totalRealizedPnl > 0 ? 'text-green-600' : pnlData.totalRealizedPnl < 0 ? 'text-red-600' : ''
+              )}>
+                {pnlData.totalRealizedPnl >= 0 ? '+' : ''}{pnlData.totalRealizedPnl.toFixed(4)} USDT
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs text-muted-foreground">{t('pnl.totalFees')}</p>
+              <p className="text-xl font-bold text-muted-foreground">
+                -{pnlData.totalFees.toFixed(4)} USDT
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs text-muted-foreground">{t('pnl.winRate')}</p>
+              <p className="text-xl font-bold">
+                {pnlData.winRate.toFixed(1)}%
+                <span className="text-xs text-muted-foreground ml-2">
+                  ({pnlData.winningTrades}W / {pnlData.losingTrades}L)
+                </span>
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs text-muted-foreground">{t('pnl.totalTrades')}</p>
+              <p className="text-xl font-bold">{pnlData.totalTrades}</p>
+            </div>
+          </div>
+
+          {pnlData.symbols.length > 0 && (
+            <div className="rounded-lg border bg-card">
+              <div className="p-4 border-b">
+                <h2 className="font-semibold">{t('pnl.bySymbol')}</h2>
+              </div>
+              <div className="divide-y">
+                {pnlData.symbols.map((s) => (
+                  <div key={s.symbol} className="flex items-center justify-between px-4 py-3 text-sm">
+                    <div className="flex items-center gap-3 min-w-[140px]">
+                      <span className="font-medium">{s.symbol}</span>
+                      <span className="text-xs text-muted-foreground">{s.tradeCount} trades</span>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      {s.openPosition > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          pos: {s.openPosition.toFixed(6)} @ ~{s.openPositionCost > 0 ? (s.openPositionCost / s.openPosition).toFixed(2) : '-'}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground w-20 text-right">
+                        avg buy {s.avgBuyPrice > 0 ? s.avgBuyPrice.toFixed(2) : '-'}
+                      </span>
+                      <span className={cn(
+                        'font-medium w-32 text-right',
+                        s.realizedPnl > 0 ? 'text-green-600' : s.realizedPnl < 0 ? 'text-red-600' : ''
+                      )}>
+                        {s.realizedPnl >= 0 ? '+' : ''}{s.realizedPnl.toFixed(4)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

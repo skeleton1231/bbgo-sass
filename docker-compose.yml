@@ -1,4 +1,15 @@
 services:
+  marketdata:
+    image: bbgo-base:latest
+    container_name: bbgo-marketdata
+    volumes:
+      - bbgo-data:/data
+      - ./docker/configs/marketdata.yaml:/config/bbgo.yaml:ro
+    networks:
+      - bbgo-net
+    command: ["run", "--config", "/config/bbgo.yaml", "--no-sync", "--enable-grpc", "--grpc-bind", ":9090"]
+    restart: unless-stopped
+
   manager:
     build:
       context: ..
@@ -22,6 +33,9 @@ services:
       - SUPABASE_DB_URL=${SUPABASE_DB_URL}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - MANAGER_TOKEN=${MANAGER_TOKEN}
+      - MARKETDATA_ADDR=bbgo-marketdata:9090
+    depends_on:
+      - marketdata
     networks:
       - bbgo-net
     restart: unless-stopped

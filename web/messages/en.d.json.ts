@@ -92,7 +92,18 @@ declare const messages: {
     "save": "Save",
     "saving": "Saving...",
     "testnet": "Testnet",
-    "containerLogs": "Container Logs"
+    "containerLogs": "Container Logs",
+    "pnl": {
+      "realized": "Realized P&L",
+      "totalFees": "Total Fees",
+      "winRate": "Win Rate",
+      "totalTrades": "Total Trades",
+      "bySymbol": "P&L by Symbol"
+    },
+    "live": {
+      "connected": "Live",
+      "disconnected": "Offline"
+    }
   },
   "Backtest": {
     "title": "Backtest",
@@ -113,6 +124,7 @@ declare const messages: {
     "backtestDuration": "Backtest may take 30-60 seconds depending on date range..."
   },
   "Settings": {
+    "title": "Settings",
     "apiKeys": {
       "title": "Exchange API Keys",
       "add": "Add API Key",
@@ -125,6 +137,31 @@ declare const messages: {
       "delete": "Delete",
       "verified": "Verified",
       "verificationFailed": "Verification failed"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Configure Telegram or Slack to receive trade, order, and container health alerts.",
+      "addTelegram": "Add Telegram Bot",
+      "addSlack": "Add Slack Webhook",
+      "botToken": "Bot Token",
+      "chatId": "Chat ID",
+      "webhookUrl": "Webhook URL",
+      "trades": "Trades",
+      "orders": "Orders",
+      "health": "Health",
+      "add": "Add",
+      "adding": "Adding...",
+      "added": "Notification channel added.",
+      "addError": "Failed to add notification channel.",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "deleted": "Notification channel removed.",
+      "deleteError": "Failed to remove channel.",
+      "sendTest": "Send Test",
+      "testSent": "Test notification sent.",
+      "testError": "Failed to send test.",
+      "loading": "Loading...",
+      "loadError": "Failed to load notification configs."
     }
   },
   "Errors": {

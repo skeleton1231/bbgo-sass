@@ -89,7 +89,18 @@
     "save": "保存",
     "saving": "保存中...",
     "testnet": "测试网",
-    "containerLogs": "容器日志"
+    "containerLogs": "容器日志",
+    "pnl": {
+      "realized": "已实现盈亏",
+      "totalFees": "总手续费",
+      "winRate": "胜率",
+      "totalTrades": "总交易数",
+      "bySymbol": "按币种盈亏"
+    },
+    "live": {
+      "connected": "实时",
+      "disconnected": "离线"
+    }
   },
   "Backtest": {
     "title": "回测",
@@ -110,6 +121,7 @@
     "backtestDuration": "回测可能需要 30-60 秒，取决于日期范围..."
   },
   "Settings": {
+    "title": "设置",
     "apiKeys": {
       "title": "交易所 API 密钥",
       "add": "添加 API 密钥",
@@ -122,6 +134,31 @@
       "delete": "删除",
       "verified": "已验证",
       "verificationFailed": "验证失败"
+    },
+    "notifications": {
+      "title": "通知",
+      "description": "配置 Telegram 或 Slack 接收交易、订单和容器健康告警。",
+      "addTelegram": "添加 Telegram 机器人",
+      "addSlack": "添加 Slack Webhook",
+      "botToken": "Bot Token",
+      "chatId": "Chat ID",
+      "webhookUrl": "Webhook URL",
+      "trades": "成交",
+      "orders": "订单",
+      "health": "健康",
+      "add": "添加",
+      "adding": "添加中...",
+      "added": "通知渠道已添加。",
+      "addError": "添加通知渠道失败。",
+      "cancel": "取消",
+      "remove": "移除",
+      "deleted": "通知渠道已移除。",
+      "deleteError": "移除渠道失败。",
+      "sendTest": "发送测试",
+      "testSent": "测试通知已发送。",
+      "testError": "发送测试失败。",
+      "loading": "加载中...",
+      "loadError": "加载通知配置失败。"
     }
   },
   "Errors": {

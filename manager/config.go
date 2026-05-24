@@ -17,8 +17,9 @@ type Config struct {
 	DockerNetwork string
 	BBGOImage     string
 	BBGOPort      int
-	BBGOGRPCPort  int
-	ManagerToken  string
+	BBGOGRPCPort    int
+	ManagerToken    string
+	MarketDataAddr  string
 }
 
 func LoadConfig() (*Config, error) {
@@ -34,7 +35,8 @@ func LoadConfig() (*Config, error) {
 		BBGOImage:     getEnv("BBGO_IMAGE", "bbgo-base:latest"),
 		BBGOPort:      getEnvInt("BBGO_PORT", 8080),
 		BBGOGRPCPort:  getEnvInt("BBGO_GRPC_PORT", 9090),
-		ManagerToken:  getEnv("MANAGER_TOKEN", ""),
+		ManagerToken:   getEnv("MANAGER_TOKEN", ""),
+		MarketDataAddr: getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),
 	}
 
 	if cfg.SupabaseURL == "" || cfg.SupabaseKey == "" {

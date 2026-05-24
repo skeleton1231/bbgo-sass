@@ -21,6 +21,7 @@ import {
   fetchBotAssets,
   fetchBotStrategies,
   fetchContainerLogs,
+  fetchBotPnL,
   type StrategyEntry,
   type UserContainer,
   type BacktestResult,
@@ -31,6 +32,7 @@ import {
   type BBGoBalance,
   type BBGoAsset,
   type BBGoStrategyState,
+  type PnLReport,
 } from './manager'
 
 // --- Strategy & container queries ---
@@ -194,6 +196,15 @@ export function useContainerLogs(userId: string, tail?: string) {
   })
 }
 
+export function useBotPnL(userId: string, exchange?: string, symbol?: string) {
+  return useQuery<PnLReport>({
+    queryKey: ['bot-pnl', userId, exchange, symbol],
+    queryFn: () => fetchBotPnL(userId, exchange, symbol),
+    enabled: !!userId,
+    refetchInterval: 30_000,
+  })
+}
+
 // --- Credentials ---
 
 export function useCredentials(userId: string) {
@@ -231,4 +242,5 @@ export type {
   BBGoBalance,
   BBGoAsset,
   BBGoStrategyState,
+  PnLReport,
 }

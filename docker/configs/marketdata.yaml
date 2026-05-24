@@ -1,0 +1,15 @@
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: BINANCE
+    publicOnly: true
+  okex:
+    exchange: okex
+    envVarPrefix: OKEX
+    publicOnly: true
+
+exchange:
+  binance:
+    symbol: BTCUSDT
+  okex:
+    symbol: BTCUSDT

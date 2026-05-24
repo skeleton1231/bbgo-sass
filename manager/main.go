@@ -42,12 +42,17 @@ func main() {
 
 	syncer := NewSyncerWithCreds(users, cfg, containerMgr, credStore)
 
+	notifier := NewNotifier(cfg.DataDir, enc)
+
 	recoveredUsers, err := syncer.LoadUsersFromSupabase()
 	if err != nil {
 		log.Printf("warning: could not load users from supabase: %v", err)
 	} else {
 		users.Restore(recoveredUsers)
 		containerMgr.RecoverUsers(recoveredUsers)
+		for _, uc := range recoveredUsers {
+			notifier.LoadUser(uc.UserID)
+		}
 		log.Printf("restored %d users from supabase", len(recoveredUsers))
 	}
 
@@ -63,6 +68,11 @@ func main() {
 			for _, uc := range users {
 				if uc.Status == StatusRunning && !containerMgr.IsRunning(uc.UserID) {
 					log.Printf("health check: container %s died, restarting", containerMgr.containerName(uc.UserID))
+					notifier.Dispatch(uc.UserID, NotificationEvent{
+						Type:    "container",
+						Title:   "Container Restarted",
+						Message: fmt.Sprintf("Container bbgo-%s died and is being restarted.", uc.UserID[:8]),
+					})
 					if err := containerMgr.CreateAndStart(uc); err != nil {
 						log.Printf("health check: restart %s failed: %v", uc.UserID, err)
 					}
@@ -72,7 +82,15 @@ func main() {
 	}()
 
 	proxy := NewBotProxy(containerMgr)
-	api := NewAPI(users, containerMgr, proxy, credStore, enc, syncer)
+
+	var hub *MarketDataHub
+	if h, err := NewMarketDataHub(cfg.MarketDataAddr); err != nil {
+		log.Printf("warning: marketdata hub not available (%v), real-time data disabled", err)
+	} else {
+		hub = h
+	}
+
+	api := NewAPI(users, containerMgr, proxy, credStore, enc, syncer, hub, notifier)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

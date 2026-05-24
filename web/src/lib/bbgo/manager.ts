@@ -110,6 +110,33 @@ export interface BBGoStrategyState {
   [key: string]: unknown
 }
 
+export interface SymbolPnL {
+  symbol: string
+  realizedPnl: number
+  totalBuys: number
+  totalSells: number
+  buyVolume: number
+  sellVolume: number
+  totalFees: number
+  tradeCount: number
+  winningTrades: number
+  losingTrades: number
+  avgBuyPrice: number
+  avgSellPrice: number
+  openPosition: number
+  openPositionCost: number
+}
+
+export interface PnLReport {
+  totalRealizedPnl: number
+  totalFees: number
+  totalTrades: number
+  winningTrades: number
+  losingTrades: number
+  winRate: number
+  symbols: SymbolPnL[]
+}
+
 // --- Strategy CRUD ---
 
 export function fetchUserStrategies(userId: string) {
@@ -240,6 +267,14 @@ export function fetchContainerLogs(userId: string, tail?: string) {
   return request<{ logs: string }>(`/users/${userId}/logs${qs ? `?${qs}` : ''}`)
 }
 
+export function fetchBotPnL(userId: string, exchange?: string, symbol?: string) {
+  const params = new URLSearchParams()
+  if (exchange) params.set('exchange', exchange)
+  if (symbol) params.set('symbol', symbol)
+  const qs = params.toString()
+  return request<PnLReport>(`/users/${userId}/bbgo/pnl${qs ? `?${qs}` : ''}`)
+}
+
 // --- Credentials ---
 
 export interface CredentialInfo {
@@ -271,4 +306,48 @@ export function deleteCredential(id: string, userId: string) {
   return request<{ status: string }>(`/credentials/${id}?user_id=${userId}`, {
     method: 'DELETE',
   })
+}
+
+// --- Notifications ---
+
+export interface NotificationConfigInfo {
+  id: string
+  type: 'telegram' | 'slack'
+  enabled: boolean
+  rules: {
+    trade_events: boolean
+    order_events: boolean
+    container_health: boolean
+  }
+}
+
+export function fetchNotificationConfigs() {
+  return request<NotificationConfigInfo[]>('/notifications/config')
+}
+
+export function createNotificationConfig(data: {
+  type: 'telegram' | 'slack'
+  token?: string
+  chat_id?: string
+  webhook_url?: string
+  rules: {
+    trade_events: boolean
+    order_events: boolean
+    container_health: boolean
+  }
+}) {
+  return request<NotificationConfigInfo>('/notifications/config', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteNotificationConfig(id: string) {
+  return request<{ status: string }>(`/notifications/config/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export function testNotification() {
+  return request<{ status: string }>('/notifications/test', { method: 'POST' })
 }
