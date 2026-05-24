@@ -105,6 +105,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'tradeInBand', label: 'Trade In Band', type: 'boolean', default: false, description: 'Only trade within Bollinger Band' },
       { key: 'shadowProtection', label: 'Shadow Protection', type: 'boolean', default: false, description: 'Avoid placing orders during strong price drops' },
     ],
+    liveOnly: true,
   },
   {
     id: 'linregmaker',
@@ -112,6 +113,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Market making with linear regression trend indicators for dynamic spread and exposure',
     category: 'maker',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -128,6 +130,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Market making with Relative Strength indicator for trend-aware order placement',
     category: 'maker',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -171,6 +174,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Market making with Bollinger Band safety and grid scaling',
     category: 'maker',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
@@ -185,6 +189,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Trend following with Supertrend indicator and optional DEMA confirmation',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -263,7 +268,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'interval', label: 'Investment Interval', type: 'select', default: '1h', options: ['15m', '1h', '4h', '1d', '1w'], description: 'Interval between investments' },
+      { key: 'investmentInterval', label: 'Investment Interval', type: 'select', default: '1h', options: ['15m', '1h', '4h', '1d', '1w'], description: 'Interval between investments' },
       { key: 'budget', label: 'Budget Amount', type: 'number', default: 100, step: 0.01, required: true, description: 'Budget per period' },
       { key: 'budgetPeriod', label: 'Budget Period', type: 'select', default: 'day', options: ['day', 'week', 'month'] },
     ],
@@ -274,6 +279,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Advanced DCA with take-profit, price deviation, and max order controls',
     category: 'dca',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'quoteInvestment', label: 'Quote Investment', type: 'number', default: 1000, step: 0.01, required: true, description: 'Total quote investment' },
@@ -288,6 +294,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'DCA v2 variant with additional recovery options',
     category: 'dca',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'quoteInvestment', label: 'Quote Investment', type: 'number', default: 1000, step: 0.01, required: true },
@@ -333,22 +340,11 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Place large wall orders at configurable levels',
     category: 'other',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.1, step: 0.001, required: true },
       { key: 'spread', label: 'Spread', type: 'number', default: 0.01, step: 0.001 },
-    ],
-  },
-  {
-    id: 'support',
-    label: 'Support',
-    description: 'Place buy orders at support price levels',
-    category: 'other',
-    supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    fields: [
-      { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
-      { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
     ],
   },
   {
@@ -414,6 +410,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Order flow based market making with per-trade order management',
     category: 'maker',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -426,6 +423,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Advanced market maker with layered liquidity and mid-price EMA tracking',
     category: 'maker',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'numOfLiquidityLayers', label: 'Liquidity Layers', type: 'number', default: 5, min: 1, max: 50, required: true, description: 'Number of liquidity layers' },
@@ -458,6 +456,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Drift MA strategy with linear regression prediction, ATR stop-loss and trailing exits',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['5m', '15m', '1h', '4h', '1d'] },
@@ -477,6 +476,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Elliott Wave oscillator with ATR stop-loss, Heikin-Ashi and trailing exits',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['5m', '15m', '1h', '4h', '1d'] },
@@ -494,6 +494,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Multi-factor linear strategy with momentum and exit management',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -503,7 +504,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
 
   // ===================== Additional Mean Reversion Strategies =====================
   {
-    id: 'ewoDgtrd',
+    id: 'ewo_dgtrd',
     label: 'EWO Divergence',
     description: 'Elliott Wave Oscillator divergence trading with CCI-Stochastic filters',
     category: 'mean-reversion',
@@ -574,6 +575,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Trade on volume surge signals with EMA and pivot high confirmation',
     category: 'volatility',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
+    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
@@ -752,6 +754,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     category: 'cross-exchange',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     crossExchange: true,
+    liveOnly: true,
     sessionRoles: [
       { name: 'spot', label: 'Spot Session', futures: false },
       { name: 'futures', label: 'Futures Session', futures: true },
@@ -786,6 +789,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     category: 'cross-exchange',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     crossExchange: true,
+    liveOnly: true,
     sessionRoles: [
       { name: 'spot', label: 'Spot Session', futures: false },
       { name: 'futures', label: 'Futures Session', futures: true },

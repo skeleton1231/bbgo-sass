@@ -13,6 +13,34 @@ const (
 	StatusError   = "error"
 )
 
+// legacyStrategyAliases maps old frontend IDs to the correct bbgo strategy IDs.
+var legacyStrategyAliases = map[string]string{
+	"ewoDgtrd": "ewo_dgtrd",
+}
+
+// legacyFieldAliases maps strategy IDs to old→new field renames.
+var legacyFieldAliases = map[string]map[string]string{
+	"dca": {"interval": "investmentInterval"},
+}
+
+// normalizeStrategyConfig fixes old strategy IDs and field names from legacy DB records.
+func normalizeStrategyConfig(strategy string, params map[string]interface{}) (string, map[string]interface{}) {
+	if alias, ok := legacyStrategyAliases[strategy]; ok {
+		strategy = alias
+	}
+	if fields, ok := legacyFieldAliases[strategy]; ok {
+		for oldKey, newKey := range fields {
+			if v, exists := params[oldKey]; exists {
+				if _, hasNew := params[newKey]; !hasNew {
+					params[newKey] = v
+				}
+				delete(params, oldKey)
+			}
+		}
+	}
+	return strategy, params
+}
+
 type SessionRoleConfig struct {
 	Name         string `json:"name"`
 	Exchange     string `json:"exchange"`
@@ -149,14 +177,20 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		if err := json.Unmarshal(s.Config, &params); err != nil {
 			var rawStr string
 			if err2 := json.Unmarshal(s.Config, &rawStr); err2 == nil {
+				strategyID := s.Strategy
+				if alias, ok := legacyStrategyAliases[strategyID]; ok {
+					strategyID = alias
+				}
 				entry := map[string]interface{}{
 					"on":         s.Exchange,
-					s.Strategy:   rawStr,
+					strategyID:   rawStr,
 				}
 				exchangeStrategies = append(exchangeStrategies, entry)
 			}
 			continue
 		}
+
+		s.Strategy, params = normalizeStrategyConfig(s.Strategy, params)
 
 		if s.CrossExchange {
 			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials)
@@ -253,8 +287,24 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	}
 
 	prefix := exchangeEnvPrefix(exchange)
+	delete(allParams, "exchange")
+
+	strategy, allParams = normalizeStrategyConfig(strategy, allParams)
+
+	symbol := "BTCUSDT"
+	if v, ok := allParams["symbol"].(string); ok && v != "" {
+		symbol = v
+	}
+
+	// Ensure interval is set for strategies that require kline subscriptions
+	if _, ok := allParams["interval"]; !ok {
+		allParams["interval"] = "1h"
+	}
 
 	btCfg := struct {
+		Exchange map[string]struct {
+			Symbol string `yaml:"symbol"`
+		} `yaml:"exchange"`
 		Sessions map[string]struct {
 			Exchange     string `yaml:"exchange"`
 			EnvVarPrefix string `yaml:"envVarPrefix"`
@@ -262,6 +312,7 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 		ExchangeStrategies []map[string]interface{} `yaml:"exchangeStrategies"`
 		Backtest struct {
 			Sessions  []string `yaml:"sessions"`
+			Symbols   []string `yaml:"symbols"`
 			StartTime string   `yaml:"startTime"`
 			EndTime   string   `yaml:"endTime"`
 			Accounts  map[string]struct {
@@ -269,6 +320,11 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 			} `yaml:"accounts"`
 		} `yaml:"backtest"`
 	}{
+		Exchange: map[string]struct {
+			Symbol string `yaml:"symbol"`
+		}{
+			exchange: {Symbol: symbol},
+		},
 		Sessions: map[string]struct {
 			Exchange     string `yaml:"exchange"`
 			EnvVarPrefix string `yaml:"envVarPrefix"`
@@ -277,12 +333,13 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 		},
 		ExchangeStrategies: []map[string]interface{}{
 			{
-				"on":     exchange,
-				strategy: allParams,
+				"on":       exchange,
+				strategy:   allParams,
 			},
 		},
 		Backtest: struct {
 			Sessions  []string `yaml:"sessions"`
+			Symbols   []string `yaml:"symbols"`
 			StartTime string   `yaml:"startTime"`
 			EndTime   string   `yaml:"endTime"`
 			Accounts  map[string]struct {
@@ -290,6 +347,7 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 			} `yaml:"accounts"`
 		}{
 			Sessions:  []string{exchange},
+			Symbols:   []string{symbol},
 			StartTime: startTime,
 			EndTime:   endTime,
 			Accounts: map[string]struct {
