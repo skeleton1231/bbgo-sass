@@ -22,7 +22,9 @@ type MarketDataHub struct {
 	clients map[string]map[chan json.RawMessage]struct{} // key: "market" or "user:{userID}"
 }
 
-func NewMarketDataHub(addr string) (*MarketDataHub, error) {
+func NewMarketDataHub(addr string, subs []MarketSub) (*MarketDataHub, error) {
+	// SECURITY: Uses plaintext gRPC. Security relies on Docker network isolation.
+	// For production with untrusted networks, replace with grpc.WithTransportCredentials(credentials.NewTLS(...)).
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("dial marketdata %s: %w", addr, err)
@@ -34,25 +36,43 @@ func NewMarketDataHub(addr string) (*MarketDataHub, error) {
 		clients: make(map[string]map[chan json.RawMessage]struct{}),
 	}
 
-	go hub.subscribeDefault()
+	go hub.subscribeDefault(subs)
 	return hub, nil
 }
 
+func channelPb(name string) pb.Channel {
+	switch name {
+	case "trade":
+		return pb.Channel_TRADE
+	case "kline":
+		return pb.Channel_KLINE
+	case "book":
+		return pb.Channel_BOOK
+	default:
+		return pb.Channel_TRADE
+	}
+}
+
 // subscribeDefault subscribes to common market data with automatic reconnect.
-func (h *MarketDataHub) subscribeDefault() {
+func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 	const (
 		minBackoff = 2 * time.Second
 		maxBackoff = 30 * time.Second
 	)
 
-	backoff := minBackoff
-	req := &pb.SubscribeRequest{
-		Subscriptions: []*pb.Subscription{
-			{Exchange: "binance", Channel: pb.Channel_TRADE, Symbol: "BTCUSDT"},
-			{Exchange: "binance", Channel: pb.Channel_KLINE, Symbol: "BTCUSDT", Interval: "1m"},
-			{Exchange: "binance", Channel: pb.Channel_BOOK, Symbol: "BTCUSDT", Depth: "5"},
-		},
+	pbSubs := make([]*pb.Subscription, len(subs))
+	for i, s := range subs {
+		pbSubs[i] = &pb.Subscription{
+			Exchange: s.Exchange,
+			Channel:  channelPb(s.Channel),
+			Symbol:   s.Symbol,
+			Interval: s.Interval,
+			Depth:    s.Depth,
+		}
 	}
+
+	backoff := minBackoff
+	req := &pb.SubscribeRequest{Subscriptions: pbSubs}
 
 	for {
 		ctx := context.Background()
@@ -72,7 +92,11 @@ func (h *MarketDataHub) subscribeDefault() {
 				break
 			}
 
-			msg, _ := json.Marshal(marketDataToJSON(md))
+			msg, err := json.Marshal(marketDataToJSON(md))
+			if err != nil {
+				log.Printf("marketdata json marshal error: %v", err)
+				continue
+			}
 			h.broadcast("market", msg)
 		}
 
@@ -97,6 +121,7 @@ func (h *MarketDataHub) broadcast(key string, msg json.RawMessage) {
 func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, containerAddr string, sessions []string) (chan json.RawMessage, error) {
 	key := "user:" + userID
 
+	// SECURITY: plaintext gRPC — relies on Docker network isolation.
 	conn, err := grpc.NewClient(containerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("dial user container %s: %w", containerAddr, err)
@@ -139,7 +164,11 @@ func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, co
 				log.Printf("user data stream %s error: %v", userID, err)
 				return
 			}
-			msg, _ := json.Marshal(userDataToJSON(ud))
+			msg, err := json.Marshal(userDataToJSON(ud))
+				if err != nil {
+					log.Printf("user data json marshal error for %s: %v", userID, err)
+					continue
+				}
 			select {
 			case ch <- msg:
 			default:

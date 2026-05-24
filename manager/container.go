@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const containerPrefix = "bbgo-"
@@ -154,25 +156,41 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 func (cm *ContainerManager) SyncBacktest(exchange, symbol, startTime, endTime string) (string, error) {
 	cm.ensureBacktestSharedDir()
 
-	yaml := fmt.Sprintf(`sessions:
-  %s:
-    exchange: %s
+	type syncConfig struct {
+		Sessions map[string]struct {
+			Exchange string `yaml:"exchange"`
+		} `yaml:"sessions"`
+		Backtest struct {
+			Sessions  []string `yaml:"sessions"`
+			Symbols   []string `yaml:"symbols"`
+			StartTime string   `yaml:"startTime"`
+			EndTime   string   `yaml:"endTime"`
+		} `yaml:"backtest"`
+	}
 
-backtest:
-  sessions:
-    - %s
-  symbols:
-    - %s
-  startTime: "%s"
-  endTime: "%s"
-`, exchange, exchange, exchange, symbol, startTime, endTime)
+	cfg := syncConfig{}
+	cfg.Sessions = map[string]struct {
+		Exchange string `yaml:"exchange"`
+	}{
+		exchange: {Exchange: exchange},
+	}
+	cfg.Backtest.Sessions = []string{exchange}
+	cfg.Backtest.Symbols = []string{symbol}
+	cfg.Backtest.StartTime = startTime
+	cfg.Backtest.EndTime = endTime
+
+	yamlBytes, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return "", fmt.Errorf("marshal backtest config: %w", err)
+	}
+	yamlContent := string(yamlBytes)
 
 	hostDir := cm.cfg.DataDir + "/backtest-sync"
 	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir: %w", err)
 	}
 	configPath := hostDir + "/bbgo.yaml"
-	if err := os.WriteFile(configPath, []byte(yaml), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0o644); err != nil {
 		return "", fmt.Errorf("write config: %w", err)
 	}
 

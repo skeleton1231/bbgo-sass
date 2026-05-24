@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 )
@@ -16,18 +20,87 @@ type WSMessage struct {
 	Data json.RawMessage `json:"data"`
 }
 
-func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+// WSTicketStore issues short-lived, single-use tickets for WebSocket auth.
+// This avoids exposing the manager token in WebSocket URLs.
+type WSTicketStore struct {
+	mu      sync.Mutex
+	tickets map[string]*wsTicket
+}
+
+type wsTicket struct {
+	userID    string
+	expiresAt time.Time
+}
+
+func NewWSTicketStore() *WSTicketStore {
+	ts := &WSTicketStore{tickets: make(map[string]*wsTicket)}
+	go ts.cleanup()
+	return ts
+}
+
+func (ts *WSTicketStore) cleanup() {
+	for {
+		time.Sleep(30 * time.Second)
+		ts.mu.Lock()
+		now := time.Now()
+		for k, t := range ts.tickets {
+			if now.After(t.expiresAt) {
+				delete(ts.tickets, k)
+			}
+		}
+		ts.mu.Unlock()
+	}
+}
+
+func (ts *WSTicketStore) Issue(userID string) string {
+	b := make([]byte, 24)
+	rand.Read(b)
+	ticket := hex.EncodeToString(b)
+	ts.mu.Lock()
+	ts.tickets[ticket] = &wsTicket{userID: userID, expiresAt: time.Now().Add(30 * time.Second)}
+	ts.mu.Unlock()
+	return ticket
+}
+
+func (ts *WSTicketStore) Redeem(ticket string) (string, bool) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	t, ok := ts.tickets[ticket]
+	if !ok || time.Now().After(t.expiresAt) {
+		return "", false
+	}
+	delete(ts.tickets, ticket)
+	return t.userID, true
+}
+
+func (api *API) IssueWSTicket(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(r)
 	if !ok {
-		userID = r.URL.Query().Get("userId")
-		if !isValidUUID(userID) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	ticket := api.wsTickets.Issue(userID)
+	writeJSON(w, http.StatusOK, map[string]string{"ticket": ticket})
+}
+
+func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	ticket := r.URL.Query().Get("ticket")
+	if ticket == "" {
+		http.Error(w, "missing ticket", http.StatusUnauthorized)
+		return
+	}
+	userID, ok := api.wsTickets.Redeem(ticket)
+	if !ok {
+		http.Error(w, "invalid or expired ticket", http.StatusUnauthorized)
+		return
 	}
 
+	origins := api.cfg.WSAllowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"localhost:*", "127.0.0.1:*"}
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"},
+		OriginPatterns: origins,
 	})
 	if err != nil {
 		log.Printf("ws accept error: %v", err)
@@ -129,5 +202,6 @@ func extractSessionNames(uc *UserContainer) []string {
 	for s := range seen {
 		sessions = append(sessions, s)
 	}
+	sort.Strings(sessions)
 	return sessions
 }

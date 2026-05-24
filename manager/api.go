@@ -13,6 +13,7 @@ import (
 )
 
 type API struct {
+	cfg      *Config
 	users     *UserContainerManager
 	container *ContainerManager
 	proxy     *BotProxy
@@ -21,12 +22,15 @@ type API struct {
 	syncer    *Syncer
 	hub       *MarketDataHub
 	notifier  *Notifier
+	wsTickets *WSTicketStore
+	btSyncSem chan struct{} // limits concurrent backtest sync operations
 
 	newBBGoClient func(baseURL string) *BBGoClient
 }
 
-func NewAPI(users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier) *API {
+func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier) *API {
 	return &API{
+		cfg:           cfg,
 		users:         users,
 		container:     cm,
 		proxy:         proxy,
@@ -35,6 +39,8 @@ func NewAPI(users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, 
 		syncer:        syncer,
 		hub:           hub,
 		notifier:      notifier,
+		wsTickets:     NewWSTicketStore(),
+		btSyncSem:     make(chan struct{}, 2),
 		newBBGoClient: NewBBGoClient,
 	}
 }
@@ -76,6 +82,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	r.Post("/api/notifications/test", api.TestNotification)
 
 	// WebSocket for real-time data
+	r.Get("/api/ws/ticket", api.IssueWSTicket)
 	r.Get("/api/ws", api.HandleWebSocket)
 
 	// Generic proxy for any other bbgo API calls
@@ -385,6 +392,12 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+
 	var req struct {
 		Exchange  string   `json:"exchange"`
 		Symbols   []string `json:"symbols"`
@@ -395,6 +408,14 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+
+	select {
+	case api.btSyncSem <- struct{}{}:
+	default:
+		writeError(w, http.StatusTooManyRequests, "backtest sync already in progress, try again later")
+		return
+	}
+	defer func() { <-api.btSyncSem }()
 	if req.Exchange == "" {
 		req.Exchange = "binance"
 	}
@@ -413,6 +434,7 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		Output string `json:"output"`
 		Error  string `json:"error,omitempty"`
 	}
+	log.Printf("backtest sync requested by user %s: %s %v %s-%s", userID, req.Exchange, req.Symbols, req.StartTime, req.EndTime)
 	var results []syncResult
 	for _, sym := range req.Symbols {
 		out, err := api.container.SyncBacktest(req.Exchange, sym, req.StartTime, req.EndTime)
@@ -429,7 +451,11 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) BacktestSyncStatus(w http.ResponseWriter, _ *http.Request) {
-	dbPath := api.container.cfg.DataDir + "/../backtest-shared/backtest.db"
+	dbPath := api.container.cfg.BacktestSharedDir
+	if dbPath == "" {
+		dbPath = api.container.cfg.DataDir + "/backtest-shared"
+	}
+	dbPath += "/backtest.db"
 	info, err := os.Stat(dbPath)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]interface{}{

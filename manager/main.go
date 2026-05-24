@@ -101,13 +101,13 @@ func main() {
 	proxy := NewBotProxy(containerMgr)
 
 	var hub *MarketDataHub
-	if h, err := NewMarketDataHub(cfg.MarketDataAddr); err != nil {
+	if h, err := NewMarketDataHub(cfg.MarketDataAddr, cfg.MarketSubscriptions); err != nil {
 		log.Printf("warning: marketdata hub not available (%v), real-time data disabled", err)
 	} else {
 		hub = h
 	}
 
-	api := NewAPI(users, containerMgr, proxy, credStore, enc, syncer, hub, notifier)
+	api := NewAPI(cfg, users, containerMgr, proxy, credStore, enc, syncer, hub, notifier)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

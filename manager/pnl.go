@@ -45,6 +45,7 @@ type PnLReport struct {
 
 type fifoQueue struct {
 	items []fifoItem
+	head  int
 }
 
 type fifoItem struct {
@@ -58,20 +59,23 @@ func (q *fifoQueue) push(price, quantity float64) {
 
 func (q *fifoQueue) pop(quantity float64) (costBasis float64, remaining float64) {
 	remaining = quantity
-	for remaining > 1e-12 && len(q.items) > 0 {
-		head := q.items[0]
-		if head.quantity <= remaining {
-			costBasis += head.quantity * head.price
-			remaining -= head.quantity
-			q.items = q.items[1:]
+	for remaining > 1e-12 && q.head < len(q.items) {
+		item := &q.items[q.head]
+		if item.quantity <= remaining {
+			costBasis += item.quantity * item.price
+			remaining -= item.quantity
+			q.head++
 		} else {
-			costBasis += remaining * head.price
-			head.quantity -= remaining
-			q.items[0] = head
+			costBasis += remaining * item.price
+			item.quantity -= remaining
 			remaining = 0
 		}
 	}
 	return costBasis, remaining
+}
+
+func (q *fifoQueue) remaining() []fifoItem {
+	return q.items[q.head:]
 }
 
 func calculatePnL(trades []BBGoTrade) PnLReport {
@@ -131,7 +135,7 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 			}
 		}
 
-		for _, item := range buyQueue.items {
+		for _, item := range buyQueue.remaining() {
 			symPnL.OpenPosition += item.quantity
 			symPnL.OpenPositionCost += item.quantity * item.price
 		}
