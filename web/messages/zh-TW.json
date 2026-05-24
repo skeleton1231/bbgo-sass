@@ -32,7 +32,9 @@
     "manage": "管理",
     "viewAll": "在儀表板中檢視全部",
     "noStrategies": "尚未配置策略。",
-    "createStrategy": "建立策略"
+    "createStrategy": "建立策略",
+    "strategyCount": "1 / {count} 個策略",
+    "loading": "載入中..."
   },
   "Bots": {
     "title": "交易機器人",
@@ -89,7 +91,24 @@
     "save": "儲存",
     "saving": "儲存中...",
     "testnet": "測試網",
-    "containerLogs": "容器日誌"
+    "noCredsForExchange": "未設定 {exchange} 的 API 憑證，請先在設定中新增。",
+    "noCredsForRole": "{role} ({exchange}) 未設定 API 憑證。",
+    "containerLogs": "容器日誌",
+    "pnl": {
+      "realized": "已實現盈虧",
+      "totalFees": "總手續費",
+      "winRate": "勝率",
+      "totalTrades": "總交易數",
+      "bySymbol": "按幣種盈虧",
+      "tradeCount": "{count} 筆交易",
+      "openPosition": "持倉: {amount} @ ~{price}",
+      "avgBuy": "均價 {price}"
+    },
+    "crossExchange": "跨交易所",
+    "live": {
+      "connected": "即時",
+      "disconnected": "離線"
+    }
   },
   "Backtest": {
     "title": "回測",
@@ -107,9 +126,11 @@
     "endDate": "結束日期",
     "running": "執行中...",
     "backtestOutput": "回測輸出",
-    "backtestDuration": "回測可能需要 30-60 秒，取決於日期範圍..."
+    "backtestDuration": "回測可能需要 30-60 秒，取決於日期範圍...",
+    "error": "回測失敗，請重試。"
   },
   "Settings": {
+    "title": "設定",
     "apiKeys": {
       "title": "交易所 API 金鑰",
       "add": "新增 API 金鑰",
@@ -122,6 +143,31 @@
       "delete": "刪除",
       "verified": "已驗證",
       "verificationFailed": "驗證失敗"
+    },
+    "notifications": {
+      "title": "通知",
+      "description": "設定 Telegram 或 Slack 以接收交易、訂單和容器健康警報。",
+      "addTelegram": "新增 Telegram Bot",
+      "addSlack": "新增 Slack Webhook",
+      "botToken": "Bot Token",
+      "chatId": "聊天 ID",
+      "webhookUrl": "Webhook URL",
+      "trades": "交易",
+      "orders": "訂單",
+      "health": "健康",
+      "add": "新增",
+      "adding": "新增中...",
+      "added": "通知頻道已新增。",
+      "addError": "新增通知頻道失敗。",
+      "cancel": "取消",
+      "remove": "移除",
+      "deleted": "通知頻道已移除。",
+      "deleteError": "移除頻道失敗。",
+      "sendTest": "發送測試",
+      "testSent": "測試通知已發送。",
+      "testError": "測試通知發送失敗。",
+      "loading": "載入中...",
+      "loadError": "載入通知設定失敗。"
     }
   },
   "Errors": {

@@ -32,7 +32,9 @@
     "manage": "관리",
     "viewAll": "대시보드에서 전체 보기",
     "noStrategies": "아직 설정된 전략이 없습니다.",
-    "createStrategy": "전략 만들기"
+    "createStrategy": "전략 만들기",
+    "strategyCount": "1 / {count} 전략",
+    "loading": "로딩 중..."
   },
   "Bots": {
     "title": "트레이딩 봇",
@@ -89,7 +91,24 @@
     "save": "저장",
     "saving": "저장 중...",
     "testnet": "테스트넷",
-    "containerLogs": "컨테이너 로그"
+    "noCredsForExchange": "{exchange} API 자격 증명이 설정되지 않았습니다. 설정에서 먼저 추가하세요.",
+    "noCredsForRole": "{role} ({exchange}) API 자격 증명이 설정되지 않았습니다.",
+    "containerLogs": "컨테이너 로그",
+    "pnl": {
+      "realized": "실현 손익",
+      "totalFees": "총 수수료",
+      "winRate": "승률",
+      "totalTrades": "총 거래 수",
+      "bySymbol": "심볼별 손익",
+      "tradeCount": "{count}건",
+      "openPosition": "포지션: {amount} @ ~{price}",
+      "avgBuy": "평균 매수 {price}"
+    },
+    "crossExchange": "크로스 거래소",
+    "live": {
+      "connected": "실시간",
+      "disconnected": "오프라인"
+    }
   },
   "Backtest": {
     "title": "백테스트",
@@ -107,9 +126,11 @@
     "endDate": "종료 날짜",
     "running": "실행 중...",
     "backtestOutput": "백테스트 출력",
-    "backtestDuration": "날짜 범위에 따라 30-60초가 걸릴 수 있습니다..."
+    "backtestDuration": "날짜 범위에 따라 30-60초가 걸릴 수 있습니다...",
+    "error": "백테스트에 실패했습니다. 다시 시도해 주세요."
   },
   "Settings": {
+    "title": "설정",
     "apiKeys": {
       "title": "거래소 API 키",
       "add": "API 키 추가",
@@ -122,6 +143,31 @@
       "delete": "삭제",
       "verified": "인증 완료",
       "verificationFailed": "인증 실패"
+    },
+    "notifications": {
+      "title": "알림",
+      "description": "Telegram 또는 Slack을 설정하여 거래, 주문, 컨테이너 상태 알림을 받으세요.",
+      "addTelegram": "Telegram 봇 추가",
+      "addSlack": "Slack Webhook 추가",
+      "botToken": "봇 토큰",
+      "chatId": "채팅 ID",
+      "webhookUrl": "Webhook URL",
+      "trades": "거래",
+      "orders": "주문",
+      "health": "상태",
+      "add": "추가",
+      "adding": "추가 중...",
+      "added": "알림 채널이 추가되었습니다.",
+      "addError": "알림 채널 추가에 실패했습니다.",
+      "cancel": "취소",
+      "remove": "제거",
+      "deleted": "알림 채널이 제거되었습니다.",
+      "deleteError": "채널 제거에 실패했습니다.",
+      "sendTest": "테스트 전송",
+      "testSent": "테스트 알림이 전송되었습니다.",
+      "testError": "테스트 알림 전송에 실패했습니다.",
+      "loading": "로딩 중...",
+      "loadError": "알림 설정을 불러오지 못했습니다."
     }
   },
   "Errors": {

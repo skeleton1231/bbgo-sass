@@ -1,9 +1,10 @@
 const PROXY_PREFIX = '/api/manager'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const { headers: customHeaders, ...rest } = options ?? {}
   const res = await fetch(`${PROXY_PREFIX}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
+    ...rest,
+    headers: { 'Content-Type': 'application/json', ...customHeaders },
   })
 
   if (!res.ok) {
@@ -285,8 +286,8 @@ export interface CredentialInfo {
   is_verified: boolean
 }
 
-export function fetchCredentials(userId: string) {
-  return request<CredentialInfo[]>(`/credentials?user_id=${userId}`)
+export function fetchCredentials(_userId: string) {
+  return request<CredentialInfo[]>('/credentials')
 }
 
 export function createCredential(data: {
@@ -302,8 +303,8 @@ export function createCredential(data: {
   })
 }
 
-export function deleteCredential(id: string, userId: string) {
-  return request<{ status: string }>(`/credentials/${id}?user_id=${userId}`, {
+export function deleteCredential(id: string, _userId: string) {
+  return request<{ status: string }>(`/credentials/${id}`, {
     method: 'DELETE',
   })
 }

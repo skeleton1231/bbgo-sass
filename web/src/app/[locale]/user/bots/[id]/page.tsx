@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import {
   useUserStrategies,
@@ -210,16 +211,16 @@ export default function BotDetailPage() {
                   <div key={s.symbol} className="flex items-center justify-between px-4 py-3 text-sm">
                     <div className="flex items-center gap-3 min-w-[140px]">
                       <span className="font-medium">{s.symbol}</span>
-                      <span className="text-xs text-muted-foreground">{s.tradeCount} trades</span>
+                      <span className="text-xs text-muted-foreground">{t('pnl.tradeCount', { count: s.tradeCount })}</span>
                     </div>
                     <div className="flex items-center gap-6">
                       {s.openPosition > 0 && (
                         <span className="text-xs text-muted-foreground">
-                          pos: {s.openPosition.toFixed(6)} @ ~{s.openPositionCost > 0 ? (s.openPositionCost / s.openPosition).toFixed(2) : '-'}
+                          {t('pnl.openPosition', { amount: s.openPosition.toFixed(6), price: s.openPositionCost > 0 ? (s.openPositionCost / s.openPosition).toFixed(2) : '-' })}
                         </span>
                       )}
                       <span className="text-xs text-muted-foreground w-20 text-right">
-                        avg buy {s.avgBuyPrice > 0 ? s.avgBuyPrice.toFixed(2) : '-'}
+                        {t('pnl.avgBuy', { price: s.avgBuyPrice > 0 ? s.avgBuyPrice.toFixed(2) : '-' })}
                       </span>
                       <span className={cn(
                         'font-medium w-32 text-right',
@@ -403,7 +404,7 @@ export default function BotDetailPage() {
                     <div>
                       <p className="text-sm font-medium">{s.name || s.strategy}</p>
                       <p className="text-xs text-muted-foreground">
-                        {s.exchange}{s.crossExchange ? ' (cross-exchange)' : ''} · {s.strategy} · {t(`mode.${s.mode}`)}
+                        {s.exchange}{s.crossExchange ? ` (${t('crossExchange')})` : ''} · {s.strategy} · {t(`mode.${s.mode}`)}
                       </p>
                     </div>
                     {isRunning && (

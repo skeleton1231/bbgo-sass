@@ -4,28 +4,8 @@ import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRunBacktest } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory } from '@/lib/bbgo/strategies'
+import { CATEGORY_LABELS, EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
-
-const CATEGORY_LABELS: Record<string, string> = {
-  grid: 'Grid',
-  maker: 'Market Maker',
-  trend: 'Trend Following',
-  'mean-reversion': 'Mean Reversion',
-  dca: 'DCA',
-  volatility: 'Volatility',
-  indicator: 'Indicator',
-  'cross-exchange': 'Cross-Exchange',
-  utility: 'Utility',
-  other: 'Other',
-}
-
-const EXCHANGES = [
-  { id: 'binance', label: 'Binance' },
-  { id: 'okex', label: 'OKX' },
-  { id: 'bybit', label: 'Bybit' },
-  { id: 'bitget', label: 'Bitget' },
-  { id: 'kucoin', label: 'KuCoin' },
-]
 
 export function BacktestPanel({ userId }: { userId: string }) {
   const t = useTranslations('Backtest')
@@ -90,7 +70,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
               onChange={(e) => setExchange(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
-              {EXCHANGES.map((ex) => (
+              {EXCHANGE_OPTIONS.map((ex) => (
                 <option key={ex.id} value={ex.id}>{ex.label}</option>
               ))}
             </select>
@@ -153,12 +133,6 @@ export function BacktestPanel({ userId }: { userId: string }) {
           <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
             {runBacktest.data.output.replace(/\x1b\[[0-9;]*m/g, '')}
           </pre>
-        </div>
-      )}
-
-      {runBacktest.isError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p className="text-sm text-destructive">{(runBacktest.error as Error).message}</p>
         </div>
       )}
     </div>

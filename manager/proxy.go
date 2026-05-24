@@ -47,6 +47,8 @@ func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID st
 		return
 	}
 	proxyReq.Header = r.Header.Clone()
+	proxyReq.Header.Del("X-Manager-Token")
+	proxyReq.Header.Del("X-User-Id")
 
 	resp, err := bp.client.Do(proxyReq)
 	if err != nil {

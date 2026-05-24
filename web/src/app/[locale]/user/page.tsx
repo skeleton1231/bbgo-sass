@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import {
   useUserStrategies,
@@ -29,15 +29,16 @@ export default function DashboardPage() {
   }, [])
 
   const { data: userContainer } = useUserStrategies(userId)
-  const { data: tradesData } = useBotTrades(userId)
+  const isActive = userContainer?.status === 'running'
+  const strategyCount = userContainer?.strategies?.length ?? 0
+
+  const { data: tradesData } = useBotTrades(userId, undefined, undefined)
   const { data: assetsData } = useBotAssets(userId)
   const { data: sessionsData } = useBotSessions(userId)
 
-  const trades = tradesData?.trades ?? []
-  const assets = assetsData?.assets ?? {}
-  const isActive = userContainer?.status === 'running'
-  const strategyCount = userContainer?.strategies?.length ?? 0
-  const sessionCount = sessionsData?.sessions?.length ?? 0
+  const trades = isActive ? (tradesData?.trades ?? []) : []
+  const assets = isActive ? (assetsData?.assets ?? {}) : {}
+  const sessionCount = isActive ? (sessionsData?.sessions?.length ?? 0) : 0
 
   const totalValue = Object.values(assets).reduce((sum, a: BBGoAsset) => {
     return sum + parseFloat(a.netAssetInUSD || '0')
@@ -52,7 +53,7 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground">{t('activeBots')}</p>
           <p className="text-2xl font-bold mt-1">
             {isActive ? 1 : 0}
-            <span className="text-base font-normal text-muted-foreground"> / {strategyCount} strategies</span>
+            <span className="text-base font-normal text-muted-foreground"> / {t('strategyCount', { count: strategyCount })}</span>
           </p>
         </div>
         <div className="rounded-lg border bg-card p-6">
@@ -139,7 +140,7 @@ export default function DashboardPage() {
 
       {!userId && (
         <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
-          Loading...
+          {t('loading')}
         </div>
       )}
 

@@ -109,6 +109,10 @@ func (api *API) resolveUserID(w http.ResponseWriter, r *http.Request) (string, b
 			writeError(w, http.StatusBadRequest, "invalid user ID format")
 			return "", false
 		}
+		if headerID, ok := userIDFromRequest(r); ok && headerID != urlID {
+			writeError(w, http.StatusForbidden, "user ID mismatch")
+			return "", false
+		}
 		return urlID, true
 	}
 	id, ok := userIDFromRequest(r)
@@ -272,16 +276,23 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var reachable bool
 	for i := 0; i < 30; i++ {
 		client := api.newBBGoClient(api.container.APIURL(userID))
 		if err := client.Ping(); err == nil {
+			reachable = true
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	api.users.UpdateStatus(userID, StatusRunning)
-	uc.Status = StatusRunning
+	if reachable {
+		api.users.UpdateStatus(userID, StatusRunning)
+		uc.Status = StatusRunning
+	} else {
+		api.users.UpdateStatus(userID, StatusError)
+		uc.Status = StatusError
+	}
 	writeJSON(w, http.StatusOK, uc)
 }
 
@@ -320,6 +331,10 @@ func (api *API) ProxyToBot(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userID")
 	if !isValidUUID(userID) {
 		writeError(w, http.StatusBadRequest, "invalid user ID format")
+		return
+	}
+	if headerID, ok := userIDFromRequest(r); ok && headerID != userID {
+		writeError(w, http.StatusForbidden, "user ID mismatch")
 		return
 	}
 
@@ -418,7 +433,7 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		IsTestnet:           req.IsTestnet,
 	}
 
-	if err := api.creds.Create(cred); err != nil {
+	if err := api.creds.Upsert(cred); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -429,17 +444,18 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
 		go func() {
 			log.Printf("restarting container for user %s after credential update", userID)
-			if err := api.container.CreateAndStart(uc); err != nil {
+			if err := api.container.Restart(uc); err != nil {
 				log.Printf("restart after credential update failed for user %s: %v", userID, err)
 			}
 		}()
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"id":         cred.ID,
-		"user_id":    cred.UserID,
-		"exchange":   cred.Exchange,
-		"is_testnet": cred.IsTestnet,
+		"id":          cred.ID,
+		"user_id":     cred.UserID,
+		"exchange":    cred.Exchange,
+		"is_testnet":  cred.IsTestnet,
+		"is_verified": cred.IsVerified,
 	})
 }
 
@@ -495,7 +511,7 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
 		go func() {
 			log.Printf("restarting container for user %s after credential deletion", userID)
-			if err := api.container.CreateAndStart(uc); err != nil {
+			if err := api.container.Restart(uc); err != nil {
 				log.Printf("restart after credential deletion failed for user %s: %v", userID, err)
 			}
 		}()
@@ -909,10 +925,19 @@ func (api *API) TestNotification(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-	api.notifier.Dispatch(userID, NotificationEvent{
+	sent := api.notifier.Dispatch(userID, NotificationEvent{
 		Type:    "test",
 		Title:   "BBGO Test Notification",
 		Message: "If you see this, notifications are working!",
 	})
+	if !sent {
+		configs := api.notifier.List(userID)
+		if len(configs) == 0 {
+			writeError(w, http.StatusBadRequest, "no notification channels configured")
+		} else {
+			writeError(w, http.StatusTooManyRequests, "rate limited — try again in a minute")
+		}
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
 }

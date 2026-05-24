@@ -182,15 +182,29 @@ func (s *Syncer) getCursor(userID, table string) int64 {
 
 func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
 	payload, _ := json.Marshal(map[string]interface{}{
-		"user_id":    userID,
-		"table_name": table,
-		"last_gid":   lastGID,
+		"last_gid": lastGID,
 	})
-	resp, err := s.supabaseRequest("POST", "sync_cursors", payload)
+	path := "sync_cursors?user_id=eq." + userID + "&table_name=eq." + table
+	resp, err := s.supabaseRequest("PATCH", path, payload)
 	if err != nil {
 		return
 	}
 	resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		return
+	}
+
+	insPayload, _ := json.Marshal(map[string]interface{}{
+		"user_id":    userID,
+		"table_name": table,
+		"last_gid":   lastGID,
+	})
+	insResp, err := s.supabaseRequest("POST", "sync_cursors", insPayload)
+	if err != nil {
+		return
+	}
+	insResp.Body.Close()
 }
 
 func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
@@ -235,6 +249,11 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 	}
 	resp.Body.Close()
 
+	if resp.StatusCode >= 400 {
+		log.Printf("sync orders for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
+		return
+	}
+
 	maxGID := lastGID
 	for _, o := range orders {
 		if int64(o.GID) > maxGID {
@@ -271,6 +290,7 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 			"fee":          t.Fee,
 			"fee_currency": t.FeeCurrency,
 			"quote_quantity": t.QuoteQuantity,
+			"traded_at":      t.TradedAt,
 		}
 	}
 
@@ -286,6 +306,11 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 		return
 	}
 	resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		log.Printf("sync trades for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
+		return
+	}
 
 	maxGID := lastGID
 	for _, t := range trades {

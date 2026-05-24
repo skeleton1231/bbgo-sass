@@ -56,7 +56,8 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	uc, found := api.users.Get(userID)
 	if found && uc.Status == StatusRunning {
 		containerAddr := api.container.ContainerGRPCAddr(userID)
-		userCh, err = api.hub.SubscribeUserData(ctx, userID, containerAddr)
+		sessions := extractSessionNames(uc)
+		userCh, err = api.hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
 		if err != nil {
 			log.Printf("ws user data subscribe error for %s: %v", userID, err)
 		} else {
@@ -109,4 +110,24 @@ func wsWrite(conn *websocket.Conn, ctx context.Context, mu *sync.Mutex, msg []by
 		defer mu.Unlock()
 	}
 	conn.Write(ctx, websocket.MessageText, msg)
+}
+
+func extractSessionNames(uc *UserContainer) []string {
+	seen := map[string]bool{}
+	for _, s := range uc.Strategies {
+		if s.CrossExchange {
+			for _, sr := range s.Sessions {
+				if !seen[sr.Name] {
+					seen[sr.Name] = true
+				}
+			}
+		} else if s.Exchange != "" {
+			seen[s.Exchange] = true
+		}
+	}
+	sessions := make([]string, 0, len(seen))
+	for s := range seen {
+		sessions = append(sessions, s)
+	}
+	return sessions
 }

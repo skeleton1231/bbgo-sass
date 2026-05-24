@@ -64,18 +64,20 @@ func main() {
 		defer ticker.Stop()
 		for range ticker.C {
 			syncer.SyncAll()
-			users := users.ListUsers()
-			for _, uc := range users {
+			allUsers := users.ListUsers()
+			for _, uc := range allUsers {
 				if uc.Status == StatusRunning && !containerMgr.IsRunning(uc.UserID) {
 					log.Printf("health check: container %s died, restarting", containerMgr.containerName(uc.UserID))
+					if err := containerMgr.CreateAndStart(uc); err != nil {
+						log.Printf("health check: restart %s failed: %v", uc.UserID, err)
+						users.UpdateStatus(uc.UserID, StatusError)
+						continue
+					}
 					notifier.Dispatch(uc.UserID, NotificationEvent{
 						Type:    "container",
 						Title:   "Container Restarted",
-						Message: fmt.Sprintf("Container bbgo-%s died and is being restarted.", uc.UserID[:8]),
+						Message: fmt.Sprintf("Container bbgo-%s was restarted after an unexpected stop.", safeShortID(uc.UserID)),
 					})
-					if err := containerMgr.CreateAndStart(uc); err != nil {
-						log.Printf("health check: restart %s failed: %v", uc.UserID, err)
-					}
 				}
 			}
 		}
@@ -122,6 +124,9 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
+	}
+	if hub != nil {
+		hub.Close()
 	}
 	log.Println("server stopped")
 }

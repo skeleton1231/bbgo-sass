@@ -32,7 +32,9 @@
     "manage": "管理",
     "viewAll": "ダッシュボードですべて表示",
     "noStrategies": "ストラテジーが設定されていません。",
-    "createStrategy": "ストラテジーを作成"
+    "createStrategy": "ストラテジーを作成",
+    "strategyCount": "1 / {count} ストラテジー",
+    "loading": "読み込み中..."
   },
   "Bots": {
     "title": "トレードボット",
@@ -89,7 +91,24 @@
     "save": "保存",
     "saving": "保存中...",
     "testnet": "テストネット",
-    "containerLogs": "コンテナログ"
+    "noCredsForExchange": "{exchange} の API 認証情報が設定されていません。先に設定で追加してください。",
+    "noCredsForRole": "{role} ({exchange}) の API 認証情報が設定されていません。",
+    "containerLogs": "コンテナログ",
+    "pnl": {
+      "realized": "実現損益",
+      "totalFees": "合計手数料",
+      "winRate": "勝率",
+      "totalTrades": "総取引数",
+      "bySymbol": "シンボル別損益",
+      "tradeCount": "{count} 件",
+      "openPosition": "ポジ: {amount} @ ~{price}",
+      "avgBuy": "平均買い {price}"
+    },
+    "crossExchange": "クロス取引所",
+    "live": {
+      "connected": "リアルタイム",
+      "disconnected": "オフライン"
+    }
   },
   "Backtest": {
     "title": "バックテスト",
@@ -107,9 +126,11 @@
     "endDate": "終了日",
     "running": "実行中...",
     "backtestOutput": "バックテスト出力",
-    "backtestDuration": "日付範囲により30-60秒かかる場合があります..."
+    "backtestDuration": "日付範囲により30-60秒かかる場合があります...",
+    "error": "バックテストに失敗しました。もう一度お試しください。"
   },
   "Settings": {
+    "title": "設定",
     "apiKeys": {
       "title": "取引所 API キー",
       "add": "API キー追加",
@@ -122,6 +143,31 @@
       "delete": "削除",
       "verified": "検証済み",
       "verificationFailed": "検証失敗"
+    },
+    "notifications": {
+      "title": "通知",
+      "description": "Telegram または Slack を設定して、取引・注文・コンテナヘルスアラートを受信。",
+      "addTelegram": "Telegram Bot 追加",
+      "addSlack": "Slack Webhook 追加",
+      "botToken": "Bot トークン",
+      "chatId": "チャット ID",
+      "webhookUrl": "Webhook URL",
+      "trades": "取引",
+      "orders": "注文",
+      "health": "ヘルス",
+      "add": "追加",
+      "adding": "追加中...",
+      "added": "通知チャンネルを追加しました。",
+      "addError": "通知チャンネルの追加に失敗しました。",
+      "cancel": "キャンセル",
+      "remove": "削除",
+      "deleted": "通知チャンネルを削除しました。",
+      "deleteError": "チャンネルの削除に失敗しました。",
+      "sendTest": "テスト送信",
+      "testSent": "テスト通知を送信しました。",
+      "testError": "テスト通知の送信に失敗しました。",
+      "loading": "読み込み中...",
+      "loadError": "通知設定の読み込みに失敗しました。"
     }
   },
   "Errors": {

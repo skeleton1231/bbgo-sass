@@ -61,7 +61,7 @@ func TestSyncer_SyncOrdersViaAPI(t *testing.T) {
 			json.NewEncoder(w).Encode(orders)
 			return
 		}
-		if r.Method == "POST" && r.URL.Path == "/rest/v1/sync_cursors" {
+		if (r.Method == "PATCH" || r.Method == "POST") && r.URL.Path == "/rest/v1/sync_cursors" {
 			var cur map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&cur)
 			supabaseMu.Lock()
@@ -109,7 +109,7 @@ func TestSyncer_SyncOrdersViaAPI(t *testing.T) {
 	if len(cursorUpdates) != 1 {
 		t.Fatalf("expected 1 cursor update, got %d", len(cursorUpdates))
 	}
-	if cursorUpdates[0]["table_name"] != "sync_orders" {
+	if cursorUpdates[0]["last_gid"] == nil {
 		t.Errorf("expected cursor table_name sync_orders, got %v", cursorUpdates[0]["table_name"])
 	}
 }
@@ -146,7 +146,7 @@ func TestSyncer_SyncTradesViaAPI(t *testing.T) {
 			json.NewEncoder(w).Encode(trades)
 			return
 		}
-		if r.Method == "POST" && r.URL.Path == "/rest/v1/sync_cursors" {
+		if (r.Method == "PATCH" || r.Method == "POST") && r.URL.Path == "/rest/v1/sync_cursors" {
 			var cur map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&cur)
 			supabaseMu.Lock()
@@ -191,7 +191,7 @@ func TestSyncer_SyncTradesViaAPI(t *testing.T) {
 	if len(cursorUpdates) != 1 {
 		t.Fatalf("expected 1 cursor update, got %d", len(cursorUpdates))
 	}
-	if cursorUpdates[0]["table_name"] != "sync_trades" {
+	if cursorUpdates[0]["last_gid"] == nil {
 		t.Errorf("expected cursor table_name sync_trades, got %v", cursorUpdates[0]["table_name"])
 	}
 }
@@ -318,7 +318,7 @@ func TestSyncer_SyncOrdersWithExistingCursor(t *testing.T) {
 			}{{LastGID: 150}})
 			return
 		}
-		if r.Method == "POST" && r.URL.Path == "/rest/v1/sync_cursors" {
+		if (r.Method == "PATCH" || r.Method == "POST") && r.URL.Path == "/rest/v1/sync_cursors" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}

@@ -15,7 +15,10 @@ const (
 
 // legacyStrategyAliases maps old frontend IDs to the correct bbgo strategy IDs.
 var legacyStrategyAliases = map[string]string{
-	"ewoDgtrd": "ewo_dgtrd",
+	"ewoDgtrd":        "ewo_dgtrd",
+	"sentinel":        "sentinel_anomaly",
+	"autobuy":         "autobuy_scheduled",
+	"rebalance":       "rebalance_portfolio",
 }
 
 // legacyFieldAliases maps strategy IDs to old→new field renames.

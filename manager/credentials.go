@@ -60,12 +60,19 @@ func (cs *CredentialStore) saveAll(userID string, creds []ExchangeCredential) er
 	return os.WriteFile(cs.filePath(userID), data, 0o600)
 }
 
-func (cs *CredentialStore) Create(cred ExchangeCredential) error {
+// Upsert inserts a credential or replaces an existing one for the same exchange.
+func (cs *CredentialStore) Upsert(cred ExchangeCredential) error {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	creds, err := cs.loadAll(cred.UserID)
 	if err != nil {
 		return err
+	}
+	for i, c := range creds {
+		if c.Exchange == cred.Exchange {
+			creds[i] = cred
+			return cs.saveAll(cred.UserID, creds)
+		}
 	}
 	creds = append(creds, cred)
 	return cs.saveAll(cred.UserID, creds)

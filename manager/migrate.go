@@ -41,6 +41,14 @@ END $$;
 ALTER TABLE public.sync_orders ALTER COLUMN bot_id DROP NOT NULL;
 ALTER TABLE public.sync_trades ALTER COLUMN bot_id DROP NOT NULL;
 
+DO $ BEGIN
+    ALTER TABLE public.sync_orders ADD COLUMN executed_quantity TEXT;
+    ALTER TABLE public.sync_orders ADD COLUMN creation_time TEXT;
+    ALTER TABLE public.sync_trades ADD COLUMN quote_quantity TEXT;
+    ALTER TABLE public.sync_trades ADD COLUMN traded_at TEXT;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $;
+
 CREATE TABLE IF NOT EXISTS public.sync_cursors (
   user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   table_name TEXT NOT NULL,

@@ -94,7 +94,7 @@ func (h *MarketDataHub) broadcast(key string, msg json.RawMessage) {
 
 // SubscribeUserData connects to a per-user bbgo container's gRPC server
 // and streams order/trade/balance updates to the subscriber.
-func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, containerAddr string) (chan json.RawMessage, error) {
+func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, containerAddr string, sessions []string) (chan json.RawMessage, error) {
 	key := "user:" + userID
 
 	conn, err := grpc.NewClient(containerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -103,7 +103,11 @@ func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, co
 	}
 
 	client := pb.NewUserDataServiceClient(conn)
-	stream, err := client.Subscribe(ctx, &pb.UserDataRequest{Session: "binance"})
+	if len(sessions) == 0 {
+		conn.Close()
+		return nil, fmt.Errorf("no sessions configured for user %s", userID)
+	}
+	stream, err := client.Subscribe(ctx, &pb.UserDataRequest{Session: sessions[0]})
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("subscribe user data: %w", err)

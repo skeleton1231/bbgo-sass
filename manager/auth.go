@@ -12,6 +12,13 @@ func isValidUUID(s string) bool {
 	return uuidPattern.MatchString(s)
 }
 
+func safeShortID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}
+
 func userIDFromRequest(r *http.Request) (string, bool) {
 	id := r.Header.Get("X-User-Id")
 	if id == "" {

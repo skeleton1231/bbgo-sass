@@ -113,7 +113,10 @@ func (n *Notifier) Create(userID string, cfg NotificationConfig) error {
 func (n *Notifier) List(userID string) []NotificationConfig {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.configs[userID]
+	configs := n.configs[userID]
+	out := make([]NotificationConfig, len(configs))
+	copy(out, configs)
+	return out
 }
 
 func (n *Notifier) Delete(userID, id string) error {
@@ -126,26 +129,35 @@ func (n *Notifier) Delete(userID, id string) error {
 			filtered = append(filtered, c)
 		}
 	}
+	if len(filtered) == len(configs) {
+		return fmt.Errorf("notification config %s not found", id)
+	}
 	n.configs[userID] = filtered
 	return n.saveAll(userID, filtered)
 }
 
-func (n *Notifier) Dispatch(userID string, event NotificationEvent) {
-	n.mu.RLock()
+func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
+	n.mu.Lock()
 	configs := n.configs[userID]
 	if len(configs) == 0 {
-		n.mu.RUnlock()
-		return
+		n.mu.Unlock()
+		return false
 	}
 
 	if timings, ok := n.lastSent[userID]; ok {
 		if last, ok := timings[event.Type]; ok && time.Since(last) < n.rateLimit {
-			n.mu.RUnlock()
-			return
+			n.mu.Unlock()
+			return false
 		}
 	}
-	n.mu.RUnlock()
 
+	if n.lastSent[userID] == nil {
+		n.lastSent[userID] = make(map[string]time.Time)
+	}
+	n.lastSent[userID][event.Type] = time.Now()
+	n.mu.Unlock()
+
+	sent := false
 	for _, cfg := range configs {
 		if !cfg.Channel.Enabled {
 			continue
@@ -173,15 +185,12 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) {
 		}
 		if err != nil {
 			log.Printf("notif: send to %s/%s failed: %v", userID, cfg.Channel.Type, err)
+		} else {
+			sent = true
 		}
 	}
 
-	n.mu.Lock()
-	if n.lastSent[userID] == nil {
-		n.lastSent[userID] = make(map[string]time.Time)
-	}
-	n.lastSent[userID][event.Type] = time.Now()
-	n.mu.Unlock()
+	return sent
 }
 
 func (n *Notifier) ruleEnabled(rules NotificationRule, eventType string) bool {
@@ -192,6 +201,8 @@ func (n *Notifier) ruleEnabled(rules NotificationRule, eventType string) bool {
 		return rules.OrderEvents
 	case "container":
 		return rules.ContainerHealth
+	case "test":
+		return true
 	}
 	return false
 }

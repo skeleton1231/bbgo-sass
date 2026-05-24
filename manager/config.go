@@ -45,6 +45,9 @@ func LoadConfig() (*Config, error) {
 	if cfg.ManagerToken == "" {
 		return nil, fmt.Errorf("MANAGER_TOKEN is required (shared secret for API authentication)")
 	}
+	if cfg.EncryptionKey == "" {
+		return nil, fmt.Errorf("ENCRYPTION_KEY is required (base64-encoded 32-byte key for credential encryption)")
+	}
 	return cfg, nil
 }
 

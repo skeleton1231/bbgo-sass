@@ -196,7 +196,7 @@ func TestBBGoClient_GetStrategies(t *testing.T) {
 		if r.URL.Path != "/api/strategies/single" {
 			t.Errorf("expected /api/strategies/single, got %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(BBGoStrategiesResponse{Strategies: []BBGoStrategyState{{Strategy: "grid"}}})
+		json.NewEncoder(w).Encode(BBGoStrategiesResponse{Strategies: []BBGoStrategyState{{"strategy": "grid"}}})
 	}))
 	defer srv.Close()
 
@@ -205,7 +205,7 @@ func TestBBGoClient_GetStrategies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStrategies() returned error: %v", err)
 	}
-	if len(strats) != 1 || strats[0].Strategy != "grid" {
+	if len(strats) != 1 || strats[0]["strategy"] != "grid" {
 		t.Errorf("unexpected strategies: %v", strats)
 	}
 }

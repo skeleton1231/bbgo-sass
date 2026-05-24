@@ -4,21 +4,8 @@ import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, type SessionRole } from '@/lib/bbgo/strategies'
-import { EXCHANGES } from '@/lib/bbgo/constants'
+import { EXCHANGES, CATEGORY_LABELS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
-
-const CATEGORY_LABELS: Record<string, string> = {
-  grid: 'Grid',
-  maker: 'Market Maker',
-  trend: 'Trend Following',
-  'mean-reversion': 'Mean Reversion',
-  dca: 'DCA',
-  volatility: 'Volatility',
-  indicator: 'Indicator',
-  'cross-exchange': 'Cross-Exchange',
-  utility: 'Utility',
-  other: 'Other',
-}
 
 const ENV_PREFIXES: Record<string, string> = {
   binance: 'BINANCE',
@@ -26,6 +13,9 @@ const ENV_PREFIXES: Record<string, string> = {
   bybit: 'BYBIT',
   bitget: 'BITGET',
   kucoin: 'KUCOIN',
+  max: 'MAX',
+  coinbase: 'COINBASE',
+  bitfinex: 'BITFINEX',
 }
 
 export function CreateStrategyDialog({ userId, onClose }: { userId: string; onClose: () => void }) {
@@ -48,7 +38,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
     if (s?.sessionRoles) {
       const defaults: Record<string, string> = {}
       for (const role of s.sessionRoles) {
-        defaults[role.name] = role.futures ? 'binance' : 'binance'
+        defaults[role.name] = 'binance'
       }
       setSessionExchanges(defaults)
     } else {
@@ -161,7 +151,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
                   className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   {EXCHANGES.map((ex) => (
-                    <option key={ex} value={ex}>{ex}{role.futures ? ' (Futures)' : ''}</option>
+                    <option key={ex} value={ex}>{ex}{role.futures ? ` (${t('futures')})` : ''}</option>
                   ))}
                 </select>
                 {role.futures && (
@@ -190,14 +180,14 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           </div>
           {mode === 'live' && !isCrossExchange && !hasExchangeCreds(exchange) && (
             <p className="mt-1 text-xs text-destructive">
-              No API credentials configured for {exchange}. Add them in Settings first.
+              {t('noCredsForExchange', { exchange })}
             </p>
           )}
           {mode === 'live' && isCrossExchange && schema?.sessionRoles && (
             <div className="mt-1 space-y-0.5">
               {schema.sessionRoles.filter(r => !hasExchangeCreds(sessionExchanges[r.name] || 'binance')).map(r => (
                 <p key={r.name} className="text-xs text-destructive">
-                  No API credentials for {r.label} ({sessionExchanges[r.name] || 'binance'}).
+                  {t('noCredsForRole', { role: r.label, exchange: sessionExchanges[r.name] || 'binance' })}
                 </p>
               ))}
             </div>

@@ -246,9 +246,7 @@ func (c *BBGoClient) GetAssets() (map[string]BBGoAsset, error) {
 	return resp.Assets, nil
 }
 
-type BBGoStrategyState struct {
-	Strategy string `json:"strategy"`
-}
+type BBGoStrategyState map[string]interface{}
 
 type BBGoStrategiesResponse struct {
 	Strategies []BBGoStrategyState `json:"strategies"`

@@ -32,6 +32,7 @@ export function useMarketData({ userId, enabled = true, onMessage }: UseWebSocke
   const onMessageRef = useRef(onMessage)
   onMessageRef.current = onMessage
 
+  const connectRef = useRef<() => void>(() => {})
   const connect = useCallback(async () => {
     if (!enabled || !userId) return
 
@@ -48,7 +49,7 @@ export function useMarketData({ userId, enabled = true, onMessage }: UseWebSocke
       ws.onclose = () => {
         setConnected(false)
         wsRef.current = null
-        reconnectRef.current = setTimeout(connect, 5_000)
+        reconnectRef.current = setTimeout(() => connectRef.current(), 5_000)
       }
       ws.onerror = () => ws.close()
       ws.onmessage = (e) => {
@@ -59,9 +60,10 @@ export function useMarketData({ userId, enabled = true, onMessage }: UseWebSocke
         } catch { /* ignore malformed messages */ }
       }
     } catch {
-      reconnectRef.current = setTimeout(connect, 5_000)
+      reconnectRef.current = setTimeout(() => connectRef.current(), 5_000)
     }
   }, [userId, enabled])
+  connectRef.current = connect
 
   useEffect(() => {
     connect()

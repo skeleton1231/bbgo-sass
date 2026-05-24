@@ -35,7 +35,9 @@ declare const messages: {
     "manage": "Manage",
     "viewAll": "View all in dashboard",
     "noStrategies": "No strategies configured yet.",
-    "createStrategy": "Create a strategy"
+    "createStrategy": "Create a strategy",
+    "strategyCount": "1 / {count} strategies",
+    "loading": "Loading..."
   },
   "Bots": {
     "title": "Trading Bots",
@@ -92,14 +94,20 @@ declare const messages: {
     "save": "Save",
     "saving": "Saving...",
     "testnet": "Testnet",
+    "noCredsForExchange": "No API credentials configured for {exchange}. Add them in Settings first.",
+    "noCredsForRole": "No API credentials for {role} ({exchange}).",
     "containerLogs": "Container Logs",
     "pnl": {
       "realized": "Realized P&L",
       "totalFees": "Total Fees",
       "winRate": "Win Rate",
       "totalTrades": "Total Trades",
-      "bySymbol": "P&L by Symbol"
+      "bySymbol": "P&L by Symbol",
+      "tradeCount": "{count} trades",
+      "openPosition": "pos: {amount} @ ~{price}",
+      "avgBuy": "avg buy {price}"
     },
+    "crossExchange": "cross-exchange",
     "live": {
       "connected": "Live",
       "disconnected": "Offline"
@@ -121,7 +129,8 @@ declare const messages: {
     "endDate": "End Date",
     "running": "Running...",
     "backtestOutput": "Backtest Output",
-    "backtestDuration": "Backtest may take 30-60 seconds depending on date range..."
+    "backtestDuration": "Backtest may take 30-60 seconds depending on date range...",
+    "error": "Backtest failed. Please try again."
   },
   "Settings": {
     "title": "Settings",

@@ -63,7 +63,7 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 
 	dbPath := hostDir + "/bbgo.db"
 	if _, err := os.Stat(dbPath); err == nil {
-		backup := dbPath + ".backup." + time.Now().Format("20060122-150405")
+		backup := dbPath + ".backup." + time.Now().Format("20060102-150405")
 		os.Rename(dbPath, backup)
 		log.Printf("backed up %s -> %s", dbPath, backup)
 	}
@@ -107,22 +107,7 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 }
 
 func (cm *ContainerManager) Restart(uc *UserContainer) error {
-	hostDir := cm.hostDir(uc.UserID)
-	yamlContent := buildUserYAML(uc, func(exchange string) bool {
-		_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
-		return err == nil
-	})
-	if err := os.WriteFile(hostDir+"/bbgo.yaml", []byte(yamlContent), 0o644); err != nil {
-		return fmt.Errorf("write config: %w", err)
-	}
-
-	name := cm.containerName(uc.UserID)
-	out, err := cm.docker("restart", name)
-	if err != nil {
-		return fmt.Errorf("docker restart: %s: %w", out, err)
-	}
-	log.Printf("container %s restarted", name)
-	return nil
+	return cm.CreateAndStart(uc)
 }
 
 func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]byte, error) {
@@ -139,7 +124,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 	}
 
 	containerDir := cm.userDir(userID) + "/backtest"
-	name := fmt.Sprintf("bbgo-bt-%d-%s", os.Getpid(), time.Now().Format("20060102-150405"))
+	name := fmt.Sprintf("bbgo-bt-%s-%d", safeShortID(userID), time.Now().UnixNano())
 	args := []string{
 		"run", "--rm",
 		"--name", name,

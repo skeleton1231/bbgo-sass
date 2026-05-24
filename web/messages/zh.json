@@ -32,7 +32,9 @@
     "manage": "管理",
     "viewAll": "在仪表盘中查看全部",
     "noStrategies": "尚未配置策略。",
-    "createStrategy": "创建策略"
+    "createStrategy": "创建策略",
+    "strategyCount": "1 / {count} 个策略",
+    "loading": "加载中..."
   },
   "Bots": {
     "title": "交易机器人",
@@ -89,14 +91,20 @@
     "save": "保存",
     "saving": "保存中...",
     "testnet": "测试网",
+    "noCredsForExchange": "未配置 {exchange} 的 API 凭证，请先在设置中添加。",
+    "noCredsForRole": "{role} ({exchange}) 未配置 API 凭证。",
     "containerLogs": "容器日志",
     "pnl": {
       "realized": "已实现盈亏",
       "totalFees": "总手续费",
       "winRate": "胜率",
       "totalTrades": "总交易数",
-      "bySymbol": "按币种盈亏"
+      "bySymbol": "按币种盈亏",
+      "tradeCount": "{count} 笔交易",
+      "openPosition": "持仓: {amount} @ ~{price}",
+      "avgBuy": "均价 {price}"
     },
+    "crossExchange": "跨交易所",
     "live": {
       "connected": "实时",
       "disconnected": "离线"
@@ -118,7 +126,8 @@
     "endDate": "结束日期",
     "running": "运行中...",
     "backtestOutput": "回测输出",
-    "backtestDuration": "回测可能需要 30-60 秒，取决于日期范围..."
+    "backtestDuration": "回测可能需要 30-60 秒，取决于日期范围...",
+    "error": "回测失败，请重试。"
   },
   "Settings": {
     "title": "设置",
