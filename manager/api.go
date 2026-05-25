@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -302,6 +303,22 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Wait for gRPC port to be ready
+	if reachable {
+		grpcAddr := api.container.ContainerGRPCAddr(userID)
+		for i := 0; i < 10; i++ {
+			conn, err := net.DialTimeout("tcp", grpcAddr, time.Second)
+			if err == nil {
+				conn.Close()
+				break
+			}
+			if i == 9 {
+				log.Printf("grpc port %s not ready after 10s for user %s", grpcAddr, userID)
+			}
+			time.Sleep(time.Second)
+		}
 	}
 
 	if reachable {
