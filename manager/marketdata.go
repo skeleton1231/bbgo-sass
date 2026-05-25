@@ -17,22 +17,22 @@ import (
 // data to connected WebSocket clients.
 type MarketDataHub struct {
 	mu      sync.RWMutex
-	market  pb.MarketDataServiceClient
 	conn    *grpc.ClientConn
+	market  pb.MarketDataServiceClient
+	addr    string
 	clients map[string]map[chan json.RawMessage]struct{} // key: "market" or "user:{userID}"
 }
 
 func NewMarketDataHub(addr string, subs []MarketSub) (*MarketDataHub, error) {
-	// SECURITY: Uses plaintext gRPC. Security relies on Docker network isolation.
-	// For production with untrusted networks, replace with grpc.WithTransportCredentials(credentials.NewTLS(...)).
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("dial marketdata %s: %w", addr, err)
 	}
 
 	hub := &MarketDataHub{
-		market:  pb.NewMarketDataServiceClient(conn),
 		conn:    conn,
+		market:  pb.NewMarketDataServiceClient(conn),
+		addr:    addr,
 		clients: make(map[string]map[chan json.RawMessage]struct{}),
 	}
 
@@ -54,6 +54,7 @@ func channelPb(name string) pb.Channel {
 }
 
 // subscribeDefault subscribes to common market data with automatic reconnect.
+// On persistent failures, it re-dials the gRPC connection.
 func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 	const (
 		minBackoff = 2 * time.Second
@@ -78,7 +79,8 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 		ctx := context.Background()
 		stream, err := h.market.Subscribe(ctx, req)
 		if err != nil {
-			log.Printf("marketdata subscribe failed: %v, retrying in %v", err, backoff)
+			log.Printf("marketdata subscribe failed: %v, reconnecting in %v", err, backoff)
+			h.redial()
 			time.Sleep(backoff)
 			backoff = min(backoff*2, maxBackoff)
 			continue
@@ -100,9 +102,24 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 			h.broadcast("market", msg)
 		}
 
+		h.redial()
 		time.Sleep(backoff)
 		backoff = min(backoff*2, maxBackoff)
 	}
+}
+
+func (h *MarketDataHub) redial() {
+	if h.conn == nil {
+		return
+	}
+	h.conn.Close()
+	conn, err := grpc.NewClient(h.addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("marketdata redial failed: %v", err)
+		return
+	}
+	h.conn = conn
+	h.market = pb.NewMarketDataServiceClient(conn)
 }
 
 func (h *MarketDataHub) broadcast(key string, msg json.RawMessage) {
@@ -118,24 +135,17 @@ func (h *MarketDataHub) broadcast(key string, msg json.RawMessage) {
 
 // SubscribeUserData connects to a per-user bbgo container's gRPC server
 // and streams order/trade/balance updates to the subscriber.
+// It opens one gRPC stream per session and merges them into a single channel.
 func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, containerAddr string, sessions []string) (chan json.RawMessage, error) {
 	key := "user:" + userID
 
-	// SECURITY: plaintext gRPC — relies on Docker network isolation.
+	if len(sessions) == 0 {
+		return nil, fmt.Errorf("no sessions configured for user %s", userID)
+	}
+
 	conn, err := grpc.NewClient(containerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("dial user container %s: %w", containerAddr, err)
-	}
-
-	client := pb.NewUserDataServiceClient(conn)
-	if len(sessions) == 0 {
-		conn.Close()
-		return nil, fmt.Errorf("no sessions configured for user %s", userID)
-	}
-	stream, err := client.Subscribe(ctx, &pb.UserDataRequest{Session: sessions[0]})
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("subscribe user data: %w", err)
 	}
 
 	ch := make(chan json.RawMessage, 64)
@@ -146,37 +156,58 @@ func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, co
 	h.clients[key][ch] = struct{}{}
 	h.mu.Unlock()
 
-	go func() {
-		defer func() {
-			conn.Close()
-			h.mu.Lock()
-			delete(h.clients[key], ch)
-			if len(h.clients[key]) == 0 {
-				delete(h.clients, key)
-			}
-			h.mu.Unlock()
-			close(ch)
-		}()
+	var wg sync.WaitGroup
+	wg.Add(len(sessions))
 
-		for {
-			ud, err := stream.Recv()
-			if err != nil {
-				log.Printf("user data stream %s error: %v", userID, err)
-				return
-			}
-			msg, err := json.Marshal(userDataToJSON(ud))
-				if err != nil {
-					log.Printf("user data json marshal error for %s: %v", userID, err)
-					continue
-				}
-			select {
-			case ch <- msg:
-			default:
-			}
+	for _, session := range sessions {
+		go func(sessionName string) {
+			defer wg.Done()
+			h.receiveUserData(ctx, conn, userID, sessionName, ch)
+		}(session)
+	}
+
+	go func() {
+		wg.Wait()
+		conn.Close()
+		h.mu.Lock()
+		delete(h.clients[key], ch)
+		if len(h.clients[key]) == 0 {
+			delete(h.clients, key)
 		}
+		h.mu.Unlock()
+		close(ch)
 	}()
 
 	return ch, nil
+}
+
+// receiveUserData opens a gRPC stream for a single session and forwards
+// messages to the shared output channel.
+func (h *MarketDataHub) receiveUserData(ctx context.Context, conn *grpc.ClientConn, userID string, session string, ch chan<- json.RawMessage) {
+	client := pb.NewUserDataServiceClient(conn)
+	stream, err := client.Subscribe(ctx, &pb.UserDataRequest{Session: session})
+	if err != nil {
+		log.Printf("user data subscribe %s/%s error: %v", userID, session, err)
+		return
+	}
+
+	for {
+		ud, err := stream.Recv()
+		if err != nil {
+			log.Printf("user data stream %s/%s error: %v", userID, session, err)
+			return
+		}
+		msg, err := json.Marshal(userDataToJSON(ud))
+		if err != nil {
+			log.Printf("user data json marshal error for %s/%s: %v", userID, session, err)
+			continue
+		}
+		select {
+		case ch <- msg:
+		default:
+			log.Printf("user data channel full, dropping message for %s/%s", userID, session)
+		}
+	}
 }
 
 func (h *MarketDataHub) SubscribeMarket(ctx context.Context) (chan json.RawMessage, error) {

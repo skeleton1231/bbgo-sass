@@ -86,6 +86,7 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 
 func (s *Syncer) UpsertUser(uc *UserContainer) {
 	payload, err := json.Marshal(map[string]interface{}{
+		"user_id":    uc.UserID,
 		"status":     uc.Status,
 		"strategies": uc.Strategies,
 	})
@@ -94,35 +95,15 @@ func (s *Syncer) UpsertUser(uc *UserContainer) {
 		return
 	}
 
-	resp, err := s.supabaseRequest("PATCH", "user_containers?user_id=eq."+uc.UserID, payload)
+	resp, err := s.supabaseRequest("POST", "user_containers?on_conflict=user_id", payload)
 	if err != nil {
-		log.Printf("upsert user %s patch failed: %v", uc.UserID, err)
+		log.Printf("upsert user %s failed: %v", uc.UserID, err)
 		return
 	}
 	resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		return
-	}
-
-	insPayload, err := json.Marshal(map[string]interface{}{
-		"user_id":    uc.UserID,
-		"status":     uc.Status,
-		"strategies": uc.Strategies,
-	})
-	if err != nil {
-		log.Printf("marshal insert user %s: %v", uc.UserID, err)
-		return
-	}
-
-	insResp, err := s.supabaseRequest("POST", "user_containers", insPayload)
-	if err != nil {
-		log.Printf("upsert user %s insert failed: %v", uc.UserID, err)
-		return
-	}
-	insResp.Body.Close()
-	if insResp.StatusCode >= 400 {
-		log.Printf("upsert user %s skipped (status %d)", uc.UserID, insResp.StatusCode)
+	if resp.StatusCode >= 400 {
+		log.Printf("upsert user %s rejected (status %d)", uc.UserID, resp.StatusCode)
 	}
 }
 
@@ -182,29 +163,15 @@ func (s *Syncer) getCursor(userID, table string) int64 {
 
 func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
 	payload, _ := json.Marshal(map[string]interface{}{
-		"last_gid": lastGID,
-	})
-	path := "sync_cursors?user_id=eq." + userID + "&table_name=eq." + table
-	resp, err := s.supabaseRequest("PATCH", path, payload)
-	if err != nil {
-		return
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		return
-	}
-
-	insPayload, _ := json.Marshal(map[string]interface{}{
 		"user_id":    userID,
 		"table_name": table,
 		"last_gid":   lastGID,
 	})
-	insResp, err := s.supabaseRequest("POST", "sync_cursors", insPayload)
+	resp, err := s.supabaseRequest("POST", "sync_cursors?on_conflict=user_id,table_name", payload)
 	if err != nil {
 		return
 	}
-	insResp.Body.Close()
+	resp.Body.Close()
 }
 
 func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
@@ -341,30 +308,17 @@ func (s *Syncer) SyncCredential(cred ExchangeCredential) {
 		return
 	}
 
-	path := "exchange_credentials?user_id=eq." + cred.UserID + "&exchange=eq." + cred.Exchange
-	resp, err := s.supabaseRequest("PATCH", path, payload)
+	resp, err := s.supabaseRequest("POST", "exchange_credentials?on_conflict=user_id,exchange", payload)
 	if err != nil {
-		log.Printf("sync credential patch for user %s %s: %v", cred.UserID, cred.Exchange, err)
+		log.Printf("sync credential for user %s %s: %v", cred.UserID, cred.Exchange, err)
 		return
 	}
 	resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		log.Printf("synced credential %s for user %s", cred.Exchange, cred.UserID)
-		return
-	}
-
-	insResp, err := s.supabaseRequest("POST", "exchange_credentials", payload)
-	if err != nil {
-		log.Printf("sync credential insert for user %s %s: %v", cred.UserID, cred.Exchange, err)
-		return
-	}
-	insResp.Body.Close()
-
-	if insResp.StatusCode >= 400 {
-		log.Printf("sync credential for user %s %s skipped (status %d)", cred.UserID, cred.Exchange, insResp.StatusCode)
+	if resp.StatusCode >= 400 {
+		log.Printf("sync credential for user %s %s skipped (status %d)", cred.UserID, cred.Exchange, resp.StatusCode)
 	} else {
-		log.Printf("synced credential %s for user %s (inserted)", cred.Exchange, cred.UserID)
+		log.Printf("synced credential %s for user %s", cred.Exchange, cred.UserID)
 	}
 }
 

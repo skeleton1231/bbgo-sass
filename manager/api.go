@@ -1146,8 +1146,8 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 // hasDataForRange checks if the backtest database likely contains data for
-// the given exchange/symbol/time range. This is a heuristic — it inspects
-// the shared backtest DB file size and modification time.
+// the given exchange/symbol/time range. It checks the shared backtest DB file
+// exists and has a meaningful size.
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
 	dbPath := api.container.cfg.BacktestSharedDir
 	if dbPath == "" {
@@ -1159,16 +1159,5 @@ func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) boo
 	if err != nil {
 		return false
 	}
-	if info.Size() < 1<<20 {
-		return false
-	}
-
-	start, err := time.Parse("2006-01-02", startTime)
-	if err != nil {
-		return info.Size() > 10<<20
-	}
-	if info.ModTime().Before(start) {
-		return false
-	}
-	return true
+	return info.Size() >= 1<<20
 }

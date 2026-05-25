@@ -152,7 +152,7 @@ func (s *BacktestJobStore) persist(job *BacktestJob) {
 		log.Printf("persist backtest job %s: %v", job.ID, err)
 		return
 	}
-	os.WriteFile(path, data, 0o644)
+	os.WriteFile(path, data, 0o600)
 }
 
 func (s *BacktestJobStore) jobPath(id string) string {
@@ -234,7 +234,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 		out, err := ex.container.SyncBacktest(job.Exchange, job.Symbol, job.StartTime, job.EndTime)
 		if err != nil {
 			ex.store.UpdateStatus(job.ID, JobFailed, "data sync failed")
-			ex.store.SetError(job.ID, fmt.Sprintf("data sync failed: %s (output: %s)", err, out))
+			ex.store.SetError(job.ID, fmt.Sprintf("data sync failed: %s", err))
 			ex.notify(job, "Backtest Data Sync Failed", fmt.Sprintf("Strategy %s on %s/%s: data sync failed", job.Strategy, job.Exchange, job.Symbol))
 			return
 		}
