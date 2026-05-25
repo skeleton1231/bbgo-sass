@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -50,6 +52,10 @@ func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, prox
 		btSyncSem:     make(chan struct{}, 2),
 		newBBGoClient: NewBBGoClient,
 	}
+}
+
+func (api *API) Close() {
+	api.wsTickets.Close()
 }
 
 func (api *API) RegisterRoutes(r chi.Router) {
@@ -297,6 +303,11 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if uc.Status == StatusStarting {
+		writeJSON(w, http.StatusAccepted, uc)
+		return
+	}
+
 	// Set starting status and return immediately
 	api.users.UpdateStatus(userID, StatusStarting)
 	uc.Status = StatusStarting
@@ -307,6 +318,9 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) startUserContainer(userID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	uc, found := api.users.Get(userID)
 	if !found {
 		return
@@ -321,11 +335,18 @@ func (api *API) startUserContainer(userID string) {
 	var reachable bool
 	client := api.newBBGoClient(api.container.APIURL(userID))
 	for i := 0; i < 30; i++ {
-		if err := client.Ping(); err == nil {
+		select {
+		case <-ctx.Done():
+			api.users.UpdateStatus(userID, StatusError)
+			log.Printf("user %s health check cancelled: %v", userID, ctx.Err())
+			return
+		default:
+		}
+		if err := client.WithContext(ctx).Ping(); err == nil {
 			reachable = true
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(time.Second)
 	}
 
 	if !reachable {
@@ -468,6 +489,10 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 	if len(req.Symbols) == 0 {
 		req.Symbols = []string{"BTCUSDT", "ETHUSDT"}
 	}
+	if len(req.Symbols) > 10 {
+		writeError(w, http.StatusBadRequest, "too many symbols (max 10)")
+		return
+	}
 	if req.StartTime == "" {
 		req.StartTime = "2024-01-01"
 	}
@@ -481,15 +506,21 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		Error  string `json:"error,omitempty"`
 	}
 	log.Printf("backtest sync requested by user %s: %s %v %s-%s", userID, req.Exchange, req.Symbols, req.StartTime, req.EndTime)
-	var results []syncResult
-	for _, sym := range req.Symbols {
-		out, err := api.container.SyncBacktest(req.Exchange, sym, req.StartTime, req.EndTime)
-		r := syncResult{Symbol: sym, Output: out}
-		if err != nil {
-			r.Error = err.Error()
-		}
-		results = append(results, r)
+	results := make([]syncResult, len(req.Symbols))
+	var wg sync.WaitGroup
+	for i, sym := range req.Symbols {
+		wg.Add(1)
+		go func(idx int, sym string) {
+			defer wg.Done()
+			out, err := api.container.SyncBacktest(req.Exchange, sym, req.StartTime, req.EndTime)
+			r := syncResult{Symbol: sym, Output: out}
+			if err != nil {
+				r.Error = err.Error()
+			}
+			results[idx] = r
+		}(i, sym)
 	}
+	wg.Wait()
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"exchange":  req.Exchange,
 		"synced":    results,
@@ -583,6 +614,10 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 	// Restart user container to pick up new credentials
 	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
 		go func() {
+			uc, ok := api.users.Get(userID)
+			if !ok || uc.Status != StatusRunning {
+				return
+			}
 			log.Printf("restarting container for user %s after credential update", userID)
 			if err := api.container.Restart(uc); err != nil {
 				log.Printf("restart after credential update failed for user %s: %v", userID, err)
@@ -650,6 +685,10 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
 		go func() {
+			uc, ok := api.users.Get(userID)
+			if !ok || uc.Status != StatusRunning {
+				return
+			}
 			log.Printf("restarting container for user %s after credential deletion", userID)
 			if err := api.container.Restart(uc); err != nil {
 				log.Printf("restart after credential deletion failed for user %s: %v", userID, err)
@@ -688,7 +727,7 @@ func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGo
 		return nil, "", false
 	}
 
-	return api.newBBGoClient(api.container.APIURL(userID)), userID, true
+	return api.newBBGoClient(api.container.APIURL(userID)).WithContext(r.Context()), userID, true
 }
 
 func (api *API) BBGoPing(w http.ResponseWriter, r *http.Request) {
@@ -893,7 +932,15 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 
 	exchange := r.URL.Query().Get("exchange")
 	symbol := r.URL.Query().Get("symbol")
-	trades, err := client.GetAllTrades(exchange, symbol)
+
+	var lastGID int64
+	if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
+		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
+			lastGID = v
+		}
+	}
+
+	trades, err := client.GetAllTradesFrom(exchange, symbol, lastGID)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return

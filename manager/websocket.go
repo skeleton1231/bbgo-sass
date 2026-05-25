@@ -25,6 +25,7 @@ type WSMessage struct {
 type WSTicketStore struct {
 	mu      sync.Mutex
 	tickets map[string]*wsTicket
+	done    chan struct{}
 }
 
 type wsTicket struct {
@@ -33,14 +34,31 @@ type wsTicket struct {
 }
 
 func NewWSTicketStore() *WSTicketStore {
-	ts := &WSTicketStore{tickets: make(map[string]*wsTicket)}
+	ts := &WSTicketStore{
+		tickets: make(map[string]*wsTicket),
+		done:    make(chan struct{}),
+	}
 	go ts.cleanup()
 	return ts
 }
 
+func (ts *WSTicketStore) Close() {
+	select {
+	case <-ts.done:
+	default:
+		close(ts.done)
+	}
+}
+
 func (ts *WSTicketStore) cleanup() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(30 * time.Second)
+		select {
+		case <-ts.done:
+			return
+		case <-ticker.C:
+		}
 		ts.mu.Lock()
 		now := time.Now()
 		for k, t := range ts.tickets {
@@ -140,7 +158,8 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	var writeMu sync.Mutex
 
-	// Forward messages to WebSocket
+	// Forward market data — independent goroutine so user stream failures
+	// don't kill market data delivery.
 	go func() {
 		for {
 			select {
@@ -154,17 +173,29 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				if !wsWrite(conn, ctx, &writeMu, wsMsg) {
 					return
 				}
-			case msg, ok := <-userCh:
-				if !ok {
-					return
-				}
-				wsMsg, _ := json.Marshal(WSMessage{Type: "userData", Data: msg})
-				if !wsWrite(conn, ctx, &writeMu, wsMsg) {
-					return
-				}
 			}
 		}
 	}()
+
+	// Forward user data — separate goroutine; can exit independently
+	if userCh != nil {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg, ok := <-userCh:
+					if !ok {
+						return
+					}
+					wsMsg, _ := json.Marshal(WSMessage{Type: "userData", Data: msg})
+					if !wsWrite(conn, ctx, &writeMu, wsMsg) {
+						return
+					}
+				}
+			}
+		}()
+	}
 
 	// Read from WebSocket (keep-alive / client commands)
 	for {

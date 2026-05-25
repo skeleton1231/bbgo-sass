@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/c9s/bbgo/saas/manager/pool"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
@@ -30,7 +31,13 @@ func main() {
 
 	credStore := NewCredentialStore(cfg.DataDir, enc)
 	users := NewUserContainerManager()
-	containerMgr := NewContainerManager(cfg, credStore)
+
+	containerPool := pool.New(5)
+	defer containerPool.Release()
+	syncPool := pool.New(5)
+	defer syncPool.Release()
+
+	containerMgr := NewContainerManager(cfg, credStore, containerPool)
 
 	if err := containerMgr.EnsureNetwork(); err != nil {
 		log.Fatalf("network error: %v", err)
@@ -40,7 +47,7 @@ func main() {
 		log.Printf("warning: auto-migration failed: %v", err)
 	}
 
-	syncer := NewSyncerWithCreds(users, cfg, containerMgr, credStore)
+	syncer := NewSyncerWithCreds(users, cfg, containerMgr, credStore, syncPool)
 
 	notifier := NewNotifier(cfg.DataDir, enc)
 
@@ -62,25 +69,39 @@ func main() {
 	syncer.SyncAll()
 
 	// Auto-sync backtest data on startup (background, non-blocking)
+	btSyncPool := pool.New(2)
+	defer btSyncPool.Release()
 	go func() {
 		time.Sleep(30 * time.Second)
 		for _, ex := range cfg.BacktestExchanges {
 			for _, sym := range cfg.BacktestSymbols {
-				log.Printf("auto-syncing backtest data: %s/%s", ex, sym)
-				if out, err := containerMgr.SyncBacktest(ex, sym, cfg.BacktestStartTime, cfg.BacktestEndTime); err != nil {
-					log.Printf("backtest auto-sync %s/%s failed: %v (output: %s)", ex, sym, err, out)
-				} else {
-					log.Printf("backtest auto-sync %s/%s done", ex, sym)
+				ex, sym := ex, sym
+				if err := btSyncPool.Submit(func() {
+					log.Printf("auto-syncing backtest data: %s/%s", ex, sym)
+					if out, err := containerMgr.SyncBacktest(ex, sym, cfg.BacktestStartTime, cfg.BacktestEndTime); err != nil {
+						log.Printf("backtest auto-sync %s/%s failed: %v (output: %s)", ex, sym, err, out)
+					} else {
+						log.Printf("backtest auto-sync %s/%s done", ex, sym)
+					}
+				}); err != nil {
+					log.Printf("backtest auto-sync submit %s/%s: %v", ex, sym, err)
 				}
 			}
 		}
+		btSyncPool.Wait()
 	}()
 
 	// Periodic sync and health check
+	done := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+			}
 			syncer.SyncAll()
 			allUsers := users.ListUsers()
 			for _, r := range containerMgr.CheckAndRecover(allUsers) {
@@ -113,8 +134,13 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-		for range ticker.C {
-			btJobStore.Prune(24 * time.Hour)
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				btJobStore.Prune(24 * time.Hour)
+			}
 		}
 	}()
 
@@ -147,6 +173,8 @@ func main() {
 	<-quit
 
 	log.Println("shutting down...")
+	close(done)
+	api.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

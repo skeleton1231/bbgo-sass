@@ -6,8 +6,9 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
 	"time"
+
+	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 type Syncer struct {
@@ -16,20 +17,22 @@ type Syncer struct {
 	container       *ContainerManager
 	creds           *CredentialStore
 	client          *http.Client
+	pool            *pool.Pool
 	newBBGoClientFn func(baseURL string) *BBGoClient
 }
 
-func NewSyncer(users *UserContainerManager, cfg *Config, cm *ContainerManager) *Syncer {
+func NewSyncer(users *UserContainerManager, cfg *Config, cm *ContainerManager, p *pool.Pool) *Syncer {
 	return &Syncer{
 		users:     users,
 		cfg:       cfg,
 		container: cm,
 		client:    &http.Client{Timeout: 10 * time.Second},
+		pool:      p,
 	}
 }
 
-func NewSyncerWithCreds(users *UserContainerManager, cfg *Config, cm *ContainerManager, creds *CredentialStore) *Syncer {
-	s := NewSyncer(users, cfg, cm)
+func NewSyncerWithCreds(users *UserContainerManager, cfg *Config, cm *ContainerManager, creds *CredentialStore, p *pool.Pool) *Syncer {
+	s := NewSyncer(users, cfg, cm, p)
 	s.creds = creds
 	return s
 }
@@ -125,22 +128,17 @@ func (s *Syncer) SyncUser(userID string) {
 func (s *Syncer) SyncAll() {
 	users := s.users.ListUsers()
 
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 5) // max 5 concurrent syncs
 	for _, uc := range users {
 		s.UpsertUser(uc)
 		if uc.Status != StatusRunning {
 			continue
 		}
-		wg.Add(1)
-		go func(uc *UserContainer) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			s.syncUserData(uc)
-		}(uc)
+		uc := uc
+		if err := s.pool.Submit(func() { s.syncUserData(uc) }); err != nil {
+			log.Printf("sync pool submit for user %s: %v", uc.UserID, err)
+		}
 	}
-	wg.Wait()
+	s.pool.Wait()
 }
 
 func (s *Syncer) syncUserData(uc *UserContainer) {
@@ -192,118 +190,144 @@ func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
 }
 
 func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
-	lastGID := s.getCursor(userID, "sync_orders")
-	orders, err := client.GetAllClosedOrders("", "", lastGID)
-	if err != nil {
-		log.Printf("sync orders via api for user %s failed: %v", userID, err)
-		return
-	}
+	cursor := s.getCursor(userID, "sync_orders")
+	totalSynced := 0
+	startCursor := cursor
 
-	if len(orders) == 0 {
-		return
-	}
+	for {
+		orders, err := client.GetClosedOrders("", "", cursor)
+		if err != nil {
+			log.Printf("sync orders via api for user %s failed: %v", userID, err)
+			return
+		}
+		if len(orders) == 0 {
+			break
+		}
 
-	rows := make([]map[string]interface{}, len(orders))
-	for i, o := range orders {
-		rows[i] = map[string]interface{}{
-			"user_id":  userID,
-			"bot_id":   userID,
-			"order_id": json.Number(formatUint(o.OrderID)),
-			"symbol":   o.Symbol,
-			"side":     o.Side,
-			"price":    o.Price,
-			"quantity": o.Quantity,
-			"status":   o.Status,
-			"type":     o.Type,
-			"executed_quantity": o.ExecutedQuantity,
-			"creation_time": o.CreationTime,
+		rows := make([]map[string]interface{}, len(orders))
+		for i, o := range orders {
+			rows[i] = map[string]interface{}{
+				"user_id":  userID,
+				"bot_id":   userID,
+				"order_id": json.Number(formatUint(o.OrderID)),
+				"symbol":   o.Symbol,
+				"side":     o.Side,
+				"price":    o.Price,
+				"quantity": o.Quantity,
+				"status":   o.Status,
+				"type":     o.Type,
+				"executed_quantity": o.ExecutedQuantity,
+				"creation_time": o.CreationTime,
+			}
+		}
+
+		payload, err := json.Marshal(rows)
+		if err != nil {
+			log.Printf("marshal orders for user %s: %v", userID, err)
+			return
+		}
+
+		resp, err := s.supabaseRequest("POST", "sync_orders?on_conflict=user_id,order_id", payload)
+		if err != nil {
+			log.Printf("sync orders for user %s failed: %v", userID, err)
+			return
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			log.Printf("sync orders for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
+			return
+		}
+
+		maxGID := cursor
+		for _, o := range orders {
+			if int64(o.GID) > maxGID {
+				maxGID = int64(o.GID)
+			}
+		}
+		cursor = maxGID
+		s.updateCursor(userID, "sync_orders", cursor)
+		totalSynced += len(orders)
+
+		if len(orders) < tradesPageSize {
+			break
 		}
 	}
 
-	payload, err := json.Marshal(rows)
-	if err != nil {
-		log.Printf("marshal orders for user %s: %v", userID, err)
-		return
+	if totalSynced > 0 {
+		log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", totalSynced, userID, startCursor, cursor)
 	}
-
-	resp, err := s.supabaseRequest("POST", "sync_orders?on_conflict=user_id,order_id", payload)
-	if err != nil {
-		log.Printf("sync orders for user %s failed: %v", userID, err)
-		return
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		log.Printf("sync orders for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
-		return
-	}
-
-	maxGID := lastGID
-	for _, o := range orders {
-		if int64(o.GID) > maxGID {
-			maxGID = int64(o.GID)
-		}
-	}
-	s.updateCursor(userID, "sync_orders", maxGID)
-	log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", len(orders), userID, lastGID, maxGID)
 }
 
 func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
-	lastGID := s.getCursor(userID, "sync_trades")
-	trades, err := client.GetAllTradesFrom("", "", lastGID)
-	if err != nil {
-		log.Printf("sync trades via api for user %s failed: %v", userID, err)
-		return
-	}
+	cursor := s.getCursor(userID, "sync_trades")
+	totalSynced := 0
+	startCursor := cursor
 
-	if len(trades) == 0 {
-		return
-	}
+	for {
+		trades, err := client.GetTrades("", "", cursor)
+		if err != nil {
+			log.Printf("sync trades via api for user %s failed: %v", userID, err)
+			return
+		}
+		if len(trades) == 0 {
+			break
+		}
 
-	rows := make([]map[string]interface{}, len(trades))
-	for i, t := range trades {
-		rows[i] = map[string]interface{}{
-			"user_id":      userID,
-			"bot_id":       userID,
-			"trade_id":     json.Number(formatUint(t.ID)),
-			"order_id":     json.Number(formatUint(t.OrderID)),
-			"symbol":       t.Symbol,
-			"side":         t.Side,
-			"price":        t.Price,
-			"quantity":     t.Quantity,
-			"fee":          t.Fee,
-			"fee_currency": t.FeeCurrency,
-			"quote_quantity": t.QuoteQuantity,
-			"traded_at":      t.TradedAt,
+		rows := make([]map[string]interface{}, len(trades))
+		for i, t := range trades {
+			rows[i] = map[string]interface{}{
+				"user_id":        userID,
+				"bot_id":         userID,
+				"trade_id":       json.Number(formatUint(t.ID)),
+				"order_id":       json.Number(formatUint(t.OrderID)),
+				"symbol":         t.Symbol,
+				"side":           t.Side,
+				"price":          t.Price,
+				"quantity":       t.Quantity,
+				"fee":            t.Fee,
+				"fee_currency":   t.FeeCurrency,
+				"quote_quantity": t.QuoteQuantity,
+				"traded_at":      t.TradedAt,
+			}
+		}
+
+		payload, err := json.Marshal(rows)
+		if err != nil {
+			log.Printf("marshal trades for user %s: %v", userID, err)
+			return
+		}
+
+		resp, err := s.supabaseRequest("POST", "sync_trades?on_conflict=user_id,trade_id", payload)
+		if err != nil {
+			log.Printf("sync trades for user %s failed: %v", userID, err)
+			return
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			log.Printf("sync trades for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
+			return
+		}
+
+		maxGID := cursor
+		for _, t := range trades {
+			if t.GID > maxGID {
+				maxGID = t.GID
+			}
+		}
+		cursor = maxGID
+		s.updateCursor(userID, "sync_trades", cursor)
+		totalSynced += len(trades)
+
+		if len(trades) < tradesPageSize {
+			break
 		}
 	}
 
-	payload, err := json.Marshal(rows)
-	if err != nil {
-		log.Printf("marshal trades for user %s: %v", userID, err)
-		return
+	if totalSynced > 0 {
+		log.Printf("synced %d trades for user %s via api (cursor %d -> %d)", totalSynced, userID, startCursor, cursor)
 	}
-
-	resp, err := s.supabaseRequest("POST", "sync_trades?on_conflict=user_id,trade_id", payload)
-	if err != nil {
-		log.Printf("sync trades for user %s failed: %v", userID, err)
-		return
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		log.Printf("sync trades for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
-		return
-	}
-
-	maxGID := lastGID
-	for _, t := range trades {
-		if t.GID > maxGID {
-			maxGID = t.GID
-		}
-	}
-	s.updateCursor(userID, "sync_trades", maxGID)
-	log.Printf("synced %d trades for user %s via api (cursor %d -> %d)", len(trades), userID, lastGID, maxGID)
 }
 
 func (s *Syncer) SyncCredential(cred ExchangeCredential) {
