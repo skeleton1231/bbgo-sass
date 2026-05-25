@@ -1176,9 +1176,14 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshed, _ := api.btJobs.Get(job.ID)
+	status := JobPending
+	if refreshed != nil {
+		status = refreshed.Status
+	}
 	writeJSON(w, http.StatusAccepted, map[string]interface{}{
 		"job_id":    job.ID,
-		"status":    job.Status,
+		"status":    status,
 		"need_sync": needSync,
 	})
 }
