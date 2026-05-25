@@ -159,27 +159,6 @@ func (c *BBGoClient) GetClosedOrders(exchange, symbol string, lastGID int64) ([]
 	return resp.Orders, nil
 }
 
-// GetAllClosedOrders paginates through closed orders using the GID cursor.
-func (c *BBGoClient) GetAllClosedOrders(exchange, symbol string, lastGID int64) ([]BBGoOrder, error) {
-	var all []BBGoOrder
-	cursor := lastGID
-	for {
-		orders, err := c.GetClosedOrders(exchange, symbol, cursor)
-		if err != nil {
-			return nil, err
-		}
-		if len(orders) == 0 {
-			break
-		}
-		all = append(all, orders...)
-		if len(orders) < tradesPageSize {
-			break
-		}
-		cursor = int64(orders[len(orders)-1].GID)
-	}
-	return all, nil
-}
-
 type BBGoSession struct {
 	Name         string `json:"name"`
 	ExchangeName string `json:"exchangeName"`
