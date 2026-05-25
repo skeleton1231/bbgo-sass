@@ -94,10 +94,14 @@ const tradesPageSize = 500
 
 // GetAllTrades paginates through trades using the GID cursor.
 func (c *BBGoClient) GetAllTrades(exchange, symbol string) ([]BBGoTrade, error) {
+	return c.GetAllTradesFrom(exchange, symbol, 0)
+}
+
+func (c *BBGoClient) GetAllTradesFrom(exchange, symbol string, lastGID int64) ([]BBGoTrade, error) {
 	var all []BBGoTrade
-	var lastGID int64
+	cursor := lastGID
 	for {
-		trades, err := c.GetTrades(exchange, symbol, lastGID)
+		trades, err := c.GetTrades(exchange, symbol, cursor)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +109,7 @@ func (c *BBGoClient) GetAllTrades(exchange, symbol string) ([]BBGoTrade, error) 
 			break
 		}
 		all = append(all, trades...)
-		lastGID = trades[len(trades)-1].GID
+		cursor = trades[len(trades)-1].GID
 		if len(trades) < tradesPageSize {
 			break
 		}
@@ -149,6 +153,27 @@ func (c *BBGoClient) GetClosedOrders(exchange, symbol string, lastGID int64) ([]
 		return nil, err
 	}
 	return resp.Orders, nil
+}
+
+// GetAllClosedOrders paginates through closed orders using the GID cursor.
+func (c *BBGoClient) GetAllClosedOrders(exchange, symbol string, lastGID int64) ([]BBGoOrder, error) {
+	var all []BBGoOrder
+	cursor := lastGID
+	for {
+		orders, err := c.GetClosedOrders(exchange, symbol, cursor)
+		if err != nil {
+			return nil, err
+		}
+		if len(orders) == 0 {
+			break
+		}
+		all = append(all, orders...)
+		if len(orders) < tradesPageSize {
+			break
+		}
+		cursor = int64(orders[len(orders)-1].GID)
+	}
+	return all, nil
 }
 
 type BBGoSession struct {

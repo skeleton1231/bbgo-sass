@@ -193,7 +193,7 @@ func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
 
 func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 	lastGID := s.getCursor(userID, "sync_orders")
-	orders, err := client.GetClosedOrders("", "", lastGID)
+	orders, err := client.GetAllClosedOrders("", "", lastGID)
 	if err != nil {
 		log.Printf("sync orders via api for user %s failed: %v", userID, err)
 		return
@@ -250,7 +250,7 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 
 func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 	lastGID := s.getCursor(userID, "sync_trades")
-	trades, err := client.GetTrades("", "", lastGID)
+	trades, err := client.GetAllTradesFrom("", "", lastGID)
 	if err != nil {
 		log.Printf("sync trades via api for user %s failed: %v", userID, err)
 		return
