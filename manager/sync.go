@@ -6,15 +6,17 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
 type Syncer struct {
-	users     *UserContainerManager
-	cfg       *Config
-	container *ContainerManager
-	creds     *CredentialStore
-	client    *http.Client
+	users           *UserContainerManager
+	cfg             *Config
+	container       *ContainerManager
+	creds           *CredentialStore
+	client          *http.Client
+	newBBGoClientFn func(baseURL string) *BBGoClient
 }
 
 func NewSyncer(users *UserContainerManager, cfg *Config, cm *ContainerManager) *Syncer {
@@ -33,6 +35,9 @@ func NewSyncerWithCreds(users *UserContainerManager, cfg *Config, cm *ContainerM
 }
 
 func (s *Syncer) bbgoClient(userID string) *BBGoClient {
+	if s.newBBGoClientFn != nil {
+		return s.newBBGoClientFn(s.container.APIURL(userID))
+	}
 	return NewBBGoClient(s.container.APIURL(userID))
 }
 
@@ -119,12 +124,23 @@ func (s *Syncer) SyncUser(userID string) {
 
 func (s *Syncer) SyncAll() {
 	users := s.users.ListUsers()
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5) // max 5 concurrent syncs
 	for _, uc := range users {
 		s.UpsertUser(uc)
-		if uc.Status == StatusRunning {
-			s.syncUserData(uc)
+		if uc.Status != StatusRunning {
+			continue
 		}
+		wg.Add(1)
+		go func(uc *UserContainer) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			s.syncUserData(uc)
+		}(uc)
 	}
+	wg.Wait()
 }
 
 func (s *Syncer) syncUserData(uc *UserContainer) {
