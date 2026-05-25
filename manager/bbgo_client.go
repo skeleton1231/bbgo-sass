@@ -90,6 +90,29 @@ func (c *BBGoClient) GetTrades(exchange, symbol string, lastGID int64) ([]BBGoTr
 	return resp.Trades, nil
 }
 
+const tradesPageSize = 500
+
+// GetAllTrades paginates through trades using the GID cursor.
+func (c *BBGoClient) GetAllTrades(exchange, symbol string) ([]BBGoTrade, error) {
+	var all []BBGoTrade
+	var lastGID int64
+	for {
+		trades, err := c.GetTrades(exchange, symbol, lastGID)
+		if err != nil {
+			return nil, err
+		}
+		if len(trades) == 0 {
+			break
+		}
+		all = append(all, trades...)
+		lastGID = trades[len(trades)-1].GID
+		if len(trades) < tradesPageSize {
+			break
+		}
+	}
+	return all, nil
+}
+
 type BBGoOrder struct {
 	GID              uint64 `json:"gid"`
 	OrderID          uint64 `json:"orderID"`

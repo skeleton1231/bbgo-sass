@@ -872,7 +872,7 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 
 	exchange := r.URL.Query().Get("exchange")
 	symbol := r.URL.Query().Get("symbol")
-	trades, err := client.GetTrades(exchange, symbol, 0)
+	trades, err := client.GetAllTrades(exchange, symbol)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
