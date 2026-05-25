@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -64,7 +65,7 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 		Status     string          `json:"status"`
 		Strategies json.RawMessage `json:"strategies"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&raw); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +156,7 @@ func (s *Syncer) getCursor(userID, table string) int64 {
 	var rows []struct {
 		LastGID int64 `json:"last_gid"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil || len(rows) == 0 {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&rows); err != nil || len(rows) == 0 {
 		return 0
 	}
 	return rows[0].LastGID

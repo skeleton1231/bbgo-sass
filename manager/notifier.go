@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -144,6 +145,10 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
 		return false
 	}
 
+	// Snapshot configs to avoid racing with Create/Delete modifying the slice
+	snapshot := make([]NotificationConfig, len(configs))
+	copy(snapshot, configs)
+
 	if timings, ok := n.lastSent[userID]; ok {
 		if last, ok := timings[event.Type]; ok && time.Since(last) < n.rateLimit {
 			n.mu.Unlock()
@@ -153,7 +158,7 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
 	n.mu.Unlock()
 
 	sent := false
-	for _, cfg := range configs {
+	for _, cfg := range snapshot {
 		if !cfg.Channel.Enabled {
 			continue
 		}
@@ -235,6 +240,7 @@ func sendTelegram(client *http.Client, token, chatID, title, message string) err
 		return fmt.Errorf("telegram POST: %w", err)
 	}
 	defer resp.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("telegram API returned %d", resp.StatusCode)
 	}
@@ -250,6 +256,7 @@ func sendSlack(client *http.Client, webhookURL, title, message string) error {
 		return fmt.Errorf("slack POST: %w", err)
 	}
 	defer resp.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("slack webhook returned %d", resp.StatusCode)
 	}
