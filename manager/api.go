@@ -611,18 +611,9 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 
 	if api.syncer != nil { go api.syncer.SyncCredential(cred) }
 
-	// Restart user container to pick up new credentials
 	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
-		go func() {
-			uc, ok := api.users.Get(userID)
-			if !ok || uc.Status != StatusRunning {
-				return
-			}
-			log.Printf("restarting container for user %s after credential update", userID)
-			if err := api.container.Restart(uc); err != nil {
-				log.Printf("restart after credential update failed for user %s: %v", userID, err)
-			}
-		}()
+		api.users.UpdateStatus(userID, StatusStarting)
+		go api.startUserContainer(userID)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -684,16 +675,8 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 		if api.syncer != nil { go api.syncer.DeleteCredential(userID, exchange) }
 	}
 	if uc, ok := api.users.Get(userID); ok && uc.Status == StatusRunning {
-		go func() {
-			uc, ok := api.users.Get(userID)
-			if !ok || uc.Status != StatusRunning {
-				return
-			}
-			log.Printf("restarting container for user %s after credential deletion", userID)
-			if err := api.container.Restart(uc); err != nil {
-				log.Printf("restart after credential deletion failed for user %s: %v", userID, err)
-			}
-		}()
+		api.users.UpdateStatus(userID, StatusStarting)
+		go api.startUserContainer(userID)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -954,7 +937,7 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 // the in-memory UserContainer status. If Docker is unreachable, the in-memory
 // status is left unchanged.
 func (api *API) refreshContainerStatus(uc *UserContainer) {
-	if uc.Status != StatusRunning {
+	if uc.Status != StatusRunning && uc.Status != StatusStarting {
 		return
 	}
 	running, err := api.container.CheckRunning(uc.UserID)
