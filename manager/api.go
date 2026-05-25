@@ -192,7 +192,7 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entry := StrategyEntry{
-		ID:            fmt.Sprintf("strat-%d", time.Now().UnixNano()),
+		ID:            generateID("strat"),
 		Name:          req.Name,
 		Exchange:      req.Exchange,
 		Strategy:      req.Strategy,
@@ -543,7 +543,7 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cred := ExchangeCredential{
-		ID:                  fmt.Sprintf("cred-%d", time.Now().UnixNano()),
+		ID:                  generateID("cred"),
 		UserID:              userID,
 		Exchange:            req.Exchange,
 		APIKeyEncrypted:     keyEnc,
@@ -951,7 +951,7 @@ func (api *API) CreateNotificationConfig(w http.ResponseWriter, r *http.Request)
 	}
 
 	ch := NotificationChannel{
-		ID:      fmt.Sprintf("notif-%d", time.Now().UnixNano()),
+		ID:      generateID("notif"),
 		UserID:  userID,
 		Type:    req.Type,
 		ChatID:  req.ChatID,
@@ -1108,7 +1108,7 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 	needSync := !api.hasDataForRange(req.Exchange, req.Symbol, req.StartTime, req.EndTime)
 
 	job := &BacktestJob{
-		ID:        fmt.Sprintf("bt-%d", time.Now().UnixNano()),
+		ID:        generateID("bt"),
 		UserID:    userID,
 		Strategy:  req.Strategy,
 		Config:    req.Config,
