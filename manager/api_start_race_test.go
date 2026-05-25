@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -113,5 +114,61 @@ func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 
 	if calls := atomic.LoadInt64(&startCalls); calls != 1 {
 		t.Fatalf("expected exactly 1 containerStart call, got %d", calls)
+	}
+}
+
+func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
+	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	users := NewUserContainerManager()
+	users.AddStrategy(userID, StrategyEntry{
+		ID:       "s1",
+		Exchange: "binance",
+		Strategy: "grid",
+		Config:   rawJSON(`{}`),
+	})
+	users.UpdateStatus(userID, StatusRunning)
+
+	cfg := &Config{
+		SupabaseURL:  "http://localhost:1",
+		SupabaseKey:  "test",
+		ManagerToken: "test-token",
+	}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
+	proxy := NewBotProxy(cm)
+	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_ string) bool { return false }
+
+	unblock := make(chan struct{})
+	var startCalls int64
+	api.containerStart = func(_ *UserContainer) error {
+		atomic.AddInt64(&startCalls, 1)
+		<-unblock
+		return nil
+	}
+
+	r := testRouter(api)
+
+	// Two rapid strategy creates on a running user
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			body := strings.NewReader(`{"exchange":"binance","strategy":"grid","config":{}}`)
+			req := httptest.NewRequest("POST", "/api/users/"+userID+"/strategies", body)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+		}()
+	}
+	wg.Wait()
+	time.Sleep(100 * time.Millisecond)
+
+	calls := atomic.LoadInt64(&startCalls)
+	close(unblock)
+
+	// Only 1 containerStart should fire — the second create sees status=starting
+	if calls != 1 {
+		t.Fatalf("expected exactly 1 containerStart for rapid strategy creates, got %d", calls)
 	}
 }

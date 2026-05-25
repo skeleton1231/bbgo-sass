@@ -213,10 +213,10 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	uc, created := api.users.AddStrategy(userID, entry)
 
 	if uc.Status == StatusRunning {
+		api.users.UpdateStatus(userID, StatusStarting)
 		go api.startUserContainer(userID)
 	} else if created {
 		api.users.UpdateStatus(userID, StatusStarting)
-		uc.Status = StatusStarting
 		go api.startUserContainer(userID)
 	}
 
@@ -264,6 +264,7 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if uc.Status == StatusRunning {
+		api.users.UpdateStatus(userID, StatusStarting)
 		go api.startUserContainer(userID)
 	}
 
@@ -322,7 +323,7 @@ func (api *API) startUserContainer(userID string) {
 	defer cancel()
 
 	uc, found := api.users.Get(userID)
-	if !found {
+	if !found || uc.Status != StatusStarting {
 		return
 	}
 
