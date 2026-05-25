@@ -150,11 +150,6 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
 			return false
 		}
 	}
-
-	if n.lastSent[userID] == nil {
-		n.lastSent[userID] = make(map[string]time.Time)
-	}
-	n.lastSent[userID][event.Type] = time.Now()
 	n.mu.Unlock()
 
 	sent := false
@@ -188,6 +183,15 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
 		} else {
 			sent = true
 		}
+	}
+
+	if sent {
+		n.mu.Lock()
+		if n.lastSent[userID] == nil {
+			n.lastSent[userID] = make(map[string]time.Time)
+		}
+		n.lastSent[userID][event.Type] = time.Now()
+		n.mu.Unlock()
 	}
 
 	return sent
