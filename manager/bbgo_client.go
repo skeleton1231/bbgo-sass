@@ -26,10 +26,7 @@ func NewBBGoClient(baseURL string) *BBGoClient {
 }
 
 func (c *BBGoClient) get(path string, result interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
 		return fmt.Errorf("bbgo api %s: %w", path, err)
 	}
@@ -44,7 +41,7 @@ func (c *BBGoClient) get(path string, result interface{}) error {
 		return fmt.Errorf("bbgo api %s: status %d: %s", path, resp.StatusCode, string(body))
 	}
 
-	return json.NewDecoder(resp.Body).Decode(result)
+	return json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(result)
 }
 
 // Ping checks if the bbgo container API is responding.

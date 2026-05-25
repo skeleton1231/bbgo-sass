@@ -81,7 +81,11 @@ func (m *UserContainerManager) Get(userID string) (*UserContainer, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	uc, ok := m.users[userID]
-	return uc, ok
+	if !ok {
+		return nil, false
+	}
+	cp := *uc
+	return &cp, true
 }
 
 func (m *UserContainerManager) UpdateStatus(userID, status string) {
@@ -107,7 +111,8 @@ func (m *UserContainerManager) AddStrategy(userID string, entry StrategyEntry) (
 		m.users[userID] = uc
 	}
 	uc.Strategies = append(uc.Strategies, entry)
-	return uc, created
+	cp := *uc
+	return &cp, created
 }
 
 func (m *UserContainerManager) RemoveStrategy(userID, strategyID string) bool {
@@ -131,7 +136,8 @@ func (m *UserContainerManager) ListUsers() []*UserContainer {
 	defer m.mu.RUnlock()
 	list := make([]*UserContainer, 0, len(m.users))
 	for _, uc := range m.users {
-		list = append(list, uc)
+		cp := *uc
+		list = append(list, &cp)
 	}
 	return list
 }
