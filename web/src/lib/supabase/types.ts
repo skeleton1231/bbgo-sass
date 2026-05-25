@@ -191,22 +191,20 @@ export interface Database {
       }
       sync_cursors: {
         Row: {
-          id: string
-          bot_id: string
+          user_id: string
           table_name: string
-          last_synced_id: string
-          last_synced_at: string
+          last_gid: number
+          updated_at: string
         }
         Insert: {
-          id?: string
-          bot_id: string
+          user_id: string
           table_name: string
-          last_synced_id: string
-          last_synced_at?: string
+          last_gid?: number
+          updated_at?: string
         }
         Update: {
-          last_synced_id?: string
-          last_synced_at?: string
+          last_gid?: number
+          updated_at?: string
         }
       }
       backtest_reports: {

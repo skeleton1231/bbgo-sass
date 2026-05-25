@@ -148,15 +148,14 @@ create index idx_sync_trades_bot on public.sync_trades(bot_id);
 create index idx_sync_trades_user on public.sync_trades(user_id);
 
 -- =============================================
--- Sync cursors (track sync progress per bot)
+-- Sync cursors (track sync progress per user)
 -- =============================================
 create table public.sync_cursors (
-  id uuid primary key default uuid_generate_v4(),
-  bot_id uuid not null references public.bots(id) on delete cascade,
+  user_id uuid not null references public.user_profiles(id) on delete cascade,
   table_name text not null,
-  last_synced_id text not null,
-  last_synced_at timestamptz not null default now(),
-  unique(bot_id, table_name)
+  last_gid bigint not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, table_name)
 );
 
 alter table public.sync_cursors enable row level security;
