@@ -518,6 +518,10 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "exchange, api_key, api_secret are required")
 		return
 	}
+	if _, ok := exchangePrefixes[req.Exchange]; !ok {
+		writeError(w, http.StatusBadRequest, "unsupported exchange: "+req.Exchange)
+		return
+	}
 
 	keyEnc, err := api.encryptor.Encrypt(req.APIKey)
 	if err != nil {

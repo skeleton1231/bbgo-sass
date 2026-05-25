@@ -359,3 +359,24 @@ func setupStoppedTestAPI(t *testing.T) *API {
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	return api
 }
+
+func TestAPI_CreateCredential_InvalidExchange(t *testing.T) {
+	api := setupStoppedTestAPI(t)
+	r := testRouter(api)
+
+	body := map[string]interface{}{
+		"exchange":   "fakeexchange",
+		"api_key":    "key123",
+		"api_secret": "secret456",
+	}
+	b, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/api/credentials", bytes.NewReader(b))
+	req.Header.Set("X-User-Id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unsupported exchange, got %d: %s", w.Code, w.Body.String())
+	}
+}
