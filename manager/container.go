@@ -246,6 +246,7 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 	args = append(args,
 		"-e", "DB_DRIVER=sqlite3",
 		"-e", fmt.Sprintf("DB_DSN=%s/bbgo.db", dir),
+		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
 	)
 
 	if cm.cfg.MarketDataAddr != "" {

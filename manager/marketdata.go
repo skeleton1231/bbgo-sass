@@ -77,7 +77,10 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 
 	for {
 		ctx := context.Background()
-		stream, err := h.market.Subscribe(ctx, req)
+		h.mu.RLock()
+		client := h.market
+		h.mu.RUnlock()
+		stream, err := client.Subscribe(ctx, req)
 		if err != nil {
 			log.Printf("marketdata subscribe failed: %v, reconnecting in %v", err, backoff)
 			h.redial()
@@ -109,17 +112,24 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 }
 
 func (h *MarketDataHub) redial() {
-	if h.conn == nil {
+	h.mu.Lock()
+	oldConn := h.conn
+	h.mu.Unlock()
+
+	if oldConn == nil {
 		return
 	}
-	h.conn.Close()
+	oldConn.Close()
+
 	conn, err := grpc.NewClient(h.addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Printf("marketdata redial failed: %v", err)
 		return
 	}
+	h.mu.Lock()
 	h.conn = conn
 	h.market = pb.NewMarketDataServiceClient(conn)
+	h.mu.Unlock()
 }
 
 func (h *MarketDataHub) broadcast(key string, msg json.RawMessage) {

@@ -209,7 +209,7 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 		return
 	}
 
-	resp, err := s.supabaseRequest("POST", "sync_orders", payload)
+	resp, err := s.supabaseRequest("POST", "sync_orders?on_conflict=user_id,order_id", payload)
 	if err != nil {
 		log.Printf("sync orders for user %s failed: %v", userID, err)
 		return
@@ -267,7 +267,7 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 		return
 	}
 
-	resp, err := s.supabaseRequest("POST", "sync_trades", payload)
+	resp, err := s.supabaseRequest("POST", "sync_trades?on_conflict=user_id,trade_id", payload)
 	if err != nil {
 		log.Printf("sync trades for user %s failed: %v", userID, err)
 		return
