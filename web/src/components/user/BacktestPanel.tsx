@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { useSubmitBacktest, useBacktestJob, useBacktestJobs } from '@/lib/bbgo/queries'
+import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols } from '@/lib/bbgo/queries'
 import type { BacktestJob } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory } from '@/lib/bbgo/strategies'
 import { CATEGORY_LABELS, EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
@@ -15,12 +15,15 @@ export function BacktestPanel({ userId }: { userId: string }) {
 
   const [strategy, setStrategy] = useState('grid2')
   const [exchange, setExchange] = useState('binance')
+  const [symbol, setSymbol] = useState('BTCUSDT')
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
   const [startTime, setStartTime] = useState('2024-01-01')
   const [endTime, setEndTime] = useState('2024-03-01')
   const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true })
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<BacktestJob | null>(null)
+
+  const { data: symbolsData } = useMarketSymbols(exchange)
 
   const schema = getStrategySchema(strategy)
 
@@ -44,8 +47,9 @@ export function BacktestPanel({ userId }: { userId: string }) {
     try {
       const result = await submitBacktest.mutateAsync({
         strategy,
-        config: { ...config, exchange },
+        config: { ...config, exchange, symbol },
         exchange,
+        symbol,
         start_time: startTime,
         end_time: endTime,
       })
@@ -64,7 +68,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border bg-card p-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="block text-sm font-medium mb-1">{t('strategy')}</label>
             <select
@@ -90,13 +94,34 @@ export function BacktestPanel({ userId }: { userId: string }) {
             <label className="block text-sm font-medium mb-1">{t('exchange')}</label>
             <select
               value={exchange}
-              onChange={(e) => setExchange(e.target.value)}
+              onChange={(e) => {
+                setExchange(e.target.value)
+                setSymbol('')
+              }}
               disabled={isRunning}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             >
               {EXCHANGE_OPTIONS.map((ex) => (
                 <option key={ex.id} value={ex.id}>{ex.label}</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('symbol')}</label>
+            <select
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+              disabled={isRunning || !symbolsData?.symbols?.length}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {symbolsData?.symbols?.length ? (
+                symbolsData.symbols.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))
+              ) : (
+                <option value="">{t('loading')}</option>
+              )}
             </select>
           </div>
 

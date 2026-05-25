@@ -134,7 +134,9 @@
     "downloadingData": "正在下载市场数据...",
     "runningBacktest": "正在运行回测...",
     "waitingToStart": "等待开始...",
-    "recentJobs": "最近回测"
+    "recentJobs": "最近回测",
+    "symbol": "交易对",
+    "loading": "加载中..."
   },
   "Settings": {
     "title": "设置",

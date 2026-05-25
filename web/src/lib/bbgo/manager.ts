@@ -335,6 +335,12 @@ export function fetchBotPnL(userId: string, exchange?: string, symbol?: string) 
   return request<PnLReport>(`/users/${userId}/bbgo/pnl${qs ? `?${qs}` : ''}`)
 }
 
+// --- Market data (from shared marketdata service via Manager) ---
+
+export function fetchMarketSymbols(exchange: string) {
+  return request<{ symbols: string[] }>(`/markets/${encodeURIComponent(exchange)}/symbols`)
+}
+
 // --- Credentials ---
 
 export interface CredentialInfo {

@@ -131,7 +131,9 @@
     "downloadingData": "市場データをダウンロード中...",
     "runningBacktest": "バックテストを実行中...",
     "waitingToStart": "開始を待機中...",
-    "recentJobs": "最近のバックテスト"
+    "recentJobs": "最近のバックテスト",
+    "symbol": "シンボル",
+    "loading": "読み込み中..."
   },
   "Settings": {
     "title": "設定",

@@ -27,19 +27,3 @@ sessions:
     exchange: bitfinex
     envVarPrefix: BITFINEX
     publicOnly: true
-
-exchange:
-  binance:
-    symbol: BTCUSDT
-  okex:
-    symbol: BTC-USDT
-  bybit:
-    symbol: BTCUSDT
-  bitget:
-    symbol: BTCUSDT
-  kucoin:
-    symbol: BTC-USDT
-  max:
-    symbol: BTCTWD
-  bitfinex:
-    symbol: tBTCUSD

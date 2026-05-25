@@ -134,7 +134,9 @@
     "downloadingData": "Downloading market data...",
     "runningBacktest": "Running backtest...",
     "waitingToStart": "Waiting to start...",
-    "recentJobs": "Recent Backtests"
+    "recentJobs": "Recent Backtests",
+    "symbol": "Symbol",
+    "loading": "Loading..."
   },
   "Settings": {
     "title": "Settings",

@@ -25,6 +25,7 @@ import {
   fetchBotStrategies,
   fetchContainerLogs,
   fetchBotPnL,
+  fetchMarketSymbols,
   type TradingVolumeEntry,
   type StrategyEntry,
   type UserContainer,
@@ -174,6 +175,15 @@ export function useBotSessionSymbols(userId: string, session: string) {
     queryFn: () => fetchBotSessionSymbols(userId, session),
     enabled: !!userId && !!session,
     refetchInterval: 30_000,
+  })
+}
+
+export function useMarketSymbols(exchange: string) {
+  return useQuery<{ symbols: string[] }>({
+    queryKey: ['market-symbols', exchange],
+    queryFn: () => fetchMarketSymbols(exchange),
+    enabled: !!exchange,
+    staleTime: 5 * 60_000,
   })
 }
 

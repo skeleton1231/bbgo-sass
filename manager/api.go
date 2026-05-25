@@ -61,6 +61,9 @@ func (api *API) Close() {
 func (api *API) RegisterRoutes(r chi.Router) {
 	r.Get("/api/health", api.Health)
 
+	// Market data endpoints (Manager → marketdata REST API)
+	r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
+
 	r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
 	r.Get("/api/users/{userID}/strategies", api.ListStrategies)
 	r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
@@ -826,6 +829,22 @@ func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
 	symbols, err := client.GetSessionSymbols(session)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": symbols})
+}
+
+func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
+	exchange := chi.URLParam(r, "exchange")
+	if exchange == "" {
+		writeError(w, http.StatusBadRequest, "exchange is required")
+		return
+	}
+	base := "http://" + api.cfg.MarketDataRESTAddr
+	client := NewBBGoClient(base)
+	symbols, err := client.GetSessionSymbols(exchange)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": symbols})

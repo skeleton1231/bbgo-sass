@@ -131,7 +131,9 @@
     "downloadingData": "시장 데이터 다운로드 중...",
     "runningBacktest": "백테스트 실행 중...",
     "waitingToStart": "시작 대기 중...",
-    "recentJobs": "최근 백테스트"
+    "recentJobs": "최근 백테스트",
+    "symbol": "심볼",
+    "loading": "로딩..."
   },
   "Settings": {
     "title": "설정",
