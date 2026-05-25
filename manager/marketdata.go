@@ -76,6 +76,9 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 	req := &pb.SubscribeRequest{Subscriptions: pbSubs}
 
 	for {
+		h.redial()
+		time.Sleep(backoff)
+
 		ctx := context.Background()
 		h.mu.RLock()
 		client := h.market
@@ -83,8 +86,6 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 		stream, err := client.Subscribe(ctx, req)
 		if err != nil {
 			log.Printf("marketdata subscribe failed: %v, reconnecting in %v", err, backoff)
-			h.redial()
-			time.Sleep(backoff)
 			backoff = min(backoff*2, maxBackoff)
 			continue
 		}
@@ -105,8 +106,6 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 			h.broadcast("market", msg)
 		}
 
-		h.redial()
-		time.Sleep(backoff)
 		backoff = min(backoff*2, maxBackoff)
 	}
 }
