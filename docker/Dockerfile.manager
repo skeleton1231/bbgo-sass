@@ -1,4 +1,6 @@
 # Manager image with Docker CLI for container orchestration
+# Build: built via docker-compose from bbgo repo root (context: ..)
+#        docker build -f saas/docker/Dockerfile.manager ..
 FROM golang:1.26-bookworm AS builder
 
 WORKDIR /src/manager

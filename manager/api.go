@@ -693,7 +693,7 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
+func (api *API) userFromURL(w http.ResponseWriter, r *http.Request) (*UserContainer, string, bool) {
 	userID := chi.URLParam(r, "userID")
 	if !isValidUUID(userID) {
 		writeError(w, http.StatusBadRequest, "invalid user ID format")
@@ -703,6 +703,14 @@ func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGo
 	uc, found := api.users.Get(userID)
 	if !found {
 		writeError(w, http.StatusNotFound, "user container not found")
+		return nil, "", false
+	}
+	return uc, userID, true
+}
+
+func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
+	uc, userID, ok := api.userFromURL(w, r)
+	if !ok {
 		return nil, "", false
 	}
 
@@ -909,19 +917,17 @@ func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
-	if !isValidUUID(userID) {
-		writeError(w, http.StatusBadRequest, "invalid user ID format")
-		return
-	}
-	if _, found := api.users.Get(userID); !found {
-		writeError(w, http.StatusNotFound, "user container not found")
+	uc, userID, ok := api.userFromURL(w, r)
+	if !ok {
 		return
 	}
 
 	// Try Supabase first — faster and works when container is stopped.
 	if api.syncer != nil {
 		trades, err := api.syncer.GetTradesForPnL(userID)
+		if err != nil {
+			log.Printf("pnl supabase fallback for user %s: %v", userID, err)
+		}
 		if err == nil && len(trades) > 0 {
 			report := calculatePnL(trades)
 			writeJSON(w, http.StatusOK, report)
@@ -930,10 +936,15 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fall back to container fetch when Supabase has no data.
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
+	if uc.Status != StatusRunning {
+		writeError(w, http.StatusServiceUnavailable, "container is not running")
 		return
 	}
+	if api.container == nil {
+		writeError(w, http.StatusInternalServerError, "container manager not available")
+		return
+	}
+	client := api.newBBGoClient(api.container.APIURL(userID)).WithContext(r.Context())
 
 	exchange := r.URL.Query().Get("exchange")
 	symbol := r.URL.Query().Get("symbol")

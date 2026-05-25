@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"log"
 	"net/http"
 	"time"
@@ -79,7 +80,7 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 		Status     string          `json:"status"`
 		Strategies json.RawMessage `json:"strategies"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&raw); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxPnLResponseBody)).Decode(&raw); err != nil {
 		return nil, err
 	}
 
@@ -175,7 +176,7 @@ func (s *Syncer) getCursor(userID, table string) int64 {
 	var rows []struct {
 		LastGID int64 `json:"last_gid"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&rows); err != nil || len(rows) == 0 {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxPnLResponseBody)).Decode(&rows); err != nil || len(rows) == 0 {
 		return 0
 	}
 	return rows[0].LastGID
@@ -258,12 +259,12 @@ func (s *Syncer) fullSyncOrders(userID string, client *BBGoClient) {
 		}
 
 		if err := s.upsertOrders(userID, orders); err != nil {
-				log.Printf("full sync orders for user %s aborted: %v", userID, err)
-				return
-			}
-			totalSynced += len(orders)
+			log.Printf("full sync orders for user %s aborted: %v", userID, err)
+			return
+		}
+		totalSynced += len(orders)
 
-			for _, o := range orders {
+		for _, o := range orders {
 			if int64(o.GID) > globalMaxGID {
 				globalMaxGID = int64(o.GID)
 			}
@@ -467,42 +468,60 @@ func (s *Syncer) DeleteCredential(userID, exchange string) {
 	log.Printf("deleted credential %s for user %s from supabase", exchange, userID)
 }
 
-// GetTradesForPnL fetches trades from Supabase sync_trades for PnL calculation.
-// This is faster and works even when the container is stopped.
+
+const pnlPageSize = 1000
+
+const maxPnLResponseBody = 2 << 20 // 2 MiB
+
+type pnlTradeRow struct {
+	Symbol   string `json:"symbol"`
+	Side     string `json:"side"`
+	Price    string `json:"price"`
+	Quantity string `json:"quantity"`
+	Fee      string `json:"fee"`
+	TradedAt string `json:"traded_at"`
+}
+
 func (s *Syncer) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
-	path := "sync_trades?user_id=eq." + userID + "&order=traded_at.asc&select=symbol,side,price,quantity,fee,traded_at"
-	resp, err := s.supabaseRequest("GET", path, nil)
-	if err != nil {
-		return nil, fmt.Errorf("fetch trades for pnl: %w", err)
-	}
-	defer resp.Body.Close()
+	var allTrades []BBGoTrade
+	offset := 0
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch trades for pnl: status %d", resp.StatusCode)
-	}
-
-	var rows []struct {
-		Symbol   string `json:"symbol"`
-		Side     string `json:"side"`
-		Price    string `json:"price"`
-		Quantity string `json:"quantity"`
-		Fee      string `json:"fee"`
-		TradedAt string `json:"traded_at"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&rows); err != nil {
-		return nil, fmt.Errorf("decode trades for pnl: %w", err)
-	}
-
-	trades := make([]BBGoTrade, len(rows))
-	for i, r := range rows {
-		trades[i] = BBGoTrade{
-			Symbol:   r.Symbol,
-			Side:     r.Side,
-			Price:    r.Price,
-			Quantity: r.Quantity,
-			Fee:      r.Fee,
-			TradedAt: r.TradedAt,
+	for {
+		params := url.Values{}
+		params.Set("user_id", "eq."+userID)
+		params.Set("order", "traded_at.asc")
+		params.Set("select", "symbol,side,price,quantity,fee,traded_at")
+		params.Set("offset", fmt.Sprintf("%d", offset))
+		params.Set("limit", fmt.Sprintf("%d", pnlPageSize))
+		path := "sync_trades?" + params.Encode()
+		resp, err := s.supabaseRequest("GET", path, nil)
+		if err != nil {
+			return nil, fmt.Errorf("fetch trades for pnl: %w", err)
 		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("fetch trades for pnl: status %d", resp.StatusCode)
+		}
+
+		var rows []pnlTradeRow
+		if err := json.NewDecoder(io.LimitReader(resp.Body, maxPnLResponseBody)).Decode(&rows); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode trades for pnl: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, r := range rows {
+			allTrades = append(allTrades, BBGoTrade{
+				Symbol: r.Symbol, Side: r.Side, Price: r.Price,
+				Quantity: r.Quantity, Fee: r.Fee, TradedAt: r.TradedAt,
+			})
+		}
+
+		if len(rows) < pnlPageSize {
+			break
+		}
+		offset += len(rows)
 	}
-	return trades, nil
+	return allTrades, nil
 }

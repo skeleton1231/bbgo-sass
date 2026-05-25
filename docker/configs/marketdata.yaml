@@ -7,9 +7,39 @@ sessions:
     exchange: okex
     envVarPrefix: OKEX
     publicOnly: true
+  bybit:
+    exchange: bybit
+    envVarPrefix: BYBIT
+    publicOnly: true
+  bitget:
+    exchange: bitget
+    envVarPrefix: BITGET
+    publicOnly: true
+  kucoin:
+    exchange: kucoin
+    envVarPrefix: KUCOIN
+    publicOnly: true
+  max:
+    exchange: max
+    envVarPrefix: MAX
+    publicOnly: true
+  bitfinex:
+    exchange: bitfinex
+    envVarPrefix: BITFINEX
+    publicOnly: true
 
 exchange:
   binance:
     symbol: BTCUSDT
   okex:
+    symbol: BTC-USDT
+  bybit:
     symbol: BTCUSDT
+  bitget:
+    symbol: BTCUSDT
+  kucoin:
+    symbol: BTC-USDT
+  max:
+    symbol: BTCTWD
+  bitfinex:
+    symbol: tBTCUSD

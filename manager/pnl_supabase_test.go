@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,34 +10,34 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
-	const userID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+const pnlTestUserID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/rest/v1/sync_trades" {
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]map[string]interface{}{
-				{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1.0", "fee": "25", "traded_at": "2024-01-01T00:00:00Z"},
-				{"symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1.0", "fee": "27.5", "traded_at": "2024-01-02T00:00:00Z"},
-			})
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]interface{}{})
-	}))
-	defer supabaseSrv.Close()
+type pnlTestSetup struct {
+	router     chi.Router
+	bbgoCalled bool
+}
 
-	bbgoCalled := false
-	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bbgoCalled = true
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer bbgoSrv.Close()
+func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http.HandlerFunc) *pnlTestSetup {
+	t.Helper()
+
+	supabaseSrv := httptest.NewServer(supabaseHandler)
+	t.Cleanup(supabaseSrv.Close)
+
+	setup := &pnlTestSetup{}
+	var bbgoURL string
+	if bbgoHandler != nil {
+		bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			setup.bbgoCalled = true
+			bbgoHandler(w, r)
+		}))
+		t.Cleanup(bbgoSrv.Close)
+		bbgoURL = bbgoSrv.URL
+	}
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{
-		UserID:     userID,
-		Status:     StatusRunning,
+	users.users[pnlTestUserID] = &UserContainer{
+		UserID:     pnlTestUserID,
+		Status:     status,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
 	}
 
@@ -45,11 +46,13 @@ func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
+	cm := &ContainerManager{cfg: cfg}
 	syncer := &Syncer{users: users, cfg: cfg, container: cm, client: &http.Client{}}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, syncer, nil, nil, nil, nil)
-	api.newBBGoClient = func(_ string) *BBGoClient { return NewBBGoClient(bbgoSrv.URL) }
+	if bbgoURL != "" {
+		api.newBBGoClient = func(_ string) *BBGoClient { return NewBBGoClient(bbgoURL) }
+	}
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -59,15 +62,37 @@ func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 		})
 	})
 	api.RegisterRoutes(r)
+	setup.router = r
+	return setup
+}
 
-	req := httptest.NewRequest("GET", "/api/users/"+userID+"/bbgo/pnl", nil)
+func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
+	setup := setupPnLTest(t, StatusRunning,
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/rest/v1/sync_trades" {
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode([]map[string]interface{}{
+					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1.0", "fee": "25", "traded_at": "2024-01-01T00:00:00Z"},
+					{"symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1.0", "fee": "27.5", "traded_at": "2024-01-02T00:00:00Z"},
+				})
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode([]interface{}{})
+		},
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		},
+	)
+
+	req := httptest.NewRequest("GET", "/api/users/"+pnlTestUserID+"/bbgo/pnl", nil)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	setup.router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	if bbgoCalled {
+	if setup.bbgoCalled {
 		t.Error("bbgo container should NOT be called when Supabase has trades")
 	}
 
@@ -87,61 +112,31 @@ func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 }
 
 func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
-	const userID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/rest/v1/sync_trades" {
+	setup := setupPnLTest(t, StatusRunning,
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/rest/v1/sync_trades" {
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode([]interface{}{})
+				return
+			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]interface{}{})
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer supabaseSrv.Close()
+		},
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/trades" {
+				json.NewEncoder(w).Encode(BBGoTradesResponse{
+					Trades: []BBGoTrade{
+						{GID: 1, ID: 1, Symbol: "ETHUSDT", Side: "BUY", Price: "3000", Quantity: "2", Fee: "6", TradedAt: "2024-01-01T00:00:00Z"},
+					},
+				})
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+		},
+	)
 
-	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/trades" {
-			json.NewEncoder(w).Encode(BBGoTradesResponse{
-				Trades: []BBGoTrade{
-					{GID: 1, ID: 1, Symbol: "ETHUSDT", Side: "BUY", Price: "3000", Quantity: "2", Fee: "6", TradedAt: "2024-01-01T00:00:00Z"},
-				},
-			})
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer bbgoSrv.Close()
-
-	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{
-		UserID:     userID,
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
-
-	cfg := &Config{
-		SupabaseURL:  supabaseSrv.URL,
-		SupabaseKey:  "test",
-		ManagerToken: "test-token",
-	}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	syncer := &Syncer{users: users, cfg: cfg, container: cm, client: &http.Client{}}
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, syncer, nil, nil, nil, nil)
-	api.newBBGoClient = func(_ string) *BBGoClient { return NewBBGoClient(bbgoSrv.URL) }
-
-	r := chi.NewRouter()
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Header.Set("X-Manager-Token", "test-token")
-			next.ServeHTTP(w, r)
-		})
-	})
-	api.RegisterRoutes(r)
-
-	req := httptest.NewRequest("GET", "/api/users/"+userID+"/bbgo/pnl", nil)
+	req := httptest.NewRequest("GET", "/api/users/"+pnlTestUserID+"/bbgo/pnl", nil)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	setup.router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -157,50 +152,24 @@ func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
 }
 
 func TestBBGoPnL_WorksWhenContainerStopped(t *testing.T) {
-	const userID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/rest/v1/sync_trades" {
+	setup := setupPnLTest(t, StatusStopped,
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/rest/v1/sync_trades" {
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode([]map[string]interface{}{
+					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.5", "fee": "12.5", "traded_at": "2024-01-01T00:00:00Z"},
+				})
+				return
+			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]map[string]interface{}{
-				{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.5", "fee": "12.5", "traded_at": "2024-01-01T00:00:00Z"},
-			})
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]interface{}{})
-	}))
-	defer supabaseSrv.Close()
+			json.NewEncoder(w).Encode([]interface{}{})
+		},
+		nil,
+	)
 
-	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{
-		UserID:     userID,
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
-
-	cfg := &Config{
-		SupabaseURL:  supabaseSrv.URL,
-		SupabaseKey:  "test",
-		ManagerToken: "test-token",
-	}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	syncer := &Syncer{users: users, cfg: cfg, container: cm, client: &http.Client{}}
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, syncer, nil, nil, nil, nil)
-
-	r := chi.NewRouter()
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Header.Set("X-Manager-Token", "test-token")
-			next.ServeHTTP(w, r)
-		})
-	})
-	api.RegisterRoutes(r)
-
-	req := httptest.NewRequest("GET", "/api/users/"+userID+"/bbgo/pnl", nil)
+	req := httptest.NewRequest("GET", "/api/users/"+pnlTestUserID+"/bbgo/pnl", nil)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	setup.router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 (PnL from Supabase when container stopped), got %d: %s", w.Code, w.Body.String())
@@ -285,5 +254,49 @@ func TestSyncer_GetTradesForPnL_Empty(t *testing.T) {
 	}
 	if len(trades) != 0 {
 		t.Fatalf("expected 0 trades, got %d", len(trades))
+	}
+}
+
+func TestSyncer_GetTradesForPnL_Pagination(t *testing.T) {
+	callCount := 0
+	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		if r.URL.Path != "/rest/v1/sync_trades" {
+			t.Errorf("expected /rest/v1/sync_trades, got %s", r.URL.Path)
+		}
+
+		offset := r.URL.Query().Get("offset")
+		limit := r.URL.Query().Get("limit")
+		if limit != fmt.Sprintf("%d", pnlPageSize) {
+			t.Errorf("expected limit=%d, got %s", pnlPageSize, limit)
+		}
+
+		var page []map[string]interface{}
+		if offset == "0" {
+			for i := 0; i < pnlPageSize; i++ {
+				page = append(page, map[string]interface{}{
+					"symbol": "BTCUSDT", "side": "BUY",
+					"price": "50000", "quantity": "1", "fee": "25",
+					"traded_at": fmt.Sprintf("2024-01-%02dT00:00:00Z", (i%28)+1),
+				})
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(page)
+	}))
+	defer supabaseSrv.Close()
+
+	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
+	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
+
+	trades, err := syncer.GetTradesForPnL("user-1")
+	if err != nil {
+		t.Fatalf("GetTradesForPnL() error: %v", err)
+	}
+	if len(trades) != pnlPageSize {
+		t.Errorf("expected %d trades, got %d", pnlPageSize, len(trades))
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls (full page + empty), got %d", callCount)
 	}
 }

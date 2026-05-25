@@ -1,4 +1,7 @@
 # bbgo base image — clones from GitHub, no local source dependency
+# Build: docker build -f saas/docker/Dockerfile.bbgo-base -t bbgo-base:latest .
+# NOTE: The bbgo repo must contain the rockhopper replace directive in go.mod
+#       before building this image, otherwise SQLite backtests will fail.
 FROM golang:1.26-bookworm AS builder
 
 RUN apt-get update && apt-get install -y gcc libc6-dev git && rm -rf /var/lib/apt/lists/*
