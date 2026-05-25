@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -67,5 +68,7 @@ func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID st
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, io.LimitReader(resp.Body, 10<<20))
+	if _, err := io.Copy(w, io.LimitReader(resp.Body, 10<<20)); err != nil {
+		log.Printf("proxy copy to client for user %s: %v", userID, err)
+	}
 }

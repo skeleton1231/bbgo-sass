@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	pb "github.com/c9s/bbgo/saas/manager/pb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestExtractSessionNames_SingleExchange(t *testing.T) {
@@ -252,8 +254,35 @@ func TestChannelPb(t *testing.T) {
 }
 
 func TestHubRedial_NilConn(t *testing.T) {
-	hub := &MarketDataHub{conn: nil}
+	hub := &MarketDataHub{conn: nil, clients: make(map[string]map[chan json.RawMessage]struct{})}
 	hub.redial()
+}
+
+func TestHubRedial_ConnReplacedAtomically(t *testing.T) {
+	hub := &MarketDataHub{
+		addr:    "passthrough:///localhost:1",
+		clients: make(map[string]map[chan json.RawMessage]struct{}),
+	}
+
+	conn, err := grpc.NewClient(hub.addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Skipf("grpc client: %v", err)
+	}
+	hub.conn = conn
+
+	hub.redial()
+
+	hub.mu.RLock()
+	newConn := hub.conn
+	newClient := hub.market
+	hub.mu.RUnlock()
+
+	if newConn == nil {
+		t.Fatal("expected conn to be replaced, got nil")
+	}
+	if newClient == nil {
+		t.Fatal("expected market client to be replaced, got nil")
+	}
 }
 
 func TestHubClose_NilConn(t *testing.T) {

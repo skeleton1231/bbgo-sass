@@ -319,8 +319,8 @@ func (api *API) startUserContainer(userID string) {
 	}
 
 	var reachable bool
+	client := api.newBBGoClient(api.container.APIURL(userID))
 	for i := 0; i < 30; i++ {
-		client := api.newBBGoClient(api.container.APIURL(userID))
 		if err := client.Ping(); err == nil {
 			reachable = true
 			break
