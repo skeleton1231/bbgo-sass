@@ -37,6 +37,7 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - MANAGER_TOKEN=${MANAGER_TOKEN}
       - MARKETDATA_ADDR=bbgo-marketdata:9090
+      - MARKETDATA_REST_ADDR=bbgo-marketdata:8080
     depends_on:
       - marketdata
     networks:
