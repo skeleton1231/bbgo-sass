@@ -49,7 +49,10 @@ func main() {
 		log.Printf("warning: could not load users from supabase: %v", err)
 	} else {
 		users.Restore(recoveredUsers)
-		containerMgr.RecoverUsers(recoveredUsers)
+		recoveryResults := containerMgr.RecoverUsers(recoveredUsers)
+		for _, r := range recoveryResults {
+			users.UpdateStatus(r.UserID, r.Status)
+		}
 		for _, uc := range recoveredUsers {
 			notifier.LoadUser(uc.UserID)
 		}

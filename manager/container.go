@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -333,20 +334,45 @@ func (cm *ContainerManager) Logs(userID string, tail string) (string, error) {
 	return out, nil
 }
 
-func (cm *ContainerManager) RecoverUsers(users []*UserContainer) {
-	for _, uc := range users {
-		name := cm.containerName(uc.UserID)
-		out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
-		if out == "true" {
-			log.Printf("recovered container %s (running)", name)
-			uc.Status = StatusRunning
-		} else if uc.Status == StatusRunning {
-			log.Printf("recovering container %s for user %s", name, uc.UserID)
-			if err := cm.CreateAndStart(uc); err != nil {
-				log.Printf("recover user %s failed: %v", uc.UserID, err)
+type RecoveryResult struct {
+	UserID string
+	Status string
+}
+
+func (cm *ContainerManager) RecoverUsers(users []*UserContainer) []RecoveryResult {
+	results := make([]RecoveryResult, len(users))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+
+	for i, uc := range users {
+		wg.Add(1)
+		go func(idx int, uc *UserContainer) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			name := cm.containerName(uc.UserID)
+			out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
+			if out == "true" {
+				log.Printf("recovered container %s (running)", name)
+				results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusRunning}
+				return
 			}
-		}
+			if uc.Status == StatusRunning {
+				log.Printf("recovering container %s for user %s", name, uc.UserID)
+				if err := cm.CreateAndStart(uc); err != nil {
+					log.Printf("recover user %s failed: %v", uc.UserID, err)
+					results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusError}
+					return
+				}
+				results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusRunning}
+				return
+			}
+			results[idx] = RecoveryResult{UserID: uc.UserID, Status: uc.Status}
+		}(i, uc)
 	}
+	wg.Wait()
+	return results
 }
 
 var exchangePrefixes = map[string]string{

@@ -360,6 +360,38 @@ func setupStoppedTestAPI(t *testing.T) *API {
 	return api
 }
 
+func TestContainerManager_RecoverUsers_Concurrent(t *testing.T) {
+	users := NewUserContainerManager()
+	uc1 := &UserContainer{UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", Status: StatusStopped, Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}}}
+	uc2 := &UserContainer{UserID: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff", Status: StatusStopped, Strategies: []StrategyEntry{{ID: "s2", Exchange: "binance", Strategy: "grid"}}}
+	users.Restore([]*UserContainer{uc1, uc2})
+
+	cfg := &Config{ManagerToken: "test-token", DataDir: t.TempDir()}
+	cm := &ContainerManager{cfg: cfg}
+
+	results := cm.RecoverUsers([]*UserContainer{uc1, uc2})
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	// Both should return a result with a valid status
+	for _, r := range results {
+		if r.UserID == "" {
+			t.Error("expected non-empty user ID in result")
+		}
+		if r.Status == "" {
+			t.Error("expected non-empty status in result")
+		}
+	}
+
+	// Verify original UserContainer structs were NOT mutated
+	orig1, _ := users.Get(uc1.UserID)
+	if orig1.Status != StatusStopped {
+		t.Errorf("original user status should not be mutated by RecoverUsers, got %s", orig1.Status)
+	}
+}
+
 func TestAPI_CreateCredential_InvalidExchange(t *testing.T) {
 	api := setupStoppedTestAPI(t)
 	r := testRouter(api)
