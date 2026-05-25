@@ -13,7 +13,7 @@ import (
 const migrationSQL = `
 CREATE TABLE IF NOT EXISTS public.user_containers (
   user_id UUID PRIMARY KEY REFERENCES public.user_profiles(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'stopped', 'error')),
+  status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'stopped', 'error', 'starting')),
   strategies JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -91,6 +91,13 @@ DO $$ BEGIN
   CREATE POLICY "Users can view own credentials"
     ON public.exchange_credentials FOR SELECT
     USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.user_containers DROP CONSTRAINT IF EXISTS user_containers_status_check;
+  ALTER TABLE public.user_containers ADD CONSTRAINT user_containers_status_check
+    CHECK (status IN ('running', 'stopped', 'error', 'starting'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 `
