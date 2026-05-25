@@ -113,7 +113,13 @@ func (c *BBGoClient) GetAllTradesFrom(exchange, symbol string, lastGID int64) ([
 			break
 		}
 		all = append(all, trades...)
-		cursor = trades[len(trades)-1].GID
+		maxGID := cursor
+		for _, t := range trades {
+			if t.GID > maxGID {
+				maxGID = t.GID
+			}
+		}
+		cursor = maxGID
 		if len(trades) < tradesPageSize {
 			break
 		}

@@ -44,6 +44,11 @@ func (s *Syncer) bbgoClient(userID string) *BBGoClient {
 	return NewBBGoClient(s.container.APIURL(userID))
 }
 
+func readBodyHint(resp *http.Response) string {
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	return string(b)
+}
+
 func (s *Syncer) supabaseRequest(method, path string, body []byte) (*http.Response, error) {
 	url := s.cfg.SupabaseURL + "/rest/v1/" + path
 	req, err := http.NewRequest(method, url, bytes.NewReader(body))
@@ -109,11 +114,10 @@ func (s *Syncer) UpsertUser(uc *UserContainer) {
 		log.Printf("upsert user %s failed: %v", uc.UserID, err)
 		return
 	}
-	resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
-		log.Printf("upsert user %s rejected (status %d)", uc.UserID, resp.StatusCode)
+		log.Printf("upsert user %s rejected (status %d): %s", uc.UserID, resp.StatusCode, readBodyHint(resp))
 	}
+	resp.Body.Close()
 }
 
 func (s *Syncer) SyncUser(userID string) {
@@ -185,6 +189,9 @@ func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
 	resp, err := s.supabaseRequest("POST", "sync_cursors?on_conflict=user_id,table_name", payload)
 	if err != nil {
 		return
+	}
+	if resp.StatusCode >= 400 {
+		log.Printf("update cursor %s/%s failed (status %d): %s", userID, table, resp.StatusCode, readBodyHint(resp))
 	}
 	resp.Body.Close()
 }
@@ -302,11 +309,10 @@ func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) {
 		log.Printf("sync orders for user %s failed: %v", userID, err)
 		return
 	}
-	resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
-		log.Printf("sync orders for user %s rejected (status %d)", userID, resp.StatusCode)
+		log.Printf("sync orders for user %s rejected (status %d): %s", userID, resp.StatusCode, readBodyHint(resp))
 	}
+	resp.Body.Close()
 }
 
 func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
@@ -353,12 +359,11 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 			log.Printf("sync trades for user %s failed: %v", userID, err)
 			return
 		}
-		resp.Body.Close()
-
 		if resp.StatusCode >= 400 {
-			log.Printf("sync trades for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
+			log.Printf("sync trades for user %s rejected (status %d): %s", userID, resp.StatusCode, readBodyHint(resp))
 			return
 		}
+		resp.Body.Close()
 
 		maxGID := cursor
 		for _, t := range trades {
@@ -404,13 +409,12 @@ func (s *Syncer) SyncCredential(cred ExchangeCredential) {
 		log.Printf("sync credential for user %s %s: %v", cred.UserID, cred.Exchange, err)
 		return
 	}
-	resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
-		log.Printf("sync credential for user %s %s skipped (status %d)", cred.UserID, cred.Exchange, resp.StatusCode)
+		log.Printf("sync credential for user %s %s skipped (status %d): %s", cred.UserID, cred.Exchange, resp.StatusCode, readBodyHint(resp))
 	} else {
 		log.Printf("synced credential %s for user %s", cred.Exchange, cred.UserID)
 	}
+	resp.Body.Close()
 }
 
 func (s *Syncer) markCredentialsVerified(uc *UserContainer) {

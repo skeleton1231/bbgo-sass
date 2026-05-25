@@ -100,6 +100,16 @@ DO $$ BEGIN
     CHECK (status IN ('running', 'stopped', 'error', 'starting'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- Unique indexes required for upsert (on_conflict) in sync.go.
+-- Without these, PostgreSQL rejects ON CONFLICT and sync silently fails.
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS sync_orders_user_order_uniq
+    ON public.sync_orders(user_id, order_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS sync_trades_user_trade_uniq
+    ON public.sync_trades(user_id, trade_id);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
 `
 
 func RunMigration(dbURL string) error {

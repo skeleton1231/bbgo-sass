@@ -80,3 +80,52 @@ func TestGetAllTrades_Empty(t *testing.T) {
 		t.Errorf("expected 0 trades, got %d", len(trades))
 	}
 }
+
+// TestGetAllTrades_OutOfOrderGID verifies that GetAllTradesFrom uses max GID
+// for cursor advancement, not the last element's GID. The bbgo API returns
+// trades sorted by traded_at DESC, which may not match GID order.
+func TestGetAllTrades_OutOfOrderGID(t *testing.T) {
+	var lastCursor int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gidStr := r.URL.Query().Get("gid")
+		gid, _ := strconv.ParseInt(gidStr, 10, 64)
+		lastCursor = gid
+
+		if gid > 4 {
+			json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: nil})
+			return
+		}
+		// Return exactly tradesPageSize trades with GIDs out of order.
+		// Last element has GID=1 (lowest), but max is tradesPageSize+4.
+		// Old code would use cursor=1, missing GIDs 2..tradesPageSize+4.
+		// Fixed code uses cursor=tradesPageSize+4 (max), getting empty next page.
+		trades := make([]BBGoTrade, tradesPageSize)
+		for i := 0; i < tradesPageSize; i++ {
+			gidVal := int64(i + 5)
+			trades[i] = BBGoTrade{
+				GID: gidVal, ID: uint64(gidVal), Symbol: "BTCUSDT", Side: "BUY",
+				Price: "100", Quantity: "1",
+			}
+		}
+		// Swap last two: put low GID at the end (simulating traded_at DESC sort)
+		trades[tradesPageSize-1] = BBGoTrade{
+			GID: 1, ID: 1, Symbol: "BTCUSDT", Side: "BUY", Price: "100", Quantity: "1",
+		}
+		json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: trades})
+	}))
+	defer srv.Close()
+
+	client := NewBBGoClient(srv.URL)
+	trades, err := client.GetAllTrades("", "")
+	if err != nil {
+		t.Fatalf("GetAllTrades: %v", err)
+	}
+	if len(trades) != tradesPageSize {
+		t.Fatalf("expected %d trades, got %d", tradesPageSize, len(trades))
+	}
+	// Cursor should be max GID (tradesPageSize+3 = 503), not last element's GID (1).
+	// If cursor were 1, second call would get gid>1 and return ALL trades again.
+	if lastCursor != int64(tradesPageSize+3) {
+		t.Errorf("second call cursor = %d, want %d (max GID, not last element's GID 1)", lastCursor, tradesPageSize+3)
+	}
+}
