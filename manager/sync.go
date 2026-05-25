@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -231,7 +232,9 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 		return
 	}
 
-	s.upsertOrders(userID, newOrders)
+	if err := s.upsertOrders(userID, newOrders); err != nil {
+		return
+	}
 	s.updateCursor(userID, "sync_orders", maxGID)
 	log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", len(newOrders), userID, cursor, maxGID)
 }
@@ -254,10 +257,13 @@ func (s *Syncer) fullSyncOrders(userID string, client *BBGoClient) {
 			break
 		}
 
-		s.upsertOrders(userID, orders)
-		totalSynced += len(orders)
+		if err := s.upsertOrders(userID, orders); err != nil {
+				log.Printf("full sync orders for user %s aborted: %v", userID, err)
+				return
+			}
+			totalSynced += len(orders)
 
-		for _, o := range orders {
+			for _, o := range orders {
 			if int64(o.GID) > globalMaxGID {
 				globalMaxGID = int64(o.GID)
 			}
@@ -280,7 +286,7 @@ func (s *Syncer) fullSyncOrders(userID string, client *BBGoClient) {
 	}
 }
 
-func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) {
+func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) error {
 	rows := make([]map[string]interface{}, len(orders))
 	for i, o := range orders {
 		rows[i] = map[string]interface{}{
@@ -299,19 +305,18 @@ func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) {
 
 	payload, err := json.Marshal(rows)
 	if err != nil {
-		log.Printf("marshal orders for user %s: %v", userID, err)
-		return
+		return fmt.Errorf("marshal orders for user %s: %w", userID, err)
 	}
 
 	resp, err := s.supabaseRequest("POST", "sync_orders?on_conflict=user_id,order_id", payload)
 	if err != nil {
-		log.Printf("sync orders for user %s failed: %v", userID, err)
-		return
+		return fmt.Errorf("sync orders for user %s: %w", userID, err)
 	}
 	if resp.StatusCode >= 400 {
-		log.Printf("sync orders for user %s rejected (status %d): %s", userID, resp.StatusCode, readBodyHint(resp))
+		return fmt.Errorf("sync orders for user %s rejected (status %d): %s", userID, resp.StatusCode, readBodyHint(resp))
 	}
 	resp.Body.Close()
+	return nil
 }
 
 func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
@@ -359,6 +364,7 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 		}
 		if resp.StatusCode >= 400 {
 			log.Printf("sync trades for user %s rejected (status %d): %s", userID, resp.StatusCode, readBodyHint(resp))
+			resp.Body.Close()
 			return
 		}
 		resp.Body.Close()
