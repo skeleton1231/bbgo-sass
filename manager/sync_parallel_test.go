@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 func TestSyncer_SyncAll_Concurrent(t *testing.T) {
@@ -57,12 +59,15 @@ func TestSyncer_SyncAll_Concurrent(t *testing.T) {
 	}
 
 	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test"}
+	p := pool.New(5)
+	defer p.Release()
 	cm := &ContainerManager{cfg: cfg}
 	syncer := &Syncer{
 		users:     users,
 		cfg:       cfg,
 		container: cm,
 		client:    &http.Client{},
+		pool:      p,
 	}
 	syncer.newBBGoClientFn = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
@@ -101,12 +106,15 @@ func TestSyncer_SyncAll_SkipsStopped(t *testing.T) {
 	}
 
 	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test"}
+	p := pool.New(5)
+	defer p.Release()
 	cm := &ContainerManager{cfg: cfg}
 	syncer := &Syncer{
 		users:     users,
 		cfg:       cfg,
 		container: cm,
 		client:    &http.Client{},
+		pool:      p,
 	}
 	syncer.newBBGoClientFn = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)

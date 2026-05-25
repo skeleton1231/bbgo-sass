@@ -85,8 +85,7 @@ func (m *UserContainerManager) Get(userID string) (*UserContainer, bool) {
 	if !ok {
 		return nil, false
 	}
-	cp := *uc
-	return &cp, true
+	return cloneUserContainer(uc), true
 }
 
 func (m *UserContainerManager) UpdateStatus(userID, status string) {
@@ -112,8 +111,7 @@ func (m *UserContainerManager) AddStrategy(userID string, entry StrategyEntry) (
 		m.users[userID] = uc
 	}
 	uc.Strategies = append(uc.Strategies, entry)
-	cp := *uc
-	return &cp, created
+	return cloneUserContainer(uc), created
 }
 
 func (m *UserContainerManager) RemoveStrategy(userID, strategyID string) bool {
@@ -137,8 +135,7 @@ func (m *UserContainerManager) ListUsers() []*UserContainer {
 	defer m.mu.RUnlock()
 	list := make([]*UserContainer, 0, len(m.users))
 	for _, uc := range m.users {
-		cp := *uc
-		list = append(list, &cp)
+		list = append(list, cloneUserContainer(uc))
 	}
 	return list
 }
@@ -369,4 +366,13 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	}
 
 	return yaml.Marshal(btCfg)
+}
+
+func cloneUserContainer(uc *UserContainer) *UserContainer {
+	cp := *uc
+	if len(uc.Strategies) > 0 {
+		cp.Strategies = make([]StrategyEntry, len(uc.Strategies))
+		copy(cp.Strategies, uc.Strategies)
+	}
+	return &cp
 }

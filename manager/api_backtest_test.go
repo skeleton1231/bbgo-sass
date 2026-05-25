@@ -28,7 +28,7 @@ func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 		ManagerToken: "test-token",
 		DataDir:      t.TempDir(),
 	}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 
 	btJobs := NewBacktestJobStore(t.TempDir())
@@ -342,7 +342,7 @@ func TestAPI_ListBacktestJobs_Empty(t *testing.T) {
 
 func TestAPI_HasDataForRange_NoDB(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
@@ -359,7 +359,7 @@ func TestAPI_HasDataForRange_SmallFile(t *testing.T) {
 	os.WriteFile(filepath.Join(sharedDir, "backtest.db"), make([]byte, 100), 0o600)
 
 	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
@@ -379,7 +379,7 @@ func TestAPI_HasDataForRange_OldModTime(t *testing.T) {
 	os.Chtimes(dbPath, past, past)
 
 	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
@@ -399,7 +399,7 @@ func TestAPI_HasDataForRange_ValidDB(t *testing.T) {
 	os.Chtimes(dbPath, time.Now(), time.Now())
 
 	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
@@ -417,7 +417,7 @@ func TestAPI_HasDataForRange_InvalidStartTime(t *testing.T) {
 	os.WriteFile(dbPath, make([]byte, 2<<20), 0o600)
 
 	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
@@ -436,7 +436,7 @@ func TestAPI_HasDataForRange_LargeDB(t *testing.T) {
 	os.WriteFile(dbPath, make([]byte, 11<<20), 0o600)
 
 	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)

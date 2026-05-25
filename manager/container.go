@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/saas/manager/pool"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,10 +23,11 @@ const containerPrefix = "bbgo-"
 type ContainerManager struct {
 	cfg   *Config
 	creds *CredentialStore
+	pool  *pool.Pool
 }
 
-func NewContainerManager(cfg *Config, creds *CredentialStore) *ContainerManager {
-	return &ContainerManager{cfg: cfg, creds: creds}
+func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool) *ContainerManager {
+	return &ContainerManager{cfg: cfg, creds: creds, pool: p}
 }
 
 func (cm *ContainerManager) containerName(userID string) string {
@@ -346,34 +348,37 @@ type HealthCheckResult struct {
 // any that have died. Uses a goroutine pool (max 5) for parallel docker inspect.
 func (cm *ContainerManager) CheckAndRecover(users []*UserContainer) []HealthCheckResult {
 	results := make([]HealthCheckResult, len(users))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 5)
+	var mu sync.Mutex
 
 	for i, uc := range users {
 		if uc.Status != StatusRunning {
 			results[i] = HealthCheckResult{UserID: uc.UserID, Alive: false}
 			continue
 		}
-		wg.Add(1)
-		go func(idx int, uc *UserContainer) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
+		idx, uc := i, uc
+		if err := cm.pool.Submit(func() {
 			running, _ := cm.CheckRunning(uc.UserID)
 			if running {
+				mu.Lock()
 				results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: true}
+				mu.Unlock()
 				return
 			}
 			log.Printf("health check: container %s died, restarting", cm.containerName(uc.UserID))
 			if err := cm.CreateAndStart(uc); err != nil {
+				mu.Lock()
 				results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: false, Error: err.Error()}
+				mu.Unlock()
 				return
 			}
+			mu.Lock()
 			results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: true, Restarted: true}
-		}(i, uc)
+			mu.Unlock()
+		}); err != nil {
+			results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: false, Error: err.Error()}
+		}
 	}
-	wg.Wait()
+	cm.pool.Wait()
 	return results
 }
 
@@ -384,37 +389,42 @@ type RecoveryResult struct {
 
 func (cm *ContainerManager) RecoverUsers(users []*UserContainer) []RecoveryResult {
 	results := make([]RecoveryResult, len(users))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 5)
+	var mu sync.Mutex
 
 	for i, uc := range users {
-		wg.Add(1)
-		go func(idx int, uc *UserContainer) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
+		idx, uc := i, uc
+		if err := cm.pool.Submit(func() {
 			name := cm.containerName(uc.UserID)
 			out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
 			if out == "true" {
 				log.Printf("recovered container %s (running)", name)
+				mu.Lock()
 				results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusRunning}
+				mu.Unlock()
 				return
 			}
 			if uc.Status == StatusRunning {
 				log.Printf("recovering container %s for user %s", name, uc.UserID)
 				if err := cm.CreateAndStart(uc); err != nil {
 					log.Printf("recover user %s failed: %v", uc.UserID, err)
+					mu.Lock()
 					results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusError}
+					mu.Unlock()
 					return
 				}
+				mu.Lock()
 				results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusRunning}
+				mu.Unlock()
 				return
 			}
+			mu.Lock()
 			results[idx] = RecoveryResult{UserID: uc.UserID, Status: uc.Status}
-		}(i, uc)
+			mu.Unlock()
+		}); err != nil {
+			results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusError}
+		}
 	}
-	wg.Wait()
+	cm.pool.Wait()
 	return results
 }
 
@@ -453,8 +463,11 @@ func cleanupBackups(dir, prefix string, keepNewest int) {
 		return
 	}
 	sort.Slice(backups, func(i, j int) bool {
-		ni, _ := backups[i].Info()
-		nj, _ := backups[j].Info()
+		ni, errI := backups[i].Info()
+		nj, errJ := backups[j].Info()
+		if errI != nil || errJ != nil {
+			return errI == nil
+		}
 		return ni.ModTime().After(nj.ModTime())
 	})
 	for _, b := range backups[keepNewest:] {

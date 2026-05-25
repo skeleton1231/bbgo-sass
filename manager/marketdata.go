@@ -13,14 +13,22 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type pooledConn struct {
+	conn *grpc.ClientConn
+	ref  int
+}
+
 // MarketDataHub manages gRPC connections to bbgo containers and broadcasts
 // data to connected WebSocket clients.
 type MarketDataHub struct {
-	mu      sync.RWMutex
-	conn    *grpc.ClientConn
-	market  pb.MarketDataServiceClient
-	addr    string
-	clients map[string]map[chan json.RawMessage]struct{} // key: "market" or "user:{userID}"
+	mu       sync.RWMutex
+	conn     *grpc.ClientConn
+	market   pb.MarketDataServiceClient
+	addr     string
+	clients  map[string]map[chan json.RawMessage]struct{} // key: "market" or "user:{userID}"
+	userPool map[string]*pooledConn                       // key: container address, shared gRPC connections
+	dialFn   func(addr string) (*grpc.ClientConn, error)
+	done     chan struct{}
 }
 
 func NewMarketDataHub(addr string, subs []MarketSub) (*MarketDataHub, error) {
@@ -30,14 +38,53 @@ func NewMarketDataHub(addr string, subs []MarketSub) (*MarketDataHub, error) {
 	}
 
 	hub := &MarketDataHub{
-		conn:    conn,
-		market:  pb.NewMarketDataServiceClient(conn),
-		addr:    addr,
-		clients: make(map[string]map[chan json.RawMessage]struct{}),
+		conn:     conn,
+		market:   pb.NewMarketDataServiceClient(conn),
+		addr:     addr,
+		clients:  make(map[string]map[chan json.RawMessage]struct{}),
+		userPool: make(map[string]*pooledConn),
+		dialFn:   defaultDial,
+		done:     make(chan struct{}),
 	}
 
 	go hub.subscribeDefault(subs)
 	return hub, nil
+}
+
+func defaultDial(addr string) (*grpc.ClientConn, error) {
+	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
+func (h *MarketDataHub) getOrDial(addr string) (*grpc.ClientConn, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if pc, ok := h.userPool[addr]; ok {
+		pc.ref++
+		return pc.conn, nil
+	}
+
+	conn, err := h.dialFn(addr)
+	if err != nil {
+		return nil, err
+	}
+	h.userPool[addr] = &pooledConn{conn: conn, ref: 1}
+	return conn, nil
+}
+
+func (h *MarketDataHub) releaseConn(addr string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	pc, ok := h.userPool[addr]
+	if !ok {
+		return
+	}
+	pc.ref--
+	if pc.ref <= 0 {
+		pc.conn.Close()
+		delete(h.userPool, addr)
+	}
 }
 
 func channelPb(name string) pb.Channel {
@@ -53,8 +100,6 @@ func channelPb(name string) pb.Channel {
 	}
 }
 
-// subscribeDefault subscribes to common market data with automatic reconnect.
-// On persistent failures, it re-dials the gRPC connection.
 func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 	const (
 		minBackoff = 2 * time.Second
@@ -77,7 +122,11 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 
 	for {
 		h.redial()
-		time.Sleep(backoff)
+		select {
+		case <-h.done:
+			return
+		case <-time.After(backoff):
+		}
 
 		ctx := context.Background()
 		h.mu.RLock()
@@ -118,7 +167,7 @@ func (h *MarketDataHub) redial() {
 		return
 	}
 
-	conn, err := grpc.NewClient(h.addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := h.dialFn(h.addr)
 	if err != nil {
 		h.mu.Unlock()
 		log.Printf("marketdata redial failed: %v", err)
@@ -144,7 +193,7 @@ func (h *MarketDataHub) broadcast(key string, msg json.RawMessage) {
 
 // SubscribeUserData connects to a per-user bbgo container's gRPC server
 // and streams order/trade/balance updates to the subscriber.
-// It opens one gRPC stream per session and merges them into a single channel.
+// gRPC connections are pooled: one connection per container address, shared across WS clients.
 func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, containerAddr string, sessions []string) (chan json.RawMessage, error) {
 	key := "user:" + userID
 
@@ -152,7 +201,7 @@ func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, co
 		return nil, fmt.Errorf("no sessions configured for user %s", userID)
 	}
 
-	conn, err := grpc.NewClient(containerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := h.getOrDial(containerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("dial user container %s: %w", containerAddr, err)
 	}
@@ -177,7 +226,7 @@ func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, co
 
 	go func() {
 		wg.Wait()
-		conn.Close()
+		h.releaseConn(containerAddr)
 		h.mu.Lock()
 		delete(h.clients[key], ch)
 		if len(h.clients[key]) == 0 {
@@ -190,8 +239,6 @@ func (h *MarketDataHub) SubscribeUserData(ctx context.Context, userID string, co
 	return ch, nil
 }
 
-// receiveUserData opens a gRPC stream for a single session and forwards
-// messages to the shared output channel.
 func (h *MarketDataHub) receiveUserData(ctx context.Context, conn *grpc.ClientConn, userID string, session string, ch chan<- json.RawMessage) {
 	client := pb.NewUserDataServiceClient(conn)
 	stream, err := client.Subscribe(ctx, &pb.UserDataRequest{Session: session})
@@ -244,8 +291,22 @@ func (h *MarketDataHub) Unsubscribe(key string, ch chan json.RawMessage) {
 }
 
 func (h *MarketDataHub) Close() {
+	if h.done != nil {
+		select {
+		case <-h.done:
+		default:
+			close(h.done)
+		}
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if h.conn != nil {
 		h.conn.Close()
+	}
+	for addr, pc := range h.userPool {
+		pc.conn.Close()
+		delete(h.userPool, addr)
 	}
 }
 

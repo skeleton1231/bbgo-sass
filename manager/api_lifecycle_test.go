@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 func TestAPI_CreateStrategy(t *testing.T) {
@@ -248,7 +250,7 @@ func TestAPI_StartUser_NoStrategies(t *testing.T) {
 		Status: StatusStopped,
 	}
 	cfg := &Config{ManagerToken: "test-token"}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
@@ -354,7 +356,7 @@ func setupStoppedTestAPI(t *testing.T) *API {
 		ManagerToken: "test-token",
 		DataDir:      t.TempDir(),
 	}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	return api
@@ -367,7 +369,9 @@ func TestContainerManager_RecoverUsers_Concurrent(t *testing.T) {
 	users.Restore([]*UserContainer{uc1, uc2})
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: t.TempDir()}
-	cm := &ContainerManager{cfg: cfg}
+	p := pool.New(5)
+	defer p.Release()
+	cm := &ContainerManager{cfg: cfg, pool: p}
 
 	results := cm.RecoverUsers([]*UserContainer{uc1, uc2})
 

@@ -14,19 +14,23 @@ import (
 type BBGoClient struct {
 	baseURL string
 	client  *http.Client
+	ctx     context.Context
 }
 
 func NewBBGoClient(baseURL string) *BBGoClient {
 	return &BBGoClient{
 		baseURL: baseURL,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
+		client:  &http.Client{Timeout: 15 * time.Second},
+		ctx:     context.Background(),
 	}
 }
 
+func (c *BBGoClient) WithContext(ctx context.Context) *BBGoClient {
+	return &BBGoClient{baseURL: c.baseURL, client: c.client, ctx: ctx}
+}
+
 func (c *BBGoClient) get(path string, result interface{}) error {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
 		return fmt.Errorf("bbgo api %s: %w", path, err)
 	}

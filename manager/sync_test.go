@@ -18,7 +18,7 @@ func TestSyncer_SyncUserData_PingFails(t *testing.T) {
 
 	cfg := &Config{SupabaseURL: "http://localhost:99999", SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
-	syncer := NewSyncer(users, cfg, cm)
+	syncer := NewSyncer(users, cfg, cm, nil)
 
 	uc := &UserContainer{UserID: "user-1", Status: StatusRunning}
 	// Should not panic when bbgo is unreachable
@@ -259,7 +259,7 @@ func TestSyncer_LoadUsersFromSupabase(t *testing.T) {
 	defer supabaseSrv.Close()
 
 	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
-	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg})
+	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
 
 	users, err := syncer.LoadUsersFromSupabase()
 	if err != nil {
@@ -283,7 +283,7 @@ func TestSyncer_LoadUsersFromSupabase_Non200(t *testing.T) {
 	defer supabaseSrv.Close()
 
 	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test"}
-	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg})
+	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
 
 	users, err := syncer.LoadUsersFromSupabase()
 	if err != nil {
@@ -295,15 +295,20 @@ func TestSyncer_LoadUsersFromSupabase_Non200(t *testing.T) {
 }
 
 func TestSyncer_SyncOrdersWithExistingCursor(t *testing.T) {
-	var supabaseMu sync.Mutex
-	var receivedGID string
+	var mu sync.Mutex
+	var receivedGIDs []string
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/orders/closed" {
-			receivedGID = r.URL.Query().Get("gid")
+			mu.Lock()
+			receivedGIDs = append(receivedGIDs, r.URL.Query().Get("gid"))
+			mu.Unlock()
+
+			// Return one new order (GID=200 > cursor 150) and one old (GID=100 < cursor)
 			json.NewEncoder(w).Encode(BBGoOrdersResponse{
 				Orders: []BBGoOrder{
 					{GID: 200, OrderID: 200, Symbol: "ETHUSDT", Side: "BUY", Type: "LIMIT", Price: "2500", Quantity: "2.0", Status: "FILLED"},
+					{GID: 100, OrderID: 100, Symbol: "ETHUSDT", Side: "SELL", Type: "LIMIT", Price: "2600", Quantity: "1.0", Status: "FILLED"},
 				},
 			})
 			return
@@ -311,6 +316,7 @@ func TestSyncer_SyncOrdersWithExistingCursor(t *testing.T) {
 	}))
 	defer bbgoSrv.Close()
 
+	var upsertedOrders []map[string]interface{}
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/rest/v1/sync_cursors" {
 			json.NewEncoder(w).Encode([]struct {
@@ -318,11 +324,16 @@ func TestSyncer_SyncOrdersWithExistingCursor(t *testing.T) {
 			}{{LastGID: 150}})
 			return
 		}
-		if (r.Method == "PATCH" || r.Method == "POST") && r.URL.Path == "/rest/v1/sync_cursors" {
+		if r.Method == "POST" && r.URL.Path == "/rest/v1/sync_orders" {
+			var rows []map[string]interface{}
+			json.NewDecoder(r.Body).Decode(&rows)
+			mu.Lock()
+			upsertedOrders = append(upsertedOrders, rows...)
+			mu.Unlock()
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if r.Method == "POST" && r.URL.Path == "/rest/v1/sync_orders" {
+		if (r.Method == "PATCH" || r.Method == "POST") && r.URL.Path == "/rest/v1/sync_cursors" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -340,9 +351,28 @@ func TestSyncer_SyncOrdersWithExistingCursor(t *testing.T) {
 	client := NewBBGoClient(bbgoSrv.URL)
 	syncer.syncOrdersViaAPI("user-1", client)
 
-	supabaseMu.Lock()
-	defer supabaseMu.Unlock()
-	if receivedGID != "150" {
-		t.Errorf("expected gid=150 from cursor, got %s", receivedGID)
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Incremental sync sends gid=0 to get latest orders, not gid=cursor
+	if len(receivedGIDs) != 1 || receivedGIDs[0] != "0" {
+		t.Errorf("expected gid=0 for incremental sync, got %v", receivedGIDs)
+	}
+
+	// Only the order with GID > cursor (150) should be synced
+	if len(upsertedOrders) != 1 {
+		t.Fatalf("expected 1 new order (GID=200 > cursor 150), got %d", len(upsertedOrders))
+	}
+	switch v := upsertedOrders[0]["order_id"].(type) {
+	case json.Number:
+		if v.String() != "200" {
+			t.Errorf("expected order_id=200, got %s", v.String())
+		}
+	case float64:
+		if v != 200 {
+			t.Errorf("expected order_id=200, got %v", v)
+		}
+	default:
+		t.Errorf("expected order_id=200, got %v (%T)", upsertedOrders[0]["order_id"], upsertedOrders[0]["order_id"])
 	}
 }

@@ -191,8 +191,51 @@ func (s *Syncer) updateCursor(userID, table string, lastGID int64) {
 
 func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 	cursor := s.getCursor(userID, "sync_orders")
+
+	if cursor == 0 {
+		s.fullSyncOrders(userID, client)
+		return
+	}
+
+	// Incremental sync: bbgo's /api/orders/closed uses DESC ordering (gid < :gid),
+	// which paginates backward. To get NEW orders, fetch without cursor (gid=0)
+	// which returns the latest 500, then filter to only orders with GID > saved cursor.
+	orders, err := client.GetClosedOrders("", "", 0)
+	if err != nil {
+		log.Printf("sync orders via api for user %s failed: %v", userID, err)
+		return
+	}
+	if len(orders) == 0 {
+		return
+	}
+
+	var newOrders []BBGoOrder
+	maxGID := cursor
+	for _, o := range orders {
+		if int64(o.GID) > cursor {
+			newOrders = append(newOrders, o)
+		}
+		if int64(o.GID) > maxGID {
+			maxGID = int64(o.GID)
+		}
+	}
+
+	if len(newOrders) == 0 {
+		return
+	}
+
+	s.upsertOrders(userID, newOrders)
+	s.updateCursor(userID, "sync_orders", maxGID)
+	log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", len(newOrders), userID, cursor, maxGID)
+}
+
+// fullSyncOrders paginates backward through all orders for initial sync (cursor=0).
+// The bbgo API returns orders in GID DESC order with LIMIT 500, so we paginate
+// backward and save the global max GID as the cursor.
+func (s *Syncer) fullSyncOrders(userID string, client *BBGoClient) {
+	var globalMaxGID int64
 	totalSynced := 0
-	startCursor := cursor
+	cursor := int64(0)
 
 	for {
 		orders, err := client.GetClosedOrders("", "", cursor)
@@ -204,50 +247,20 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 			break
 		}
 
-		rows := make([]map[string]interface{}, len(orders))
-		for i, o := range orders {
-			rows[i] = map[string]interface{}{
-				"user_id":  userID,
-				"bot_id":   userID,
-				"order_id": json.Number(formatUint(o.OrderID)),
-				"symbol":   o.Symbol,
-				"side":     o.Side,
-				"price":    o.Price,
-				"quantity": o.Quantity,
-				"status":   o.Status,
-				"type":     o.Type,
-				"executed_quantity": o.ExecutedQuantity,
-				"creation_time": o.CreationTime,
-			}
-		}
-
-		payload, err := json.Marshal(rows)
-		if err != nil {
-			log.Printf("marshal orders for user %s: %v", userID, err)
-			return
-		}
-
-		resp, err := s.supabaseRequest("POST", "sync_orders?on_conflict=user_id,order_id", payload)
-		if err != nil {
-			log.Printf("sync orders for user %s failed: %v", userID, err)
-			return
-		}
-		resp.Body.Close()
-
-		if resp.StatusCode >= 400 {
-			log.Printf("sync orders for user %s rejected (status %d), not advancing cursor", userID, resp.StatusCode)
-			return
-		}
-
-		maxGID := cursor
-		for _, o := range orders {
-			if int64(o.GID) > maxGID {
-				maxGID = int64(o.GID)
-			}
-		}
-		cursor = maxGID
-		s.updateCursor(userID, "sync_orders", cursor)
+		s.upsertOrders(userID, orders)
 		totalSynced += len(orders)
+
+		for _, o := range orders {
+			if int64(o.GID) > globalMaxGID {
+				globalMaxGID = int64(o.GID)
+			}
+		}
+
+		// Advance cursor to smallest GID in batch (last element since DESC)
+		cursor = int64(orders[len(orders)-1].GID)
+		if cursor <= 0 {
+			break
+		}
 
 		if len(orders) < tradesPageSize {
 			break
@@ -255,7 +268,44 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 	}
 
 	if totalSynced > 0 {
-		log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", totalSynced, userID, startCursor, cursor)
+		s.updateCursor(userID, "sync_orders", globalMaxGID)
+		log.Printf("full synced %d orders for user %s via api (cursor 0 -> %d)", totalSynced, userID, globalMaxGID)
+	}
+}
+
+func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) {
+	rows := make([]map[string]interface{}, len(orders))
+	for i, o := range orders {
+		rows[i] = map[string]interface{}{
+			"user_id":           userID,
+			"bot_id":            userID,
+			"order_id":          json.Number(formatUint(o.OrderID)),
+			"symbol":            o.Symbol,
+			"side":              o.Side,
+			"price":             o.Price,
+			"quantity":          o.Quantity,
+			"status":            o.Status,
+			"type":              o.Type,
+			"executed_quantity": o.ExecutedQuantity,
+			"creation_time":     o.CreationTime,
+		}
+	}
+
+	payload, err := json.Marshal(rows)
+	if err != nil {
+		log.Printf("marshal orders for user %s: %v", userID, err)
+		return
+	}
+
+	resp, err := s.supabaseRequest("POST", "sync_orders?on_conflict=user_id,order_id", payload)
+	if err != nil {
+		log.Printf("sync orders for user %s failed: %v", userID, err)
+		return
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		log.Printf("sync orders for user %s rejected (status %d)", userID, resp.StatusCode)
 	}
 }
 

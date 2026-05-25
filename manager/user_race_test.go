@@ -97,11 +97,42 @@ func TestAddStrategyReturnsSnapshot(t *testing.T) {
 		t.Fatal("expected user to be created")
 	}
 
-	// Mutate returned value — should not affect stored state
 	uc.Status = StatusRunning
 
 	uc2, _ := m.Get("user-1")
 	if uc2.Status == StatusRunning {
 		t.Error("AddStrategy() should return a snapshot, not a pointer to internal state")
+	}
+}
+
+func TestGet_StrategiesSliceIsDeepCopy(t *testing.T) {
+	m := NewUserContainerManager()
+	m.AddStrategy("user-1", StrategyEntry{
+		ID:       "s1",
+		Strategy: "grid2",
+		Exchange: "binance",
+		Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
+	})
+
+	uc1, _ := m.Get("user-1")
+	// Modify element through returned copy — should NOT affect stored data
+	uc1.Strategies[0].Exchange = "okex"
+
+	uc2, _ := m.Get("user-1")
+	if uc2.Strategies[0].Exchange == "okex" {
+		t.Fatal("Get() must deep-copy Strategies slice — modifying returned copy affected internal state")
+	}
+}
+
+func TestListUsers_StrategiesSliceIsDeepCopy(t *testing.T) {
+	m := NewUserContainerManager()
+	m.AddStrategy("user-1", StrategyEntry{ID: "s1", Exchange: "binance", Config: rawJSON(`{}`)})
+
+	users := m.ListUsers()
+	users[0].Strategies[0].Exchange = "okex"
+
+	users2 := m.ListUsers()
+	if users2[0].Strategies[0].Exchange == "okex" {
+		t.Fatal("ListUsers() must deep-copy Strategies — modifying returned copy affected internal state")
 	}
 }

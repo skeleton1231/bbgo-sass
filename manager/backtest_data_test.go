@@ -10,7 +10,7 @@ import (
 func TestHasDataForRange_WhenDBNotExist(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil)
+	cm := NewContainerManager(cfg, nil, nil)
 	api := &API{container: cm}
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
@@ -25,7 +25,7 @@ func TestHasDataForRange_WhenDBTooSmall(t *testing.T) {
 	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 100), 0o644)
 
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil)
+	cm := NewContainerManager(cfg, nil, nil)
 	api := &API{container: cm}
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
@@ -42,7 +42,7 @@ func TestHasDataForRange_WhenDBExistsButStale(t *testing.T) {
 	os.Chtimes(sharedDir+"/backtest.db", oldTime, oldTime)
 
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil)
+	cm := NewContainerManager(cfg, nil, nil)
 	api := &API{container: cm}
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
@@ -57,7 +57,7 @@ func TestHasDataForRange_WhenDBRecentAndLarge(t *testing.T) {
 	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 2<<20), 0o644)
 
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil)
+	cm := NewContainerManager(cfg, nil, nil)
 	api := &API{container: cm}
 
 	if !api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
@@ -72,7 +72,7 @@ func TestHasDataForRange_WithCustomSharedDir(t *testing.T) {
 	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 2<<20), 0o644)
 
 	cfg := &Config{DataDir: dir, BacktestSharedDir: sharedDir}
-	cm := NewContainerManager(cfg, nil)
+	cm := NewContainerManager(cfg, nil, nil)
 	api := &API{container: cm}
 
 	if !api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {

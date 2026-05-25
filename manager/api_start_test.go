@@ -60,7 +60,7 @@ func TestAPI_StartUserAsync_NoStrategies(t *testing.T) {
 		Status: StatusStopped,
 	}
 	cfg := &Config{ManagerToken: "test-token"}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
@@ -97,7 +97,7 @@ func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(_ string) *BBGoClient {
@@ -171,7 +171,7 @@ func setupTestAPIWithMockCM(bbgoHandler http.HandlerFunc, isRunning bool) (*API,
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_ string) bool { return isRunning }

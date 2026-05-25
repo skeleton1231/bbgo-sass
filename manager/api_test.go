@@ -24,7 +24,7 @@ func setupTestAPI(bbgoHandler http.HandlerFunc) (*API, *httptest.Server) {
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(_ string) *BBGoClient {
@@ -149,7 +149,7 @@ func TestAPI_BBGoTrades_WithQueryParams(t *testing.T) {
 func TestAPI_BBGo_UserNotFound(t *testing.T) {
 	users := NewUserContainerManager()
 	cfg := &Config{ManagerToken: "test-token"}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 
@@ -167,7 +167,7 @@ func TestAPI_BBGo_UserNotFound(t *testing.T) {
 func TestAPI_BBGo_InvalidUserID(t *testing.T) {
 	users := NewUserContainerManager()
 	cfg := &Config{ManagerToken: "test-token"}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 
@@ -189,7 +189,7 @@ func TestAPI_BBGo_ContainerStopped(t *testing.T) {
 		Status: StatusStopped,
 	}
 	cfg := &Config{ManagerToken: "test-token"}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 
