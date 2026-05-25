@@ -909,6 +909,27 @@ func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "userID")
+	if !isValidUUID(userID) {
+		writeError(w, http.StatusBadRequest, "invalid user ID format")
+		return
+	}
+	if _, found := api.users.Get(userID); !found {
+		writeError(w, http.StatusNotFound, "user container not found")
+		return
+	}
+
+	// Try Supabase first — faster and works when container is stopped.
+	if api.syncer != nil {
+		trades, err := api.syncer.GetTradesForPnL(userID)
+		if err == nil && len(trades) > 0 {
+			report := calculatePnL(trades)
+			writeJSON(w, http.StatusOK, report)
+			return
+		}
+	}
+
+	// Fall back to container fetch when Supabase has no data.
 	client, _, ok := api.bbgoClientForUser(w, r)
 	if !ok {
 		return

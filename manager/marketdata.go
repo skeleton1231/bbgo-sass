@@ -119,9 +119,13 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 
 	backoff := minBackoff
 	req := &pb.SubscribeRequest{Subscriptions: pbSubs}
+	firstAttempt := true
 
 	for {
-		h.redial()
+		if !firstAttempt {
+			h.redial()
+		}
+		firstAttempt = false
 		select {
 		case <-h.done:
 			return

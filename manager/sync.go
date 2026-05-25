@@ -71,7 +71,7 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil
+		return nil, fmt.Errorf("load users from supabase: unexpected status %d", resp.StatusCode)
 	}
 
 	var raw []struct {
@@ -275,7 +275,7 @@ func (s *Syncer) fullSyncOrders(userID string, client *BBGoClient) {
 			break
 		}
 
-		if len(orders) < tradesPageSize {
+		if len(orders) < syncPageSize {
 			break
 		}
 	}
@@ -313,7 +313,9 @@ func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) error {
 		return fmt.Errorf("sync orders for user %s: %w", userID, err)
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("sync orders for user %s rejected (status %d): %s", userID, resp.StatusCode, readBodyHint(resp))
+		hint := readBodyHint(resp)
+		resp.Body.Close()
+		return fmt.Errorf("sync orders for user %s rejected (status %d): %s", userID, resp.StatusCode, hint)
 	}
 	resp.Body.Close()
 	return nil
@@ -379,7 +381,7 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 		s.updateCursor(userID, "sync_trades", cursor)
 		totalSynced += len(trades)
 
-		if len(trades) < tradesPageSize {
+		if len(trades) < syncPageSize {
 			break
 		}
 	}
@@ -463,4 +465,44 @@ func (s *Syncer) DeleteCredential(userID, exchange string) {
 	}
 	resp.Body.Close()
 	log.Printf("deleted credential %s for user %s from supabase", exchange, userID)
+}
+
+// GetTradesForPnL fetches trades from Supabase sync_trades for PnL calculation.
+// This is faster and works even when the container is stopped.
+func (s *Syncer) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
+	path := "sync_trades?user_id=eq." + userID + "&order=traded_at.asc&select=symbol,side,price,quantity,fee,traded_at"
+	resp, err := s.supabaseRequest("GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetch trades for pnl: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch trades for pnl: status %d", resp.StatusCode)
+	}
+
+	var rows []struct {
+		Symbol   string `json:"symbol"`
+		Side     string `json:"side"`
+		Price    string `json:"price"`
+		Quantity string `json:"quantity"`
+		Fee      string `json:"fee"`
+		TradedAt string `json:"traded_at"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&rows); err != nil {
+		return nil, fmt.Errorf("decode trades for pnl: %w", err)
+	}
+
+	trades := make([]BBGoTrade, len(rows))
+	for i, r := range rows {
+		trades[i] = BBGoTrade{
+			Symbol:   r.Symbol,
+			Side:     r.Side,
+			Price:    r.Price,
+			Quantity: r.Quantity,
+			Fee:      r.Fee,
+			TradedAt: r.TradedAt,
+		}
+	}
+	return trades, nil
 }

@@ -17,7 +17,7 @@ func TestGetAllTrades_Pagination(t *testing.T) {
 		gid, _ := strconv.ParseInt(gidStr, 10, 64)
 
 		var trades []BBGoTrade
-		batchSize := int64(tradesPageSize)
+		batchSize := int64(syncPageSize)
 		if gid >= 2*batchSize {
 			// 3rd page: empty
 		} else if gid >= batchSize {
@@ -49,7 +49,7 @@ func TestGetAllTrades_Pagination(t *testing.T) {
 		t.Fatalf("GetAllTrades: %v", err)
 	}
 
-	expectedCount := tradesPageSize + tradesPageSize/2
+	expectedCount := syncPageSize + syncPageSize/2
 	if len(trades) != expectedCount {
 		t.Errorf("expected %d trades, got %d", expectedCount, len(trades))
 	}
@@ -95,12 +95,12 @@ func TestGetAllTrades_OutOfOrderGID(t *testing.T) {
 			json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: nil})
 			return
 		}
-		// Return exactly tradesPageSize trades with GIDs out of order.
-		// Last element has GID=1 (lowest), but max is tradesPageSize+4.
-		// Old code would use cursor=1, missing GIDs 2..tradesPageSize+4.
-		// Fixed code uses cursor=tradesPageSize+4 (max), getting empty next page.
-		trades := make([]BBGoTrade, tradesPageSize)
-		for i := 0; i < tradesPageSize; i++ {
+		// Return exactly syncPageSize trades with GIDs out of order.
+		// Last element has GID=1 (lowest), but max is syncPageSize+4.
+		// Old code would use cursor=1, missing GIDs 2..syncPageSize+4.
+		// Fixed code uses cursor=syncPageSize+4 (max), getting empty next page.
+		trades := make([]BBGoTrade, syncPageSize)
+		for i := 0; i < syncPageSize; i++ {
 			gidVal := int64(i + 5)
 			trades[i] = BBGoTrade{
 				GID: gidVal, ID: uint64(gidVal), Symbol: "BTCUSDT", Side: "BUY",
@@ -108,7 +108,7 @@ func TestGetAllTrades_OutOfOrderGID(t *testing.T) {
 			}
 		}
 		// Swap last two: put low GID at the end (simulating traded_at DESC sort)
-		trades[tradesPageSize-1] = BBGoTrade{
+		trades[syncPageSize-1] = BBGoTrade{
 			GID: 1, ID: 1, Symbol: "BTCUSDT", Side: "BUY", Price: "100", Quantity: "1",
 		}
 		json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: trades})
@@ -120,12 +120,12 @@ func TestGetAllTrades_OutOfOrderGID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAllTrades: %v", err)
 	}
-	if len(trades) != tradesPageSize {
-		t.Fatalf("expected %d trades, got %d", tradesPageSize, len(trades))
+	if len(trades) != syncPageSize {
+		t.Fatalf("expected %d trades, got %d", syncPageSize, len(trades))
 	}
-	// Cursor should be max GID (tradesPageSize+3 = 503), not last element's GID (1).
+	// Cursor should be max GID (syncPageSize+3 = 503), not last element's GID (1).
 	// If cursor were 1, second call would get gid>1 and return ALL trades again.
-	if lastCursor != int64(tradesPageSize+3) {
-		t.Errorf("second call cursor = %d, want %d (max GID, not last element's GID 1)", lastCursor, tradesPageSize+3)
+	if lastCursor != int64(syncPageSize+3) {
+		t.Errorf("second call cursor = %d, want %d (max GID, not last element's GID 1)", lastCursor, syncPageSize+3)
 	}
 }

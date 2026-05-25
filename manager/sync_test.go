@@ -286,11 +286,11 @@ func TestSyncer_LoadUsersFromSupabase_Non200(t *testing.T) {
 	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
 
 	users, err := syncer.LoadUsersFromSupabase()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error on non-200 response, got nil")
 	}
-	if len(users) != 0 {
-		t.Fatalf("expected 0 users on server error, got %d", len(users))
+	if users != nil {
+		t.Fatalf("expected nil users on error, got %d", len(users))
 	}
 }
 

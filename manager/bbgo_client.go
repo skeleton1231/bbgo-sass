@@ -94,7 +94,7 @@ func (c *BBGoClient) GetTrades(exchange, symbol string, lastGID int64) ([]BBGoTr
 	return resp.Trades, nil
 }
 
-const tradesPageSize = 500
+const syncPageSize = 500
 
 // GetAllTrades paginates through trades using the GID cursor.
 func (c *BBGoClient) GetAllTrades(exchange, symbol string) ([]BBGoTrade, error) {
@@ -120,7 +120,7 @@ func (c *BBGoClient) GetAllTradesFrom(exchange, symbol string, lastGID int64) ([
 			}
 		}
 		cursor = maxGID
-		if len(trades) < tradesPageSize {
+		if len(trades) < syncPageSize {
 			break
 		}
 	}
