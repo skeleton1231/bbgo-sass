@@ -334,6 +334,49 @@ func (cm *ContainerManager) Logs(userID string, tail string) (string, error) {
 	return out, nil
 }
 
+// HealthCheckResult reports the outcome of checking a single container.
+type HealthCheckResult struct {
+	UserID    string
+	Alive     bool
+	Restarted bool
+	Error     string
+}
+
+// CheckAndRecover checks all running containers in parallel and restarts
+// any that have died. Uses a goroutine pool (max 5) for parallel docker inspect.
+func (cm *ContainerManager) CheckAndRecover(users []*UserContainer) []HealthCheckResult {
+	results := make([]HealthCheckResult, len(users))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+
+	for i, uc := range users {
+		if uc.Status != StatusRunning {
+			results[i] = HealthCheckResult{UserID: uc.UserID, Alive: false}
+			continue
+		}
+		wg.Add(1)
+		go func(idx int, uc *UserContainer) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			running, _ := cm.CheckRunning(uc.UserID)
+			if running {
+				results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: true}
+				return
+			}
+			log.Printf("health check: container %s died, restarting", cm.containerName(uc.UserID))
+			if err := cm.CreateAndStart(uc); err != nil {
+				results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: false, Error: err.Error()}
+				return
+			}
+			results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: true, Restarted: true}
+		}(i, uc)
+	}
+	wg.Wait()
+	return results
+}
+
 type RecoveryResult struct {
 	UserID string
 	Status string
