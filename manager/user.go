@@ -303,6 +303,8 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	if v, ok := allParams["symbol"].(string); ok && v != "" {
 		symbol = v
 	}
+	// Ensure symbol is in the strategy config for bbgo dependency injection
+	allParams["symbol"] = symbol
 
 	// Ensure interval is set for strategies that require kline subscriptions
 	if _, ok := allParams["interval"]; !ok {
