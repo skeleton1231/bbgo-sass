@@ -16,7 +16,11 @@ func TestBuildUserYAML_SingleExchange(t *testing.T) {
 			},
 		},
 	}
-	yaml := buildUserYAML(uc, func(exchange string) bool { return false })
+	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	yaml := string(yamlBytes)
 	if !strings.Contains(yaml, "exchange:") {
 		t.Error("expected exchange section")
 	}
@@ -53,7 +57,11 @@ func TestBuildUserYAML_CrossExchange(t *testing.T) {
 			},
 		},
 	}
-	yaml := buildUserYAML(uc, func(exchange string) bool { return false })
+	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	yaml := string(yamlBytes)
 
 	if !strings.Contains(yaml, "crossExchangeStrategies:") {
 		t.Error("expected crossExchangeStrategies section")
@@ -96,7 +104,11 @@ func TestBuildUserYAML_Mixed(t *testing.T) {
 			},
 		},
 	}
-	yaml := buildUserYAML(uc, func(exchange string) bool { return false })
+	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	yaml := string(yamlBytes)
 
 	if !strings.Contains(yaml, "exchangeStrategies:") {
 		t.Error("expected exchangeStrategies section for grid2")

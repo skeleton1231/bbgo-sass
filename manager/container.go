@@ -81,11 +81,14 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		cleanupBackups(hostDir, "bbgo.db.backup", 3)
 	}
 
-	yamlContent := buildUserYAML(uc, func(exchange string) bool {
+	yamlContent, err := buildUserYAML(uc, func(exchange string) bool {
 		_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
 		return err == nil
 	})
-	if err := os.WriteFile(hostDir+"/bbgo.yaml", []byte(yamlContent), 0o644); err != nil {
+	if err != nil {
+		return fmt.Errorf("build config for user %s: %w", uc.UserID, err)
+	}
+	if err := os.WriteFile(hostDir+"/bbgo.yaml", yamlContent, 0o644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 

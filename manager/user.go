@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -172,7 +173,7 @@ type environmentConfig struct {
 	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery"`
 }
 
-func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool) string {
+func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool) ([]byte, error) {
 	exchanges := map[string]exchangeConfig{}
 	sessions := map[string]sessionConfig{}
 	var exchangeStrategies []map[string]interface{}
@@ -246,9 +247,9 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 
 	out, err := yaml.Marshal(cfg)
 	if err != nil {
-		return ""
+		return nil, fmt.Errorf("marshal bbgo config for user %s: %w", uc.UserID, err)
 	}
-	return string(out)
+	return out, nil
 }
 
 func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool) map[string]interface{} {
