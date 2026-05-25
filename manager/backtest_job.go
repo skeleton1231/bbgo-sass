@@ -92,6 +92,14 @@ func (s *BacktestJobStore) ListByUser(userID string) []*BacktestJob {
 }
 
 func (s *BacktestJobStore) UpdateStatus(jobID, status, progress string) *BacktestJob {
+	return s.updateStatus(jobID, status, progress, "")
+}
+
+func (s *BacktestJobStore) FailJob(jobID, progress, errMsg string) *BacktestJob {
+	return s.updateStatus(jobID, JobFailed, progress, errMsg)
+}
+
+func (s *BacktestJobStore) updateStatus(jobID, status, progress, errMsg string) *BacktestJob {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	j, ok := s.jobs[jobID]
@@ -100,6 +108,9 @@ func (s *BacktestJobStore) UpdateStatus(jobID, status, progress string) *Backtes
 	}
 	j.Status = status
 	j.Progress = progress
+	if errMsg != "" {
+		j.Error = errMsg
+	}
 	now := time.Now()
 	if status == JobDownloading || status == JobRunning {
 		if j.StartedAt == nil {
@@ -217,8 +228,7 @@ func (ex *BacktestExecutor) Submit(job *BacktestJob) error {
 	ex.store.Create(job)
 
 	if !ex.store.AcquireSlot() {
-		ex.store.UpdateStatus(job.ID, JobFailed, "too many concurrent backtest jobs")
-		ex.store.SetError(job.ID, "server busy, try again later")
+		ex.store.FailJob(job.ID, "too many concurrent backtest jobs", "server busy, try again later")
 		return fmt.Errorf("server busy")
 	}
 
@@ -233,8 +243,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 		ex.store.UpdateStatus(job.ID, JobDownloading, "syncing market data...")
 		out, err := ex.container.SyncBacktest(job.Exchange, job.Symbol, job.StartTime, job.EndTime)
 		if err != nil {
-			ex.store.UpdateStatus(job.ID, JobFailed, "data sync failed")
-			ex.store.SetError(job.ID, fmt.Sprintf("data sync failed: %s", err))
+		ex.store.FailJob(job.ID, "data sync failed", fmt.Sprintf("data sync failed: %s", err))
 			ex.notify(job, "Backtest Data Sync Failed", fmt.Sprintf("Strategy %s on %s/%s: data sync failed", job.Strategy, job.Exchange, job.Symbol))
 			return
 		}
@@ -245,15 +254,13 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime)
 	if err != nil {
-		ex.store.UpdateStatus(job.ID, JobFailed, "config error")
-		ex.store.SetError(job.ID, fmt.Sprintf("invalid config: %v", err))
+		ex.store.FailJob(job.ID, "config error", fmt.Sprintf("invalid config: %v", err))
 		return
 	}
 
 	result, err := ex.container.RunBacktest(job.UserID, yamlContent)
 	if err != nil {
-		ex.store.UpdateStatus(job.ID, JobFailed, "backtest failed")
-		ex.store.SetError(job.ID, err.Error())
+		ex.store.FailJob(job.ID, "backtest failed", err.Error())
 		ex.notify(job, "Backtest Failed", fmt.Sprintf("Strategy %s: %s", job.Strategy, err.Error()))
 		return
 	}
