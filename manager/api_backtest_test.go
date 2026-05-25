@@ -384,9 +384,9 @@ func TestAPI_HasDataForRange_OldModTime(t *testing.T) {
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 
-	// mod-time no longer affects the check — size alone determines availability
-	if !api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
-		t.Error("expected true for db >= 1MB regardless of mod time")
+	// stale DB (>24h old) should not be considered valid
+	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
+		t.Error("expected false for stale db with old mod time")
 	}
 }
 
@@ -396,8 +396,7 @@ func TestAPI_HasDataForRange_ValidDB(t *testing.T) {
 	os.MkdirAll(sharedDir, 0o755)
 	dbPath := filepath.Join(sharedDir, "backtest.db")
 	os.WriteFile(dbPath, make([]byte, 2<<20), 0o600)
-	future, _ := time.Parse("2006-01-02", "2024-06-01")
-	os.Chtimes(dbPath, future, future)
+	os.Chtimes(dbPath, time.Now(), time.Now())
 
 	cfg := &Config{DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}

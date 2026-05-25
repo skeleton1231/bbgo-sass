@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -68,6 +70,7 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		backup := dbPath + ".backup." + time.Now().Format("20060102-150405")
 		os.Rename(dbPath, backup)
 		log.Printf("backed up %s -> %s", dbPath, backup)
+		cleanupBackups(hostDir, "bbgo.db.backup", 3)
 	}
 
 	yamlContent := buildUserYAML(uc, func(exchange string) bool {
@@ -357,4 +360,30 @@ func exchangeEnvPrefix(exchange string) string {
 		return p
 	}
 	return "EXCHANGE"
+}
+
+// cleanupBackups keeps only the keepNewest most recent backup files matching
+// the given prefix pattern in dir. Older backups are deleted.
+func cleanupBackups(dir, prefix string, keepNewest int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	var backups []os.DirEntry
+	for _, e := range entries {
+		if matched, _ := filepath.Match(prefix+"*", e.Name()); matched {
+			backups = append(backups, e)
+		}
+	}
+	if len(backups) <= keepNewest {
+		return
+	}
+	sort.Slice(backups, func(i, j int) bool {
+		ni, _ := backups[i].Info()
+		nj, _ := backups[j].Info()
+		return ni.ModTime().After(nj.ModTime())
+	})
+	for _, b := range backups[keepNewest:] {
+		os.Remove(filepath.Join(dir, b.Name()))
+	}
 }

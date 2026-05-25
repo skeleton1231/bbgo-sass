@@ -1166,9 +1166,15 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+const (
+	minDBSize  = 1 << 20 // 1MB
+	maxDBAge   = 24 * time.Hour
+)
+
 // hasDataForRange checks if the backtest database likely contains data for
-// the given exchange/symbol/time range. It checks the shared backtest DB file
-// exists and has a meaningful size.
+// the given exchange/symbol/time range. It verifies the shared backtest DB
+// file exists, is large enough, and was recently modified (indicating it
+// contains up-to-date data).
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
 	dbPath := api.container.cfg.BacktestSharedDir
 	if dbPath == "" {
@@ -1180,5 +1186,11 @@ func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) boo
 	if err != nil {
 		return false
 	}
-	return info.Size() >= 1<<20
+	if info.Size() < minDBSize {
+		return false
+	}
+	if time.Since(info.ModTime()) > maxDBAge {
+		return false
+	}
+	return true
 }
