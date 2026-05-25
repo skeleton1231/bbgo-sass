@@ -285,7 +285,6 @@ func (s *Syncer) upsertOrders(userID string, orders []BBGoOrder) {
 	for i, o := range orders {
 		rows[i] = map[string]interface{}{
 			"user_id":           userID,
-			"bot_id":            userID,
 			"order_id":          json.Number(formatUint(o.OrderID)),
 			"symbol":            o.Symbol,
 			"side":              o.Side,
@@ -334,7 +333,6 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 		for i, t := range trades {
 			rows[i] = map[string]interface{}{
 				"user_id":        userID,
-				"bot_id":         userID,
 				"trade_id":       json.Number(formatUint(t.ID)),
 				"order_id":       json.Number(formatUint(t.OrderID)),
 				"symbol":         t.Symbol,
