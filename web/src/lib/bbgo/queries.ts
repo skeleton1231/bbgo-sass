@@ -25,6 +25,7 @@ import {
   fetchBotStrategies,
   fetchContainerLogs,
   fetchBotPnL,
+  type TradingVolumeEntry,
   type StrategyEntry,
   type UserContainer,
   type BacktestResult,
@@ -195,7 +196,7 @@ export function useBotClosedOrders(userId: string, exchange?: string, symbol?: s
 }
 
 export function useBotTradingVolume(userId: string, period?: string) {
-  return useQuery<{ tradingVolumes: unknown }>({
+  return useQuery<{ tradingVolumes: TradingVolumeEntry[] }>({
     queryKey: ['bot-trading-volume', userId, period],
     queryFn: () => fetchBotTradingVolume(userId, period),
     enabled: !!userId,
@@ -279,4 +280,5 @@ export type {
   BBGoAsset,
   BBGoStrategyState,
   PnLReport,
+  TradingVolumeEntry,
 }

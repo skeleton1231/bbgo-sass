@@ -8,10 +8,15 @@ import {
   useBotTrades,
   useBotAssets,
   useBotSessions,
+  useBotTradingVolume,
+  useBotPnL,
   type BBGoTrade,
   type BBGoAsset,
 } from '@/lib/bbgo/queries'
 import { cn } from '@/lib/utils'
+import { AssetAllocationChart } from '@/components/dashboard/AssetAllocationChart'
+import { TradingVolumeChart } from '@/components/dashboard/TradingVolumeChart'
+import { PnlSummary } from '@/components/dashboard/PnlSummary'
 
 export default function DashboardPage() {
   const t = useTranslations('Dashboard')
@@ -35,6 +40,8 @@ export default function DashboardPage() {
   const { data: tradesData } = useBotTrades(userId, undefined, undefined)
   const { data: assetsData } = useBotAssets(userId)
   const { data: sessionsData } = useBotSessions(userId)
+  const { data: volumeData } = useBotTradingVolume(userId)
+  const { data: pnlData } = useBotPnL(userId)
 
   const trades = isActive ? (tradesData?.trades ?? []) : []
   const assets = isActive ? (assetsData?.assets ?? {}) : {}
@@ -73,6 +80,26 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {isActive && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="font-semibold mb-3">Asset Allocation</h2>
+            <AssetAllocationChart assets={assets} />
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="font-semibold mb-3">Trading Volume</h2>
+            <TradingVolumeChart volumes={volumeData?.tradingVolumes ?? []} />
+          </div>
+        </div>
+      )}
+
+      {isActive && pnlData && pnlData.totalTrades > 0 && (
+        <div className="rounded-lg border bg-card p-4">
+          <h2 className="font-semibold mb-3">P&L Summary</h2>
+          <PnlSummary report={pnlData} />
+        </div>
+      )}
 
       {isActive && strategyCount > 0 && (
         <div className="rounded-lg border bg-card">

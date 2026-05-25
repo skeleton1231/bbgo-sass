@@ -302,12 +302,22 @@ export function fetchBotClosedOrders(userId: string, exchange?: string, symbol?:
   return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/orders/closed${qs ? `?${qs}` : ''}`)
 }
 
+export interface TradingVolumeEntry {
+  year: number
+  month?: number
+  day?: number
+  time?: string
+  exchange?: string
+  symbol?: string
+  quoteVolume: number
+}
+
 export function fetchBotTradingVolume(userId: string, period?: string, segment?: string) {
   const params = new URLSearchParams()
   if (period) params.set('period', period)
   if (segment) params.set('segment', segment)
   const qs = params.toString()
-  return request<{ tradingVolumes: unknown }>(`/users/${userId}/bbgo/trading-volume${qs ? `?${qs}` : ''}`)
+  return request<{ tradingVolumes: TradingVolumeEntry[] }>(`/users/${userId}/bbgo/trading-volume${qs ? `?${qs}` : ''}`)
 }
 
 export function fetchContainerLogs(userId: string, tail?: string) {
