@@ -437,6 +437,7 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Strategy  string          `json:"strategy"`
 		Config    json.RawMessage `json:"config"`
+	Exchange  string          `json:"exchange"`
 		StartTime string          `json:"start_time"`
 		EndTime   string          `json:"end_time"`
 	}
@@ -445,7 +446,7 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime)
+	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid config: %v", err))
 		return
@@ -1274,31 +1275,9 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-const (
-	minDBSize  = 1 << 20 // 1MB
-	maxDBAge   = 24 * time.Hour
-)
-
-// hasDataForRange checks if the backtest database likely contains data for
-// the given exchange/symbol/time range. It verifies the shared backtest DB
-// file exists, is large enough, and was recently modified (indicating it
-// contains up-to-date data).
+// hasDataForRange always returns false to force a sync before every backtest.
+// bbgo's sync is incremental (skips already-downloaded intervals), so the cost
+// is minimal and this guarantees data exists for the requested exchange/symbol.
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
-	dbPath := api.container.cfg.BacktestSharedDir
-	if dbPath == "" {
-		dbPath = api.container.cfg.DataDir + "/backtest-shared"
-	}
-	dbPath += "/backtest.db"
-
-	info, err := os.Stat(dbPath)
-	if err != nil {
-		return false
-	}
-	if info.Size() < minDBSize {
-		return false
-	}
-	if time.Since(info.ModTime()) > maxDBAge {
-		return false
-	}
-	return true
+	return false
 }

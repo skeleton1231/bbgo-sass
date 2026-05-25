@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -340,7 +337,7 @@ func TestAPI_ListBacktestJobs_Empty(t *testing.T) {
 	}
 }
 
-func TestAPI_HasDataForRange_NoDB(t *testing.T) {
+func TestAPI_HasDataForRange_AlwaysSyncs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	users := NewUserContainerManager()
@@ -348,100 +345,6 @@ func TestAPI_HasDataForRange_NoDB(t *testing.T) {
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
-		t.Error("expected false when db file does not exist")
-	}
-}
-
-func TestAPI_HasDataForRange_SmallFile(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := filepath.Join(dir, "backtest-shared")
-	os.MkdirAll(sharedDir, 0o755)
-	os.WriteFile(filepath.Join(sharedDir, "backtest.db"), make([]byte, 100), 0o600)
-
-	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	users := NewUserContainerManager()
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
-		t.Error("expected false for file < 1MB")
-	}
-}
-
-func TestAPI_HasDataForRange_OldModTime(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := filepath.Join(dir, "backtest-shared")
-	os.MkdirAll(sharedDir, 0o755)
-	dbPath := filepath.Join(sharedDir, "backtest.db")
-	os.WriteFile(dbPath, make([]byte, 2<<20), 0o600)
-	past, _ := time.Parse("2006-01-02", "2023-06-01")
-	os.Chtimes(dbPath, past, past)
-
-	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	users := NewUserContainerManager()
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	// stale DB (>24h old) should not be considered valid
-	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
-		t.Error("expected false for stale db with old mod time")
-	}
-}
-
-func TestAPI_HasDataForRange_ValidDB(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := filepath.Join(dir, "backtest-shared")
-	os.MkdirAll(sharedDir, 0o755)
-	dbPath := filepath.Join(sharedDir, "backtest.db")
-	os.WriteFile(dbPath, make([]byte, 2<<20), 0o600)
-	os.Chtimes(dbPath, time.Now(), time.Now())
-
-	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	users := NewUserContainerManager()
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	if !api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
-		t.Error("expected true for valid db with recent modtime")
-	}
-}
-
-func TestAPI_HasDataForRange_InvalidStartTime(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := filepath.Join(dir, "backtest-shared")
-	os.MkdirAll(sharedDir, 0o755)
-	dbPath := filepath.Join(sharedDir, "backtest.db")
-	os.WriteFile(dbPath, make([]byte, 2<<20), 0o600)
-
-	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	users := NewUserContainerManager()
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	// size-based check ignores start_time validity
-	if !api.hasDataForRange("binance", "BTCUSDT", "not-a-date", "2024-03-01") {
-		t.Error("expected true for db >= 1MB regardless of date format")
-	}
-}
-
-func TestAPI_HasDataForRange_LargeDB(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := filepath.Join(dir, "backtest-shared")
-	os.MkdirAll(sharedDir, 0o755)
-	dbPath := filepath.Join(sharedDir, "backtest.db")
-	os.WriteFile(dbPath, make([]byte, 11<<20), 0o600)
-
-	cfg := &Config{DataDir: dir}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	users := NewUserContainerManager()
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	if !api.hasDataForRange("binance", "BTCUSDT", "not-a-date", "2024-03-01") {
-		t.Error("expected true for db >= 1MB")
+		t.Error("expected false — sync should always be forced")
 	}
 }

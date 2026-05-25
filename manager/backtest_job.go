@@ -252,7 +252,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	ex.store.UpdateStatus(job.ID, JobRunning, "running backtest...")
 
-	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime)
+	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime, job.Exchange, job.Symbol)
 	if err != nil {
 		ex.store.FailJob(job.ID, "config error", fmt.Sprintf("invalid config: %v", err))
 		return

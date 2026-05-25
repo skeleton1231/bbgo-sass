@@ -276,15 +276,20 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, 
 	}
 }
 
-func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime string) ([]byte, error) {
+func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string) ([]byte, error) {
 	var allParams map[string]interface{}
 	if err := json.Unmarshal(rawConfig, &allParams); err != nil {
 		return nil, err
 	}
 
-	exchange := "binance"
-	if v, ok := allParams["exchange"].(string); ok && v != "" {
-		exchange = v
+	exchange := overrideExchange
+	if exchange == "" {
+		if v, ok := allParams["exchange"].(string); ok && v != "" {
+			exchange = v
+		}
+	}
+	if exchange == "" {
+		exchange = "binance"
 	}
 
 	if startTime == "" {
@@ -299,9 +304,14 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 
 	strategy, allParams = normalizeStrategyConfig(strategy, allParams)
 
-	symbol := "BTCUSDT"
-	if v, ok := allParams["symbol"].(string); ok && v != "" {
-		symbol = v
+	symbol := overrideSymbol
+	if symbol == "" {
+		if v, ok := allParams["symbol"].(string); ok && v != "" {
+			symbol = v
+		}
+	}
+	if symbol == "" {
+		symbol = "BTCUSDT"
 	}
 	// Ensure symbol is in the strategy config for bbgo dependency injection
 	allParams["symbol"] = symbol

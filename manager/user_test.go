@@ -128,7 +128,7 @@ func TestBuildUserYAML_Mixed(t *testing.T) {
 }
 
 func TestBuildBacktestYAML(t *testing.T) {
-	yaml, err := buildBacktestYAML("grid2", rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), "2024-01-01", "2024-06-01")
+	yaml, err := buildBacktestYAML("grid2", rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), "2024-01-01", "2024-06-01", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

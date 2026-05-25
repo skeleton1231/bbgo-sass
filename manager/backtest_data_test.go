@@ -4,79 +4,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
-func TestHasDataForRange_WhenDBNotExist(t *testing.T) {
+func TestHasDataForRange_AlwaysReturnsFalse(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{DataDir: dir}
 	cm := NewContainerManager(cfg, nil, nil)
 	api := &API{container: cm}
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
-		t.Error("should return false when DB does not exist")
-	}
-}
-
-func TestHasDataForRange_WhenDBTooSmall(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := dir + "/backtest-shared"
-	os.MkdirAll(sharedDir, 0o755)
-	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 100), 0o644)
-
-	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
-	api := &API{container: cm}
-
-	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
-		t.Error("should return false when DB is too small")
-	}
-}
-
-func TestHasDataForRange_WhenDBExistsButStale(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := dir + "/backtest-shared"
-	os.MkdirAll(sharedDir, 0o755)
-	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 2<<20), 0o644)
-	oldTime := time.Now().Add(-48 * time.Hour)
-	os.Chtimes(sharedDir+"/backtest.db", oldTime, oldTime)
-
-	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
-	api := &API{container: cm}
-
-	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
-		t.Error("should return false when DB modification time is stale")
-	}
-}
-
-func TestHasDataForRange_WhenDBRecentAndLarge(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := dir + "/backtest-shared"
-	os.MkdirAll(sharedDir, 0o755)
-	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 2<<20), 0o644)
-
-	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
-	api := &API{container: cm}
-
-	if !api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
-		t.Error("should return true when DB is recent and large enough")
-	}
-}
-
-func TestHasDataForRange_WithCustomSharedDir(t *testing.T) {
-	dir := t.TempDir()
-	sharedDir := filepath.Join(dir, "custom-shared")
-	os.MkdirAll(sharedDir, 0o755)
-	os.WriteFile(sharedDir+"/backtest.db", make([]byte, 2<<20), 0o644)
-
-	cfg := &Config{DataDir: dir, BacktestSharedDir: sharedDir}
-	cm := NewContainerManager(cfg, nil, nil)
-	api := &API{container: cm}
-
-	if !api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {
-		t.Error("should return true with custom shared dir")
+		t.Error("should always return false to force sync")
 	}
 }
 
