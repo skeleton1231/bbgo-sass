@@ -126,6 +126,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(maxBodySize(2 << 20)) // 2MB max request body
 
 	r.Use(SharedSecretAuth(cfg.ManagerToken))
 
@@ -155,4 +156,13 @@ func main() {
 		hub.Close()
 	}
 	log.Println("server stopped")
+}
+
+func maxBodySize(n int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, n)
+			next.ServeHTTP(w, r)
+		})
+	}
 }
