@@ -151,13 +151,17 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				wsMsg, _ := json.Marshal(WSMessage{Type: "market", Data: msg})
-				wsWrite(conn, ctx, &writeMu, wsMsg)
+				if !wsWrite(conn, ctx, &writeMu, wsMsg) {
+					return
+				}
 			case msg, ok := <-userCh:
 				if !ok {
 					return
 				}
 				wsMsg, _ := json.Marshal(WSMessage{Type: "userData", Data: msg})
-				wsWrite(conn, ctx, &writeMu, wsMsg)
+				if !wsWrite(conn, ctx, &writeMu, wsMsg) {
+					return
+				}
 			}
 		}
 	}()
@@ -177,12 +181,13 @@ func (cm *ContainerManager) ContainerGRPCAddr(userID string) string {
 	return fmt.Sprintf("%s:%d", cm.containerName(userID), cm.cfg.BBGOGRPCPort)
 }
 
-func wsWrite(conn *websocket.Conn, ctx context.Context, mu *sync.Mutex, msg []byte) {
+func wsWrite(conn *websocket.Conn, ctx context.Context, mu *sync.Mutex, msg []byte) bool {
 	if mu != nil {
 		mu.Lock()
 		defer mu.Unlock()
 	}
-	conn.Write(ctx, websocket.MessageText, msg)
+	err := conn.Write(ctx, websocket.MessageText, msg)
+	return err == nil
 }
 
 func extractSessionNames(uc *UserContainer) []string {
