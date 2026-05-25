@@ -28,7 +28,9 @@ type API struct {
 	btJobs    *BacktestJobStore
 	btSyncSem chan struct{}
 
-	newBBGoClient func(baseURL string) *BBGoClient
+	newBBGoClient    func(baseURL string) *BBGoClient
+	containerStart   func(uc *UserContainer) error
+	containerRunning func(userID string) bool
 }
 
 func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore) *API {
@@ -205,17 +207,11 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	uc, created := api.users.AddStrategy(userID, entry)
 
 	if uc.Status == StatusRunning {
-		if err := api.container.Restart(uc); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+		go api.startUserContainer(userID)
 	} else if created {
-		if err := api.container.CreateAndStart(uc); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		api.users.UpdateStatus(userID, StatusRunning)
-		uc.Status = StatusRunning
+		api.users.UpdateStatus(userID, StatusStarting)
+		uc.Status = StatusStarting
+		go api.startUserContainer(userID)
 	}
 
 	if api.syncer != nil { go api.syncer.SyncUser(userID) }
@@ -262,13 +258,24 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if uc.Status == StatusRunning {
-		if err := api.container.Restart(uc); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+		go api.startUserContainer(userID)
 	}
 
 	writeJSON(w, http.StatusOK, uc)
+}
+
+func (api *API) isContainerRunning(userID string) bool {
+	if api.containerRunning != nil {
+		return api.containerRunning(userID)
+	}
+	return api.container.IsRunning(userID)
+}
+
+func (api *API) startContainer(uc *UserContainer) error {
+	if api.containerStart != nil {
+		return api.containerStart(uc)
+	}
+	return api.container.CreateAndStart(uc)
 }
 
 func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
@@ -283,15 +290,31 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if api.container.IsRunning(userID) {
+	if api.isContainerRunning(userID) {
 		api.users.UpdateStatus(userID, StatusRunning)
 		uc.Status = StatusRunning
 		writeJSON(w, http.StatusOK, uc)
 		return
 	}
 
-	if err := api.container.CreateAndStart(uc); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	// Set starting status and return immediately
+	api.users.UpdateStatus(userID, StatusStarting)
+	uc.Status = StatusStarting
+	writeJSON(w, http.StatusAccepted, uc)
+
+	// Run container start + health check in background
+	go api.startUserContainer(userID)
+}
+
+func (api *API) startUserContainer(userID string) {
+	uc, found := api.users.Get(userID)
+	if !found {
+		return
+	}
+
+	if err := api.startContainer(uc); err != nil {
+		log.Printf("start container for user %s failed: %v", userID, err)
+		api.users.UpdateStatus(userID, StatusError)
 		return
 	}
 
@@ -305,30 +328,28 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	// Wait for gRPC port to be ready
-	if reachable {
+	if !reachable {
+		api.users.UpdateStatus(userID, StatusError)
+		log.Printf("user %s container started but health check failed", userID)
+		return
+	}
+
+	api.users.UpdateStatus(userID, StatusRunning)
+	log.Printf("user %s container started and healthy", userID)
+
+	// gRPC readiness is best-effort — don't block the status update.
+	go func() {
 		grpcAddr := api.container.ContainerGRPCAddr(userID)
 		for i := 0; i < 10; i++ {
 			conn, err := net.DialTimeout("tcp", grpcAddr, time.Second)
 			if err == nil {
 				conn.Close()
-				break
-			}
-			if i == 9 {
-				log.Printf("grpc port %s not ready after 10s for user %s", grpcAddr, userID)
+				return
 			}
 			time.Sleep(time.Second)
 		}
-	}
-
-	if reachable {
-		api.users.UpdateStatus(userID, StatusRunning)
-		uc.Status = StatusRunning
-	} else {
-		api.users.UpdateStatus(userID, StatusError)
-		uc.Status = StatusError
-	}
-	writeJSON(w, http.StatusOK, uc)
+		log.Printf("grpc port %s not ready after 10s for user %s", grpcAddr, userID)
+	}()
 }
 
 func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {

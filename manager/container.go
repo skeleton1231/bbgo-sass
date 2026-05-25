@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+const dockerTimeout = 2 * time.Minute
 
 const containerPrefix = "bbgo-"
 
@@ -29,7 +32,9 @@ func (cm *ContainerManager) containerName(userID string) string {
 }
 
 func (cm *ContainerManager) docker(args ...string) (string, error) {
-	cmd := exec.Command("docker", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), dockerTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", args...)
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
@@ -129,7 +134,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 	}
 
 	containerDir := cm.userDir(userID) + "/backtest"
-	name := fmt.Sprintf("bbgo-bt-%s-%d", safeShortID(userID), time.Now().UnixNano())
+	name := generateID("bbgo-bt-" + safeShortID(userID))
 	args := []string{
 		"run", "--rm",
 		"--name", name,
@@ -197,7 +202,7 @@ func (cm *ContainerManager) SyncBacktest(exchange, symbol, startTime, endTime st
 		return "", fmt.Errorf("write config: %w", err)
 	}
 
-	name := fmt.Sprintf("bbgo-sync-%d", time.Now().UnixNano())
+	name := generateID("bbgo-sync")
 	args := []string{
 		"run", "--rm",
 		"--name", name,

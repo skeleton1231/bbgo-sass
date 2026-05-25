@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	StatusRunning = "running"
-	StatusStopped = "stopped"
-	StatusError   = "error"
+	StatusRunning  = "running"
+	StatusStopped  = "stopped"
+	StatusError    = "error"
+	StatusStarting = "starting"
 )
 
 // legacyStrategyAliases maps old frontend IDs to the correct bbgo strategy IDs.
