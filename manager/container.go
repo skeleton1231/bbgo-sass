@@ -170,32 +170,9 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 func (cm *ContainerManager) SyncBacktest(exchange, symbol, startTime, endTime string) (string, error) {
 	cm.ensureBacktestSharedDir()
 
-	type syncConfig struct {
-		Sessions map[string]struct {
-			Exchange string `yaml:"exchange"`
-		} `yaml:"sessions"`
-		Backtest struct {
-			Sessions  []string `yaml:"sessions"`
-			Symbols   []string `yaml:"symbols"`
-			StartTime string   `yaml:"startTime"`
-			EndTime   string   `yaml:"endTime"`
-		} `yaml:"backtest"`
-	}
-
-	cfg := syncConfig{}
-	cfg.Sessions = map[string]struct {
-		Exchange string `yaml:"exchange"`
-	}{
-		exchange: {Exchange: exchange},
-	}
-	cfg.Backtest.Sessions = []string{exchange}
-	cfg.Backtest.Symbols = []string{symbol}
-	cfg.Backtest.StartTime = startTime
-	cfg.Backtest.EndTime = endTime
-
-	yamlBytes, err := yaml.Marshal(&cfg)
+	yamlBytes, err := buildSyncConfig(exchange, symbol, startTime, endTime)
 	if err != nil {
-		return "", fmt.Errorf("marshal backtest config: %w", err)
+		return "", err
 	}
 	yamlContent := string(yamlBytes)
 
@@ -245,6 +222,33 @@ func (cm *ContainerManager) ensureBacktestSharedDir() {
 	if _, err := cm.docker(args...); err != nil {
 		log.Printf("backtest-shared dir ensure (may already exist): %v", err)
 	}
+}
+
+func buildSyncConfig(exchange, symbol, startTime, endTime string) ([]byte, error) {
+	type syncConfig struct {
+		Sessions map[string]struct {
+			Exchange string `yaml:"exchange"`
+		} `yaml:"sessions"`
+		Backtest struct {
+			Sessions  []string `yaml:"sessions"`
+			Symbols   []string `yaml:"symbols"`
+			StartTime string   `yaml:"startTime"`
+			EndTime   string   `yaml:"endTime"`
+		} `yaml:"backtest"`
+	}
+
+	cfg := syncConfig{}
+	cfg.Sessions = map[string]struct {
+		Exchange string `yaml:"exchange"`
+	}{
+		exchange: {Exchange: exchange},
+	}
+	cfg.Backtest.Sessions = []string{exchange}
+	cfg.Backtest.Symbols = []string{symbol}
+	cfg.Backtest.StartTime = startTime
+	cfg.Backtest.EndTime = endTime
+
+	return yaml.Marshal(&cfg)
 }
 
 func (cm *ContainerManager) envArgs(uc *UserContainer) []string {

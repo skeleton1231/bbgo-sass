@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,56 @@ func TestCleanupBackups(t *testing.T) {
 	}
 	if backupCount != 2 {
 		t.Errorf("expected 2 backups remaining, got %d", backupCount)
+	}
+}
+
+func TestBuildSyncConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		exchange   string
+		symbol     string
+		startTime  string
+		endTime    string
+		wantInYAML []string
+	}{
+		{
+			name:      "binance_btcusdt",
+			exchange:  "binance",
+			symbol:    "BTCUSDT",
+			startTime: "2024-01-01",
+			endTime:   "2024-06-01",
+			wantInYAML: []string{"binance:", "BTCUSDT", "2024-01-01", "2024-06-01"},
+		},
+		{
+			name:      "bybit_ethusdt",
+			exchange:  "bybit",
+			symbol:    "ETHUSDT",
+			startTime: "2024-03-01",
+			endTime:   "2024-03-31",
+			wantInYAML: []string{"bybit:", "ETHUSDT", "2024-03-01", "2024-03-31"},
+		},
+		{
+			name:      "kucoin_solusdt",
+			exchange:  "kucoin",
+			symbol:    "SOLUSDT",
+			startTime: "2023-01-01",
+			endTime:   "2024-01-01",
+			wantInYAML: []string{"kucoin:", "SOLUSDT"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			yaml, err := buildSyncConfig(tt.exchange, tt.symbol, tt.startTime, tt.endTime)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			s := string(yaml)
+			for _, want := range tt.wantInYAML {
+				if !strings.Contains(s, want) {
+					t.Errorf("expected YAML to contain %q\n--- YAML ---\n%s", want, s)
+				}
+			}
+		})
 	}
 }

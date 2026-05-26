@@ -348,3 +348,83 @@ func TestAPI_HasDataForRange_AlwaysSyncs(t *testing.T) {
 		t.Error("expected false — sync should always be forced")
 	}
 }
+
+func TestAPI_SubmitBacktest_Validation(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     map[string]interface{}
+		wantCode int
+	}{
+		{
+			name:     "start_after_end_time",
+			body:     map[string]interface{}{"strategy": "grid2", "start_time": "2025-01-01", "end_time": "2024-01-01"},
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "empty_config",
+			body:     map[string]interface{}{"strategy": "grid2", "config": map[string]interface{}{}},
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "nil_config",
+			body:     map[string]interface{}{"strategy": "grid2"},
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "very_long_date_range",
+			body:     map[string]interface{}{"strategy": "grid2", "start_time": "2020-01-01", "end_time": "2026-01-01"},
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "single_day_range",
+			body:     map[string]interface{}{"strategy": "grid2", "start_time": "2024-06-01", "end_time": "2024-06-01"},
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "supported_exchange_bybit",
+			body:     map[string]interface{}{"strategy": "grid2", "exchange": "bybit", "symbol": "BTCUSDT"},
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "supported_exchange_okex",
+			body:     map[string]interface{}{"strategy": "grid2", "exchange": "okex", "symbol": "BTCUSDT"},
+			wantCode: http.StatusAccepted,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, r := setupBacktestTestAPI(t)
+			b, _ := json.Marshal(tt.body)
+			req := httptest.NewRequest("POST", "/api/backtest/submit", bytes.NewReader(b))
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("expected %d, got %d: %s", tt.wantCode, w.Code, w.Body.String())
+			}
+
+			if tt.wantCode == http.StatusAccepted {
+				var resp map[string]interface{}
+				json.NewDecoder(w.Body).Decode(&resp)
+				if resp["job_id"] == nil || resp["job_id"] == "" {
+					t.Error("expected job_id in accepted response")
+				}
+			}
+		})
+	}
+}
+
+func TestAPI_GetBacktestJob_InvalidID(t *testing.T) {
+	_, _, r := setupBacktestTestAPI(t)
+
+	for _, id := range []string{"", "nonexistent", "../../../etc/passwd"} {
+		req := httptest.NewRequest("GET", "/api/backtest/jobs/"+id, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("expected 404 for job id %q, got %d", id, w.Code)
+		}
+	}
+}
