@@ -176,13 +176,22 @@ var frontendLiveOnlyStrategies = map[string]bool{
 func TestLiveOnlyLists_FrontendBackendSync(t *testing.T) {
 	t.Helper()
 	for strategy := range liveOnlyStrategies {
-		if !frontendLiveOnlyStrategies[strategy] {
-			t.Errorf("backend liveOnly strategy %q missing from frontendLiveOnlyStrategies — add it to frontend strategies.ts", strategy)
+		found := false
+		for feID := range frontendLiveOnlyStrategies {
+			resolved, _ := normalizeStrategyConfig(feID, nil)
+			if resolved == strategy {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("backend liveOnly strategy %q has no matching frontend entry", strategy)
 		}
 	}
-	for strategy := range frontendLiveOnlyStrategies {
-		if !liveOnlyStrategies[strategy] {
-			t.Errorf("frontend liveOnly strategy %q missing from backend liveOnlyStrategies — add it to user.go", strategy)
+	for feID := range frontendLiveOnlyStrategies {
+		resolved, _ := normalizeStrategyConfig(feID, nil)
+		if !liveOnlyStrategies[resolved] {
+			t.Errorf("frontend liveOnly strategy %q (resolves to %q) missing from backend liveOnlyStrategies", feID, resolved)
 		}
 	}
 }
