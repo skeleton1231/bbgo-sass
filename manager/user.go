@@ -15,12 +15,13 @@ const (
 	StatusStarting = "starting"
 )
 
-// legacyStrategyAliases maps old frontend IDs to the correct bbgo strategy IDs.
+// legacyStrategyAliases maps frontend strategy IDs to the correct bbgo registered IDs.
+// bbgo only knows: sentinel, autobuy, rebalance, ewo_dgtrd — not the longer frontend variants.
 var legacyStrategyAliases = map[string]string{
-	"ewoDgtrd":        "ewo_dgtrd",
-	"sentinel":        "sentinel_anomaly",
-	"autobuy":         "autobuy_scheduled",
-	"rebalance":       "rebalance_portfolio",
+	"ewoDgtrd":           "ewo_dgtrd",
+	"sentinel_anomaly":   "sentinel",
+	"autobuy_scheduled":  "autobuy",
+	"rebalance_portfolio": "rebalance",
 }
 
 // liveOnlyStrategies are strategies that only work in live mode (they require
