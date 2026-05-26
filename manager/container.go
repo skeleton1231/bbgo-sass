@@ -24,6 +24,13 @@ type ContainerManager struct {
 	cfg   *Config
 	creds *CredentialStore
 	pool  *pool.Pool
+
+	// test hooks
+	runBacktestFn  func(userID string, yamlContent []byte) ([]byte, error)
+	syncBacktestFn func(exchange, symbol, start, end string) (string, error)
+	logsFn         func(userID string, tail string) (string, error)
+	apiURLFn       func(userID string) string
+	checkRunningFn func(userID string) (bool, error)
 }
 
 func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool) *ContainerManager {
@@ -61,6 +68,9 @@ func (cm *ContainerManager) hostDir(userID string) string {
 // APIURL returns the internal Docker DNS URL for the user's bbgo container.
 // Works when manager and containers share the same Docker network.
 func (cm *ContainerManager) APIURL(userID string) string {
+	if cm.apiURLFn != nil {
+		return cm.apiURLFn(userID)
+	}
 	return fmt.Sprintf("http://%s:%d", cm.containerName(userID), cm.cfg.BBGOPort)
 }
 
@@ -82,6 +92,9 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 	}
 
 	yamlContent, err := buildUserYAML(uc, func(exchange string) bool {
+		if cm.creds == nil {
+			return false
+		}
 		_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
 		return err == nil
 	})
@@ -127,6 +140,9 @@ func (cm *ContainerManager) Restart(uc *UserContainer) error {
 }
 
 func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]byte, error) {
+	if cm.runBacktestFn != nil {
+		return cm.runBacktestFn(userID, yamlContent)
+	}
 	hostBacktestDir := cm.hostDir(userID) + "/backtest"
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
@@ -168,6 +184,9 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 }
 
 func (cm *ContainerManager) SyncBacktest(exchange, symbol, startTime, endTime string) (string, error) {
+	if cm.syncBacktestFn != nil {
+		return cm.syncBacktestFn(exchange, symbol, startTime, endTime)
+	}
 	cm.ensureBacktestSharedDir()
 
 	yamlBytes, err := buildSyncConfig(exchange, symbol, startTime, endTime)
@@ -326,6 +345,9 @@ func (cm *ContainerManager) IsRunning(userID string) bool {
 }
 
 func (cm *ContainerManager) CheckRunning(userID string) (bool, error) {
+	if cm.checkRunningFn != nil {
+		return cm.checkRunningFn(userID)
+	}
 	name := cm.containerName(userID)
 	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
 	if err != nil {
@@ -335,6 +357,9 @@ func (cm *ContainerManager) CheckRunning(userID string) (bool, error) {
 }
 
 func (cm *ContainerManager) Logs(userID string, tail string) (string, error) {
+	if cm.logsFn != nil {
+		return cm.logsFn(userID, tail)
+	}
 	name := cm.containerName(userID)
 	out, err := cm.docker("logs", "--tail", tail, name)
 	if err != nil {

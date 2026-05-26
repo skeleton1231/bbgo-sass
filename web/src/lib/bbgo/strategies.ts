@@ -308,6 +308,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Auto Buy',
     description: 'Automatic periodic buying with fixed amount',
     category: 'dca',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -352,6 +353,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Sentinel',
     description: 'Monitor and alert on price movements and market conditions',
     category: 'other',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -391,6 +393,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Rebalance',
     description: 'Periodic portfolio rebalancing across assets',
     category: 'other',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'interval', label: 'Interval', type: 'select', default: '1d', options: ['1h', '4h', '1d', '1w'] },

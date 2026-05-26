@@ -283,10 +283,14 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 
 func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool) map[string]interface{} {
 	for _, sr := range s.Sessions {
+		prefix := sr.EnvVarPrefix
+		if prefix == "" {
+			prefix = exchangeEnvPrefix(sr.Exchange)
+		}
 		if _, exists := sessions[sr.Name]; !exists {
 			sessions[sr.Name] = sessionConfig{
 				Exchange:     sr.Exchange,
-				EnvVarPrefix: sr.EnvVarPrefix,
+				EnvVarPrefix: prefix,
 				Futures:      sr.Futures,
 				PublicOnly:   !hasCredentials(sr.Exchange),
 			}

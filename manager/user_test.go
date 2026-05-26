@@ -381,9 +381,13 @@ func TestBuildBacktestYAML_LegacyAliases(t *testing.T) {
 		expected string
 		config   string
 	}{
-		{"sentinel", "sentinel_anomaly", `{"symbol":"BTCUSDT"}`},
-		{"autobuy", "autobuy_scheduled", `{"symbol":"BTCUSDT"}`},
-		{"rebalance", "rebalance_portfolio", `{"symbol":"BTCUSDT"}`},
+		// Frontend IDs normalize to bbgo registered IDs
+		{"sentinel_anomaly", "sentinel", `{"symbol":"BTCUSDT"}`},
+		{"autobuy_scheduled", "autobuy", `{"symbol":"BTCUSDT"}`},
+		{"rebalance_portfolio", "rebalance", `{"symbol":"BTCUSDT"}`},
+		// Already-normalized bbgo IDs pass through unchanged
+		{"sentinel", "sentinel", `{"symbol":"BTCUSDT"}`},
+		{"autobuy", "autobuy", `{"symbol":"BTCUSDT"}`},
 	}
 
 	for _, tt := range tests {
