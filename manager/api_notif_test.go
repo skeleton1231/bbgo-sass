@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -211,14 +212,26 @@ func TestAPI_DeleteNotificationConfig_NotFound(t *testing.T) {
 }
 
 func TestAPI_TestNotification_Dispatches(t *testing.T) {
+	// Set up a mock Slack webhook server so sendSlack actually succeeds
+	slackSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer slackSrv.Close()
+
 	api, cleanup := setupTestAPIWithNotifier(t)
 	defer cleanup()
+	api.notifier.client = slackSrv.Client()
+	// Replace transport to route any URL to the mock server
+	origTransport := api.notifier.client.Transport
+	api.notifier.client.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		req.URL, _ = url.Parse(slackSrv.URL + req.URL.Path)
+		return http.DefaultTransport.RoundTrip(req)
+	})
+	defer func() { api.notifier.client.Transport = origTransport }()
 
 	r := testRouter(api)
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
-	// Use slack type — webhook URL is fake but won't cause real HTTP errors
-	// because Dispatch() returns true as long as configs exist
 	body := `{"type":"slack","webhook_url":"https://hooks.slack.com/services/FAKE","rules":{"trade_events":true}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/notifications/config", strings.NewReader(body))
 	req.Header.Set("X-User-Id", userID)
@@ -233,12 +246,14 @@ func TestAPI_TestNotification_Dispatches(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
 
-	// Dispatch returns true if any config exists (even if send fails),
-	// so TestNotification returns 200
 	if w2.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w2.Code, w2.Body.String())
 	}
 }
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
 func TestAPI_TestNotification_NoChannels(t *testing.T) {
 	api, cleanup := setupTestAPIWithNotifier(t)
