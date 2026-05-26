@@ -106,7 +106,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'tradeInBand', label: 'Trade In Band', type: 'boolean', default: false, description: 'Only trade within Bollinger Band' },
       { key: 'shadowProtection', label: 'Shadow Protection', type: 'boolean', default: false, description: 'Avoid placing orders during strong price drops' },
     ],
-    liveOnly: true,
   },
   {
     id: 'linregmaker',

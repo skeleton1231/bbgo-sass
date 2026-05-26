@@ -37,7 +37,7 @@ export interface StrategyEntry {
 
 export interface UserContainer {
   user_id: string
-  status: 'running' | 'stopped' | 'error'
+  status: 'running' | 'stopped' | 'error' | 'starting'
   strategies: StrategyEntry[]
 }
 

@@ -50,6 +50,7 @@ export function StrategyList({ userId }: { userId: string }) {
             className={cn(
               'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
               status === 'running' && 'bg-green-100 text-green-700',
+              status === 'starting' && 'bg-yellow-100 text-yellow-700',
               status === 'stopped' && 'bg-gray-100 text-gray-700',
               status === 'error' && 'bg-red-100 text-red-700'
             )}
@@ -63,6 +64,13 @@ export function StrategyList({ userId }: { userId: string }) {
               className="rounded-md border px-3 py-1 text-sm hover:bg-muted disabled:opacity-50"
             >
               {t('stop')}
+            </button>
+          ) : status === 'starting' ? (
+            <button
+              disabled
+              className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground opacity-50 cursor-not-allowed"
+            >
+              {t('start')}
             </button>
           ) : (
             <button
