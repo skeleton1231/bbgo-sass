@@ -66,12 +66,25 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	// Market data endpoints (Manager → marketdata REST API)
 	r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
 
-	r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
-	r.Get("/api/users/{userID}/strategies", api.ListStrategies)
-	r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
+	// State-changing endpoints with per-user rate limiting
+	r.Route("/", func(r chi.Router) {
+		r.Use(UserRateLimit(3*time.Second, 20))
+		r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
+		r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
+		r.Post("/api/users/{userID}/start", api.StartUser)
+		r.Post("/api/users/{userID}/stop", api.StopUser)
+		r.Post("/api/credentials", api.CreateCredential)
+		r.Delete("/api/credentials/{id}", api.DeleteCredential)
+		r.Post("/api/notifications/config", api.CreateNotificationConfig)
+		r.Delete("/api/notifications/config/{id}", api.DeleteNotificationConfig)
+		r.Post("/api/notifications/test", api.TestNotification)
+		r.Post("/api/backtest", api.RunBacktest)
+		r.Post("/api/backtest/submit", api.SubmitBacktest)
+		r.Post("/api/backtest/sync", api.SyncBacktestData)
+	})
 
-	r.Post("/api/users/{userID}/start", api.StartUser)
-	r.Post("/api/users/{userID}/stop", api.StopUser)
+	// Read endpoints (no rate limit)
+	r.Get("/api/users/{userID}/strategies", api.ListStrategies)
 	r.Get("/api/users/{userID}/status", api.UserStatus)
 
 	// Aggregated bbgo data endpoints (Manager → bbgo REST API)
@@ -93,11 +106,8 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	// Container logs
 	r.Get("/api/users/{userID}/logs", api.ContainerLogs)
 
-	// Notifications
-	r.Post("/api/notifications/config", api.CreateNotificationConfig)
+	// Notifications (read)
 	r.Get("/api/notifications/config", api.ListNotificationConfigs)
-	r.Delete("/api/notifications/config/{id}", api.DeleteNotificationConfig)
-	r.Post("/api/notifications/test", api.TestNotification)
 
 	// WebSocket for real-time data
 	r.Get("/api/ws/ticket", api.IssueWSTicket)
@@ -106,17 +116,11 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	// Generic proxy for any other bbgo API calls
 	r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
 
-	// Backtest endpoints
-	r.Post("/api/backtest", api.RunBacktest)                  // legacy sync
-	r.Post("/api/backtest/submit", api.SubmitBacktest)        // async submit
-	r.Get("/api/backtest/jobs", api.ListBacktestJobs)          // list user jobs
-	r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)   // get job status
-	r.Post("/api/backtest/sync", api.SyncBacktestData)
+	// Backtest endpoints (read)
+	r.Get("/api/backtest/jobs", api.ListBacktestJobs)
+	r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)
 	r.Get("/api/backtest/status", api.BacktestSyncStatus)
-
-	r.Post("/api/credentials", api.CreateCredential)
 	r.Get("/api/credentials", api.ListCredentials)
-	r.Delete("/api/credentials/{id}", api.DeleteCredential)
 }
 
 func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
@@ -195,7 +199,10 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	if alias, ok := legacyStrategyAliases[req.Strategy]; ok {
 		normalizedStrategy = alias
 	}
-	if req.Mode != "" && req.Mode != "paper" && req.Mode != "live" {
+	if req.Mode == "" {
+		req.Mode = "paper"
+	}
+	if req.Mode != "paper" && req.Mode != "live" {
 		writeError(w, http.StatusBadRequest, "mode must be 'paper' or 'live'")
 		return
 	}
@@ -618,6 +625,10 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := exchangePrefixes[req.Exchange]; !ok {
 		writeError(w, http.StatusBadRequest, "unsupported exchange: "+req.Exchange)
+		return
+	}
+	if api.encryptor == nil || api.creds == nil {
+		writeError(w, http.StatusServiceUnavailable, "credential storage not configured")
 		return
 	}
 

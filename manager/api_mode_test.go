@@ -257,7 +257,7 @@ func TestAPI_CreateStrategy_NoModeWithExistingMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201 when mode is empty (skips mixed-mode check), got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when empty mode (defaults to paper) conflicts with existing live, got %d: %s", w.Code, w.Body.String())
 	}
 }

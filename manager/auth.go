@@ -4,6 +4,8 @@ import (
 	"crypto/subtle"
 	"net/http"
 	"regexp"
+	"sync"
+	"time"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -47,5 +49,86 @@ func SharedSecretAuth(sharedSecret string) func(http.Handler) http.Handler {
 			}
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+type userRateLimiter struct {
+	mu       sync.Mutex
+	visitors map[string]*visitor
+	rate     time.Duration
+	maxBurst int
+}
+
+type visitor struct {
+	tokens   int
+	lastSeen time.Time
+}
+
+func UserRateLimit(rate time.Duration, maxBurst int) func(http.Handler) http.Handler {
+	rl := &userRateLimiter{
+		visitors: make(map[string]*visitor),
+		rate:     rate,
+		maxBurst: maxBurst,
+	}
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			rl.cleanup()
+		}
+	}()
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := userIDFromRequest(r)
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if !rl.allow(userID) {
+				writeError(w, http.StatusTooManyRequests, "rate limited — try again later")
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (rl *userRateLimiter) allow(userID string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	v, ok := rl.visitors[userID]
+	if !ok {
+		rl.visitors[userID] = &visitor{tokens: rl.maxBurst - 1, lastSeen: now}
+		return true
+	}
+
+	elapsed := now.Sub(v.lastSeen)
+	tokensToAdd := int(elapsed / rl.rate)
+	v.tokens += tokensToAdd
+	if v.tokens > rl.maxBurst {
+		v.tokens = rl.maxBurst
+	}
+	v.lastSeen = now
+
+	if v.tokens <= 0 {
+		return false
+	}
+	v.tokens--
+	return true
+}
+
+func (rl *userRateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	threshold := time.Now().Add(-1 * time.Hour)
+	for id, v := range rl.visitors {
+		if v.lastSeen.Before(threshold) {
+			delete(rl.visitors, id)
+		}
 	}
 }

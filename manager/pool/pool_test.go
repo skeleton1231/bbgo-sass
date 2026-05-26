@@ -124,3 +124,45 @@ func TestPool_ReleaseIdempotent(t *testing.T) {
 	p.Release()
 	p.Release()
 }
+
+func TestPool_Size(t *testing.T) {
+	p := New(5)
+	defer p.Release()
+	if p.Size() != 5 {
+		t.Errorf("expected size 5, got %d", p.Size())
+	}
+}
+
+func TestPool_Waiting(t *testing.T) {
+	p := New(1)
+	defer p.Release()
+
+	started := make(chan struct{})
+	_ = p.Submit(func() {
+		close(started)
+		time.Sleep(300 * time.Millisecond)
+	})
+	<-started
+
+	_ = p.Submit(func() {})
+	time.Sleep(100 * time.Millisecond)
+
+	w := p.Waiting()
+	if w < 0 {
+		t.Errorf("expected waiting >= 0, got %d", w)
+	}
+	p.Wait()
+}
+
+func TestPool_SubmitWithTimeout(t *testing.T) {
+	p := New(1)
+	defer p.Release()
+
+	err := p.SubmitWithTimeout(func() {
+		time.Sleep(10 * time.Millisecond)
+	}, 5*time.Second)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	p.Wait()
+}
