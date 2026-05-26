@@ -182,6 +182,13 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.containerRunning = func(string) bool { return false }
 	api.containerStart = func(*UserContainer) error { return nil }
+	api.newBBGoClient = func(baseURL string) *BBGoClient {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`ok`))
+		}))
+		t.Cleanup(srv.Close)
+		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
+	}
 	return api, func() { api.Close() }
 }
 

@@ -315,6 +315,9 @@ func (api *API) startContainer(uc *UserContainer) error {
 	if api.containerStart != nil {
 		return api.containerStart(uc)
 	}
+	if api.container == nil {
+		return fmt.Errorf("container manager not configured")
+	}
 	return api.container.CreateAndStart(uc)
 }
 
