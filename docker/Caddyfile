@@ -1,0 +1,20 @@
+{$DOMAIN:localhost} {
+	reverse_proxy web:3000
+
+	encode gzip
+
+	rate_limit {
+		zone static_zone 10r/s
+		zone api_zone 5r/s
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+handle_errors {
+	respond "{http.error.status_code} {http.error.status_text}"
+}

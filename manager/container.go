@@ -31,6 +31,7 @@ type ContainerManager struct {
 	logsFn         func(userID string, tail string) (string, error)
 	apiURLFn       func(userID string) string
 	checkRunningFn func(userID string) (bool, error)
+	dockerFn       func(args ...string) (string, error)
 }
 
 func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool) *ContainerManager {
@@ -42,6 +43,9 @@ func (cm *ContainerManager) containerName(userID string) string {
 }
 
 func (cm *ContainerManager) docker(args ...string) (string, error) {
+	if cm.dockerFn != nil {
+		return cm.dockerFn(args...)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), dockerTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", args...)
@@ -86,7 +90,9 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 	dbPath := hostDir + "/bbgo.db"
 	if _, err := os.Stat(dbPath); err == nil {
 		backup := dbPath + ".backup." + time.Now().Format("20060102-150405")
-		os.Rename(dbPath, backup)
+		if err := copyFile(dbPath, backup); err != nil {
+			return fmt.Errorf("backup %s: %w", dbPath, err)
+		}
 		log.Printf("backed up %s -> %s", dbPath, backup)
 		cleanupBackups(hostDir, "bbgo.db.backup", 3)
 	}
@@ -476,6 +482,25 @@ func exchangeEnvPrefix(exchange string) string {
 		return p
 	}
 	return "EXCHANGE"
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", src, err)
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", dst, err)
+	}
+	defer out.Close()
+
+	if _, err := out.ReadFrom(in); err != nil {
+		return fmt.Errorf("copy %s -> %s: %w", src, dst, err)
+	}
+	return nil
 }
 
 // cleanupBackups keeps only the keepNewest most recent backup files matching

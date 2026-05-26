@@ -119,17 +119,12 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 
 	backoff := minBackoff
 	req := &pb.SubscribeRequest{Subscriptions: pbSubs}
-	firstAttempt := true
 
 	for {
-		if !firstAttempt {
-			h.redial()
-		}
-		firstAttempt = false
 		select {
 		case <-h.done:
 			return
-		case <-time.After(backoff):
+		default:
 		}
 
 		ctx := context.Background()
@@ -140,6 +135,12 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 		if err != nil {
 			log.Printf("marketdata subscribe failed: %v, reconnecting in %v", err, backoff)
 			backoff = min(backoff*2, maxBackoff)
+			h.redial()
+			select {
+			case <-h.done:
+				return
+			case <-time.After(backoff):
+			}
 			continue
 		}
 
@@ -160,6 +161,12 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 		}
 
 		backoff = min(backoff*2, maxBackoff)
+		h.redial()
+		select {
+		case <-h.done:
+			return
+		case <-time.After(backoff):
+		}
 	}
 }
 

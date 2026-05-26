@@ -219,18 +219,28 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 	}
 
 	var newOrders []BBGoOrder
-	maxGID := cursor
 	for _, o := range orders {
 		if int64(o.GID) > cursor {
 			newOrders = append(newOrders, o)
-		}
-		if int64(o.GID) > maxGID {
-			maxGID = int64(o.GID)
 		}
 	}
 
 	if len(newOrders) == 0 {
 		return
+	}
+
+	// If the raw batch is full (500), there may be more orders beyond this
+	// page. Fall back to full sync to ensure nothing is missed.
+	if len(orders) == syncPageSize {
+		s.fullSyncOrders(userID, client)
+		return
+	}
+
+	maxGID := cursor
+	for _, o := range newOrders {
+		if int64(o.GID) > maxGID {
+			maxGID = int64(o.GID)
+		}
 	}
 
 	if err := s.upsertOrders(userID, newOrders); err != nil {

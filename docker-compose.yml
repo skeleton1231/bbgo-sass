@@ -12,14 +12,25 @@ services:
       - BINANCE_API_SECRET=${BINANCE_API_SECRET}
     command: ["run", "--config", "/config/bbgo.yaml", "--no-sync", "--enable-webserver", "--enable-grpc", "--grpc-bind", ":9090"]
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   manager:
     build:
       context: ..
       dockerfile: saas/docker/Dockerfile.manager
     container_name: bbgo-manager
-    ports:
-      - "8090:8090"
+    expose:
+      - "8090"
     volumes:
       - bbgo-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -39,33 +50,74 @@ services:
       - MARKETDATA_ADDR=bbgo-marketdata:9090
       - MARKETDATA_REST_ADDR=bbgo-marketdata:8080
     depends_on:
-      - marketdata
+      marketdata:
+        condition: service_healthy
     networks:
       - bbgo-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8090/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
   web:
     build:
       context: ../saas/web
       dockerfile: Dockerfile
     container_name: bbgo-web
-    ports:
-      - "3142:3000"
+    expose:
+      - "3000"
     environment:
       - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - MANAGER_API_URL=http://manager:8090
       - MANAGER_TOKEN=${MANAGER_TOKEN}
     depends_on:
-      - manager
+      manager:
+        condition: service_healthy
     networks:
       - bbgo-net
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: bbgo-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - bbgo-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
 
 networks:
   bbgo-net:
@@ -73,3 +125,6 @@ networks:
 
 volumes:
   bbgo-data:
+  # caddy_data persists TLS certificates — back up for production
+  caddy_data:
+  caddy_config:
