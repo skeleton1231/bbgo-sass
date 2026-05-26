@@ -884,7 +884,7 @@ func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := "http://" + api.cfg.MarketDataRESTAddr
-	client := NewBBGoClient(base)
+	client := api.newBBGoClient(base)
 	symbols, err := client.GetSessionSymbols(exchange)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
