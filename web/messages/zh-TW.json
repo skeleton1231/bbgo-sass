@@ -8,7 +8,24 @@
     "forgotPassword": "忘記密碼？",
     "invalidCredentials": "電子郵件或密碼錯誤",
     "passwordTooShort": "密碼至少需要6個字元",
-    "passwordsDontMatch": "兩次輸入的密碼不一致"
+    "passwordsDontMatch": "兩次輸入的密碼不一致",
+    "noAccount": "沒有帳戶？",
+    "signUp": "註冊",
+    "createAccount": "建立帳戶",
+    "signupSubtitle": "幾分鐘內開始自動交易",
+    "confirmPassword": "確認密碼",
+    "signingUp": "正在建立...",
+    "hasAccount": "已有帳戶？",
+    "resetPassword": "重設密碼",
+    "resetPasswordSubtitle": "輸入電子郵件以接收重設連結",
+    "sendResetLink": "發送重設連結",
+    "sending": "發送中...",
+    "backToLogin": "返回登入",
+    "heroTitle": "專業加密貨幣交易，自動化。",
+    "heroSubtitle": "部署交易策略，使用歷史數據回測，並監控業績 — 盡在一個平台。",
+    "welcomeBack": "歡迎回來",
+    "loginSubtitle": "登入您的帳戶以繼續",
+    "signupSuccess": "帳戶已建立！請查收電子郵件確認後登入。"
   },
   "Nav": {
     "dashboard": "儀表板",
@@ -17,7 +34,10 @@
     "settings": "設定",
     "apiKeys": "API 金鑰",
     "billing": "帳單",
-    "signOut": "登出"
+    "signOut": "登出",
+    "openMenu": "開啟選單",
+    "navigation": "導航",
+    "notifications": "通知"
   },
   "Dashboard": {
     "title": "儀表板",
@@ -34,7 +54,10 @@
     "noStrategies": "尚未配置策略。",
     "createStrategy": "建立策略",
     "strategyCount": "1 / {count} 個策略",
-    "loading": "載入中..."
+    "loading": "載入中...",
+    "assetAllocation": "資產配置",
+    "tradingVolume": "交易量",
+    "pnlSummary": "損益摘要"
   },
   "Bots": {
     "title": "交易機器人",
@@ -132,6 +155,11 @@
     "runningBacktest": "正在運行回測...",
     "waitingToStart": "等待開始...",
     "recentJobs": "最近回測",
+    "statusPending": "等待中",
+    "statusDownloading": "下載中",
+    "statusRunning": "執行中",
+    "statusCompleted": "已完成",
+    "statusFailed": "失敗",
     "symbol": "交易對",
     "loading": "載入中..."
   },
@@ -179,5 +207,9 @@
   "Errors": {
     "serverError": "伺服器錯誤，請重試。",
     "fetchFailed": "取得資料失敗，請重試。"
+  },
+  "Common": {
+    "pageNotFound": "找不到此頁面。",
+    "goHome": "返回首頁"
   }
 }

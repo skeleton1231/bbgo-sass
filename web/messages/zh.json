@@ -8,7 +8,24 @@
     "forgotPassword": "忘记密码？",
     "invalidCredentials": "邮箱或密码错误",
     "passwordTooShort": "密码至少需要6个字符",
-    "passwordsDontMatch": "两次输入的密码不一致"
+    "passwordsDontMatch": "两次输入的密码不一致",
+    "noAccount": "没有账户？",
+    "signUp": "注册",
+    "createAccount": "创建账户",
+    "signupSubtitle": "几分钟内开始自动交易",
+    "confirmPassword": "确认密码",
+    "signingUp": "正在创建...",
+    "hasAccount": "已有账户？",
+    "resetPassword": "重置密码",
+    "resetPasswordSubtitle": "输入邮箱以接收重置链接",
+    "sendResetLink": "发送重置链接",
+    "sending": "发送中...",
+    "backToLogin": "返回登录",
+    "heroTitle": "专业加密货币交易，自动化。",
+    "heroSubtitle": "部署交易策略，使用历史数据回测，并监控业绩 — 尽在一个平台。",
+    "welcomeBack": "欢迎回来",
+    "loginSubtitle": "登录您的账户以继续",
+    "signupSuccess": "账户已创建！请查收邮件确认后登录。"
   },
   "Nav": {
     "dashboard": "仪表盘",
@@ -17,7 +34,10 @@
     "settings": "设置",
     "apiKeys": "API 密钥",
     "billing": "账单",
-    "signOut": "退出登录"
+    "signOut": "退出登录",
+    "openMenu": "打开菜单",
+    "navigation": "导航",
+    "notifications": "通知"
   },
   "Dashboard": {
     "title": "仪表盘",
@@ -34,7 +54,10 @@
     "noStrategies": "尚未配置策略。",
     "createStrategy": "创建策略",
     "strategyCount": "1 / {count} 个策略",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "assetAllocation": "资产配置",
+    "tradingVolume": "交易量",
+    "pnlSummary": "盈亏汇总"
   },
   "Bots": {
     "title": "交易机器人",
@@ -136,6 +159,11 @@
     "runningBacktest": "正在运行回测...",
     "waitingToStart": "等待开始...",
     "recentJobs": "最近回测",
+    "statusPending": "等待中",
+    "statusDownloading": "下载中",
+    "statusRunning": "运行中",
+    "statusCompleted": "已完成",
+    "statusFailed": "失败",
     "symbol": "交易对",
     "loading": "加载中..."
   },
@@ -183,5 +211,9 @@
   "Errors": {
     "serverError": "服务器错误，请重试。",
     "fetchFailed": "获取数据失败，请重试。"
+  },
+  "Common": {
+    "pageNotFound": "找不到此页面。",
+    "goHome": "返回首页"
   }
 }

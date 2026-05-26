@@ -8,7 +8,24 @@
     "forgotPassword": "Forgot password?",
     "invalidCredentials": "Invalid email or password",
     "passwordTooShort": "Password must be at least 6 characters",
-    "passwordsDontMatch": "Passwords do not match"
+    "passwordsDontMatch": "Passwords do not match",
+    "resetPassword": "Reset Password",
+    "resetPasswordSubtitle": "Enter your email to receive a reset link",
+    "sendResetLink": "Send Reset Link",
+    "sending": "Sending...",
+    "backToLogin": "Back to login",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign Up",
+    "createAccount": "Create your account",
+    "signupSubtitle": "Start automated trading in minutes",
+    "confirmPassword": "Confirm Password",
+    "signingUp": "Creating account...",
+    "hasAccount": "Already have an account?",
+    "heroTitle": "Professional crypto trading, automated.",
+    "heroSubtitle": "Deploy trading strategies, backtest with historical data, and monitor performance — all from one platform.",
+    "welcomeBack": "Welcome back",
+    "loginSubtitle": "Sign in to your account to continue",
+    "signupSuccess": "Account created! Please check your email to confirm, then sign in."
   },
   "Nav": {
     "dashboard": "Dashboard",
@@ -17,7 +34,10 @@
     "settings": "Settings",
     "apiKeys": "API Keys",
     "billing": "Billing",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "openMenu": "Open menu",
+    "navigation": "Navigation",
+    "notifications": "Notifications"
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -34,7 +54,10 @@
     "noStrategies": "No strategies configured yet.",
     "createStrategy": "Create a strategy",
     "strategyCount": "1 / {count} strategies",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "assetAllocation": "Asset Allocation",
+    "tradingVolume": "Trading Volume",
+    "pnlSummary": "P&L Summary"
   },
   "Bots": {
     "title": "Trading Bots",
@@ -136,6 +159,11 @@
     "runningBacktest": "Running backtest...",
     "waitingToStart": "Waiting to start...",
     "recentJobs": "Recent Backtests",
+    "statusPending": "Pending",
+    "statusDownloading": "Downloading",
+    "statusRunning": "Running",
+    "statusCompleted": "Completed",
+    "statusFailed": "Failed",
     "symbol": "Symbol",
     "loading": "Loading..."
   },
@@ -183,5 +211,9 @@
   "Errors": {
     "serverError": "Server error. Please try again.",
     "fetchFailed": "Failed to fetch data. Please try again."
+  },
+  "Common": {
+    "pageNotFound": "This page could not be found.",
+    "goHome": "Go Home"
   }
 }

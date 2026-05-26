@@ -8,7 +8,24 @@
     "forgotPassword": "비밀번호를 잊으셨나요?",
     "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다",
     "passwordTooShort": "비밀번호는 6자 이상이어야 합니다",
-    "passwordsDontMatch": "비밀번호가 일치하지 않습니다"
+    "passwordsDontMatch": "비밀번호가 일치하지 않습니다",
+    "noAccount": "계정이 없으신가요?",
+    "signUp": "가입하기",
+    "createAccount": "계정 만들기",
+    "signupSubtitle": "몇 분 만에 자동 거래 시작",
+    "confirmPassword": "비밀번호 확인",
+    "signingUp": "생성 중...",
+    "hasAccount": "이미 계정이 있으신가요?",
+    "resetPassword": "비밀번호 재설정",
+    "resetPasswordSubtitle": "재설정 링크를 받을 이메일을 입력하세요",
+    "sendResetLink": "재설정 링크 보내기",
+    "sending": "보내는 중...",
+    "backToLogin": "로그인으로 돌아가기",
+    "heroTitle": "전문 암호화폐 거래, 자동화.",
+    "heroSubtitle": "거래 전략을 배포하고, 과거 데이터로 백테스트하고, 성과를 모니터링하세요 — 모든 것을 하나의 플랫폼에서.",
+    "welcomeBack": "돌아오신 것을 환영합니다",
+    "loginSubtitle": "계속하려면 계정에 로그인하세요",
+    "signupSuccess": "계정이 생성되었습니다! 이메일을 확인한 후 로그인하세요."
   },
   "Nav": {
     "dashboard": "대시보드",
@@ -17,7 +34,10 @@
     "settings": "설정",
     "apiKeys": "API 키",
     "billing": "결제",
-    "signOut": "로그아웃"
+    "signOut": "로그아웃",
+    "openMenu": "메뉴 열기",
+    "navigation": "탐색",
+    "notifications": "알림"
   },
   "Dashboard": {
     "title": "대시보드",
@@ -34,7 +54,10 @@
     "noStrategies": "아직 설정된 전략이 없습니다.",
     "createStrategy": "전략 만들기",
     "strategyCount": "1 / {count} 전략",
-    "loading": "로딩 중..."
+    "loading": "로딩 중...",
+    "assetAllocation": "자산 배분",
+    "tradingVolume": "거래량",
+    "pnlSummary": "손익 요약"
   },
   "Bots": {
     "title": "트레이딩 봇",
@@ -132,6 +155,11 @@
     "runningBacktest": "백테스트 실행 중...",
     "waitingToStart": "시작 대기 중...",
     "recentJobs": "최근 백테스트",
+    "statusPending": "대기 중",
+    "statusDownloading": "다운로드 중",
+    "statusRunning": "실행 중",
+    "statusCompleted": "완료",
+    "statusFailed": "실패",
     "symbol": "심볼",
     "loading": "로딩..."
   },
@@ -179,5 +207,9 @@
   "Errors": {
     "serverError": "서버 오류. 다시 시도해 주세요.",
     "fetchFailed": "데이터를 가져오지 못했습니다."
+  },
+  "Common": {
+    "pageNotFound": "페이지를 찾을 수 없습니다.",
+    "goHome": "홈으로"
   }
 }

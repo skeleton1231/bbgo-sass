@@ -8,7 +8,24 @@
     "forgotPassword": "パスワードをお忘れですか？",
     "invalidCredentials": "メールアドレスまたはパスワードが正しくありません",
     "passwordTooShort": "パスワードは6文字以上必要です",
-    "passwordsDontMatch": "パスワードが一致しません"
+    "passwordsDontMatch": "パスワードが一致しません",
+    "noAccount": "アカウントをお持ちでない方",
+    "signUp": "サインアップ",
+    "createAccount": "アカウント作成",
+    "signupSubtitle": "数分で自動取引を開始",
+    "confirmPassword": "パスワード確認",
+    "signingUp": "作成中...",
+    "hasAccount": "アカウントをお持ちの方",
+    "resetPassword": "パスワードリセット",
+    "resetPasswordSubtitle": "リセットリンクを受け取るメールアドレスを入力",
+    "sendResetLink": "リセットリンクを送信",
+    "sending": "送信中...",
+    "backToLogin": "ログインに戻る",
+    "heroTitle": "プロの暗号通貨取引、自動化。",
+    "heroSubtitle": "取引戦略をデプロイし、履歴データでバックテストし、パフォーマンスを監視 — すべて1つのプラットフォームで。",
+    "welcomeBack": "おかえりなさい",
+    "loginSubtitle": "アカウントにログインして続行",
+    "signupSuccess": "アカウントが作成されました！メールを確認してからログインしてください。"
   },
   "Nav": {
     "dashboard": "ダッシュボード",
@@ -17,7 +34,10 @@
     "settings": "設定",
     "apiKeys": "API キー",
     "billing": "請求",
-    "signOut": "ログアウト"
+    "signOut": "ログアウト",
+    "openMenu": "メニューを開く",
+    "navigation": "ナビゲーション",
+    "notifications": "通知"
   },
   "Dashboard": {
     "title": "ダッシュボード",
@@ -34,7 +54,10 @@
     "noStrategies": "ストラテジーが設定されていません。",
     "createStrategy": "ストラテジーを作成",
     "strategyCount": "1 / {count} ストラテジー",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "assetAllocation": "資産配分",
+    "tradingVolume": "取引高",
+    "pnlSummary": "損益サマリー"
   },
   "Bots": {
     "title": "トレードボット",
@@ -132,6 +155,11 @@
     "runningBacktest": "バックテストを実行中...",
     "waitingToStart": "開始を待機中...",
     "recentJobs": "最近のバックテスト",
+    "statusPending": "待機中",
+    "statusDownloading": "ダウンロード中",
+    "statusRunning": "実行中",
+    "statusCompleted": "完了",
+    "statusFailed": "失敗",
     "symbol": "シンボル",
     "loading": "読み込み中..."
   },
@@ -179,5 +207,9 @@
   "Errors": {
     "serverError": "サーバーエラー。もう一度お試しください。",
     "fetchFailed": "データの取得に失敗しました。"
+  },
+  "Common": {
+    "pageNotFound": "このページは見つかりませんでした。",
+    "goHome": "ホームへ"
   }
 }

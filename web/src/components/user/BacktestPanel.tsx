@@ -26,6 +26,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
   const { data: symbolsData } = useMarketSymbols(exchange)
 
   const schema = getStrategySchema(strategy)
+  const formFields = schema ? schema.fields.filter((f) => f.key !== 'symbol') : []
 
   const { data: activeJob } = useBacktestJob(activeJobId)
 
@@ -111,7 +112,16 @@ export function BacktestPanel({ userId }: { userId: string }) {
             <label className="block text-sm font-medium mb-1">{t('symbol')}</label>
             <select
               value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
+              onChange={(e) => {
+                const newSymbol = e.target.value
+                setSymbol(newSymbol)
+                setConfig((prev) => ({
+                  ...prev,
+                  symbol: newSymbol,
+                  upperPrice: 0,
+                  lowerPrice: 0,
+                }))
+              }}
               disabled={isRunning || !symbolsData?.symbols?.length}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             >
@@ -148,10 +158,10 @@ export function BacktestPanel({ userId }: { userId: string }) {
           </div>
         </div>
 
-        {schema && schema.fields.length > 0 && (
+        {formFields.length > 0 && (
           <div className="border-t pt-4">
             <StrategyConfigForm
-              fields={schema.fields}
+              fields={formFields}
               values={config}
               onChange={setConfig}
             />
@@ -229,17 +239,27 @@ export function BacktestPanel({ userId }: { userId: string }) {
   )
 }
 
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  pending: 'statusPending',
+  downloading: 'statusDownloading',
+  running: 'statusRunning',
+  completed: 'statusCompleted',
+  failed: 'statusFailed',
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  downloading: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+}
+
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    downloading: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  }
+  const t = useTranslations('Backtest')
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-      {status}
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'}`}>
+      {t(STATUS_LABEL_KEYS[status] ?? status)}
     </span>
   )
 }
