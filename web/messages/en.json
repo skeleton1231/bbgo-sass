@@ -95,6 +95,7 @@
     "testnet": "Testnet",
     "noCredsForExchange": "No API credentials configured for {exchange}. Add them in Settings first.",
     "noCredsForRole": "No API credentials for {role} ({exchange}).",
+    "liveOnlyHint": "This strategy requires live mode.",
     "containerLogs": "Container Logs",
     "pnl": {
       "realized": "Realized P&L",

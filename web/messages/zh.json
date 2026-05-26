@@ -95,6 +95,7 @@
     "testnet": "测试网",
     "noCredsForExchange": "未配置 {exchange} 的 API 凭证，请先在设置中添加。",
     "noCredsForRole": "{role} ({exchange}) 未配置 API 凭证。",
+    "liveOnlyHint": "此策略仅支持实盘模式。",
     "containerLogs": "容器日志",
     "pnl": {
       "realized": "已实现盈亏",

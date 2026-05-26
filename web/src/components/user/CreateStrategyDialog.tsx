@@ -34,6 +34,9 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
     setConfig(getStrategyDefaults(newStrategy))
+    if (getStrategySchema(newStrategy)?.liveOnly) {
+      setMode('live')
+    }
     const s = getStrategySchema(newStrategy)
     if (s?.sessionRoles) {
       const defaults: Record<string, string> = {}
@@ -49,6 +52,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const strategiesByCategory = getStrategiesByCategory()
   const schema = getStrategySchema(strategy)
   const isCrossExchange = schema?.crossExchange === true
+  const isLiveOnly = schema?.liveOnly === true
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -167,17 +171,21 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           <label className="block text-sm font-medium mb-1">{t('modeLabel')}</label>
           <div className="flex gap-4">
             {(['live', 'paper'] as const).map((m) => (
-              <label key={m} className="flex items-center gap-2 text-sm">
+              <label key={m} className={`flex items-center gap-2 text-sm${isLiveOnly && m === 'paper' ? ' opacity-50' : ''}`}>
                 <input
                   type="radio"
                   name="mode"
                   value={m}
                   checked={mode === m}
                   onChange={() => setMode(m)}
+                  disabled={isLiveOnly && m === 'paper'}
                 />
                 {t(`mode.${m}`)}
               </label>
             ))}
+            {isLiveOnly && (
+              <p className="text-xs text-muted-foreground">{t('liveOnlyHint')}</p>
+            )}
           </div>
           {mode === 'live' && !isCrossExchange && !hasExchangeCreds(exchange) && (
             <p className="mt-1 text-xs text-destructive">
