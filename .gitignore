@@ -3,6 +3,7 @@
 .env.*.local
 manager/manager
 manager/manager.exe
+manager/cover.out
 manager/*~
 manager/data/
 web/node_modules/
