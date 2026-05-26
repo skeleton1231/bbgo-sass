@@ -154,7 +154,7 @@ func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			body := strings.NewReader(`{"exchange":"binance","strategy":"grid","config":{}}`)
+			body := strings.NewReader(`{"name":"Test","exchange":"binance","strategy":"grid","config":{}}`)
 			req := httptest.NewRequest("POST", "/api/users/"+userID+"/strategies", body)
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()

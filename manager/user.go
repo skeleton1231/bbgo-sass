@@ -23,6 +23,34 @@ var legacyStrategyAliases = map[string]string{
 	"rebalance":       "rebalance_portfolio",
 }
 
+// liveOnlyStrategies are strategies that only work in live mode (they require
+// real-time exchange features not available in paper trading).
+var liveOnlyStrategies = map[string]bool{
+	"bollmaker":       true,
+	"linregmaker":     true,
+	"rsmaker":         true,
+	"scmaker":         true,
+	"supertrend":      true,
+	"dca2":            true,
+	"dca3":            true,
+	"wall":            true,
+	"sentinel_anomaly": true,
+	"audacitymaker":   true,
+	"liquiditymaker":  true,
+	"drift":           true,
+	"elliottwave":     true,
+	"factorzoo":       true,
+	"xvs":             true,
+	"autoborrow":      true,
+	"convert":         true,
+	"deposit2transfer": true,
+	"autobuy_scheduled": true,
+	"rebalance_portfolio": true,
+	"support":         true,
+	"xpremium":        true,
+	"xnav":            true,
+}
+
 // legacyFieldAliases maps strategy IDs to old→new field renames.
 var legacyFieldAliases = map[string]map[string]string{
 	"dca": {"interval": "investmentInterval"},

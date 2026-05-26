@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,7 @@ type API struct {
 
 	newBBGoClient    func(baseURL string) *BBGoClient
 	containerStart   func(uc *UserContainer) error
+	containerStop    func(userID string)
 	containerRunning func(userID string) bool
 }
 
@@ -176,6 +178,10 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "strategy is required")
 		return
 	}
+	if strings.TrimSpace(req.Name) == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
 	if !req.CrossExchange && req.Exchange == "" {
 		writeError(w, http.StatusBadRequest, "exchange is required for single-exchange strategies")
 		return
@@ -183,6 +189,30 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	if req.CrossExchange && len(req.Sessions) == 0 {
 		writeError(w, http.StatusBadRequest, "sessions are required for cross-exchange strategies")
 		return
+	}
+
+	normalizedStrategy := req.Strategy
+	if alias, ok := legacyStrategyAliases[req.Strategy]; ok {
+		normalizedStrategy = alias
+	}
+	if req.Mode != "" && req.Mode != "paper" && req.Mode != "live" {
+		writeError(w, http.StatusBadRequest, "mode must be 'paper' or 'live'")
+		return
+	}
+	if req.Mode == "paper" && liveOnlyStrategies[normalizedStrategy] {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("strategy %s only supports live mode", req.Strategy))
+		return
+	}
+
+	// Prevent mixing paper and live strategies in the same container.
+	existingUC, _ := api.users.Get(userID)
+	if existingUC != nil && len(existingUC.Strategies) > 0 && req.Mode != "" {
+		for _, s := range existingUC.Strategies {
+			if s.Mode != "" && s.Mode != req.Mode {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("cannot mix paper and live strategies — existing strategy %q uses %s mode", s.Strategy, s.Mode))
+				return
+			}
+		}
 	}
 
 	if req.Mode == "live" && api.creds != nil {
@@ -259,7 +289,7 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 
 	uc, found := api.users.Get(userID)
 	if !found || len(uc.Strategies) == 0 {
-		api.container.Stop(userID)
+		api.stopContainer(userID)
 		api.users.UpdateStatus(userID, StatusStopped)
 		if api.syncer != nil { go api.syncer.SyncUser(userID) }
 		writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "reason": "no strategies left"})
@@ -286,6 +316,14 @@ func (api *API) startContainer(uc *UserContainer) error {
 		return api.containerStart(uc)
 	}
 	return api.container.CreateAndStart(uc)
+}
+
+func (api *API) stopContainer(userID string) {
+	if api.containerStop != nil {
+		api.containerStop(userID)
+		return
+	}
+	api.container.Stop(userID)
 }
 
 func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
@@ -383,7 +421,7 @@ func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.container.Stop(userID)
+	api.stopContainer(userID)
 	api.users.UpdateStatus(userID, StatusStopped)
 	if api.syncer != nil { go api.syncer.SyncUser(userID) }
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID})
@@ -701,6 +739,10 @@ func (api *API) userFromURL(w http.ResponseWriter, r *http.Request) (*UserContai
 	userID := chi.URLParam(r, "userID")
 	if !isValidUUID(userID) {
 		writeError(w, http.StatusBadRequest, "invalid user ID format")
+		return nil, "", false
+	}
+	if headerID, ok := userIDFromRequest(r); ok && headerID != userID {
+		writeError(w, http.StatusForbidden, "user ID mismatch")
 		return nil, "", false
 	}
 
