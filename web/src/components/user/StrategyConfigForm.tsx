@@ -63,8 +63,9 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
             </label>
           ) : (
             <input
-              type={field.type === 'number' ? 'number' : 'text'}
-              value={field.type === 'number' ? formatNumberValue(values[field.key], field.default) : String(values[field.key] ?? field.default)}
+              type="text"
+              inputMode="decimal"
+              value={field.type === 'number' ? formatNumberValue(values[field.key], field.default) : String(values[field.key] ?? field.default ?? '')}
               onChange={(e) => {
                 const val = field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value
                 handleChange(field.key, val)
