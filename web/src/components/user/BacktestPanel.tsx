@@ -87,19 +87,15 @@ export function BacktestPanel({ userId }: { userId: string }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLastResult(null)
-    try {
-      const result = await submitBacktest.mutateAsync({
-        strategy,
-        config: { ...config, exchange, symbol: displaySymbol },
-        exchange,
-        symbol: displaySymbol,
-        start_time: startTime,
-        end_time: endTime,
-      })
-      setActiveJobId(result.job_id)
-    } catch {
-      // Error available via submitBacktest.error
-    }
+    const result = await submitBacktest.mutateAsync({
+      strategy,
+      config: { ...config, exchange, symbol: displaySymbol },
+      exchange,
+      symbol: displaySymbol,
+      start_time: startTime,
+      end_time: endTime,
+    })
+    setActiveJobId(result.job_id)
   }
 
   const isRunning = activeJob?.status === 'pending' || activeJob?.status === 'downloading' || activeJob?.status === 'running'
