@@ -94,7 +94,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Market making with Bollinger Band neutral zone and trend-following exposure control',
     category: 'maker',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
