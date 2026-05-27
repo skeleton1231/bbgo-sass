@@ -37,7 +37,9 @@
     "signOut": "登出",
     "openMenu": "開啟選單",
     "navigation": "導航",
-    "notifications": "通知"
+    "notifications": "通知",
+    "modeLive": "實盤",
+    "modePaper": "模擬"
   },
   "Dashboard": {
     "title": "儀表板",

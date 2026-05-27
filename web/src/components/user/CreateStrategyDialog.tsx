@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, type SessionRole } from '@/lib/bbgo/strategies'
 import { EXCHANGES } from '@/lib/bbgo/constants'
+import { useTradingMode } from '@/components/providers/trading-mode'
 import { StrategyConfigForm } from './StrategyConfigForm'
 
 const ENV_PREFIXES: Record<string, string> = {
@@ -28,7 +29,8 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const [name, setName] = useState('')
   const [exchange, setExchange] = useState('binance')
   const [strategy, setStrategy] = useState('grid2')
-  const [mode, setMode] = useState<'live' | 'paper'>('paper')
+  const { mode: globalMode } = useTradingMode()
+  const [mode, setMode] = useState<'live' | 'paper'>(globalMode)
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
   const [sessionExchanges, setSessionExchanges] = useState<Record<string, string>>({})
 

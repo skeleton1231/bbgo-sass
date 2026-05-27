@@ -22,6 +22,7 @@ import { TradingVolumeChart } from '@/components/dashboard/TradingVolumeChart'
 import { PnlSummary } from '@/components/dashboard/PnlSummary'
 import { PnlChart } from '@/components/dashboard/PnlChart'
 import { EquityChart } from '@/components/dashboard/EquityChart'
+import { useTradingMode } from '@/components/providers/trading-mode'
 import {
   Activity,
   BarChart3,
@@ -36,27 +37,25 @@ export default function DashboardPage() {
   const t = useTranslations('Dashboard')
   const bt = useTranslations('Bots')
   const userId = useUserId()
+  const { mode: globalMode } = useTradingMode()
 
   const { data: containersResp } = useUserStrategies(userId)
   const containers = containersResp?.containers ?? {}
-  const liveContainer = containers.live
-  const paperContainer = containers.paper
-  const anyActive = liveContainer?.status === 'running' || paperContainer?.status === 'running'
-  const strategyCount = (liveContainer?.strategies?.length ?? 0) + (paperContainer?.strategies?.length ?? 0)
+  const activeContainer = containers[globalMode]
+  const otherContainer = containers[globalMode === 'live' ? 'paper' : 'live']
+  const isActive = activeContainer?.status === 'running'
+  const anyActive = isActive || otherContainer?.status === 'running'
+  const strategyCount = (activeContainer?.strategies?.length ?? 0) + (otherContainer?.strategies?.length ?? 0)
 
-  const dashboardMode = liveContainer?.status === 'running' ? 'live' as const
-    : paperContainer?.status === 'running' ? 'paper' as const
-    : undefined
+  const { data: tradesData } = useBotTrades(userId, undefined, undefined, globalMode)
+  const { data: assetsData } = useBotAssets(userId, globalMode)
+  const { data: sessionsData } = useBotSessions(userId, globalMode)
+  const { data: volumeData } = useBotTradingVolume(userId, undefined, globalMode)
+  const { data: pnlData } = useBotPnL(userId, undefined, undefined, globalMode)
 
-  const { data: tradesData } = useBotTrades(userId, undefined, undefined, dashboardMode)
-  const { data: assetsData } = useBotAssets(userId, dashboardMode)
-  const { data: sessionsData } = useBotSessions(userId, dashboardMode)
-  const { data: volumeData } = useBotTradingVolume(userId, undefined, dashboardMode)
-  const { data: pnlData } = useBotPnL(userId, undefined, undefined, dashboardMode)
-
-  const trades = anyActive ? (tradesData?.trades ?? []) : []
-  const assets = anyActive ? (assetsData?.assets ?? {}) : {}
-  const sessionCount = anyActive ? (sessionsData?.sessions?.length ?? 0) : 0
+  const trades = isActive ? (tradesData?.trades ?? []) : []
+  const assets = isActive ? (assetsData?.assets ?? {}) : {}
+  const sessionCount = isActive ? (sessionsData?.sessions?.length ?? 0) : 0
 
   const totalValue = Object.values(assets).reduce((sum, a: BBGoAsset) => {
     return sum + parseFloat(a.netAssetInUSD || '0')
@@ -65,7 +64,15 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+          <span className={cn(
+            'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium',
+            globalMode === 'live' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
+          )}>
+            {bt(`mode.${globalMode}`)}
+          </span>
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {anyActive
             ? t('strategyCount', { count: strategyCount })
@@ -83,7 +90,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold">{anyActive ? 1 : 0}</span>
+              <span className="text-2xl font-semibold">{isActive ? 1 : 0}</span>
               <span className="text-sm text-muted-foreground">/ {strategyCount}</span>
             </div>
           </CardContent>
@@ -130,7 +137,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {anyActive && (
+      {isActive && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="rounded-xl">
             <CardHeader className="pb-2">
@@ -152,7 +159,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {anyActive && pnlData && pnlData.totalTrades > 0 && (
+      {isActive && pnlData && pnlData.totalTrades > 0 && (
         <Card className="rounded-xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">{t('pnlSummary')}</CardTitle>
@@ -163,7 +170,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {anyActive && trades.length > 0 && (
+      {isActive && trades.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="rounded-xl">
             <CardHeader className="pb-2">
@@ -196,7 +203,7 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <div className="divide-y">
-            {[liveContainer, paperContainer].filter(Boolean).flatMap(uc => uc!.strategies.map(s => ({ ...s, containerStatus: uc!.status }))).map((s) => (
+            {[activeContainer, otherContainer].filter(Boolean).flatMap(uc => uc!.strategies.map(s => ({ ...s, containerStatus: uc!.status }))).map((s) => (
               <div key={s.id} className="flex items-center justify-between px-6 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
@@ -228,7 +235,7 @@ export default function DashboardPage() {
         <Card className="rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-sm font-medium">{t('recentTrades')}</CardTitle>
-            <Link href={`/user/bots/${userId}`}>
+            <Link href={`/user/bots/${userId}?mode=${globalMode}`}>
               <Button variant="ghost" size="sm" className="text-xs text-primary">
                 {t('viewAll')} <ArrowUpRight className="ml-1 h-3 w-3" />
               </Button>

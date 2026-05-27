@@ -6,7 +6,7 @@ import { useUserStrategies, useStartUser, useStopUser, useDeleteStrategy } from 
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-export function StrategyList({ userId }: { userId: string }) {
+export function StrategyList({ userId, activeMode }: { userId: string; activeMode?: 'live' | 'paper' }) {
   const t = useTranslations('Bots')
   const { data: containersResp, isLoading } = useUserStrategies(userId)
   const startUser = useStartUser()
@@ -31,18 +31,27 @@ export function StrategyList({ userId }: { userId: string }) {
     )
   }
 
+  const sortedModes = (['live', 'paper'] as Array<'live' | 'paper'>).sort((a, b) => {
+    if (a === activeMode) return -1
+    if (b === activeMode) return 1
+    return 0
+  })
+
   return (
     <div className="space-y-3">
-      {(['live', 'paper'] as const).map((mode) => {
+      {sortedModes.map((mode) => {
         const uc = containers[mode]
         if (!uc) return null
         const strategies = uc.strategies ?? []
-        if (strategies.length === 0) return null
         const status = uc.status ?? 'stopped'
+        const isHighlighted = mode === activeMode
 
         return (
-          <div key={mode} className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+          <div key={mode} className={cn('space-y-2', !isHighlighted && 'opacity-60')}>
+            <div className={cn(
+              'flex items-center justify-between rounded-lg border bg-card p-4 transition-all',
+              isHighlighted && 'ring-1 ring-primary/20',
+            )}>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{t(`mode.${mode}`)} {t('userContainer')}</p>

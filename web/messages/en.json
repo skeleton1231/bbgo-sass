@@ -37,7 +37,9 @@
     "signOut": "Sign Out",
     "openMenu": "Open menu",
     "navigation": "Navigation",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "modeLive": "Live",
+    "modePaper": "Paper"
   },
   "Dashboard": {
     "title": "Dashboard",

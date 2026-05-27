@@ -7,10 +7,12 @@ import { Plus } from 'lucide-react'
 import { StrategyList } from '@/components/user/StrategyList'
 import { CreateStrategyDialog } from '@/components/user/CreateStrategyDialog'
 import { useUserId } from '@/components/providers/user-id'
+import { useTradingMode } from '@/components/providers/trading-mode'
 
 export default function BotsPage() {
   const t = useTranslations('Bots')
   const userId = useUserId()
+  const { mode: globalMode } = useTradingMode()
   const [showCreate, setShowCreate] = useState(false)
 
   return (
@@ -25,7 +27,7 @@ export default function BotsPage() {
         </Button>
       </div>
 
-      {userId && <StrategyList userId={userId} />}
+      {userId && <StrategyList userId={userId} activeMode={globalMode} />}
 
       {showCreate && userId && (
         <CreateStrategyDialog userId={userId} onClose={() => setShowCreate(false)} />

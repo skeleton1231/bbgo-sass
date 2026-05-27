@@ -37,7 +37,9 @@
     "signOut": "로그아웃",
     "openMenu": "메뉴 열기",
     "navigation": "탐색",
-    "notifications": "알림"
+    "notifications": "알림",
+    "modeLive": "실전",
+    "modePaper": "모의"
   },
   "Dashboard": {
     "title": "대시보드",

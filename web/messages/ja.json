@@ -37,7 +37,9 @@
     "signOut": "ログアウト",
     "openMenu": "メニューを開く",
     "navigation": "ナビゲーション",
-    "notifications": "通知"
+    "notifications": "通知",
+    "modeLive": "ライブ",
+    "modePaper": "ペーパー"
   },
   "Dashboard": {
     "title": "ダッシュボード",

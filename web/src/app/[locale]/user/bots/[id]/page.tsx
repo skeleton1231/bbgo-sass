@@ -24,6 +24,7 @@ import {
 } from '@/lib/bbgo/queries'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
 import { useKlineData } from '@/hooks/useKlineData'
+import { useTradingMode } from '@/components/providers/trading-mode'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,7 +76,8 @@ export default function BotDetailPage() {
   const searchParams = useSearchParams()
   const userId = params.id
   const rawMode = searchParams.get('mode')
-  const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper' : 'live'
+  const { mode: globalMode } = useTradingMode()
+  const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper' : rawMode === 'live' ? 'live' : globalMode
   const [activeSession, setActiveSession] = useState<string>('')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })

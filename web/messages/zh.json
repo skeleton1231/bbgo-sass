@@ -37,7 +37,9 @@
     "signOut": "退出登录",
     "openMenu": "打开菜单",
     "navigation": "导航",
-    "notifications": "通知"
+    "notifications": "通知",
+    "modeLive": "实盘",
+    "modePaper": "模拟"
   },
   "Dashboard": {
     "title": "仪表盘",

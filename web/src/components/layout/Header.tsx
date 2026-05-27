@@ -6,6 +6,8 @@ import { usePathname } from '@/i18n/navigation'
 import { UserNav } from './UserNav'
 import { MobileSidebar } from './Sidebar'
 import { Button } from '@/components/ui/button'
+import { useTradingMode } from '@/components/providers/trading-mode'
+import { cn } from '@/lib/utils'
 import {
   Sheet,
   SheetContent,
@@ -20,6 +22,32 @@ const breadcrumbMap: Record<string, string> = {
   '/user/settings': 'settings',
   '/user/settings/api-keys': 'apiKeys',
   '/user/settings/notifications': 'notifications',
+}
+
+function ModeToggle() {
+  const t = useTranslations('Nav')
+  const { mode, setMode } = useTradingMode()
+
+  return (
+    <div className="flex items-center rounded-full border bg-muted/50 p-0.5">
+      {(['live', 'paper'] as const).map((m) => (
+        <button
+          key={m}
+          onClick={() => setMode(m)}
+          className={cn(
+            'rounded-full px-3 py-1 text-[11px] font-medium transition-all',
+            mode === m
+              ? m === 'live'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-amber-500 text-white shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {m === 'live' ? t('modeLive') : t('modePaper')}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export function Header({ email }: { email?: string }) {
@@ -63,7 +91,10 @@ export function Header({ email }: { email?: string }) {
             ))}
           </nav>
         </div>
-        <UserNav email={email} />
+        <div className="flex items-center gap-3">
+          <ModeToggle />
+          <UserNav email={email} />
+        </div>
       </header>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
