@@ -57,7 +57,14 @@
     "loading": "載入中...",
     "assetAllocation": "資產配置",
     "tradingVolume": "交易量",
-    "pnlSummary": "損益摘要"
+    "pnlSummary": "損益摘要",
+    "noAssetData": "暫無資產資料",
+    "noVolumeData": "暫無交易量資料",
+    "other": "其他",
+    "period7d": "7天",
+    "period30d": "30天",
+    "periodMonth": "月",
+    "periodYear": "年"
   },
   "Bots": {
     "title": "交易機器人",
@@ -117,6 +124,8 @@
     "noCredsForExchange": "未設定 {exchange} 的 API 憑證，請先在設定中新增。",
     "noCredsForRole": "{role} ({exchange}) 未設定 API 憑證。",
     "containerLogs": "容器日誌",
+    "loadingLogs": "載入日誌...",
+    "noStrategiesTab": "暫無策略",
     "pnl": {
       "realized": "已實現盈虧",
       "totalFees": "總手續費",
@@ -211,5 +220,17 @@
   "Common": {
     "pageNotFound": "找不到此頁面。",
     "goHome": "返回首頁"
+  },
+  "Categories": {
+    "grid": "網格",
+    "maker": "做市",
+    "trend": "趨勢追蹤",
+    "mean-reversion": "均值回歸",
+    "dca": "定投",
+    "volatility": "波動率",
+    "indicator": "指標",
+    "cross-exchange": "跨交易所",
+    "utility": "工具",
+    "other": "其他"
   }
 }

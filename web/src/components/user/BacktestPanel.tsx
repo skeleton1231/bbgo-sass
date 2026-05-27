@@ -2,14 +2,15 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols } from '@/lib/bbgo/queries'
+import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
 import type { BacktestJob } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory } from '@/lib/bbgo/strategies'
-import { CATEGORY_LABELS, EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
+import { EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
 
 export function BacktestPanel({ userId }: { userId: string }) {
   const t = useTranslations('Backtest')
+  const ct = useTranslations('Categories')
   const submitBacktest = useSubmitBacktest()
   const { data: jobsData } = useBacktestJobs()
 
@@ -24,11 +25,28 @@ export function BacktestPanel({ userId }: { userId: string }) {
   const [lastResult, setLastResult] = useState<BacktestJob | null>(null)
 
   const { data: symbolsData } = useMarketSymbols(exchange)
+  const { data: tickerData } = useMarketTicker(exchange, symbol)
 
   const schema = getStrategySchema(strategy)
   const formFields = schema ? schema.fields.filter((f) => f.key !== 'symbol') : []
 
   const { data: activeJob } = useBacktestJob(activeJobId)
+
+  // Auto-set upperPrice/lowerPrice from ticker when symbol changes
+  useEffect(() => {
+    const ticker = tickerData?.ticker
+    if (!ticker || !ticker.close) return
+    const hasPriceFields = schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')
+    if (!hasPriceFields) return
+    const price = ticker.close
+    const range = price * 0.2
+    setConfig((prev) => ({
+      ...prev,
+      symbol,
+      upperPrice: Math.round((price + range) * 100) / 100,
+      lowerPrice: Math.round((price - range) * 100) / 100,
+    }))
+  }, [tickerData, schema?.fields, symbol])
 
   useEffect(() => {
     if (activeJob && (activeJob.status === 'completed' || activeJob.status === 'failed')) {
@@ -79,7 +97,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             >
               {Object.entries(strategiesByCategory).map(([cat, items]) => (
-                <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
+                <optgroup key={cat} label={ct(cat)}>
                   {items.map((s) => (
                     <option key={s.id} value={s.id}>{s.label}</option>
                   ))}
@@ -118,8 +136,6 @@ export function BacktestPanel({ userId }: { userId: string }) {
                 setConfig((prev) => ({
                   ...prev,
                   symbol: newSymbol,
-                  upperPrice: 0,
-                  lowerPrice: 0,
                 }))
               }}
               disabled={isRunning || !symbolsData?.symbols?.length}

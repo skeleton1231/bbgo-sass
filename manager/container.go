@@ -18,6 +18,8 @@ import (
 
 const dockerTimeout = 2 * time.Minute
 
+const backtestDockerTimeout = 30 * time.Minute
+
 const containerPrefix = "bbgo-"
 
 type ContainerManager struct {
@@ -47,6 +49,17 @@ func (cm *ContainerManager) docker(args ...string) (string, error) {
 		return cm.dockerFn(args...)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), dockerTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	out, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
+}
+
+func (cm *ContainerManager) dockerLong(args ...string) (string, error) {
+	if cm.dockerFn != nil {
+		return cm.dockerFn(args...)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), backtestDockerTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	out, err := cmd.CombinedOutput()
@@ -182,7 +195,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		"--config", "bbgo.yaml",
 	)
 
-	out, err := cm.docker(args...)
+	out, err := cm.dockerLong(args...)
 	if err != nil {
 		return nil, fmt.Errorf("backtest failed: %s: %w", out, err)
 	}
@@ -229,7 +242,7 @@ func (cm *ContainerManager) SyncBacktest(exchange, symbol, startTime, endTime st
 		"--config", "bbgo.yaml",
 	)
 
-	out, err := cm.docker(args...)
+	out, err := cm.dockerLong(args...)
 	if err != nil {
 		return out, fmt.Errorf("sync failed: %w", err)
 	}

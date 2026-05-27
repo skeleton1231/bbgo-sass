@@ -13,18 +13,18 @@ export type Exchange = (typeof EXCHANGES)[number]
 
 export const EXCHANGES_REQUIRING_PASSPHRASE: string[] = ['okex', 'kucoin', 'bitget']
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  grid: 'Grid',
-  maker: 'Market Maker',
-  trend: 'Trend Following',
-  'mean-reversion': 'Mean Reversion',
-  dca: 'DCA',
-  volatility: 'Volatility',
-  indicator: 'Indicator',
-  'cross-exchange': 'Cross-Exchange',
-  utility: 'Utility',
-  other: 'Other',
-}
+export const CATEGORY_KEYS = [
+  'grid',
+  'maker',
+  'trend',
+  'mean-reversion',
+  'dca',
+  'volatility',
+  'indicator',
+  'cross-exchange',
+  'utility',
+  'other',
+] as const
 
 export const EXCHANGE_OPTIONS = [
   { id: 'binance', label: 'Binance' },

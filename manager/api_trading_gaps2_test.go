@@ -17,7 +17,7 @@ func TestAPI_MarketSymbols_ProxiesToMarketDataREST(t *testing.T) {
 
 	symbolsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"symbols": []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"},
+			"symbols": []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "INVALIDPAIR", "123456"},
 		})
 	}))
 	defer symbolsSrv.Close()
@@ -40,8 +40,17 @@ func TestAPI_MarketSymbols_ProxiesToMarketDataREST(t *testing.T) {
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
 	symbols, ok := resp["symbols"].([]interface{})
-	if !ok || len(symbols) < 3 {
-		t.Fatalf("expected 3+ symbols, got %v", resp["symbols"])
+	if !ok || len(symbols) != 3 {
+		t.Fatalf("expected 3 filtered symbols, got %d: %v", len(symbols), resp["symbols"])
+	}
+	for _, s := range symbols {
+		str, ok := s.(string)
+		if !ok {
+			t.Fatalf("symbol is not a string: %v", s)
+		}
+		if str == "INVALIDPAIR" || str == "123456" {
+			t.Errorf("invalid symbol %q should have been filtered out", str)
+		}
 	}
 }
 

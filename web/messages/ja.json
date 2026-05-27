@@ -57,7 +57,14 @@
     "loading": "読み込み中...",
     "assetAllocation": "資産配分",
     "tradingVolume": "取引高",
-    "pnlSummary": "損益サマリー"
+    "pnlSummary": "損益サマリー",
+    "noAssetData": "資産データがありません",
+    "noVolumeData": "取引量データがありません",
+    "other": "その他",
+    "period7d": "7日",
+    "period30d": "30日",
+    "periodMonth": "月",
+    "periodYear": "年"
   },
   "Bots": {
     "title": "トレードボット",
@@ -117,6 +124,8 @@
     "noCredsForExchange": "{exchange} の API 認証情報が設定されていません。先に設定で追加してください。",
     "noCredsForRole": "{role} ({exchange}) の API 認証情報が設定されていません。",
     "containerLogs": "コンテナログ",
+    "loadingLogs": "ログを読み込み中...",
+    "noStrategiesTab": "ストラテジーなし",
     "pnl": {
       "realized": "実現損益",
       "totalFees": "合計手数料",
@@ -211,5 +220,17 @@
   "Common": {
     "pageNotFound": "このページは見つかりませんでした。",
     "goHome": "ホームへ"
+  },
+  "Categories": {
+    "grid": "グリッド",
+    "maker": "マーケットメイカー",
+    "trend": "トレンドフォロー",
+    "mean-reversion": "平均回帰",
+    "dca": "DCA",
+    "volatility": "ボラティリティ",
+    "indicator": "インジケーター",
+    "cross-exchange": "クロス取引所",
+    "utility": "ユーティリティ",
+    "other": "その他"
   }
 }

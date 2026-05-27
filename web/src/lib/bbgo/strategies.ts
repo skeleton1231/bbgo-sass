@@ -45,7 +45,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'upperPrice', label: 'Upper Price', type: 'number', default: 70000, step: 0.01, required: true, description: 'Upper price boundary' },
       { key: 'lowerPrice', label: 'Lower Price', type: 'number', default: 50000, step: 0.01, required: true, description: 'Lower price boundary' },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true, description: 'Quantity per grid order' },
-      { key: 'profitSpread', label: 'Profit Spread', type: 'number', default: 0, step: 0.01, description: 'Fixed profit spread (absolute price, 0 = auto from grid range)' },
+      { key: 'profitSpread', label: 'Profit Spread', type: 'number', default: 50, step: 0.01, required: true, description: 'Fixed profit spread per grid (absolute price difference)' },
       { key: 'side', label: 'Initial Side', type: 'select', default: 'both', options: ['buy', 'sell', 'both'], description: 'Initial maker orders side' },
       { key: 'catchUp', label: 'Catch Up', type: 'boolean', default: false, description: 'Enable grid to catch up with price changes' },
     ],
@@ -59,12 +59,13 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true, description: 'Trading pair' },
       { key: 'gridNumber', label: 'Grid Number', type: 'number', default: 10, min: 2, max: 200, required: true, description: 'Number of grid orders' },
-      { key: 'upperPrice', label: 'Upper Price', type: 'number', default: 70000, step: 0.01, required: true },
-      { key: 'lowerPrice', label: 'Lower Price', type: 'number', default: 50000, step: 0.01, required: true },
-      { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true, description: 'Quantity per grid order' },
+      { key: 'upperPrice', label: 'Upper Price', type: 'number', default: 70000, step: 0.01, required: true, description: 'Upper price boundary (adjust for selected symbol)' },
+      { key: 'lowerPrice', label: 'Lower Price', type: 'number', default: 50000, step: 0.01, required: true, description: 'Lower price boundary (adjust for selected symbol)' },
+      { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, description: 'Quantity per grid order (mutually exclusive with Quote Investment)' },
       { key: 'profitSpread', label: 'Profit Spread', type: 'number', default: 0, step: 0.01, description: 'Fixed profit spread (absolute price, 0 = auto from grid range)' },
-      { key: 'quoteInvestment', label: 'Quote Investment', type: 'number', default: 1000, step: 0.01, description: 'Total quote investment amount' },
+      { key: 'quoteInvestment', label: 'Quote Investment', type: 'number', default: 1000, step: 0.01, description: 'Total quote investment amount (overrides Quantity if set)' },
       { key: 'compound', label: 'Compound', type: 'boolean', default: false, description: 'Reinvest profits' },
+      { key: 'earnBase', label: 'Earn Base', type: 'boolean', default: false, description: 'Earn profit in base currency instead of quote' },
       { key: 'triggerPrice', label: 'Trigger Price', type: 'number', default: 0, step: 0.01, description: 'Price to trigger grid opening (0 = disabled)' },
       { key: 'stopLossPrice', label: 'Stop Loss Price', type: 'number', default: 0, step: 0.01, description: 'Stop loss price (0 = disabled)' },
       { key: 'takeProfitPrice', label: 'Take Profit Price', type: 'number', default: 0, step: 0.01, description: 'Take profit price (0 = disabled)' },
@@ -82,7 +83,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'gridNumber', label: 'Grid Number', type: 'number', default: 10, min: 2, max: 100, required: true },
       { key: 'gridPips', label: 'Grid Pips', type: 'number', default: 50, step: 0.01, required: true, description: 'Grid spacing in pips' },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
-      { key: 'profitSpread', label: 'Profit Spread', type: 'number', default: 0, step: 0.01, description: 'Fixed profit spread (absolute price, 0 = auto)' },
+      { key: 'profitSpread', label: 'Profit Spread', type: 'number', default: 50, step: 0.01, required: true, description: 'Fixed profit spread (absolute price)' },
     ],
   },
 
@@ -149,9 +150,10 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
+      { key: 'interval', label: 'Interval', type: 'select', default: '1m', options: ['1m', '5m', '15m', '1h', '4h'] },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
-      { key: 'spread', label: 'Spread', type: 'number', default: 0.001, step: 0.0001, required: true },
-      { key: 'minProfitSpread', label: 'Min Profit Spread', type: 'number', default: 0.001, step: 0.0001 },
+      { key: 'halfSpread', label: 'Half Spread', type: 'number', default: 0.001, step: 0.0001, required: true, description: 'Half of the bid-ask spread' },
+      { key: 'dryRun', label: 'Dry Run', type: 'boolean', default: false, description: 'Simulate without real orders' },
     ],
   },
   {
@@ -177,8 +179,12 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
-      { key: 'spread', label: 'Spread', type: 'number', default: 0.001, step: 0.0001 },
+      { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
+      { key: 'window', label: 'Window', type: 'number', default: 20, min: 1, max: 500, required: true, description: 'Indicator window size' },
+      { key: 'k', label: 'K Factor', type: 'number', default: 0.5, step: 0.1, description: 'K factor for strength calculation' },
+      { key: 'numOfLiquidityLayers', label: 'Liquidity Layers', type: 'number', default: 5, min: 1, max: 50, required: true },
+      { key: 'maxExposure', label: 'Max Exposure', type: 'number', default: 1, step: 0.01 },
+      { key: 'minProfit', label: 'Min Profit', type: 'number', default: 0.001, step: 0.0001 },
     ],
   },
 
@@ -189,7 +195,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Trend following with Supertrend indicator and optional DEMA confirmation',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -312,9 +317,11 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'interval', label: 'Interval', type: 'select', default: '1d', options: ['1h', '4h', '1d', '1w'] },
-      { key: 'buyQuantity', label: 'Buy Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
-      { key: 'amount', label: 'Amount', type: 'number', default: 100, step: 0.01 },
+      { key: 'schedule', label: 'Schedule', type: 'text', default: '0 10 * * *', required: true, description: 'Cron schedule (e.g., "0 10 * * *" for daily 10am)' },
+      { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, description: 'Buy quantity per order' },
+      { key: 'amount', label: 'Amount', type: 'number', default: 100, step: 0.01, description: 'Buy amount in quote currency (alternative to quantity)' },
+      { key: 'minBaseBalance', label: 'Min Base Balance', type: 'number', default: 0, step: 0.01, description: 'Only buy if base balance above this' },
+      { key: 'dryRun', label: 'Dry Run', type: 'boolean', default: false, description: 'Simulate without real orders' },
     ],
   },
 
@@ -344,8 +351,11 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
+      { key: 'side', label: 'Side', type: 'select', default: 'sell', options: ['buy', 'sell'], required: true },
+      { key: 'interval', label: 'Interval', type: 'select', default: '1m', options: ['1m', '5m', '15m', '1h'] },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.1, step: 0.001, required: true },
-      { key: 'spread', label: 'Spread', type: 'number', default: 0.01, step: 0.001 },
+      { key: 'numLayers', label: 'Num Layers', type: 'number', default: 5, min: 1, max: 50, required: true },
+      { key: 'layerSpread', label: 'Layer Spread', type: 'number', default: 0.01, step: 0.001, description: 'Spread between each layer' },
     ],
   },
   {
@@ -358,21 +368,10 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
-    ],
-  },
-  {
-    id: 'sentinel_anomaly',
-    label: 'Sentinel Anomaly',
-    description: 'Price anomaly detection with isolation forest and alerts',
-    category: 'utility',
-    supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
-    fields: [
-      { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'interval', label: 'Interval', type: 'select', default: '1m', options: ['1m', '5m', '15m', '1h'] },
-      { key: 'threshold', label: 'Anomaly Threshold', type: 'number', default: 0.5, step: 0.1, description: 'Sensitivity for anomaly detection' },
+      { key: 'threshold', label: 'Threshold', type: 'number', default: 0.5, step: 0.1, description: 'Sensitivity for anomaly detection' },
       { key: 'window', label: 'Window', type: 'number', default: 100, min: 10, max: 1000, description: 'Lookback window for detection' },
       { key: 'numSamples', label: 'Samples', type: 'number', default: 50, min: 10, description: 'Number of samples for training' },
+      { key: 'proportion', label: 'Proportion', type: 'number', default: 0.1, step: 0.01, description: 'Proportion of outliers expected' },
     ],
   },
   {
@@ -396,8 +395,10 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
-      { key: 'interval', label: 'Interval', type: 'select', default: '1d', options: ['1h', '4h', '1d', '1w'] },
+      { key: 'schedule', label: 'Schedule', type: 'text', default: '0 0 * * *', required: true, description: 'Cron schedule (e.g., "0 0 * * *" for daily)' },
+      { key: 'quoteCurrency', label: 'Quote Currency', type: 'text', default: 'USDT', required: true },
       { key: 'threshold', label: 'Rebalance Threshold', type: 'number', default: 0.05, step: 0.01, description: 'Deviation threshold to trigger rebalance' },
+      { key: 'dryRun', label: 'Dry Run', type: 'boolean', default: false, description: 'Simulate without real orders' },
     ],
   },
 
@@ -411,8 +412,8 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'gridNumber', label: 'Grid Number', type: 'number', default: 10, min: 2, max: 200, required: true },
-      { key: 'upperPrice', label: 'Upper Price', type: 'number', default: 70000, step: 0.01, required: true },
-      { key: 'lowerPrice', label: 'Lower Price', type: 'number', default: 50000, step: 0.01, required: true },
+      { key: 'upperPrice', label: 'Upper Price', type: 'number', default: 70000, step: 0.01, required: true, description: 'Upper price boundary (adjust for selected symbol)' },
+      { key: 'lowerPrice', label: 'Lower Price', type: 'number', default: 50000, step: 0.01, required: true, description: 'Lower price boundary (adjust for selected symbol)' },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
       { key: 'profitSpread', label: 'Profit Spread', type: 'number', default: 0, step: 0.01, description: 'Fixed profit spread (absolute price, 0 = auto)' },
       { key: 'quoteInvestment', label: 'Quote Investment', type: 'number', default: 1000, step: 0.01 },
@@ -474,7 +475,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Drift MA strategy with linear regression prediction, ATR stop-loss and trailing exits',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['5m', '15m', '1h', '4h', '1d'] },
@@ -485,7 +485,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'useAtr', label: 'Use ATR Stop', type: 'boolean', default: false, description: 'Use ATR for stop-loss calculation' },
       { key: 'predictOffset', label: 'Predict Offset', type: 'number', default: 10, min: 1, description: 'Lookback length for prediction' },
       { key: 'atrWindow', label: 'ATR Window', type: 'number', default: 14, min: 1 },
-      { key: 'drawGraph', label: 'Draw Graph', type: 'boolean', default: true },
+      { key: 'generateGraph', label: 'Generate Graph', type: 'boolean', default: true, description: 'Generate graph on shutdown in backtest' },
     ],
   },
   {
@@ -494,7 +494,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Elliott Wave oscillator with ATR stop-loss, Heikin-Ashi and trailing exits',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['5m', '15m', '1h', '4h', '1d'] },
@@ -512,7 +511,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     description: 'Multi-factor linear strategy with momentum and exit management',
     category: 'trend',
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'] },
@@ -659,32 +657,6 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     ],
   },
   {
-    id: 'autobuy_scheduled',
-    label: 'Scheduled Auto Buy',
-    description: 'Scheduled automatic buying with balance conditions',
-    category: 'utility',
-    supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
-    fields: [
-      { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'schedule', label: 'Schedule', type: 'text', default: '0 10 * * 1', description: 'Cron schedule for auto-buy (e.g., weekly Monday 10am)' },
-      { key: 'minBaseBalance', label: 'Min Base Balance', type: 'number', default: 0, step: 0.01, description: 'Only buy if base balance is above this' },
-    ],
-  },
-  {
-    id: 'rebalance_portfolio',
-    label: 'Portfolio Rebalance',
-    description: 'Rebalance portfolio assets according to target weights on a schedule',
-    category: 'utility',
-    supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
-    liveOnly: true,
-    fields: [
-      { key: 'schedule', label: 'Schedule', type: 'text', default: '0 0 * * *', required: true, description: 'Cron schedule (e.g., daily at midnight)' },
-      { key: 'quoteCurrency', label: 'Quote Currency', type: 'text', default: 'USDT', required: true },
-      { key: 'threshold', label: 'Drift Threshold', type: 'number', default: 0.05, step: 0.01, description: 'Only rebalance if weight drifts beyond this' },
-    ],
-  },
-  {
     id: 'support',
     label: 'Support Monitor',
     description: 'Detect support/resistance levels and trigger protective orders',
@@ -781,7 +753,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     ],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
-      { key: 'spread', label: 'Spread', type: 'number', default: 0.001, step: 0.0001 },
+      { key: 'halfSpread', label: 'Half Spread', type: 'number', default: 0.001, step: 0.0001, description: 'Half of the bid-ask spread' },
       { key: 'quantity', label: 'Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
     ],
   },

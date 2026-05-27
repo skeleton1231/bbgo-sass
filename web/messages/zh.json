@@ -57,7 +57,14 @@
     "loading": "加载中...",
     "assetAllocation": "资产配置",
     "tradingVolume": "交易量",
-    "pnlSummary": "盈亏汇总"
+    "pnlSummary": "盈亏汇总",
+    "noAssetData": "暂无资产数据",
+    "noVolumeData": "暂无交易量数据",
+    "other": "其他",
+    "period7d": "7天",
+    "period30d": "30天",
+    "periodMonth": "月",
+    "periodYear": "年"
   },
   "Bots": {
     "title": "交易机器人",
@@ -120,6 +127,8 @@
     "noCredsForRole": "{role} ({exchange}) 未配置 API 凭证。",
     "liveOnlyHint": "此策略仅支持实盘模式。",
     "containerLogs": "容器日志",
+    "loadingLogs": "加载日志...",
+    "noStrategiesTab": "暂无策略",
     "pnl": {
       "realized": "已实现盈亏",
       "totalFees": "总手续费",
@@ -215,5 +224,17 @@
   "Common": {
     "pageNotFound": "找不到此页面。",
     "goHome": "返回首页"
+  },
+  "Categories": {
+    "grid": "网格",
+    "maker": "做市",
+    "trend": "趋势跟踪",
+    "mean-reversion": "均值回归",
+    "dca": "定投",
+    "volatility": "波动率",
+    "indicator": "指标",
+    "cross-exchange": "跨交易所",
+    "utility": "工具",
+    "other": "其他"
   }
 }

@@ -19,8 +19,8 @@ export default function BacktestPage() {
   }, [])
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">{t('title')}</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       {userId && <BacktestPanel userId={userId} />}
     </div>
   )

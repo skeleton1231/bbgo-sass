@@ -7,6 +7,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...customHeaders },
   })
 
+  if (res.status === 401) {
+    const locale = window.location.pathname.split('/')[1] || ''
+    window.location.href = `/${locale}/login`
+    throw new Error('Session expired')
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error || `Manager API error: ${res.status}`)
@@ -339,6 +345,37 @@ export function fetchBotPnL(userId: string, exchange?: string, symbol?: string) 
 
 export function fetchMarketSymbols(exchange: string) {
   return request<{ symbols: string[] }>(`/markets/${encodeURIComponent(exchange)}/symbols`)
+}
+
+export interface MarketTicker {
+  symbol: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export function fetchMarketTicker(exchange: string, symbol: string) {
+  return request<{ ticker: MarketTicker }>(`/markets/${encodeURIComponent(exchange)}/ticker?symbol=${encodeURIComponent(symbol)}`)
+}
+
+export interface MarketKline {
+  time: number
+  open: string
+  high: string
+  low: string
+  close: string
+  volume: string
+  quoteVolume?: string
+  closed: boolean
+}
+
+export function fetchMarketKlines(exchange: string, symbol: string, interval?: string, limit?: number) {
+  const params = new URLSearchParams({ symbol })
+  if (interval) params.set('interval', interval)
+  if (limit) params.set('limit', String(limit))
+  return request<{ klines: MarketKline[] }>(`/markets/${encodeURIComponent(exchange)}/klines?${params}`)
 }
 
 // --- Credentials ---

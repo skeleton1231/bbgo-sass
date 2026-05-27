@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import type { BBGoAsset } from '@/lib/bbgo/queries'
 
@@ -24,7 +25,7 @@ interface ChartEntry {
   usdValue: string
 }
 
-function buildChartData(assets: Record<string, BBGoAsset>): ChartEntry[] {
+function buildChartData(assets: Record<string, BBGoAsset>, otherLabel: string): ChartEntry[] {
   const entries = Object.values(assets ?? {})
     .map((a) => ({
       name: a.currency,
@@ -37,7 +38,7 @@ function buildChartData(assets: Record<string, BBGoAsset>): ChartEntry[] {
   const top = entries.slice(0, 7)
   const otherValue = entries.slice(7).reduce((s, e) => s + e.value, 0)
   if (otherValue > 0) {
-    top.push({ name: 'Other', value: otherValue, usdValue: otherValue.toFixed(2) })
+    top.push({ name: otherLabel, value: otherValue, usdValue: otherValue.toFixed(2) })
   }
   return top
 }
@@ -55,12 +56,13 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
 }
 
 export function AssetAllocationChart({ assets }: AssetAllocationChartProps) {
-  const data = buildChartData(assets)
+  const t = useTranslations('Dashboard')
+  const data = buildChartData(assets, t('other'))
 
   if (data.length === 0) {
     return (
       <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
-        No asset data available
+        {t('noAssetData')}
       </div>
     )
   }

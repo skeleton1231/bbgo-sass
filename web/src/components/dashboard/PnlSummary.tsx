@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import type { PnLReport } from '@/lib/bbgo/queries'
 
 interface PnlSummaryProps {
@@ -7,22 +8,23 @@ interface PnlSummaryProps {
 }
 
 export function PnlSummary({ report }: PnlSummaryProps) {
+  const t = useTranslations('Bots.pnl')
   const isPositive = report.totalRealizedPnl >= 0
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Realized P&L</p>
+        <p className="text-xs text-muted-foreground">{t('realized')}</p>
         <p className={isPositive ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
           {isPositive ? '+' : ''}${report.totalRealizedPnl.toFixed(2)}
         </p>
       </div>
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Total Fees</p>
+        <p className="text-xs text-muted-foreground">{t('totalFees')}</p>
         <p className="text-sm font-medium">${report.totalFees.toFixed(2)}</p>
       </div>
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Win Rate</p>
+        <p className="text-xs text-muted-foreground">{t('winRate')}</p>
         <p className="text-sm font-medium">
           {report.totalTrades > 0
             ? `${((report.winningTrades / report.totalTrades) * 100).toFixed(1)}%`
@@ -40,7 +42,7 @@ export function PnlSummary({ report }: PnlSummaryProps) {
         </div>
       </div>
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Trades</p>
+        <p className="text-xs text-muted-foreground">{t('totalTrades')}</p>
         <p className="text-sm font-medium">
           {report.totalTrades}
           <span className="text-xs text-muted-foreground ml-1">

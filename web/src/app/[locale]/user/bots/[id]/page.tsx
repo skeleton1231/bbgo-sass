@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
 import {
   useUserStrategies,
   useStartUser,
@@ -22,8 +23,50 @@ import {
   type BBGoBalance,
 } from '@/lib/bbgo/queries'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
+import { useKlineData } from '@/hooks/useKlineData'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  ArrowDownRight,
+  Play,
+  Square,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  BarChart3,
+  Bot,
+  Activity,
+  AlertCircle,
+  WifiOff,
+} from 'lucide-react'
+
+const CandlestickChart = dynamic(
+  () => import('@/components/chart/CandlestickChart').then((m) => ({ default: m.CandlestickChart })),
+  { ssr: false, loading: () => <div className="h-[450px] animate-pulse rounded-lg bg-muted" /> }
+)
+
+const DepthChart = dynamic(
+  () => import('@/components/chart/DepthChart').then((m) => ({ default: m.DepthChart })),
+  { ssr: false, loading: () => <div className="h-[300px] animate-pulse rounded-lg bg-muted" /> }
+)
+
+const KLINE_INTERVALS = [
+  { key: '1m', label: '1m' },
+  { key: '5m', label: '5m' },
+  { key: '15m', label: '15m' },
+  { key: '1h', label: '1H' },
+  { key: '4h', label: '4H' },
+  { key: '1d', label: '1D' },
+] as const
 
 export default function BotDetailPage() {
   const t = useTranslations('Bots')
@@ -31,6 +74,8 @@ export default function BotDetailPage() {
   const params = useParams<{ id: string }>()
   const userId = params.id
   const [activeSession, setActiveSession] = useState<string>('')
+  const [klineInterval, setKlineInterval] = useState('1h')
+  const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
 
   const { data: userContainer, isLoading, isError } = useUserStrategies(userId)
   const startUser = useStartUser()
@@ -41,9 +86,7 @@ export default function BotDetailPage() {
   const firstSession = sessions[0]?.name ?? ''
 
   useEffect(() => {
-    if (!activeSession && firstSession) {
-      setActiveSession(firstSession)
-    }
+    if (!activeSession && firstSession) setActiveSession(firstSession)
   }, [firstSession, activeSession])
 
   const isRunning = userContainer?.status === 'running'
@@ -55,17 +98,75 @@ export default function BotDetailPage() {
   const { data: pingData } = useBotPing(userId)
   const { data: logsData } = useContainerLogs(userId, '100')
   const { data: pnlData } = useBotPnL(userId)
-  const { connected: wsConnected } = useMarketData({ userId, enabled: isRunning })
+
+  const activeExchange = sessions.find((s) => s.name === activeSession)?.exchangeName ?? ''
+  const activeSymbol = (userContainer?.strategies?.[0]?.config?.symbol as string | undefined) ?? ''
+
+  const { candles, isLoading: klinesLoading } = useKlineData({
+    userId,
+    exchange: activeExchange,
+    symbol: activeSymbol,
+    interval: klineInterval,
+    enabled: isRunning && !!activeExchange && !!activeSymbol,
+  })
+
+  const tradeMarkers: TradeMarker[] = useMemo(() => {
+    if (!tradesData?.trades) return []
+    return tradesData.trades
+      .filter((tr) => !activeSymbol || tr.symbol === activeSymbol)
+      .slice(0, 200)
+      .map((tr) => ({
+        time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as number,
+        side: tr.side as 'BUY' | 'SELL',
+        price: parseFloat(tr.price),
+        quantity: parseFloat(tr.quantity),
+      }))
+  }, [tradesData?.trades, activeSymbol])
+
+  const orderLevels: OrderLevel[] = useMemo(() => {
+    if (!openOrdersData?.orders) return []
+    return openOrdersData.orders
+      .filter((o) => !activeSymbol || o.symbol === activeSymbol)
+      .map((o) => ({
+        price: parseFloat(o.price),
+        side: o.side as 'BUY' | 'SELL',
+        quantity: o.executedQuantity || o.quantity,
+      }))
+  }, [openOrdersData?.orders, activeSymbol])
+
+  const handleWSMessage = useCallback((msg: { type: string; data: { channel?: string; depth?: { bids: Array<{ price: string; volume: string }>; asks: Array<{ price: string; volume: string }> } } }) => {
+    if (msg.type !== 'market' || !msg.data.depth) return
+    setDepthData({
+      bids: msg.data.depth.bids.slice(0, 20).map((b) => ({ price: parseFloat(b.price), volume: parseFloat(b.volume) })),
+      asks: msg.data.depth.asks.slice(0, 20).map((a) => ({ price: parseFloat(a.price), volume: parseFloat(a.volume) })),
+    })
+  }, [])
+
+  const { connected: wsConnected } = useMarketData({
+    userId,
+    enabled: isRunning,
+    onMessage: handleWSMessage,
+  })
 
   if (isLoading) {
-    return <div className="text-muted-foreground">{t('loading')}</div>
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      </div>
+    )
   }
 
   if (isError) {
     return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-        <p className="text-sm text-destructive">{t('errorLoading')}</p>
-      </div>
+      <Card className="rounded-xl border-destructive/50">
+        <CardContent className="flex flex-col items-center py-12">
+          <AlertCircle className="h-8 w-8 text-destructive mb-3" />
+          <p className="text-sm text-destructive">{t('errorLoading')}</p>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -83,369 +184,482 @@ export default function BotDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <button onClick={() => router.back()} className="text-sm text-muted-foreground hover:text-foreground mb-2">
-            &larr; {t('backToBots')}
+        <div className="space-y-1">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {t('backToBots')}
           </button>
-          <h1 className="text-2xl font-bold">{t('tradingDashboard')}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('tradingDashboard')}</h1>
           <p className="text-sm text-muted-foreground">
             {t('strategiesCount', { count: strategies.length })} · {t('containerName', { id: userId.slice(0, 8) })}
           </p>
         </div>
+
         <div className="flex items-center gap-3">
-          {isRunning && !wsConnected && (
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-              {t('live.connecting')}
-            </span>
+          {isRunning && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'gap-1.5 rounded-full text-[11px]',
+                wsConnected
+                  ? 'border-trade-up/30 text-trade-up'
+                  : 'border-yellow-500/30 text-yellow-600'
+              )}
+            >
+              {wsConnected ? (
+                <><span className="h-1.5 w-1.5 rounded-full bg-trade-up animate-pulse" />{t('live.connected')}</>
+              ) : (
+                <><span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />{t('live.connecting')}</>
+              )}
+            </Badge>
           )}
-          {isRunning && wsConnected && (
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-              {t('live.connected')}
-            </span>
-          )}
-          <span
+
+          <Badge
+            variant="outline"
             className={cn(
-              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-              status === 'running' && 'bg-green-100 text-green-700',
-              status === 'stopped' && 'bg-gray-100 text-gray-700',
-              status === 'error' && 'bg-red-100 text-red-700'
+              'rounded-full text-[11px] font-medium',
+              status === 'running' && 'border-trade-up/30 text-trade-up',
+              status === 'stopped' && 'border-border text-muted-foreground',
+              status === 'error' && 'border-trade-down/30 text-trade-down'
             )}
           >
             {t(`status.${status}`)}
-          </span>
+          </Badge>
+
           {status === 'running' ? (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => stopUser.mutate(userId, { onError: (err) => toast.error(err.message) })}
               disabled={stopUser.isPending}
-              className="rounded-md border px-4 py-2 text-sm hover:bg-muted disabled:opacity-50"
+              className="rounded-full"
             >
+              <Square className="mr-1.5 h-3.5 w-3.5" />
               {t('stop')}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              size="sm"
               onClick={() => startUser.mutate(userId, { onError: (err) => toast.error(err.message) })}
               disabled={startUser.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="rounded-full"
             >
+              <Play className="mr-1.5 h-3.5 w-3.5" />
               {t('start')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {!isRunning && (
-        <div className={cn(
-          'rounded-lg border px-4 py-3 text-sm',
-          status === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-muted text-muted-foreground'
-        )}>
-          {status === 'error'
-            ? t('errorBanner')
-            : t('stoppedBanner')}
+        <div
+          className={cn(
+            'flex items-center gap-3 rounded-xl px-5 py-3.5 text-sm',
+            status === 'error'
+              ? 'bg-trade-down/5 text-trade-down border border-trade-down/20'
+              : 'bg-muted text-muted-foreground'
+          )}
+        >
+          {status === 'error' ? <AlertCircle className="h-4 w-4 shrink-0" /> : <WifiOff className="h-4 w-4 shrink-0" />}
+          {status === 'error' ? t('errorBanner') : t('stoppedBanner')}
         </div>
       )}
 
-      {/* Session tabs */}
       {sessions.length > 0 && (
         <div className="flex gap-2">
           {sessions.map((s) => (
-            <button
+            <Button
               key={s.name}
+              variant={activeSession === s.name ? 'default' : 'outline'}
+              size="sm"
               onClick={() => setActiveSession(s.name)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm font-medium',
-                activeSession === s.name
-                  ? 'bg-primary text-primary-foreground'
-                  : 'border hover:bg-muted'
-              )}
+              className="rounded-full text-xs"
             >
-              {s.exchangeName || s.name}{s.exchangeName && s.name !== s.exchangeName ? ` (${s.name})` : ''}
-            </button>
+              {s.exchangeName || s.name}
+            </Button>
           ))}
         </div>
       )}
 
-      {/* PnL Dashboard */}
       {botReachable && pnlData && pnlData.totalTrades > 0 && (
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">{t('pnl.realized')}</p>
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.realized')}</p>
+                <div className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-full',
+                  pnlData.totalRealizedPnl >= 0 ? 'bg-trade-up' : 'bg-trade-down'
+                )}>
+                  {pnlData.totalRealizedPnl >= 0
+                    ? <TrendingUp className="h-3.5 w-3.5 text-trade-up" />
+                    : <TrendingDown className="h-3.5 w-3.5 text-trade-down" />}
+                </div>
+              </div>
               <p className={cn(
-                'text-xl font-bold',
-                pnlData.totalRealizedPnl > 0 ? 'text-green-600' : pnlData.totalRealizedPnl < 0 ? 'text-red-600' : ''
+                'mt-2 text-xl font-semibold font-mono',
+                pnlData.totalRealizedPnl > 0 ? 'text-trade-up' : pnlData.totalRealizedPnl < 0 ? 'text-trade-down' : ''
               )}>
                 {pnlData.totalRealizedPnl >= 0 ? '+' : ''}{pnlData.totalRealizedPnl.toFixed(4)} USDT
               </p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">{t('pnl.totalFees')}</p>
-              <p className="text-xl font-bold text-muted-foreground">
+            </CardContent>
+          </Card>
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.totalFees')}</p>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="mt-2 text-xl font-semibold font-mono text-muted-foreground">
                 -{pnlData.totalFees.toFixed(4)} USDT
               </p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">{t('pnl.winRate')}</p>
-              <p className="text-xl font-bold">
+            </CardContent>
+          </Card>
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.winRate')}</p>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="mt-2 text-xl font-semibold font-mono">
                 {pnlData.winRate.toFixed(1)}%
-                <span className="text-xs text-muted-foreground ml-2">
+                <span className="ml-2 text-xs text-muted-foreground font-normal">
                   ({pnlData.winningTrades}W / {pnlData.losingTrades}L)
                 </span>
               </p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">{t('pnl.totalTrades')}</p>
-              <p className="text-xl font-bold">{pnlData.totalTrades}</p>
-            </div>
-          </div>
-
-          {pnlData.symbols.length > 0 && (
-            <div className="rounded-lg border bg-card">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold">{t('pnl.bySymbol')}</h2>
+            </CardContent>
+          </Card>
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.totalTrades')}</p>
+                <Activity className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="divide-y">
-                {pnlData.symbols.map((s) => (
-                  <div key={s.symbol} className="flex items-center justify-between px-4 py-3 text-sm">
-                    <div className="flex items-center gap-3 min-w-[140px]">
-                      <span className="font-medium">{s.symbol}</span>
-                      <span className="text-xs text-muted-foreground">{t('pnl.tradeCount', { count: s.tradeCount })}</span>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      {s.openPosition > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {t('pnl.openPosition', { amount: s.openPosition.toFixed(6), price: s.openPositionCost > 0 ? (s.openPositionCost / s.openPosition).toFixed(2) : '-' })}
-                        </span>
+              <p className="mt-2 text-xl font-semibold font-mono">{pnlData.totalTrades}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {botReachable && pnlData && pnlData.symbols.length > 0 && (
+        <Card className="rounded-xl">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">{t('pnl.bySymbol')}</CardTitle>
+          </CardHeader>
+          <div className="divide-y">
+            {pnlData.symbols.map((s) => (
+              <div key={s.symbol} className="flex items-center justify-between px-6 py-3 text-sm">
+                <div className="flex items-center gap-3 min-w-[140px]">
+                  <span className="font-medium">{s.symbol}</span>
+                  <span className="text-xs text-muted-foreground">{t('pnl.tradeCount', { count: s.tradeCount })}</span>
+                </div>
+                <div className="flex items-center gap-6">
+                  {s.openPosition > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      Pos: {s.openPosition.toFixed(6)}
+                    </span>
+                  )}
+                  <span className={cn(
+                    'font-medium w-32 text-right font-mono',
+                    s.realizedPnl > 0 ? 'text-trade-up' : s.realizedPnl < 0 ? 'text-trade-down' : ''
+                  )}>
+                    {s.realizedPnl >= 0 ? '+' : ''}{s.realizedPnl.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Tabs defaultValue="chart" className="space-y-4">
+        <TabsList className="bg-muted/50 p-1 rounded-lg">
+          <TabsTrigger value="chart" className="rounded-md text-xs">{t('chart')}</TabsTrigger>
+          <TabsTrigger value="depth" className="rounded-md text-xs">{t('depth')}</TabsTrigger>
+          <TabsTrigger value="balances" className="rounded-md text-xs">{t('balances')}</TabsTrigger>
+          <TabsTrigger value="open-orders" className="rounded-md text-xs">{t('openOrders')} ({openOrders.length})</TabsTrigger>
+          <TabsTrigger value="closed-orders" className="rounded-md text-xs">{t('closedOrders')} ({closedOrders.length})</TabsTrigger>
+          <TabsTrigger value="trades" className="rounded-md text-xs">{t('recentTrades')}</TabsTrigger>
+          <TabsTrigger value="strategies" className="rounded-md text-xs">{t('strategies')}</TabsTrigger>
+          {isRunning && <TabsTrigger value="logs" className="rounded-md text-xs">{t('containerLogs')}</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="chart">
+          <Card className="rounded-xl">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">
+                  {activeSymbol || 'Price Chart'} · {activeExchange}
+                </CardTitle>
+                <div className="flex gap-1">
+                  {KLINE_INTERVALS.map((iv) => (
+                    <button
+                      key={iv.key}
+                      onClick={() => setKlineInterval(iv.key)}
+                      className={cn(
+                        'rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
+                        klineInterval === iv.key
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       )}
-                      <span className="text-xs text-muted-foreground w-20 text-right">
-                        {t('pnl.avgBuy', { price: s.avgBuyPrice > 0 ? s.avgBuyPrice.toFixed(2) : '-' })}
-                      </span>
-                      <span className={cn(
-                        'font-medium w-32 text-right',
-                        s.realizedPnl > 0 ? 'text-green-600' : s.realizedPnl < 0 ? 'text-red-600' : ''
-                      )}>
-                        {s.realizedPnl >= 0 ? '+' : ''}{s.realizedPnl.toFixed(4)}
-                      </span>
+                    >
+                      {iv.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!activeSymbol ? (
+                <div className="flex h-[450px] items-center justify-center text-sm text-muted-foreground">
+                  {botReachable ? t('noSymbolForChart') : t('startToSeeData')}
+                </div>
+              ) : (
+                <CandlestickChart
+                  candles={candles}
+                  tradeMarkers={tradeMarkers}
+                  orderLevels={orderLevels}
+                  height={450}
+                  isLoading={klinesLoading}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="depth">
+          <Card className="rounded-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">{t('orderBook')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DepthChart bids={depthData.bids} asks={depthData.asks} height={350} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="balances">
+          <Card className="rounded-xl">
+            {nonZeroBalances.length > 0 ? (
+              <div className="divide-y">
+                {nonZeroBalances.map(([currency, b]: [string, BBGoBalance]) => (
+                  <div key={currency} className="flex items-center justify-between px-6 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">{currency.slice(0, 2)}</div>
+                      <span className="text-sm font-medium">{currency}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-mono">{b.available}</span>
+                      {parseFloat(b.locked) > 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">({t('locked', { amount: b.locked })})</span>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Balances */}
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">{t('balances')}</h2>
-          </div>
-          {nonZeroBalances.length > 0 ? (
-            <div className="divide-y max-h-80 overflow-y-auto">
-              {nonZeroBalances.map(([currency, b]: [string, BBGoBalance]) => (
-                <div key={currency} className="flex items-center justify-between px-4 py-2 text-sm">
-                  <span className="font-medium">{currency}</span>
-                  <div className="text-right">
-                    <span>{b.available}</span>
-                    {parseFloat(b.locked) > 0 && (
-                      <span className="text-muted-foreground ml-1">({t('locked', { amount: b.locked })})</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-4 text-sm text-muted-foreground">
-              {isRunning ? t('noBalances') : t('startToSeeData')}
-            </div>
-          )}
-        </div>
-
-        {/* Open Orders */}
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">{t('openOrders')} ({openOrders.length})</h2>
-          </div>
-          {openOrders.length > 0 ? (
-            <div className="divide-y max-h-80 overflow-y-auto">
-              {openOrders.map((order: BBGoOrder) => (
-                <div key={order.orderID} className="flex items-center justify-between px-4 py-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'text-xs font-medium rounded px-1.5 py-0.5',
-                      order.side === 'BUY' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    )}>
-                      {order.side}
-                    </span>
-                    <span>{order.symbol}</span>
-                    <span className="text-xs text-muted-foreground">{order.orderType}</span>
-                  </div>
-                  <div className="text-muted-foreground">
-                    {order.price} x {order.quantity}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-4 text-sm text-muted-foreground">
-              {isRunning ? t('noOpenOrders') : t('startToSeeData')}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Closed Orders */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold">{t('closedOrders')} ({closedOrders.length})</h2>
-        </div>
-        {closedOrders.length > 0 ? (
-          <div className="divide-y max-h-80 overflow-y-auto">
-            {closedOrders.map((order: BBGoOrder) => (
-              <div key={order.orderID} className="flex items-center justify-between px-4 py-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    'text-xs font-medium rounded px-1.5 py-0.5',
-                    order.side === 'BUY' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  )}>
-                    {order.side}
-                  </span>
-                  <span className="font-medium">{order.symbol}</span>
-                  <span className="text-xs text-muted-foreground">{order.orderType}</span>
-                </div>
-                <div className="flex items-center gap-4 text-muted-foreground">
-                  <span>{order.price} x {order.executedQuantity || order.quantity}</span>
-                  {order.status && (
-                    <span className={cn(
-                      'text-xs rounded px-1.5 py-0.5',
-                      order.status === 'Filled' ? 'bg-green-50 text-green-600' :
-                      order.status === 'Canceled' ? 'bg-gray-50 text-gray-500' :
-                      'bg-yellow-50 text-yellow-600'
-                    )}>
-                      {order.status}
-                    </span>
-                  )}
-                  {order.creationTime && (
-                    <span className="text-xs">{new Date(order.creationTime).toLocaleString()}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 text-sm text-muted-foreground">
-            {isRunning ? t('noClosedOrders') : t('startToSeeData')}
-          </div>
-        )}
-      </div>
-
-      {/* Trades */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold">{t('recentTrades')}</h2>
-        </div>
-        {trades.length > 0 ? (
-          <div className="divide-y max-h-80 overflow-y-auto">
-            {trades.map((trade: BBGoTrade) => (
-              <div key={trade.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                <div className="flex items-center gap-3">
-                  <span className={cn(
-                    'text-xs font-medium rounded px-1.5 py-0.5',
-                    trade.side === 'BUY' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  )}>
-                    {trade.side}
-                  </span>
-                  <span className="font-medium">{trade.symbol}</span>
-                  <span className="text-xs text-muted-foreground">{trade.exchange}</span>
-                  {trade.isMaker && (
-                    <span className="text-xs text-muted-foreground border rounded px-1">{t('maker')}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-4 text-muted-foreground">
-                  <span>{trade.price} x {trade.quantity}</span>
-                  {trade.quoteQuantity && parseFloat(trade.quoteQuantity) > 0 && (
-                    <span className="text-xs">${parseFloat(trade.quoteQuantity).toFixed(2)}</span>
-                  )}
-                  <span className="text-xs">{trade.fee} {trade.feeCurrency}</span>
-                  {trade.tradedAt && (
-                    <span className="text-xs">
-                      {new Date(trade.tradedAt).toLocaleString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 text-sm text-muted-foreground">
-            {isRunning ? t('noTrades') : t('startToSeeData')}
-          </div>
-        )}
-      </div>
-
-      {/* Strategies */}
-      {strategies.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold">{t('strategies')} ({strategies.length})</h2>
-            {liveStrategies.length > 0 && (
-              <span className="text-xs text-green-600">{t('activeCount', { count: liveStrategies.length })}</span>
+            ) : (
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {isRunning ? t('noBalances') : t('startToSeeData')}
+              </CardContent>
             )}
-          </div>
-          <div className="divide-y">
-            {strategies.map((s) => {
-              const liveState = liveStrategies.find((ls) => ls.strategy === s.strategy)
-              return (
-                <div key={s.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{s.name || s.strategy}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.exchange}{s.crossExchange ? ` (${t('crossExchange')})` : ''} · {s.strategy} · {t(`mode.${s.mode}`)}
-                      </p>
-                    </div>
-                    {isRunning && (
-                      <span className={cn(
-                        'text-xs font-medium rounded-full px-2 py-0.5',
-                        liveState ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                      )}>
-                        {liveState ? t('strategyStatus.running') : t('strategyStatus.idle')}
-                      </span>
-                    )}
-                  </div>
-                  {liveState && Object.keys(liveState).length > 1 && (
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                      {Object.entries(liveState)
-                        .filter(([k]) => k !== 'strategy')
-                        .slice(0, 6)
-                        .map(([key, val]) => (
-                          <span key={key} className="text-xs text-muted-foreground">
-                            {key}: <span className="text-foreground">{String(val)}</span>
-                          </span>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+          </Card>
+        </TabsContent>
 
-      {/* Container Logs */}
-      {isRunning && logsData?.logs && (
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">{t('containerLogs')}</h2>
-          </div>
-          <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[300px] overflow-y-auto p-4">
-            {logsData.logs.replace(/\x1b\[[0-9;]*m/g, '')}
-          </pre>
+        <TabsContent value="open-orders">
+          <Card className="rounded-xl">
+            {openOrders.length > 0 ? (
+              <div className="divide-y">
+                {openOrders.map((order: BBGoOrder) => (
+                  <OrderRow key={order.orderID} order={order} />
+                ))}
+              </div>
+            ) : (
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {isRunning ? t('noOpenOrders') : t('startToSeeData')}
+              </CardContent>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="closed-orders">
+          <Card className="rounded-xl">
+            {closedOrders.length > 0 ? (
+              <ScrollArea className="max-h-[400px]">
+                <div className="divide-y">
+                  {closedOrders.map((order: BBGoOrder) => (
+                    <OrderRow key={order.orderID} order={order} showStatus showTime />
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {isRunning ? t('noClosedOrders') : t('startToSeeData')}
+              </CardContent>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="trades">
+          <Card className="rounded-xl">
+            {trades.length > 0 ? (
+              <ScrollArea className="max-h-[400px]">
+                <div className="divide-y">
+                  {trades.map((trade: BBGoTrade) => (
+                    <div key={trade.id} className="flex items-center justify-between px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          'flex h-7 w-7 items-center justify-center rounded-full',
+                          trade.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'
+                        )}>
+                          {trade.side === 'BUY'
+                            ? <ArrowDownRight className="h-3.5 w-3.5 text-trade-up" />
+                            : <ArrowUpRight className="h-3.5 w-3.5 text-trade-down" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{trade.symbol}</span>
+                            <Badge variant="secondary" className="rounded-md text-[10px]">{trade.side}</Badge>
+                            {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">{t('maker')}</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{trade.exchange}</p>
+                        </div>
+                      </div>
+                      <div className="text-right space-y-0.5">
+                        <p className="text-sm font-mono">{trade.price} × {trade.quantity}</p>
+                        <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
+                          {trade.quoteQuantity && parseFloat(trade.quoteQuantity) > 0 && (
+                            <span>${parseFloat(trade.quoteQuantity).toFixed(2)}</span>
+                          )}
+                          <span>{trade.fee} {trade.feeCurrency}</span>
+                          {trade.tradedAt && <span>{new Date(trade.tradedAt).toLocaleString()}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {isRunning ? t('noTrades') : t('startToSeeData')}
+              </CardContent>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="strategies">
+          <Card className="rounded-xl">
+            {strategies.length > 0 ? (
+              <div className="divide-y">
+                {strategies.map((s) => {
+                  const liveState = liveStrategies.find((ls) => ls.strategy === s.strategy)
+                  return (
+                    <div key={s.id} className="px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                            <Bot className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{s.name || s.strategy}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {s.exchange}{s.crossExchange ? ` (${t('crossExchange')})` : ''} · {s.strategy} · {t(`mode.${s.mode}`)}
+                            </p>
+                          </div>
+                        </div>
+                        {isRunning && (
+                          <Badge
+                            variant={liveState ? 'default' : 'secondary'}
+                            className={cn('rounded-full text-[11px]', liveState && 'bg-trade-up text-white hover:bg-trade-up')}
+                          >
+                            {liveState ? t('strategyStatus.running') : t('strategyStatus.idle')}
+                          </Badge>
+                        )}
+                      </div>
+                      {liveState && Object.keys(liveState).length > 1 && (
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-11">
+                          {Object.entries(liveState)
+                            .filter(([k]) => k !== 'strategy')
+                            .slice(0, 6)
+                            .map(([key, val]) => (
+                              <span key={key} className="text-xs text-muted-foreground">
+                                {key}: <span className="text-foreground font-mono">{String(val)}</span>
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">{t('noStrategiesTab')}</CardContent>
+            )}
+          </Card>
+        </TabsContent>
+
+        {isRunning && (
+          <TabsContent value="logs">
+            <Card className="rounded-xl">
+              {logsData?.logs ? (
+                <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[400px] overflow-y-auto p-5 font-mono leading-relaxed">
+                  {logsData.logs.replace(/\x1b\[[0-9;]*m/g, '')}
+                </pre>
+              ) : (
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">{t('loadingLogs')}</CardContent>
+              )}
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
+    </div>
+  )
+}
+
+interface OrderRowProps {
+  order: BBGoOrder
+  showStatus?: boolean
+  showTime?: boolean
+}
+
+function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
+  return (
+    <div className="flex items-center justify-between px-6 py-3">
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          'flex h-7 w-7 items-center justify-center rounded-full',
+          order.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'
+        )}>
+          {order.side === 'BUY'
+            ? <ArrowDownRight className="h-3.5 w-3.5 text-trade-up" />
+            : <ArrowUpRight className="h-3.5 w-3.5 text-trade-down" />}
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{order.symbol}</span>
+          <Badge variant="secondary" className="rounded-md text-[10px]">{order.orderType}</Badge>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="text-sm text-muted-foreground font-mono">
+          {order.price} × {order.executedQuantity || order.quantity}
+        </span>
+        {showStatus && order.status && (
+          <Badge variant="outline" className={cn(
+            'rounded-full text-[10px]',
+            order.status === 'Filled' && 'border-trade-up/30 text-trade-up',
+            order.status === 'Canceled' && 'border-border text-muted-foreground'
+          )}>
+            {order.status}
+          </Badge>
+        )}
+        {showTime && order.creationTime && (
+          <span className="text-xs text-muted-foreground">{new Date(order.creationTime).toLocaleString()}</span>
+        )}
+      </div>
     </div>
   )
 }

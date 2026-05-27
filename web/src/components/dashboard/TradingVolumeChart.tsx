@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   BarChart,
   Bar,
@@ -26,12 +27,8 @@ interface TradingVolumeChartProps {
   volumes: TradingVolumeEntry[]
 }
 
-const PERIODS = [
-  { key: '7d', label: '7D' },
-  { key: '30d', label: '30D' },
-  { key: 'month', label: 'Month' },
-  { key: 'year', label: 'Year' },
-] as const
+const PERIOD_KEYS = ['period7d', 'period30d', 'periodMonth', 'periodYear'] as const
+const PERIOD_VALUES = ['7d', '30d', 'month', 'year'] as const
 
 function formatLabel(entry: TradingVolumeEntry, period: string): string {
   if (period === 'year') return String(entry.year)
@@ -53,12 +50,13 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function TradingVolumeChart({ volumes }: TradingVolumeChartProps) {
+  const t = useTranslations('Dashboard')
   const [period, setPeriod] = useState('7d')
 
   if (!volumes || volumes.length === 0) {
     return (
       <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
-        No trading volume data
+        {t('noVolumeData')}
       </div>
     )
   }
@@ -71,20 +69,23 @@ export function TradingVolumeChart({ volumes }: TradingVolumeChartProps) {
   return (
     <div>
       <div className="flex gap-1 mb-4">
-        {PERIODS.map((p) => (
-          <button
-            key={p.key}
-            onClick={() => setPeriod(p.key)}
-            className={cn(
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              period === p.key
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
+        {PERIOD_KEYS.map((key, i) => {
+          const value = PERIOD_VALUES[i]!
+          return (
+            <button
+              key={value}
+              onClick={() => setPeriod(value)}
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                period === value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              {t(key)}
+            </button>
+          )
+        })}
       </div>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={chartData}>

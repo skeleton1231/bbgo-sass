@@ -26,6 +26,7 @@ import {
   fetchContainerLogs,
   fetchBotPnL,
   fetchMarketSymbols,
+  fetchMarketKlines,
   type TradingVolumeEntry,
   type StrategyEntry,
   type UserContainer,
@@ -40,6 +41,8 @@ import {
   type BBGoAsset,
   type BBGoStrategyState,
   type PnLReport,
+  type MarketTicker,
+  fetchMarketTicker,
 } from './manager'
 
 // --- Strategy & container queries ---
@@ -184,6 +187,24 @@ export function useMarketSymbols(exchange: string) {
     queryFn: () => fetchMarketSymbols(exchange),
     enabled: !!exchange,
     staleTime: 5 * 60_000,
+  })
+}
+
+export function useMarketTicker(exchange: string, symbol: string) {
+  return useQuery<{ ticker: MarketTicker }>({
+    queryKey: ['market-ticker', exchange, symbol],
+    queryFn: () => fetchMarketTicker(exchange, symbol),
+    enabled: !!exchange && !!symbol,
+    staleTime: 30_000,
+  })
+}
+
+export function useMarketKlines(exchange: string, symbol: string, interval?: string) {
+  return useQuery<{ klines: Array<{ time: number; open: string; high: string; low: string; close: string; volume: string; closed: boolean }> }>({
+    queryKey: ['market-klines', exchange, symbol, interval],
+    queryFn: () => fetchMarketKlines(exchange, symbol, interval),
+    enabled: !!exchange && !!symbol,
+    staleTime: 60_000,
   })
 }
 

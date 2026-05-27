@@ -57,7 +57,14 @@
     "loading": "로딩 중...",
     "assetAllocation": "자산 배분",
     "tradingVolume": "거래량",
-    "pnlSummary": "손익 요약"
+    "pnlSummary": "손익 요약",
+    "noAssetData": "자산 데이터 없음",
+    "noVolumeData": "거래량 데이터 없음",
+    "other": "기타",
+    "period7d": "7일",
+    "period30d": "30일",
+    "periodMonth": "월",
+    "periodYear": "연"
   },
   "Bots": {
     "title": "트레이딩 봇",
@@ -117,6 +124,8 @@
     "noCredsForExchange": "{exchange} API 자격 증명이 설정되지 않았습니다. 설정에서 먼저 추가하세요.",
     "noCredsForRole": "{role} ({exchange}) API 자격 증명이 설정되지 않았습니다.",
     "containerLogs": "컨테이너 로그",
+    "loadingLogs": "로그 로딩 중...",
+    "noStrategiesTab": "전략 없음",
     "pnl": {
       "realized": "실현 손익",
       "totalFees": "총 수수료",
@@ -211,5 +220,17 @@
   "Common": {
     "pageNotFound": "페이지를 찾을 수 없습니다.",
     "goHome": "홈으로"
+  },
+  "Categories": {
+    "grid": "그리드",
+    "maker": "마켓 메이커",
+    "trend": "트렌드 추종",
+    "mean-reversion": "평균 회귀",
+    "dca": "DCA",
+    "volatility": "변동성",
+    "indicator": "인디케이터",
+    "cross-exchange": "크로스 거래소",
+    "utility": "유틸리티",
+    "other": "기타"
   }
 }

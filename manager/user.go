@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -54,7 +55,13 @@ var liveOnlyStrategies = map[string]bool{
 
 // legacyFieldAliases maps strategy IDs to old→new field renames.
 var legacyFieldAliases = map[string]map[string]string{
-	"dca": {"interval": "investmentInterval"},
+	"dca":         {"interval": "investmentInterval"},
+	"fixedmaker":  {"spread": "halfSpread", "minProfitSpread": ""},
+	"xfixedmaker": {"spread": "halfSpread"},
+	"wall":        {"spread": "layerSpread"},
+	"autobuy":     {"interval": "schedule", "buyQuantity": "quantity"},
+	"rebalance":   {"interval": "schedule"},
+	"drift":       {"drawGraph": "generateGraph"},
 }
 
 // normalizeStrategyConfig fixes old strategy IDs and field names from legacy DB records.
@@ -335,8 +342,6 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	prefix := exchangeEnvPrefix(exchange)
 	delete(allParams, "exchange")
 
-	strategy, allParams = normalizeStrategyConfig(strategy, allParams)
-
 	symbol := overrideSymbol
 	if symbol == "" {
 		if v, ok := allParams["symbol"].(string); ok && v != "" {
@@ -349,10 +354,9 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	// Ensure symbol is in the strategy config for bbgo dependency injection
 	allParams["symbol"] = symbol
 
-	// Ensure interval is set for strategies that require kline subscriptions
-	if _, ok := allParams["interval"]; !ok {
-		allParams["interval"] = "1h"
-	}
+	// Interval comes from the frontend when the strategy needs it.
+	// Do not force a default — strategies without interval (grid, flashcrash)
+	// should not have one injected.
 
 	btCfg := struct {
 		Exchange map[string]struct {
@@ -406,12 +410,47 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 			Accounts: map[string]struct {
 				Balances map[string]string `yaml:"balances"`
 			}{
-				exchange: {Balances: map[string]string{"USDT": "10000", "BTC": "0.1"}},
+				exchange: {Balances: backtestBalances(symbol)},
 			},
 		},
 	}
 
 	return yaml.Marshal(btCfg)
+}
+
+var commonQuoteCurrencies = []string{"USDT", "BUSD", "USDC", "TUSD", "FDUSD", "BTC", "ETH", "BNB"}
+
+func extractQuoteCurrency(symbol string) string {
+	for _, q := range commonQuoteCurrencies {
+		if strings.HasSuffix(symbol, q) {
+			return q
+		}
+	}
+	return "USDT"
+}
+
+func backtestBalances(symbol string) map[string]string {
+	quote := extractQuoteCurrency(symbol)
+	return map[string]string{quote: "10000"}
+}
+
+func filterTradingPairs(symbols []string) []string {
+	filtered := make([]string, 0, len(symbols))
+	for _, s := range symbols {
+		if isValidTradingPair(s) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+func isValidTradingPair(symbol string) bool {
+	for _, q := range commonQuoteCurrencies {
+		if strings.HasSuffix(symbol, q) && len(symbol) > len(q) {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneUserContainer(uc *UserContainer) *UserContainer {

@@ -57,7 +57,22 @@
     "loading": "Loading...",
     "assetAllocation": "Asset Allocation",
     "tradingVolume": "Trading Volume",
-    "pnlSummary": "P&L Summary"
+    "pnlSummary": "P&L Summary",
+    "noAssetData": "No asset data available",
+    "noVolumeData": "No trading volume data",
+    "other": "Other",
+    "period7d": "7D",
+    "period30d": "30D",
+    "periodMonth": "Month",
+    "periodYear": "Year",
+    "pnlChart": "Daily P&L",
+    "equityCurve": "Equity Curve",
+    "noPnlData": "No P&L data yet",
+    "noEquityData": "No equity data yet",
+    "backtestEquityCurve": "Equity Curve",
+    "backtestMetrics": "Performance Metrics",
+    "totalReturn": "Total Return",
+    "maxDrawdown": "Max Drawdown"
   },
   "Bots": {
     "title": "Trading Bots",
@@ -120,6 +135,8 @@
     "noCredsForRole": "No API credentials for {role} ({exchange}).",
     "liveOnlyHint": "This strategy requires live mode.",
     "containerLogs": "Container Logs",
+    "loadingLogs": "Loading logs...",
+    "noStrategiesTab": "No strategies",
     "pnl": {
       "realized": "Realized P&L",
       "totalFees": "Total Fees",
@@ -135,7 +152,11 @@
       "connected": "Live",
       "connecting": "Connecting...",
       "disconnected": "Offline"
-    }
+    },
+    "chart": "Chart",
+    "depth": "Depth",
+    "orderBook": "Order Book",
+    "noSymbolForChart": "No symbol configured for chart display"
   },
   "Backtest": {
     "title": "Backtest",
@@ -215,5 +236,17 @@
   "Common": {
     "pageNotFound": "This page could not be found.",
     "goHome": "Go Home"
+  },
+  "Categories": {
+    "grid": "Grid",
+    "maker": "Market Maker",
+    "trend": "Trend Following",
+    "mean-reversion": "Mean Reversion",
+    "dca": "DCA",
+    "volatility": "Volatility",
+    "indicator": "Indicator",
+    "cross-exchange": "Cross-Exchange",
+    "utility": "Utility",
+    "other": "Other"
   }
 }

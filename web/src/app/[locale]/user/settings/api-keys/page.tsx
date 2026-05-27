@@ -6,8 +6,8 @@ import { ApiKeyList } from '@/components/user/ApiKeyList'
 export default function ApiKeysPage() {
   const t = useTranslations('Settings.apiKeys')
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">{t('title')}</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       <ApiKeyList />
     </div>
   )

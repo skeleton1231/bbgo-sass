@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	pb "github.com/c9s/bbgo/saas/manager/pb"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -63,8 +65,10 @@ func (api *API) Close() {
 func (api *API) RegisterRoutes(r chi.Router) {
 	r.Get("/api/health", api.Health)
 
-	// Market data endpoints (Manager → marketdata REST API)
+	// Market data endpoints (Manager → marketdata REST/gRPC API)
 	r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
+	r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
+// TODO: 	r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
 
 	// State-changing endpoints with per-user rate limiting
 	r.Route("/", func(r chi.Router) {
@@ -888,7 +892,7 @@ func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": symbols})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
 }
 
 func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
@@ -904,7 +908,120 @@ func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": symbols})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
+}
+
+func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
+	exchange := chi.URLParam(r, "exchange")
+	symbol := r.URL.Query().Get("symbol")
+	if exchange == "" || symbol == "" {
+		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
+		return
+	}
+	if api.hub == nil || api.hub.conn == nil {
+		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	client := pb.NewMarketDataQueryClient(api.hub.conn)
+	resp, err := client.QueryTicker(ctx, &pb.QueryTickerRequest{Exchange: exchange, Symbol: symbol})
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("query ticker: %s", err))
+		return
+	}
+	if resp.Error != nil {
+		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
+		return
+	}
+	if resp.Ticker == nil {
+		writeError(w, http.StatusNotFound, "ticker not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"ticker": map[string]interface{}{
+			"symbol":  resp.Ticker.Symbol,
+			"open":    resp.Ticker.Open,
+			"high":    resp.Ticker.High,
+			"low":     resp.Ticker.Low,
+			"close":   resp.Ticker.Close,
+			"volume":  resp.Ticker.Volume,
+		},
+	})
+}
+
+func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
+	exchange := chi.URLParam(r, "exchange")
+	symbol := r.URL.Query().Get("symbol")
+	if exchange == "" || symbol == "" {
+		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
+		return
+	}
+	if api.hub == nil || api.hub.conn == nil {
+		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
+		return
+	}
+
+	interval := r.URL.Query().Get("interval")
+	if interval == "" {
+		interval = "1h"
+	}
+	limitStr := r.URL.Query().Get("limit")
+	limit := int64(500)
+	if limitStr != "" {
+		if l, err := strconv.ParseInt(limitStr, 10, 64); err == nil && l > 0 && l <= 1500 {
+			limit = l
+		}
+	}
+	startTimeStr := r.URL.Query().Get("start_time")
+	endTimeStr := r.URL.Query().Get("end_time")
+	var startTime, endTime int64
+	if startTimeStr != "" {
+		if t, err := strconv.ParseInt(startTimeStr, 10, 64); err == nil {
+			startTime = t
+		}
+	}
+	if endTimeStr != "" {
+		if t, err := strconv.ParseInt(endTimeStr, 10, 64); err == nil {
+			endTime = t
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	client := pb.NewMarketDataQueryClient(api.hub.conn)
+	resp, err := client.QueryKLines(ctx, &pb.QueryKLinesRequest{
+		Exchange:  exchange,
+		Symbol:    symbol,
+		Interval:  interval,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Limit:     limit,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("query klines: %s", err))
+		return
+	}
+	if resp.Error != nil {
+		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
+		return
+	}
+
+	klines := make([]map[string]interface{}, 0, len(resp.Klines))
+	for _, k := range resp.Klines {
+		klines = append(klines, map[string]interface{}{
+			"time":        k.StartTime,
+			"open":        k.Open,
+			"high":        k.High,
+			"low":         k.Low,
+			"close":       k.Close,
+			"volume":      k.Volume,
+			"quoteVolume": k.QuoteVolume,
+			"closed":      k.Closed,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"klines": klines})
 }
 
 func (api *API) BBGoAssets(w http.ResponseWriter, r *http.Request) {
@@ -1337,3 +1454,4 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
 	return false
 }
+

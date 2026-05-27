@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, type SessionRole } from '@/lib/bbgo/strategies'
-import { EXCHANGES, CATEGORY_LABELS } from '@/lib/bbgo/constants'
+import { EXCHANGES } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
 
 const ENV_PREFIXES: Record<string, string> = {
@@ -20,6 +20,7 @@ const ENV_PREFIXES: Record<string, string> = {
 
 export function CreateStrategyDialog({ userId, onClose }: { userId: string; onClose: () => void }) {
   const t = useTranslations('Bots')
+  const ct = useTranslations('Categories')
   const createStrategy = useCreateStrategy()
   const { data: credentials } = useCredentials(userId)
   const hasExchangeCreds = (ex: string) => (credentials ?? []).some(c => c.exchange === ex)
@@ -135,7 +136,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             {Object.entries(strategiesByCategory).map(([cat, items]) => (
-              <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
+              <optgroup key={cat} label={ct(cat)}>
                 {items.map((s) => (
                   <option key={s.id} value={s.id}>{s.label}</option>
                 ))}

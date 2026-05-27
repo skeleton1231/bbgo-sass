@@ -75,20 +75,23 @@ export async function updateSession(request: NextRequest, response: NextResponse
     }
   )
 
-  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] | null = null
-  try {
-    const { data } = await supabase.auth.getUser()
-    user = data?.user ?? null
-  } catch {
-    return reply
-  }
-
   const pathname = request.nextUrl.pathname
   const barePath = stripLocale(pathname)
   const locale = detectLocale(pathname)
 
   const isProtectedRoute = barePath.startsWith(USER_PATH)
   const isAuthRoute = barePath === LOGIN_PATH || barePath === SIGNUP_PATH
+
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] | null = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data?.user ?? null
+  } catch {
+    if (isProtectedRoute) {
+      return redirectWithCookies(request, reply, LOGIN_PATH, locale)
+    }
+    return reply
+  }
 
   if (isProtectedRoute && !user) {
     return redirectWithCookies(request, reply, LOGIN_PATH, locale)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Link } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import {
   useUserStrategies,
@@ -14,13 +14,27 @@ import {
   type BBGoAsset,
 } from '@/lib/bbgo/queries'
 import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AssetAllocationChart } from '@/components/dashboard/AssetAllocationChart'
 import { TradingVolumeChart } from '@/components/dashboard/TradingVolumeChart'
 import { PnlSummary } from '@/components/dashboard/PnlSummary'
+import {
+  Activity,
+  BarChart3,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Bot,
+  Plus,
+} from 'lucide-react'
 
 export default function DashboardPage() {
   const t = useTranslations('Dashboard')
   const bt = useTranslations('Bots')
+  const router = useRouter()
   const [userId, setUserId] = useState('')
 
   useEffect(() => {
@@ -28,10 +42,14 @@ export default function DashboardPage() {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
       const { data: userData } = await supabase.auth.getUser()
-      if (userData.user) setUserId(userData.user.id)
+      if (userData.user) {
+        setUserId(userData.user.id)
+      } else {
+        router.push('/login')
+      }
     }
     load()
-  }, [])
+  }, [router])
 
   const { data: userContainer } = useUserStrategies(userId)
   const isActive = userContainer?.status === 'running'
@@ -51,136 +69,223 @@ export default function DashboardPage() {
     return sum + parseFloat(a.netAssetInUSD || '0')
   }, 0)
 
+  if (!userId) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-[104px] rounded-xl" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t('title')}</h1>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isActive
+            ? t('strategyCount', { count: strategyCount })
+            : t('noStrategies')}
+        </p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-sm text-muted-foreground">{t('activeBots')}</p>
-          <p className="text-2xl font-bold mt-1">
-            {isActive ? 1 : 0}
-            <span className="text-base font-normal text-muted-foreground"> / {t('strategyCount', { count: strategyCount })}</span>
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-sm text-muted-foreground">{t('sessions')}</p>
-          <p className="text-2xl font-bold mt-1">{sessionCount}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-sm text-muted-foreground">{t('recentTrades')}</p>
-          <p className="text-2xl font-bold mt-1">{trades.length}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-sm text-muted-foreground">{t('portfolioValue')}</p>
-          <p className="text-2xl font-bold mt-1">
-            {isActive && totalValue > 0
-              ? `$${totalValue.toFixed(2)}`
-              : '--'}
-          </p>
-        </div>
+        <Card className="rounded-xl">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-medium text-muted-foreground">{t('activeBots')}</p>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Bot className="h-4 w-4 text-primary" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-semibold">{isActive ? 1 : 0}</span>
+              <span className="text-sm text-muted-foreground">/ {strategyCount}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-medium text-muted-foreground">{t('sessions')}</p>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-2/10">
+                <Activity className="h-4 w-4 text-chart-2" />
+              </div>
+            </div>
+            <p className="mt-3 text-2xl font-semibold font-mono">{sessionCount}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-medium text-muted-foreground">{t('recentTrades')}</p>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-3/10">
+                <BarChart3 className="h-4 w-4 text-chart-3" />
+              </div>
+            </div>
+            <p className="mt-3 text-2xl font-semibold font-mono">{trades.length}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-medium text-muted-foreground">{t('portfolioValue')}</p>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Wallet className="h-4 w-4 text-primary" />
+              </div>
+            </div>
+            <p className="mt-3 text-2xl font-semibold font-mono">
+              {isActive && totalValue > 0
+                ? `$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : '—'}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {isActive && (
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="font-semibold mb-3">Asset Allocation</h2>
-            <AssetAllocationChart assets={assets} />
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="font-semibold mb-3">Trading Volume</h2>
-            <TradingVolumeChart volumes={volumeData?.tradingVolumes ?? []} />
-          </div>
+          <Card className="rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{t('assetAllocation')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AssetAllocationChart assets={assets} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{t('tradingVolume')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TradingVolumeChart volumes={volumeData?.tradingVolumes ?? []} />
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {isActive && pnlData && pnlData.totalTrades > 0 && (
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="font-semibold mb-3">P&L Summary</h2>
-          <PnlSummary report={pnlData} />
-        </div>
+        <Card className="rounded-xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('pnlSummary')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PnlSummary report={pnlData} />
+          </CardContent>
+        </Card>
       )}
 
       {isActive && strategyCount > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold">{t('strategies')}</h2>
-            <Link href="/user/bots" className="text-sm text-primary hover:underline">
-              {t('manage')}
+        <Card className="rounded-xl">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-sm font-medium">{t('strategies')}</CardTitle>
+            <Link href="/user/bots">
+              <Button variant="ghost" size="sm" className="text-xs text-primary">
+                {t('manage')} <ArrowUpRight className="ml-1 h-3 w-3" />
+              </Button>
             </Link>
-          </div>
+          </CardHeader>
           <div className="divide-y">
             {userContainer!.strategies.map((s) => (
-              <div key={s.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">{s.name || s.strategy}</p>
-                  <p className="text-xs text-muted-foreground">{s.exchange} · {s.strategy} · {bt(`mode.${s.mode}`)}</p>
+              <div key={s.id} className="flex items-center justify-between px-6 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                    <Bot className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{s.name || s.strategy}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.exchange} · {s.strategy} · {bt(`mode.${s.mode}`)}
+                    </p>
+                  </div>
                 </div>
-                <span className={cn(
-                  'text-xs font-medium rounded-full px-2 py-0.5',
-                  isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                )}>
+                <Badge
+                  variant={isActive ? 'default' : 'secondary'}
+                  className={cn(
+                    'rounded-full text-[11px] font-medium',
+                    isActive && 'bg-trade-up text-white hover:bg-trade-up'
+                  )}
+                >
                   {isActive ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
-                </span>
+                </Badge>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {trades.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">{t('recentTrades')}</h2>
-          </div>
+        <Card className="rounded-xl">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-sm font-medium">{t('recentTrades')}</CardTitle>
+            <Link href={`/user/bots/${userId}`}>
+              <Button variant="ghost" size="sm" className="text-xs text-primary">
+                {t('viewAll')} <ArrowUpRight className="ml-1 h-3 w-3" />
+              </Button>
+            </Link>
+          </CardHeader>
           <div className="divide-y">
             {trades.slice(0, 10).map((trade: BBGoTrade) => (
-              <div key={trade.id} className="flex items-center justify-between px-4 py-3">
+              <div key={trade.id} className="flex items-center justify-between px-6 py-3">
                 <div className="flex items-center gap-3">
-                  <span
+                  <div
                     className={cn(
-                      'text-xs font-medium rounded px-1.5 py-0.5',
-                      trade.side === 'BUY' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      'flex h-7 w-7 items-center justify-center rounded-full',
+                      trade.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'
                     )}
                   >
-                    {trade.side}
-                  </span>
-                  <span className="text-sm font-medium">{trade.symbol}</span>
-                  <span className="text-xs text-muted-foreground">{trade.exchange}</span>
+                    {trade.side === 'BUY' ? (
+                      <ArrowDownRight className="h-3.5 w-3.5 text-trade-up" />
+                    ) : (
+                      <ArrowUpRight className="h-3.5 w-3.5 text-trade-down" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{trade.symbol}</span>
+                      <Badge variant="secondary" className="rounded-md text-[10px] font-medium">
+                        {trade.side}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{trade.exchange}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>{trade.price} x {trade.quantity}</span>
+                <div className="text-right">
+                  <p className="text-sm font-medium font-mono">
+                    {trade.price} × {trade.quantity}
+                  </p>
                   {trade.tradedAt && (
-                    <span className="text-xs">{new Date(trade.tradedAt).toLocaleString()}</span>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(trade.tradedAt).toLocaleString()}
+                    </p>
                   )}
                 </div>
               </div>
             ))}
           </div>
-          <div className="p-3 border-t text-center">
-            <Link href={`/user/bots/${userId}`} className="text-sm text-primary hover:underline">
-              {t('viewAll')}
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {!userId && (
-        <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
-          {t('loading')}
-        </div>
+        </Card>
       )}
 
       {userId && !isActive && strategyCount === 0 && (
-        <div className="rounded-lg border bg-card p-8 text-center">
-          <p className="text-muted-foreground mb-4">{t('noStrategies')}</p>
-          <Link
-            href="/user/bots"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            {t('createStrategy')}
-          </Link>
-        </div>
+        <Card className="rounded-xl">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+              <Plus className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">{t('noStrategies')}</p>
+            <Link href="/user/bots">
+              <Button className="rounded-full px-6">{t('createStrategy')}</Button>
+            </Link>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

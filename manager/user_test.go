@@ -191,9 +191,9 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 		{
 			name:      "symbol_from_config_when_override_empty",
 			strategy:  "dca",
-			config:    `{"symbol":"ETHUSDT","interval":"1h"}`,
+			config:    `{"symbol":"ETHUSDT","investmentInterval":"1h"}`,
 			symbol:    "",
-			wantInYAML: []string{"dca:", "ETHUSDT", "interval:"},
+			wantInYAML: []string{"dca:", "ETHUSDT", "investmentInterval:"},
 		},
 		{
 			name:      "override_symbol_takes_priority",
@@ -235,10 +235,10 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "interval_default_added_when_missing",
-			strategy:  "grid2",
-			config:    `{"symbol":"BTCUSDT"}`,
-			wantInYAML: []string{"interval: 1h"},
+			name:       "interval_not_injected_when_missing",
+			strategy:   "grid2",
+			config:     `{"symbol":"BTCUSDT"}`,
+			wantInYAML: []string{"grid2:"},
 		},
 		{
 			name:      "interval_preserved_when_set",
@@ -321,10 +321,6 @@ func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 		{"irr", `{"symbol":"BTCUSDT"}`},
 		{"schedule", `{"symbol":"BTCUSDT"}`},
 		{"techsignal", `{"symbol":"BTCUSDT","interval":"1h"}`},
-		// Strategies that get aliased via normalizeStrategyConfig
-		{"sentinel_anomaly", `{"symbol":"BTCUSDT"}`},
-		{"autobuy_scheduled", `{"symbol":"BTCUSDT","interval":"1h"}`},
-		{"rebalance_portfolio", `{"symbol":"BTCUSDT"}`},
 	}
 
 	for _, ex := range allExchanges {
@@ -345,13 +341,9 @@ func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 				if !strings.Contains(s, allPrefixes[ex]) {
 					t.Errorf("missing env prefix %q", allPrefixes[ex])
 				}
-				// Must contain the strategy key (after normalization)
-				normalID := st.id
-				if alias, ok := legacyStrategyAliases[st.id]; ok {
-					normalID = alias
-				}
-				if !strings.Contains(s, normalID+":") {
-					t.Errorf("missing strategy %q section (input: %q)", normalID, st.id)
+				// Must contain the strategy key
+				if !strings.Contains(s, st.id+":") {
+					t.Errorf("missing strategy %q section", st.id)
 				}
 				// Must contain symbol
 				if !strings.Contains(s, "BTCUSDT") {
@@ -374,36 +366,52 @@ func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 	}
 }
 
-// TestBuildBacktestYAML_LegacyAliases verifies old frontend IDs are normalized.
-func TestBuildBacktestYAML_LegacyAliases(t *testing.T) {
+func TestIsValidTradingPair(t *testing.T) {
 	tests := []struct {
-		oldID    string
-		expected string
-		config   string
+		symbol string
+		want   bool
 	}{
-		// Frontend IDs normalize to bbgo registered IDs
-		{"sentinel_anomaly", "sentinel", `{"symbol":"BTCUSDT"}`},
-		{"autobuy_scheduled", "autobuy", `{"symbol":"BTCUSDT"}`},
-		{"rebalance_portfolio", "rebalance", `{"symbol":"BTCUSDT"}`},
-		// Already-normalized bbgo IDs pass through unchanged
-		{"sentinel", "sentinel", `{"symbol":"BTCUSDT"}`},
-		{"autobuy", "autobuy", `{"symbol":"BTCUSDT"}`},
+		{"BTCUSDT", true},
+		{"ETHBTC", true},
+		{"BNBBUSD", true},
+		{"SOLUSDC", true},
+		{"XRPFDUSD", true},
+		{"BTCETH", true},
+		{"DOGEUSDT", true},
+		{"BTGETH", true},
+		{"FORUSDT", true},
+		{"USDT", false},
+		{"BTC", false},
+		{"", false},
+		{"123ABC", false},
+		{"BINANCE-PERP", false},
+		{"BTCTWD", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.oldID, func(t *testing.T) {
-			yaml, err := buildBacktestYAML(tt.oldID, []byte(tt.config), "2024-01-01", "2024-03-01", "binance", "BTCUSDT")
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			s := string(yaml)
-			// After normalization, the YAML should contain the canonical strategy name
-			if !strings.Contains(s, tt.expected+":") {
-				t.Errorf("expected normalized strategy %q in YAML, got:\n%s", tt.expected, s)
+		t.Run(tt.symbol, func(t *testing.T) {
+			if got := isValidTradingPair(tt.symbol); got != tt.want {
+				t.Errorf("isValidTradingPair(%q) = %v, want %v", tt.symbol, got, tt.want)
 			}
 		})
 	}
 }
+
+func TestFilterTradingPairs(t *testing.T) {
+	input := []string{"BTCUSDT", "BTGETH", "FORUSDT", "123ABC", "ETHBTC", "USDT", "DOGEUSDT", "BINANCE-PERP", "SOLUSDC"}
+	filtered := filterTradingPairs(input)
+
+	want := []string{"BTCUSDT", "BTGETH", "FORUSDT", "ETHBTC", "DOGEUSDT", "SOLUSDC"}
+	if len(filtered) != len(want) {
+		t.Fatalf("expected %d symbols, got %d: %v", len(want), len(filtered), filtered)
+	}
+	for i, s := range want {
+		if filtered[i] != s {
+			t.Errorf("filtered[%d] = %q, want %q", i, filtered[i], s)
+		}
+	}
+}
+
 
 // TestBuildBacktestYAML_AllExchangesValidConfig verifies SyncBacktest config for all exchanges.
 func TestBuildSyncConfig_AllExchanges(t *testing.T) {

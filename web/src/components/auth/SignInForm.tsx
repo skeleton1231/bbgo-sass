@@ -3,6 +3,10 @@
 import { useActionState } from 'react'
 import { useTranslations } from 'next-intl'
 import { signInAction } from '@/actions/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Link } from '@/i18n/navigation'
 
 export function SignInForm() {
   const t = useTranslations('Auth')
@@ -10,45 +14,60 @@ export function SignInForm() {
 
   return (
     <form action={formAction} className="space-y-4">
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1">
-          {t('email')}
-        </label>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="email">{t('email')}</Label>
+        <Input
           id="email"
           name="email"
           type="email"
+          autoComplete="email"
           required
           placeholder={t('emailPlaceholder')}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="h-11 rounded-lg"
         />
       </div>
 
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium mb-1">
-          {t('password')}
-        </label>
-        <input
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">{t('password')}</Label>
+          <Link
+            href="/forgot-password"
+            className="text-xs text-primary hover:underline"
+          >
+            {t('forgotPassword')}
+          </Link>
+        </div>
+        <Input
           id="password"
           name="password"
           type="password"
+          autoComplete="current-password"
           required
           minLength={6}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="h-11 rounded-lg"
         />
       </div>
 
       {state?.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
+        <div className="rounded-lg bg-destructive/10 px-3 py-2">
+          <p className="text-sm text-destructive">{state.error}</p>
+        </div>
       )}
 
-      <button
+      <Button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        className="w-full rounded-full h-11"
       >
         {isPending ? t('loggingIn') : t('login')}
-      </button>
+      </Button>
+
+      <p className="text-center text-sm text-muted-foreground">
+        {t('noAccount')}{' '}
+        <Link href="/signup" className="text-primary hover:underline font-medium">
+          {t('signUp')}
+        </Link>
+      </p>
     </form>
   )
 }
