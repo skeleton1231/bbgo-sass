@@ -1,26 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { StrategyList } from '@/components/user/StrategyList'
 import { CreateStrategyDialog } from '@/components/user/CreateStrategyDialog'
+import { useUserId } from '@/components/providers/user-id'
 
 export default function BotsPage() {
   const t = useTranslations('Bots')
+  const userId = useUserId()
   const [showCreate, setShowCreate] = useState(false)
-  const [userId, setUserId] = useState('')
-
-  useEffect(() => {
-    const loadUser = async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase.auth.getUser()
-      if (data.user) setUserId(data.user.id)
-    }
-    loadUser()
-  }, [])
 
   return (
     <div className="space-y-6">

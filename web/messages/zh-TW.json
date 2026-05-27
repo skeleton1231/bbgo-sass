@@ -64,7 +64,15 @@
     "period7d": "7天",
     "period30d": "30天",
     "periodMonth": "月",
-    "periodYear": "年"
+    "periodYear": "年",
+    "pnlChart": "每日盈虧",
+    "equityCurve": "權益曲線",
+    "noPnlData": "暫無盈虧資料",
+    "noEquityData": "暫無權益資料",
+    "backtestEquityCurve": "權益曲線",
+    "backtestMetrics": "績效指標",
+    "totalReturn": "總報酬率",
+    "maxDrawdown": "最大回撤"
   },
   "Bots": {
     "title": "交易機器人",
@@ -126,6 +134,10 @@
     "containerLogs": "容器日誌",
     "loadingLogs": "載入日誌...",
     "noStrategiesTab": "暫無策略",
+    "chart": "圖表",
+    "depth": "深度",
+    "orderBook": "訂單簿",
+    "noSymbolForChart": "未設定圖表顯示的交易對",
     "pnl": {
       "realized": "已實現盈虧",
       "totalFees": "總手續費",

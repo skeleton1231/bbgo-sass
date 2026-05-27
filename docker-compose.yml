@@ -29,8 +29,8 @@ services:
       context: ..
       dockerfile: saas/docker/Dockerfile.manager
     container_name: bbgo-manager
-    expose:
-      - "8090"
+    ports:
+      - "8090:8090"
     volumes:
       - bbgo-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -72,7 +72,7 @@ services:
       context: ../saas/web
       dockerfile: Dockerfile
     container_name: bbgo-web
-    expose:
+    ports:
       - "3000"
     environment:
       - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}

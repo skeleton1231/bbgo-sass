@@ -64,7 +64,15 @@
     "period7d": "7日",
     "period30d": "30日",
     "periodMonth": "月",
-    "periodYear": "年"
+    "periodYear": "年",
+    "pnlChart": "日次損益",
+    "equityCurve": "エクイティカーブ",
+    "noPnlData": "損益データなし",
+    "noEquityData": "エクイティデータなし",
+    "backtestEquityCurve": "エクイティカーブ",
+    "backtestMetrics": "パフォーマンス指標",
+    "totalReturn": "総リターン",
+    "maxDrawdown": "最大ドローダウン"
   },
   "Bots": {
     "title": "トレードボット",
@@ -126,6 +134,10 @@
     "containerLogs": "コンテナログ",
     "loadingLogs": "ログを読み込み中...",
     "noStrategiesTab": "ストラテジーなし",
+    "chart": "チャート",
+    "depth": "板",
+    "orderBook": "オーダーブック",
+    "noSymbolForChart": "チャート表示のシンボルが設定されていません",
     "pnl": {
       "realized": "実現損益",
       "totalFees": "合計手数料",

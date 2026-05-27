@@ -64,7 +64,15 @@
     "period7d": "7일",
     "period30d": "30일",
     "periodMonth": "월",
-    "periodYear": "연"
+    "periodYear": "연",
+    "pnlChart": "일일 손익",
+    "equityCurve": "에퀴티 커브",
+    "noPnlData": "손익 데이터 없음",
+    "noEquityData": "에퀴티 데이터 없음",
+    "backtestEquityCurve": "에퀴티 커브",
+    "backtestMetrics": "성과 지표",
+    "totalReturn": "총 수익률",
+    "maxDrawdown": "최대 낙폭"
   },
   "Bots": {
     "title": "트레이딩 봇",
@@ -126,6 +134,10 @@
     "containerLogs": "컨테이너 로그",
     "loadingLogs": "로그 로딩 중...",
     "noStrategiesTab": "전략 없음",
+    "chart": "차트",
+    "depth": "호가",
+    "orderBook": "오더북",
+    "noSymbolForChart": "차트 표시를 위한 심볼이 설정되지 않았습니다",
     "pnl": {
       "realized": "실현 손익",
       "totalFees": "총 수수료",

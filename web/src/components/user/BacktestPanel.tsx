@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
 import type { BacktestJob } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory } from '@/lib/bbgo/strategies'
 import { EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
+import { BacktestEquityChart } from '@/components/backtest/BacktestEquityChart'
+
+const QUOTE_CURRENCIES = ['USDT', 'BUSD', 'USDC', 'TUSD', 'FDUSD', 'BTC', 'ETH', 'BNB']
+
+function isValidTradingPair(symbol: string): boolean {
+  return QUOTE_CURRENCIES.some((q) => symbol.endsWith(q) && symbol.length > q.length)
+}
+
+function filterSymbols(symbols: string[]): string[] {
+  return symbols.filter(isValidTradingPair)
+}
 
 export function BacktestPanel({ userId }: { userId: string }) {
   const t = useTranslations('Backtest')
@@ -20,9 +31,10 @@ export function BacktestPanel({ userId }: { userId: string }) {
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
   const [startTime, setStartTime] = useState('2024-01-01')
   const [endTime, setEndTime] = useState('2024-03-01')
-  const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true })
+  const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true, excludeCrossExchange: true })
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<BacktestJob | null>(null)
+  const prevSymbolRef = useRef(symbol)
 
   const { data: symbolsData } = useMarketSymbols(exchange)
   const { data: tickerData } = useMarketTicker(exchange, symbol)
@@ -30,10 +42,22 @@ export function BacktestPanel({ userId }: { userId: string }) {
   const schema = getStrategySchema(strategy)
   const formFields = schema ? schema.fields.filter((f) => f.key !== 'symbol') : []
 
+  const filteredSymbols = filterSymbols(symbolsData?.symbols ?? [])
+  const displaySymbol = filteredSymbols.includes(symbol) ? symbol : (filteredSymbols[0] ?? '')
+
+  useEffect(() => {
+    if (displaySymbol && displaySymbol !== symbol) {
+      setSymbol(displaySymbol)
+      setConfig((prev) => ({ ...prev, symbol: displaySymbol }))
+    }
+  }, [displaySymbol, symbol])
+
   const { data: activeJob } = useBacktestJob(activeJobId)
 
-  // Auto-set upperPrice/lowerPrice from ticker when symbol changes
+  // Auto-set upperPrice/lowerPrice from ticker only when symbol changes
   useEffect(() => {
+    if (prevSymbolRef.current === symbol) return
+    prevSymbolRef.current = symbol
     const ticker = tickerData?.ticker
     if (!ticker || !ticker.close) return
     const hasPriceFields = schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')
@@ -66,9 +90,9 @@ export function BacktestPanel({ userId }: { userId: string }) {
     try {
       const result = await submitBacktest.mutateAsync({
         strategy,
-        config: { ...config, exchange, symbol },
+        config: { ...config, exchange, symbol: displaySymbol },
         exchange,
-        symbol,
+        symbol: displaySymbol,
         start_time: startTime,
         end_time: endTime,
       })
@@ -116,6 +140,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
               onChange={(e) => {
                 setExchange(e.target.value)
                 setSymbol('')
+                setConfig(getStrategyDefaults(strategy))
               }}
               disabled={isRunning}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
@@ -129,7 +154,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
           <div>
             <label className="block text-sm font-medium mb-1">{t('symbol')}</label>
             <select
-              value={symbol}
+              value={displaySymbol}
               onChange={(e) => {
                 const newSymbol = e.target.value
                 setSymbol(newSymbol)
@@ -138,11 +163,11 @@ export function BacktestPanel({ userId }: { userId: string }) {
                   symbol: newSymbol,
                 }))
               }}
-              disabled={isRunning || !symbolsData?.symbols?.length}
+              disabled={isRunning || !filteredSymbols.length}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             >
-              {symbolsData?.symbols?.length ? (
-                symbolsData.symbols.map((s) => (
+              {filteredSymbols.length ? (
+                filteredSymbols.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))
               ) : (
@@ -172,6 +197,45 @@ export function BacktestPanel({ userId }: { userId: string }) {
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             />
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t('quickRange')}</span>
+          {([
+            { label: '1M', months: 1 },
+            { label: '3M', months: 3 },
+            { label: '6M', months: 6 },
+            { label: '1Y', months: 12 },
+          ] as const).map(({ label, months }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                const end = new Date()
+                const start = new Date()
+                start.setMonth(start.getMonth() - months)
+                setEndTime(end.toISOString().slice(0, 10))
+                setStartTime(start.toISOString().slice(0, 10))
+              }}
+              disabled={isRunning}
+              className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50 disabled:opacity-50"
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date()
+              const ytd = new Date(now.getFullYear(), 0, 1)
+              setEndTime(now.toISOString().slice(0, 10))
+              setStartTime(ytd.toISOString().slice(0, 10))
+            }}
+            disabled={isRunning}
+            className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50 disabled:opacity-50"
+          >
+            YTD
+          </button>
         </div>
 
         {formFields.length > 0 && (
@@ -218,11 +282,14 @@ export function BacktestPanel({ userId }: { userId: string }) {
       )}
 
       {lastResult && lastResult.status === 'completed' && lastResult.output && (
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold mb-2">{t('backtestOutput')}</h3>
-          <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
-            {lastResult.output.replace(/\x1b\[[0-9;]*m/g, '')}
-          </pre>
+        <div className="rounded-lg border bg-card p-4 space-y-4">
+          <BacktestEquityChart output={lastResult.output} />
+          <div>
+            <h3 className="text-sm font-semibold mb-2">{t('backtestOutput')}</h3>
+            <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
+              {lastResult.output.replace(/\x1b\[[0-9;]*m/g, '')}
+            </pre>
+          </div>
         </div>
       )}
 

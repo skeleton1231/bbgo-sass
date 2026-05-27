@@ -22,7 +22,7 @@ const breadcrumbMap: Record<string, string> = {
   '/user/settings/notifications': 'notifications',
 }
 
-export function Header() {
+export function Header({ email }: { email?: string }) {
   const t = useTranslations('Nav')
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -63,7 +63,7 @@ export function Header() {
             ))}
           </nav>
         </div>
-        <UserNav />
+        <UserNav email={email} />
       </header>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

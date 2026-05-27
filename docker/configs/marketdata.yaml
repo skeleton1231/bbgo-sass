@@ -19,10 +19,6 @@ sessions:
     exchange: kucoin
     envVarPrefix: KUCOIN
     publicOnly: true
-  max:
-    exchange: max
-    envVarPrefix: MAX
-    publicOnly: true
   bitfinex:
     exchange: bitfinex
     envVarPrefix: BITFINEX

@@ -324,7 +324,7 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 				if injected[ex] {
 					continue
 				}
-				if apiKey, apiSecret, passphrase, err := cm.creds.GetDecrypted(uc.UserID, ex); err == nil {
+				if apiKey, apiSecret, passphrase, isTestnet, err := cm.creds.GetDecryptedWithMeta(uc.UserID, ex); err == nil {
 					prefix := exchangeEnvPrefix(ex)
 					args = append(args,
 						"-e", prefix+"_API_KEY="+apiKey,
@@ -334,6 +334,9 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 						args = append(args, "-e", prefix+"_PASSPHRASE="+passphrase)
 					}
 					injected[ex] = true
+					if isTestnet {
+						args = append(args, "-e", prefix+"_TESTNET=1")
+					}
 				}
 			}
 		}

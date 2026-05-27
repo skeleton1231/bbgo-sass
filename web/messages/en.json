@@ -186,7 +186,8 @@
     "statusCompleted": "Completed",
     "statusFailed": "Failed",
     "symbol": "Symbol",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "quickRange": "Quick Range:"
   },
   "Settings": {
     "title": "Settings",

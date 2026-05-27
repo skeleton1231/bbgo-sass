@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Link, useRouter } from '@/i18n/navigation'
+import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
+import { useUserId } from '@/components/providers/user-id'
 import {
   useUserStrategies,
   useBotTrades,
@@ -17,10 +17,11 @@ import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { AssetAllocationChart } from '@/components/dashboard/AssetAllocationChart'
 import { TradingVolumeChart } from '@/components/dashboard/TradingVolumeChart'
 import { PnlSummary } from '@/components/dashboard/PnlSummary'
+import { PnlChart } from '@/components/dashboard/PnlChart'
+import { EquityChart } from '@/components/dashboard/EquityChart'
 import {
   Activity,
   BarChart3,
@@ -34,22 +35,7 @@ import {
 export default function DashboardPage() {
   const t = useTranslations('Dashboard')
   const bt = useTranslations('Bots')
-  const router = useRouter()
-  const [userId, setUserId] = useState('')
-
-  useEffect(() => {
-    const load = async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data: userData } = await supabase.auth.getUser()
-      if (userData.user) {
-        setUserId(userData.user.id)
-      } else {
-        router.push('/login')
-      }
-    }
-    load()
-  }, [router])
+  const userId = useUserId()
 
   const { data: userContainer } = useUserStrategies(userId)
   const isActive = userContainer?.status === 'running'
@@ -68,19 +54,6 @@ export default function DashboardPage() {
   const totalValue = Object.values(assets).reduce((sum, a: BBGoAsset) => {
     return sum + parseFloat(a.netAssetInUSD || '0')
   }, 0)
-
-  if (!userId) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid gap-4 md:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-[104px] rounded-xl" />
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-8">
@@ -181,6 +154,28 @@ export default function DashboardPage() {
             <PnlSummary report={pnlData} />
           </CardContent>
         </Card>
+      )}
+
+      {isActive && trades.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{t('pnlChart')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PnlChart trades={trades} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{t('equityCurve')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EquityChart assets={assets} />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {isActive && strategyCount > 0 && (

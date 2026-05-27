@@ -484,6 +484,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'useStopLoss', label: 'Use Stop Loss', type: 'boolean', default: true },
       { key: 'useAtr', label: 'Use ATR Stop', type: 'boolean', default: false, description: 'Use ATR for stop-loss calculation' },
       { key: 'predictOffset', label: 'Predict Offset', type: 'number', default: 10, min: 1, description: 'Lookback length for prediction' },
+      { key: 'MinInterval', label: 'Min Interval', type: 'select', default: '5m', options: ['1m', '5m', '15m', '30m'], description: 'Minimum interval for stop-loss and trailing exits' },
       { key: 'atrWindow', label: 'ATR Window', type: 'number', default: 14, min: 1 },
       { key: 'generateGraph', label: 'Generate Graph', type: 'boolean', default: true, description: 'Generate graph on shutdown in backtest' },
     ],
@@ -498,6 +499,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['5m', '15m', '1h', '4h', '1d'] },
       { key: 'stoploss', label: 'Stop Loss', type: 'number', default: 0.02, step: 0.001 },
+      { key: 'minInterval', label: 'Min Interval', type: 'select', default: '5m', options: ['1m', '5m', '15m', '30m'], description: 'Minimum interval for stop-loss and trailing exits' },
       { key: 'windowATR', label: 'ATR Window', type: 'number', default: 14, min: 1 },
       { key: 'windowQuick', label: 'Quick Window', type: 'number', default: 5, min: 1, description: 'Fast EWO window' },
       { key: 'windowSlow', label: 'Slow Window', type: 'number', default: 35, min: 1, description: 'Slow EWO window' },
@@ -859,10 +861,11 @@ export function getAllStrategies(): { id: string; label: string; description: st
   return STRATEGY_SCHEMAS.map((s) => ({ id: s.id, label: s.label, description: s.description, category: s.category }))
 }
 
-export function getStrategiesByCategory(opts?: { excludeLiveOnly?: boolean }): Record<string, { id: string; label: string; description: string }[]> {
+export function getStrategiesByCategory(opts?: { excludeLiveOnly?: boolean; excludeCrossExchange?: boolean }): Record<string, { id: string; label: string; description: string }[]> {
   const grouped: Record<string, { id: string; label: string; description: string }[]> = {}
   for (const s of STRATEGY_SCHEMAS) {
     if (opts?.excludeLiveOnly && s.liveOnly) continue
+    if (opts?.excludeCrossExchange && s.category === 'cross-exchange') continue
     const cat = s.category
     if (!grouped[cat]) grouped[cat] = []
     grouped[cat]!.push({ id: s.id, label: s.label, description: s.description })

@@ -21,7 +21,8 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
     if (raw === '' || raw === undefined) return ''
     const num = Number(raw)
     if (!Number.isFinite(num)) return String(raw)
-    return parseFloat(num.toFixed(10)).toString()
+    const s = num.toPrecision(10)
+    return parseFloat(s).toString()
   }
 
   return (

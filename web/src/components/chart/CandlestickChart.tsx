@@ -3,13 +3,16 @@
 import { useEffect, useRef, useCallback } from 'react'
 import {
   createChart,
+  createSeriesMarkers,
+  CandlestickSeries,
+  HistogramSeries,
   type IChartApi,
   type ISeriesApi,
-  type CandlestickData,
+  type SeriesType,
   type Time,
-  type HistogramData,
   type DeepPartial,
   type ChartOptions,
+  type ISeriesMarkersPluginApi,
   ColorType,
 } from 'lightweight-charts'
 
@@ -78,15 +81,16 @@ export function CandlestickChart({
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
-  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
-  const priceLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([])
+  const candleSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+  const priceLinesRef = useRef<ReturnType<ISeriesApi<SeriesType>['createPriceLine']>[]>([])
 
   const initChart = useCallback(() => {
     if (!containerRef.current) return
 
     if (chartRef.current) {
-      chartRef.current.remove()
+      try { chartRef.current.remove() } catch { /* already disposed */ }
       chartRef.current = null
     }
 
@@ -96,7 +100,7 @@ export function CandlestickChart({
       height,
     })
 
-    const candleSeries = chart.addCandlestickSeries({
+    const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#22c55e',
       downColor: '#ef4444',
       borderUpColor: '#22c55e',
@@ -105,7 +109,7 @@ export function CandlestickChart({
       wickDownColor: '#ef4444',
     })
 
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     })
@@ -118,6 +122,7 @@ export function CandlestickChart({
     candleSeriesRef.current = candleSeries
     volumeSeriesRef.current = volumeSeries
     priceLinesRef.current = []
+    markersRef.current = null
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -141,7 +146,7 @@ export function CandlestickChart({
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return
 
-    const candleData: CandlestickData[] = candles.map((c) => ({
+    const candleData = candles.map((c) => ({
       time: c.time,
       open: c.open,
       high: c.high,
@@ -150,7 +155,7 @@ export function CandlestickChart({
     }))
     candleSeriesRef.current.setData(candleData)
 
-    const volumeData: HistogramData[] = candles
+    const volumeData = candles
       .filter((c) => c.volume != null && c.volume > 0)
       .map((c) => ({
         time: c.time,
@@ -169,7 +174,7 @@ export function CandlestickChart({
           shape: t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
           text: `${t.side} ${t.quantity}`,
         }))
-      candleSeriesRef.current.setMarkers(markers)
+      markersRef.current = createSeriesMarkers(candleSeriesRef.current, markers)
     }
 
     chartRef.current?.timeScale().fitContent()

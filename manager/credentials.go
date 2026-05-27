@@ -120,30 +120,35 @@ func (cs *CredentialStore) Delete(userID, id string) error {
 }
 
 func (cs *CredentialStore) GetDecrypted(userID, exchange string) (apiKey, apiSecret, passphrase string, err error) {
+	apiKey, apiSecret, passphrase, _, err = cs.GetDecryptedWithMeta(userID, exchange)
+	return
+}
+
+func (cs *CredentialStore) GetDecryptedWithMeta(userID, exchange string) (apiKey, apiSecret, passphrase string, isTestnet bool, err error) {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 	creds, err := cs.loadAll(userID)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 	for _, c := range creds {
 		if c.Exchange == exchange {
 			apiKey, err = cs.crypto.Decrypt(c.APIKeyEncrypted)
 			if err != nil {
-				return "", "", "", fmt.Errorf("decrypt api key: %w", err)
+				return "", "", "", false, fmt.Errorf("decrypt api key: %w", err)
 			}
 			apiSecret, err = cs.crypto.Decrypt(c.APISecretEncrypted)
 			if err != nil {
-				return "", "", "", fmt.Errorf("decrypt api secret: %w", err)
+				return "", "", "", false, fmt.Errorf("decrypt api secret: %w", err)
 			}
 			if c.PassphraseEncrypted != "" {
 				passphrase, err = cs.crypto.Decrypt(c.PassphraseEncrypted)
 				if err != nil {
-					return "", "", "", fmt.Errorf("decrypt passphrase: %w", err)
+					return "", "", "", false, fmt.Errorf("decrypt passphrase: %w", err)
 				}
 			}
-			return apiKey, apiSecret, passphrase, nil
+			return apiKey, apiSecret, passphrase, c.IsTestnet, nil
 		}
 	}
-	return "", "", "", fmt.Errorf("no credentials for exchange %s", exchange)
+	return "", "", "", false, fmt.Errorf("no credentials for exchange %s", exchange)
 }

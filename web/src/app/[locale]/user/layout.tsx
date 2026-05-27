@@ -1,9 +1,10 @@
 import { getCurrentUser } from '@/lib/supabase/server'
-import { redirect } from '@/i18n/navigation'
+import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { LOGIN_PATH } from '@/lib/routes'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { UserIdProvider } from '@/components/providers/user-id'
 
 export default async function UserLayout({
   children,
@@ -16,16 +17,19 @@ export default async function UserLayout({
   ])
 
   if (!user) {
-    redirect({ href: LOGIN_PATH, locale })
+    const prefix = locale === 'en' ? '' : `/${locale}`
+    redirect(`${prefix}${LOGIN_PATH}`)
   }
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
+    <UserIdProvider userId={user.id}>
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header email={user.email} />
+          <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
+        </div>
       </div>
-    </div>
+    </UserIdProvider>
   )
 }

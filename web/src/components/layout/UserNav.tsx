@@ -1,6 +1,5 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import {
@@ -14,20 +13,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { signOutAction } from '@/actions/auth'
 import { Settings, LogOut } from 'lucide-react'
 
-export function UserNav() {
+interface UserNavProps {
+  email?: string
+}
+
+export function UserNav({ email }: UserNavProps) {
   const router = useRouter()
   const t = useTranslations('Nav')
-  const [email, setEmail] = useState('')
-
-  useEffect(() => {
-    const load = async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase.auth.getUser()
-      if (data.user?.email) setEmail(data.user.email)
-    }
-    load()
-  }, [])
 
   const initials = email ? email.slice(0, 2).toUpperCase() : 'U'
 

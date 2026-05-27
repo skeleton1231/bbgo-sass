@@ -68,7 +68,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	// Market data endpoints (Manager → marketdata REST/gRPC API)
 	r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
 	r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
-// TODO: 	r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
+	r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
 
 	// State-changing endpoints with per-user rate limiting
 	r.Route("/", func(r chi.Router) {

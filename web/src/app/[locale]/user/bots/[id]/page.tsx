@@ -116,7 +116,7 @@ export default function BotDetailPage() {
       .filter((tr) => !activeSymbol || tr.symbol === activeSymbol)
       .slice(0, 200)
       .map((tr) => ({
-        time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as number,
+        time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker["time"],
         side: tr.side as 'BUY' | 'SELL',
         price: parseFloat(tr.price),
         quantity: parseFloat(tr.quantity),
@@ -346,7 +346,7 @@ export default function BotDetailPage() {
         </div>
       )}
 
-      {botReachable && pnlData && pnlData.symbols.length > 0 && (
+      {botReachable && pnlData && pnlData.symbols?.length > 0 && (
         <Card className="rounded-xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">{t('pnl.bySymbol')}</CardTitle>
