@@ -19,7 +19,8 @@ func TestAPI_CreateStrategy_LiveRequiresCredentials(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{},
@@ -67,7 +68,8 @@ func TestAPI_CreateStrategy_LiveWithCredentials_Accepted(t *testing.T) {
 	insertTestCredential(t, creds, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "binance", "key", "secret")
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{},
@@ -112,7 +114,8 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 	insertTestCredential(t, creds, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "binance", "key", "secret")
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{},
@@ -157,7 +160,7 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 func TestAPI_DeleteLastStrategy_StopsContainer(t *testing.T) {
 	var stopCalled bool
 	api, _ := setupTestAPIWithMockCM(nil, true)
-	api.containerStop = func(userID string) {
+	api.containerStop = func(userID string, _ string) {
 		stopCalled = true
 	}
 	r := testRouter(api)
@@ -174,9 +177,9 @@ func TestAPI_DeleteLastStrategy_StopsContainer(t *testing.T) {
 		t.Error("deleting last strategy should stop the container")
 	}
 
-	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	if uc.Status != StatusStopped {
-		t.Errorf("expected status stopped after deleting last strategy, got %s", uc.Status)
+	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
+	if uc != nil {
+		t.Errorf("expected container deleted after last strategy removed, got status %s", uc.Status)
 	}
 }
 
@@ -185,7 +188,7 @@ func TestAPI_DeleteStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 	api, _ := setupTestAPIWithMockCM(nil, true)
 
 	api.users.mu.Lock()
-	uc := api.users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]
+	uc := api.users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive]
 	uc.Strategies = append(uc.Strategies, StrategyEntry{
 		ID:       "s2",
 		Exchange: "binance",
@@ -226,6 +229,7 @@ func TestAPI_DeleteStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 
 func TestBuildUserYAML_MultiStrategy_SameExchange_DedupSession(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -267,6 +271,7 @@ func TestBuildUserYAML_MultiStrategy_SameExchange_DedupSession(t *testing.T) {
 
 func TestBuildUserYAML_DifferentExchanges_SeparateSessions(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{

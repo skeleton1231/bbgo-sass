@@ -35,7 +35,8 @@ func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http
 	}
 
 	users := NewUserContainerManager()
-	users.users[pnlTestUserID] = &UserContainer{
+	users.users[pnlTestUserID+":"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     pnlTestUserID,
 		Status:     status,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},

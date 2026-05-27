@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/c9s/bbgo/saas/manager/pool"
@@ -39,11 +39,11 @@ func NewSyncerWithCreds(users *UserContainerManager, cfg *Config, cm *ContainerM
 	return s
 }
 
-func (s *Syncer) bbgoClient(userID string) *BBGoClient {
+func (s *Syncer) bbgoClient(userID, mode string) *BBGoClient {
 	if s.newBBGoClientFn != nil {
-		return s.newBBGoClientFn(s.container.APIURL(userID))
+		return s.newBBGoClientFn(s.container.APIURL(userID, mode))
 	}
-	return NewBBGoClient(s.container.APIURL(userID))
+	return NewBBGoClient(s.container.APIURL(userID, mode))
 }
 
 func readBodyHint(resp *http.Response) string {
@@ -77,6 +77,7 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 
 	var raw []struct {
 		UserID     string          `json:"user_id"`
+		Mode       string          `json:"mode"`
 		Status     string          `json:"status"`
 		Strategies json.RawMessage `json:"strategies"`
 	}
@@ -88,7 +89,11 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 	for i, r := range raw {
 		uc := &UserContainer{
 			UserID: r.UserID,
+			Mode:   r.Mode,
 			Status: r.Status,
+		}
+		if uc.Mode == "" {
+			uc.Mode = ModeLive
 		}
 		if len(r.Strategies) > 0 {
 			if err := json.Unmarshal(r.Strategies, &uc.Strategies); err != nil {
@@ -103,6 +108,7 @@ func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
 func (s *Syncer) UpsertUser(uc *UserContainer) {
 	payload, err := json.Marshal(map[string]interface{}{
 		"user_id":    uc.UserID,
+		"mode":       uc.Mode,
 		"status":     uc.Status,
 		"strategies": uc.Strategies,
 	})
@@ -111,7 +117,7 @@ func (s *Syncer) UpsertUser(uc *UserContainer) {
 		return
 	}
 
-	resp, err := s.supabaseRequest("POST", "user_containers?on_conflict=user_id", payload)
+	resp, err := s.supabaseRequest("POST", "user_containers?on_conflict=user_id,mode", payload)
 	if err != nil {
 		log.Printf("upsert user %s failed: %v", uc.UserID, err)
 		return
@@ -122,8 +128,8 @@ func (s *Syncer) UpsertUser(uc *UserContainer) {
 	resp.Body.Close()
 }
 
-func (s *Syncer) SyncUser(userID string) {
-	uc, ok := s.users.Get(userID)
+func (s *Syncer) SyncUser(userID, mode string) {
+	uc, ok := s.users.Get(userID, mode)
 	if !ok {
 		return
 	}
@@ -152,7 +158,7 @@ func (s *Syncer) syncUserData(uc *UserContainer) {
 		return
 	}
 
-	client := s.bbgoClient(uc.UserID)
+	client := s.bbgoClient(uc.UserID, uc.Mode)
 	if err := client.Ping(); err != nil {
 		log.Printf("sync user %s: bbgo api not reachable: %v", uc.UserID, err)
 		return
@@ -421,7 +427,7 @@ func (s *Syncer) SyncCredential(cred ExchangeCredential) {
 		return
 	}
 
-	resp, err := s.supabaseRequest("POST", "exchange_credentials?on_conflict=user_id,exchange", payload)
+	resp, err := s.supabaseRequest("POST", "exchange_credentials?on_conflict=user_id,exchange,is_testnet", payload)
 	if err != nil {
 		log.Printf("sync credential for user %s %s: %v", cred.UserID, cred.Exchange, err)
 		return
@@ -477,7 +483,6 @@ func (s *Syncer) DeleteCredential(userID, exchange string) {
 	resp.Body.Close()
 	log.Printf("deleted credential %s for user %s from supabase", exchange, userID)
 }
-
 
 const pnlPageSize = 1000
 

@@ -58,11 +58,11 @@ func chain10Setup(t *testing.T) (*API, *chi.Mux, *httptest.Server) {
 
 	users := NewUserContainerManager()
 	cfg := &Config{
-		SupabaseURL:         "http://localhost:54321",
-		SupabaseKey:         "test",
-		ManagerToken:        "test-token",
-		MarketDataAddr:      "http://market:50051",
-		MarketDataRESTAddr:  "localhost:9090",
+		SupabaseURL:        "http://localhost:54321",
+		SupabaseKey:        "test",
+		ManagerToken:       "test-token",
+		MarketDataAddr:     "http://market:50051",
+		MarketDataRESTAddr: "localhost:9090",
 	}
 	cm := &ContainerManager{cfg: cfg}
 	enc, _ := NewEncryptor(testEncryptionKey)
@@ -73,8 +73,8 @@ func chain10Setup(t *testing.T) (*API, *chi.Mux, *httptest.Server) {
 		return NewBBGoClient(baseURL)
 	}
 	api.containerStart = func(_ *UserContainer) error { return nil }
-	api.containerStop = func(_ string) {}
-	api.containerRunning = func(_ string) bool { return true }
+	api.containerStop = func(_, _ string) {}
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -97,10 +97,10 @@ func TestTradingChain_Health(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 	_ = api
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	req := httptest.NewRequest("GET", "/api/health", nil)
 	w := httptest.NewRecorder()
@@ -130,18 +130,19 @@ func TestTradingChain_ListStrategies_UserNotFound(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp["status"] != StatusStopped {
-		t.Errorf("unknown user status = %v, want stopped", resp["status"])
+	containers, _ := resp["containers"].(map[string]interface{})
+	if len(containers) != 0 {
+		t.Errorf("unknown user containers = %v, want empty", containers)
 	}
 }
 
 func TestTradingChain_ListStrategies_WithStrategies(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	req := httptest.NewRequest("GET", "/api/users/"+chain10UID+"/strategies", nil)
 	w := httptest.NewRecorder()
@@ -152,7 +153,9 @@ func TestTradingChain_ListStrategies_WithStrategies(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	strats := resp["strategies"].([]interface{})
+	containers, _ := resp["containers"].(map[string]interface{})
+	liveContainer, _ := containers["live"].(map[string]interface{})
+	strats, _ := liveContainer["strategies"].([]interface{})
 	if len(strats) != 1 {
 		t.Errorf("strategies count = %d, want 1", len(strats))
 	}
@@ -175,9 +178,9 @@ func TestTradingChain_DeleteStrategy_NotFound(t *testing.T) {
 func TestTradingChain_DeleteStrategy_LastStrategy_StopsContainer(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 	stopped := false
-	api.containerStop = func(_ string) { stopped = true }
+	api.containerStop = func(_, _ string) { stopped = true }
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
@@ -198,13 +201,13 @@ func TestTradingChain_DeleteStrategy_RemainingStrategies_Restarts(t *testing.T) 
 	_ = false
 	api.containerStart = func(_ *UserContainer) error { return nil }
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s2", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"ETHUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	req := httptest.NewRequest("DELETE", "/api/users/"+chain10UID+"/strategies/s1", nil)
 	w := httptest.NewRecorder()
@@ -214,7 +217,7 @@ func TestTradingChain_DeleteStrategy_RemainingStrategies_Restarts(t *testing.T) 
 		t.Fatalf("status = %d", w.Code)
 	}
 	// Restart is async (go api.startUserContainer), so check status changed
-	uc2, _ := api.users.Get(chain10UID)
+	uc2, _ := api.users.Get(chain10UID, ModeLive)
 	if uc2.Status != StatusStarting {
 		t.Errorf("status = %s, want starting (restart triggered)", uc2.Status)
 	}
@@ -234,18 +237,19 @@ func TestTradingChain_UserStatus_UnknownUser(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp["status"] != StatusStopped {
-		t.Errorf("unknown user status = %v, want stopped", resp["status"])
+	containers, _ := resp["containers"].(map[string]interface{})
+	if len(containers) != 0 {
+		t.Errorf("unknown user should have empty containers, got %v", containers)
 	}
 }
 
 func TestTradingChain_UserStatus_RunningUser(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	req := httptest.NewRequest("GET", "/api/users/"+chain10UID+"/status", nil)
 	w := httptest.NewRecorder()
@@ -256,8 +260,13 @@ func TestTradingChain_UserStatus_RunningUser(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp["status"] != StatusRunning {
-		t.Errorf("status = %v, want running", resp["status"])
+	containers, _ := resp["containers"].(map[string]interface{})
+	liveContainer, _ := containers["live"].(map[string]interface{})
+	if liveContainer == nil {
+		t.Fatal("expected live container in response")
+	}
+	if liveContainer["status"] != StatusRunning {
+		t.Errorf("status = %v, want running", liveContainer["status"])
 	}
 }
 
@@ -490,9 +499,9 @@ func TestTradingChain_ListCredentials(t *testing.T) {
 
 	// Create a credential first
 	api.creds.Upsert(ExchangeCredential{
-		ID:     "cred-test1",
-		UserID: chain10UID,
-		Exchange: "binance",
+		ID:                 "cred-test1",
+		UserID:             chain10UID,
+		Exchange:           "binance",
 		APIKeyEncrypted:    "enc",
 		APISecretEncrypted: "enc",
 	})
@@ -548,15 +557,15 @@ func TestTradingChain_BBGoProxy_Endpoints(t *testing.T) {
 	_ = api
 
 	// Add a running user so bbgoClientForUser works
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
-	api.container.apiURLFn = func(userID string) string { return bbgoSrv.URL }
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
+	api.container.apiURLFn = func(userID, mode string) string { return bbgoSrv.URL }
 
 	endpoints := []struct {
-		path   string
-		key    string
+		path string
+		key  string
 	}{
 		{"/api/users/" + chain10UID + "/bbgo/ping", ""},
 		{"/api/users/" + chain10UID + "/bbgo/sessions", "sessions"},
@@ -591,12 +600,12 @@ func TestTradingChain_BBGoProxy_Endpoints(t *testing.T) {
 func TestTradingChain_StopUser_Success(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 	stopped := false
-	api.containerStop = func(_ string) { stopped = true }
+	api.containerStop = func(_, _ string) { stopped = true }
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/stop", nil)
 	w := httptest.NewRecorder()
@@ -608,7 +617,7 @@ func TestTradingChain_StopUser_Success(t *testing.T) {
 	if !stopped {
 		t.Error("expected container stop to be called")
 	}
-	uc2, _ := api.users.Get(chain10UID)
+	uc2, _ := api.users.Get(chain10UID, ModeLive)
 	if uc2.Status != StatusStopped {
 		t.Errorf("status = %s, want stopped", uc2.Status)
 	}
@@ -637,10 +646,10 @@ func TestTradingChain_CreateStrategy_LiveNoCreds_Rejected(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 
 	// Add running user with no credentials
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s0", Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"strategy": "grid2",
@@ -665,9 +674,9 @@ func TestTradingChain_CreateStrategy_LiveWithCreds_Accepted(t *testing.T) {
 	keyEnc, _ := api.encryptor.Encrypt("testkey")
 	secretEnc, _ := api.encryptor.Encrypt("testsecret")
 	api.creds.Upsert(ExchangeCredential{
-		ID:     "cred-1",
-		UserID: chain10UID,
-		Exchange: "binance",
+		ID:                 "cred-1",
+		UserID:             chain10UID,
+		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
 		APISecretEncrypted: secretEnc,
 	})
@@ -730,35 +739,35 @@ func TestTradingChain_CreateStrategy_LiveOnlyPaper_Rejected(t *testing.T) {
 func TestTradingChain_CreateStrategy_ModeConflict(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 
-	// Existing paper strategy
-	api.users.AddStrategy(chain10UID, StrategyEntry{
-		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
+	// Existing live strategy
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
+		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
 	keyEnc, _ := api.encryptor.Encrypt("testkey")
 	secretEnc, _ := api.encryptor.Encrypt("testsecret")
 	api.creds.Upsert(ExchangeCredential{
-		ID:     "cred-1",
-		UserID: chain10UID,
-		Exchange: "binance",
+		ID:                 "cred-1",
+		UserID:             chain10UID,
+		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
 		APISecretEncrypted: secretEnc,
 	})
 
-	// Try to add live strategy — should conflict
+	// Add paper strategy — goes to separate container, allowed
 	body, _ := json.Marshal(map[string]interface{}{
 		"strategy": "grid2",
 		"exchange": "binance",
-		"name":     "live-bot",
-		"mode":     "live",
+		"name":     "paper-bot",
+		"mode":     "paper",
 		"config":   map[string]interface{}{"symbol": "ETHUSDT"},
 	})
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/strategies", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("mode conflict = %d, want 400; body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Errorf("mixed mode = %d, want 201; body: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -777,7 +786,7 @@ func TestTradingChain_FullLiveChain_YAMLAndEnv(t *testing.T) {
 	})
 
 	// Step 2: Add live strategy
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID:       "strat-live",
 		Exchange: "binance",
 		Strategy: "grid2",
@@ -786,7 +795,7 @@ func TestTradingChain_FullLiveChain_YAMLAndEnv(t *testing.T) {
 	})
 
 	// Step 3: Generate YAML
-	uc, _ := api.users.Get(chain10UID)
+	uc, _ := api.users.Get(chain10UID, ModeLive)
 	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool {
 		creds, _ := api.creds.List(chain10UID)
 		for _, c := range creds {
@@ -832,8 +841,8 @@ func TestTradingChain_FullLiveChain_YAMLAndEnv(t *testing.T) {
 func TestTradingChain_FullPaperChain_YAMLAndEnv(t *testing.T) {
 	api, _, _ := chain10Setup(t)
 
-	// No credentials stored
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	// No credentials stored — paper container
+	api.users.AddStrategy(chain10UID, ModePaper, StrategyEntry{
 		ID:       "strat-paper",
 		Exchange: "binance",
 		Strategy: "grid2",
@@ -841,7 +850,7 @@ func TestTradingChain_FullPaperChain_YAMLAndEnv(t *testing.T) {
 		Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
 	})
 
-	uc, _ := api.users.Get(chain10UID)
+	uc, _ := api.users.Get(chain10UID, ModePaper)
 
 	// Paper YAML with no creds
 	yamlBytes, err := buildUserYAML(uc, func(_ string) bool { return false })
@@ -871,17 +880,17 @@ func TestTradingChain_FullPaperChain_YAMLAndEnv(t *testing.T) {
 
 func TestTradingChain_RefreshStatus_RunningContainerDied(t *testing.T) {
 	api, _, _ := chain10Setup(t)
-	api.container.checkRunningFn = func(_ string) (bool, error) { return false, nil }
+	api.container.checkRunningFn = func(_, _ string) (bool, error) { return false, nil }
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
-	uc, _ := api.users.Get(chain10UID)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
+	uc, _ := api.users.Get(chain10UID, ModeLive)
 
 	api.refreshContainerStatus(uc)
 
-	uc, _ = api.users.Get(chain10UID)
+	uc, _ = api.users.Get(chain10UID, ModeLive)
 	if uc.Status != StatusStopped {
 		t.Errorf("status after container died = %s, want stopped", uc.Status)
 	}
@@ -889,17 +898,17 @@ func TestTradingChain_RefreshStatus_RunningContainerDied(t *testing.T) {
 
 func TestTradingChain_RefreshStatus_StoppedContainer_NoChange(t *testing.T) {
 	api, _, _ := chain10Setup(t)
-	api.containerRunning = func(_ string) bool { return true }
+	api.containerRunning = func(_, _ string) bool { return true }
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusStopped)
-	uc, _ := api.users.Get(chain10UID)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusStopped)
+	uc, _ := api.users.Get(chain10UID, ModeLive)
 
 	api.refreshContainerStatus(uc)
 
-	uc, _ = api.users.Get(chain10UID)
+	uc, _ = api.users.Get(chain10UID, ModeLive)
 	if uc.Status != StatusStopped {
 		t.Errorf("stopped container status changed to %s", uc.Status)
 	}
@@ -1033,7 +1042,7 @@ func TestTradingChain_ContainerLogs(t *testing.T) {
 		return "line1\nline2\n", nil
 	}
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
@@ -1051,10 +1060,10 @@ func TestTradingChain_ContainerLogs(t *testing.T) {
 func TestTradingChain_StartUser_AlreadyRunning(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
-	api.users.UpdateStatus(chain10UID, StatusRunning)
+	api.users.UpdateStatus(chain10UID, ModeLive, StatusRunning)
 
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/start", nil)
 	w := httptest.NewRecorder()
@@ -1090,10 +1099,10 @@ func TestTradingChain_StartUser_StartsAsync(t *testing.T) {
 		return NewBBGoClient(baseURL)
 	}
 	api.containerStart = func(_ *UserContainer) error { return nil }
-	api.containerRunning = func(_ string) bool { return false }
-	api.container.apiURLFn = func(userID string) string { return bbgoSrv.URL }
+	api.containerRunning = func(_, _ string) bool { return false }
+	api.container.apiURLFn = func(userID, mode string) string { return bbgoSrv.URL }
 
-	api.users.AddStrategy(chain10UID, StrategyEntry{
+	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
@@ -1108,13 +1117,13 @@ func TestTradingChain_StartUser_StartsAsync(t *testing.T) {
 	// Wait for async goroutine
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		uc, _ := api.users.Get(chain10UID)
+		uc, _ := api.users.Get(chain10UID, ModeLive)
 		if uc.Status == StatusRunning {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	uc, _ := api.users.Get(chain10UID)
+	uc, _ := api.users.Get(chain10UID, ModeLive)
 	if uc.Status != StatusRunning {
 		t.Errorf("status = %s, want running after async start", uc.Status)
 	}

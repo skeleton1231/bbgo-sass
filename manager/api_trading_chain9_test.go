@@ -84,6 +84,7 @@ func setupSyncTest(t *testing.T) (*Syncer, *httptest.Server, *httptest.Server) {
 	users := NewUserContainerManager()
 	syncUID := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000090"
 	users.users[syncUID] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     syncUID,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2"}},
@@ -118,7 +119,7 @@ func TestSync_IncrementalOrders_OnlyNew(t *testing.T) {
 	// Set cursor to 5 — only orders with GID > 5 should sync (GID 8 and 10)
 	syncer.updateCursor(syncUID, "sync_orders", 5)
 
-	client := syncer.bbgoClient(syncUID)
+	client := syncer.bbgoClient(syncUID, ModeLive)
 	syncer.syncOrdersViaAPI(syncUID, client)
 
 	cursor := syncer.getCursor(syncUID, "sync_orders")
@@ -136,7 +137,7 @@ func TestSync_FullSyncOrders_Paginated(t *testing.T) {
 	syncUID := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000090"
 
 	// Cursor = 0 triggers full sync
-	client := syncer.bbgoClient(syncUID)
+	client := syncer.bbgoClient(syncUID, ModeLive)
 	syncer.syncOrdersViaAPI(syncUID, client)
 
 	cursor := syncer.getCursor(syncUID, "sync_orders")
@@ -156,7 +157,7 @@ func TestSync_TradesWithCursor(t *testing.T) {
 	// Set trade cursor to 10 — only trades with GID > 10 should be fetched
 	syncer.updateCursor(syncUID, "sync_trades", 10)
 
-	client := syncer.bbgoClient(syncUID)
+	client := syncer.bbgoClient(syncUID, ModeLive)
 	syncer.syncTradesViaAPI(syncUID, client)
 
 	cursor := syncer.getCursor(syncUID, "sync_trades")
@@ -180,6 +181,7 @@ func TestSync_StoppedContainer_SkipsSync(t *testing.T) {
 	users := NewUserContainerManager()
 	stoppedUID := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000091"
 	users.users[stoppedUID] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     stoppedUID,
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2"}},
@@ -225,6 +227,7 @@ func TestSync_UnreachableBBGo_SkipsData(t *testing.T) {
 	users := NewUserContainerManager()
 	uid := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000092"
 	users.users[uid] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     uid,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2"}},
@@ -253,15 +256,15 @@ func TestSync_UnreachableBBGo_SkipsData(t *testing.T) {
 func TestTradingChain_LiveGrid2_CompleteYAML(t *testing.T) {
 	uid := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000093"
 	users := NewUserContainerManager()
-	users.AddStrategy(uid, StrategyEntry{
+	users.AddStrategy(uid, ModeLive, StrategyEntry{
 		ID:       "strat-1",
 		Exchange: "binance",
 		Strategy: "grid2",
 		Mode:     "live",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
 	})
 
-	uc, _ := users.Get(uid)
+	uc, _ := users.Get(uid, ModeLive)
 	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
 	if err != nil {
 		t.Fatal(err)
@@ -290,15 +293,15 @@ func TestTradingChain_LiveGrid2_CompleteYAML(t *testing.T) {
 func TestTradingChain_PaperGrid2_CompleteYAML(t *testing.T) {
 	uid := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000094"
 	users := NewUserContainerManager()
-	users.AddStrategy(uid, StrategyEntry{
+	users.AddStrategy(uid, ModePaper, StrategyEntry{
 		ID:       "strat-1",
 		Exchange: "binance",
 		Strategy: "grid2",
 		Mode:     "paper",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
 	})
 
-	uc, _ := users.Get(uid)
+	uc, _ := users.Get(uid, ModePaper)
 	yamlBytes, err := buildUserYAML(uc, func(string) bool { return false })
 	if err != nil {
 		t.Fatal(err)
@@ -328,11 +331,11 @@ func TestTradingChain_PaperGrid2_CompleteYAML(t *testing.T) {
 func TestTradingChain_CrossExchangeYAML(t *testing.T) {
 	uid := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000095"
 	users := NewUserContainerManager()
-	users.AddStrategy(uid, StrategyEntry{
+	users.AddStrategy(uid, ModeLive, StrategyEntry{
 		ID:            "xstrat-1",
 		Strategy:      "xmaker",
 		Mode:          "paper",
-			Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
+		Config:        rawJSON(`{"symbol":"BTCUSDT"}`),
 		CrossExchange: true,
 		Sessions: []SessionRoleConfig{
 			{Exchange: "binance", Name: "binance"},
@@ -340,7 +343,7 @@ func TestTradingChain_CrossExchangeYAML(t *testing.T) {
 		},
 	})
 
-	uc, _ := users.Get(uid)
+	uc, _ := users.Get(uid, ModeLive)
 	yamlBytes, err := buildUserYAML(uc, func(string) bool { return false })
 	if err != nil {
 		t.Fatal(err)
@@ -361,15 +364,15 @@ func TestTradingChain_CrossExchangeYAML(t *testing.T) {
 func TestTradingChain_LegacyAlias_Normalized(t *testing.T) {
 	uid := "aaaaaaaa-bbbb-cccc-dddd-eeeeee000096"
 	users := NewUserContainerManager()
-	users.AddStrategy(uid, StrategyEntry{
+	users.AddStrategy(uid, ModeLive, StrategyEntry{
 		ID:       "strat-1",
 		Exchange: "binance",
 		Strategy: "sentinel_anomaly",
 		Mode:     "live",
-			Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
+		Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
-	uc, _ := users.Get(uid)
+	uc, _ := users.Get(uid, ModeLive)
 	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
 	if err != nil {
 		t.Fatal(err)

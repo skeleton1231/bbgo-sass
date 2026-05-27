@@ -171,7 +171,8 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 	}
 	creds := NewCredentialStore(tmpDir, enc)
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -180,7 +181,7 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
-	api.containerRunning = func(string) bool { return false }
+	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(*UserContainer) error { return nil }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +235,7 @@ func TestAPI_PnL_SupabaseFallback_WhenStopped(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusStopped
+	api.users.users[userID+":"+ModeLive].Status = StatusStopped
 
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

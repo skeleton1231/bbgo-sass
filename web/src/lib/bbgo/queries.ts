@@ -30,6 +30,7 @@ import {
   type TradingVolumeEntry,
   type StrategyEntry,
   type UserContainer,
+  type UserContainersResponse,
   type BacktestResult,
   type BacktestJob,
   type SubmitBacktestResponse,
@@ -48,7 +49,7 @@ import {
 // --- Strategy & container queries ---
 
 export function useUserStrategies(userId: string) {
-  return useQuery<UserContainer>({
+  return useQuery<UserContainersResponse>({
     queryKey: ['user-strategies', userId],
     queryFn: () => fetchUserStrategies(userId),
     enabled: !!userId,
@@ -77,16 +78,18 @@ export function useDeleteStrategy() {
 export function useStartUser() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: apiStartUser,
-    onSuccess: (_data, userId) => qc.invalidateQueries({ queryKey: ['user-strategies', userId] }),
+    mutationFn: ({ userId, mode }: { userId: string; mode?: 'live' | 'paper' }) =>
+      apiStartUser(userId, mode),
+    onSuccess: (_data, { userId }) => qc.invalidateQueries({ queryKey: ['user-strategies', userId] }),
   })
 }
 
 export function useStopUser() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: apiStopUser,
-    onSuccess: (_data, userId) => qc.invalidateQueries({ queryKey: ['user-strategies', userId] }),
+    mutationFn: ({ userId, mode }: { userId: string; mode?: 'live' | 'paper' }) =>
+      apiStopUser(userId, mode),
+    onSuccess: (_data, { userId }) => qc.invalidateQueries({ queryKey: ['user-strategies', userId] }),
   })
 }
 
@@ -127,55 +130,55 @@ export function useBacktestJobs() {
 
 // --- Bot data queries (real-time from bbgo container) ---
 
-export function useBotPing(userId: string) {
+export function useBotPing(userId: string, mode?: 'live' | 'paper') {
   return useQuery<{ status: string }>({
-    queryKey: ['bot-ping', userId],
-    queryFn: () => fetchBotPing(userId),
+    queryKey: ['bot-ping', userId, mode],
+    queryFn: () => fetchBotPing(userId, mode),
     enabled: !!userId,
     refetchInterval: 30_000,
   })
 }
 
-export function useBotSessions(userId: string) {
+export function useBotSessions(userId: string, mode?: 'live' | 'paper') {
   return useQuery<{ sessions: BBGoSession[] }>({
-    queryKey: ['bot-sessions', userId],
-    queryFn: () => fetchBotSessions(userId),
+    queryKey: ['bot-sessions', userId, mode],
+    queryFn: () => fetchBotSessions(userId, mode),
     enabled: !!userId,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotSessionTrades(userId: string, session: string) {
+export function useBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper') {
   return useQuery<{ trades: BBGoTrade[] }>({
-    queryKey: ['bot-session-trades', userId, session],
-    queryFn: () => fetchBotSessionTrades(userId, session),
+    queryKey: ['bot-session-trades', userId, session, mode],
+    queryFn: () => fetchBotSessionTrades(userId, session, mode),
     enabled: !!userId && !!session,
     refetchInterval: 10_000,
   })
 }
 
-export function useBotOpenOrders(userId: string, session: string) {
+export function useBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper') {
   return useQuery<{ orders: BBGoOrder[] }>({
-    queryKey: ['bot-orders', userId, session],
-    queryFn: () => fetchBotOpenOrders(userId, session),
+    queryKey: ['bot-orders', userId, session, mode],
+    queryFn: () => fetchBotOpenOrders(userId, session, mode),
     enabled: !!userId && !!session,
     refetchInterval: 10_000,
   })
 }
 
-export function useBotSessionBalances(userId: string, session: string) {
+export function useBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper') {
   return useQuery<{ balances: Record<string, BBGoBalance> }>({
-    queryKey: ['bot-balances', userId, session],
-    queryFn: () => fetchBotSessionBalances(userId, session),
+    queryKey: ['bot-balances', userId, session, mode],
+    queryFn: () => fetchBotSessionBalances(userId, session, mode),
     enabled: !!userId && !!session,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotSessionSymbols(userId: string, session: string) {
+export function useBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper') {
   return useQuery<{ symbols: string[] }>({
-    queryKey: ['bot-symbols', userId, session],
-    queryFn: () => fetchBotSessionSymbols(userId, session),
+    queryKey: ['bot-symbols', userId, session, mode],
+    queryFn: () => fetchBotSessionSymbols(userId, session, mode),
     enabled: !!userId && !!session,
     refetchInterval: 30_000,
   })
@@ -208,64 +211,64 @@ export function useMarketKlines(exchange: string, symbol: string, interval?: str
   })
 }
 
-export function useBotTrades(userId: string, exchange?: string, symbol?: string) {
+export function useBotTrades(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
   return useQuery<{ trades: BBGoTrade[] }>({
-    queryKey: ['bot-trades', userId, exchange, symbol],
-    queryFn: () => fetchBotTrades(userId, exchange, symbol),
+    queryKey: ['bot-trades', userId, exchange, symbol, mode],
+    queryFn: () => fetchBotTrades(userId, exchange, symbol, undefined, mode),
     enabled: !!userId,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotClosedOrders(userId: string, exchange?: string, symbol?: string) {
+export function useBotClosedOrders(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
   return useQuery<{ orders: BBGoOrder[] }>({
-    queryKey: ['bot-closed-orders', userId, exchange, symbol],
-    queryFn: () => fetchBotClosedOrders(userId, exchange, symbol),
+    queryKey: ['bot-closed-orders', userId, exchange, symbol, mode],
+    queryFn: () => fetchBotClosedOrders(userId, exchange, symbol, undefined, mode),
     enabled: !!userId,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotTradingVolume(userId: string, period?: string) {
+export function useBotTradingVolume(userId: string, period?: string, mode?: 'live' | 'paper') {
   return useQuery<{ tradingVolumes: TradingVolumeEntry[] }>({
-    queryKey: ['bot-trading-volume', userId, period],
-    queryFn: () => fetchBotTradingVolume(userId, period),
+    queryKey: ['bot-trading-volume', userId, period, mode],
+    queryFn: () => fetchBotTradingVolume(userId, period, undefined, mode),
     enabled: !!userId,
     refetchInterval: 60_000,
   })
 }
 
-export function useBotAssets(userId: string) {
+export function useBotAssets(userId: string, mode?: 'live' | 'paper') {
   return useQuery<{ assets: Record<string, BBGoAsset> }>({
-    queryKey: ['bot-assets', userId],
-    queryFn: () => fetchBotAssets(userId),
+    queryKey: ['bot-assets', userId, mode],
+    queryFn: () => fetchBotAssets(userId, mode),
     enabled: !!userId,
     refetchInterval: 30_000,
   })
 }
 
-export function useBotStrategiesState(userId: string) {
+export function useBotStrategiesState(userId: string, mode?: 'live' | 'paper') {
   return useQuery<{ strategies: BBGoStrategyState[] }>({
-    queryKey: ['bot-strategies-state', userId],
-    queryFn: () => fetchBotStrategies(userId),
+    queryKey: ['bot-strategies-state', userId, mode],
+    queryFn: () => fetchBotStrategies(userId, mode),
     enabled: !!userId,
     refetchInterval: 30_000,
   })
 }
 
-export function useContainerLogs(userId: string, tail?: string) {
+export function useContainerLogs(userId: string, tail?: string, mode?: 'live' | 'paper') {
   return useQuery<{ logs: string }>({
-    queryKey: ['container-logs', userId, tail],
-    queryFn: () => fetchContainerLogs(userId, tail),
+    queryKey: ['container-logs', userId, tail, mode],
+    queryFn: () => fetchContainerLogs(userId, tail, mode),
     enabled: !!userId,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotPnL(userId: string, exchange?: string, symbol?: string) {
+export function useBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
   return useQuery<PnLReport>({
-    queryKey: ['bot-pnl', userId, exchange, symbol],
-    queryFn: () => fetchBotPnL(userId, exchange, symbol),
+    queryKey: ['bot-pnl', userId, exchange, symbol, mode],
+    queryFn: () => fetchBotPnL(userId, exchange, symbol, mode),
     enabled: !!userId,
     refetchInterval: 30_000,
   })
@@ -300,6 +303,7 @@ export function useDeleteCredential() {
 export type {
   StrategyEntry,
   UserContainer,
+  UserContainersResponse,
   CredentialInfo,
   BacktestResult,
   BacktestJob,

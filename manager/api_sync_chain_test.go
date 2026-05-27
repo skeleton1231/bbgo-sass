@@ -79,7 +79,7 @@ func TestSyncChain_OrdersIncremental(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{UserID: userID, Status: StatusRunning, Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance"}}}
+	users.users[userID+":"+ModeLive] = &UserContainer{UserID: userID, Status: StatusRunning, Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance"}}}
 
 	cfg := &Config{SupabaseURL: supaSrv.URL, SupabaseKey: "test-key"}
 	cm := &ContainerManager{cfg: cfg}
@@ -93,7 +93,7 @@ func TestSyncChain_OrdersIncremental(t *testing.T) {
 
 	// First sync: cursor=0 → fullSyncOrders → paginates and saves
 	savedCursor = 100
-	syncer.SyncUser(userID)
+	syncer.SyncUser(userID, ModeLive)
 
 	if len(upsertedOrders) < 2 {
 		t.Fatalf("expected at least 2 upserted orders, got %d", len(upsertedOrders))
@@ -276,7 +276,7 @@ func TestSyncChain_SkipsNonRunningUsers(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{UserID: userID, Status: StatusStopped}
+	users.users[userID+":"+ModeLive] = &UserContainer{UserID: userID, Status: StatusStopped}
 
 	cfg := &Config{SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
@@ -286,7 +286,7 @@ func TestSyncChain_SkipsNonRunningUsers(t *testing.T) {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
 
-	syncer.syncUserData(users.users[userID])
+	syncer.syncUserData(users.users[userID+":"+ModeLive])
 	if pingCalled {
 		t.Error("sync should not call bbgo API for stopped user")
 	}
@@ -313,7 +313,7 @@ func TestSyncChain_PingFailure_AbortsSync(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{UserID: userID, Status: StatusRunning}
+	users.users[userID+":"+ModeLive] = &UserContainer{UserID: userID, Status: StatusRunning}
 
 	cfg := &Config{SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
@@ -323,7 +323,7 @@ func TestSyncChain_PingFailure_AbortsSync(t *testing.T) {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
 
-	syncer.syncUserData(users.users[userID])
+	syncer.syncUserData(users.users[userID+":"+ModeLive])
 	if !pingCalled {
 		t.Error("expected ping to be called")
 	}
@@ -424,7 +424,7 @@ func TestSyncChain_TradeCursorAdvances(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{UserID: userID, Status: StatusRunning}
+	users.users[userID+":"+ModeLive] = &UserContainer{UserID: userID, Status: StatusRunning}
 
 	cfg := &Config{SupabaseURL: supaSrv.URL, SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
@@ -434,7 +434,7 @@ func TestSyncChain_TradeCursorAdvances(t *testing.T) {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
 
-	syncer.syncUserData(users.users[userID])
+	syncer.syncUserData(users.users[userID+":"+ModeLive])
 
 	time.Sleep(50 * time.Millisecond)
 	if savedCursor < 20 {
@@ -475,7 +475,7 @@ func TestSyncChain_SupabaseRejection_AbortsSync(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{UserID: userID, Status: StatusRunning}
+	users.users[userID+":"+ModeLive] = &UserContainer{UserID: userID, Status: StatusRunning}
 
 	cfg := &Config{SupabaseURL: supaSrv.URL, SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
@@ -486,5 +486,5 @@ func TestSyncChain_SupabaseRejection_AbortsSync(t *testing.T) {
 	}
 
 	// Should not panic or hang on Supabase rejection
-	syncer.syncUserData(users.users[userID])
+	syncer.syncUserData(users.users[userID+":"+ModeLive])
 }

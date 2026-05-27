@@ -57,21 +57,21 @@ func (c *BBGoClient) Ping() error {
 }
 
 type BBGoTrade struct {
-	GID            int64  `json:"gid"`
-	ID             uint64 `json:"id"`
-	OrderID        uint64 `json:"orderID"`
-	OrderUUID      string `json:"orderUUID,omitempty"`
-	Exchange       string `json:"exchange"`
-	Symbol         string `json:"symbol"`
-	Side           string `json:"side"`
-	Price          string `json:"price"`
-	Quantity       string `json:"quantity"`
-	QuoteQuantity  string `json:"quoteQuantity"`
-	IsBuyer        bool   `json:"isBuyer"`
-	IsMaker        bool   `json:"isMaker"`
-	TradedAt       string `json:"tradedAt"`
-	Fee            string `json:"fee"`
-	FeeCurrency    string `json:"feeCurrency"`
+	GID           int64  `json:"gid"`
+	ID            uint64 `json:"id"`
+	OrderID       uint64 `json:"orderID"`
+	OrderUUID     string `json:"orderUUID,omitempty"`
+	Exchange      string `json:"exchange"`
+	Symbol        string `json:"symbol"`
+	Side          string `json:"side"`
+	Price         string `json:"price"`
+	Quantity      string `json:"quantity"`
+	QuoteQuantity string `json:"quoteQuantity"`
+	IsBuyer       bool   `json:"isBuyer"`
+	IsMaker       bool   `json:"isMaker"`
+	TradedAt      string `json:"tradedAt"`
+	Fee           string `json:"fee"`
+	FeeCurrency   string `json:"feeCurrency"`
 }
 
 type BBGoTradesResponse struct {
@@ -88,7 +88,7 @@ func (c *BBGoClient) GetTrades(exchange, symbol string, lastGID int64) ([]BBGoTr
 	}
 
 	var resp BBGoTradesResponse
-	if err := c.get("/api/trades?" + q.Encode(), &resp); err != nil {
+	if err := c.get("/api/trades?"+q.Encode(), &resp); err != nil {
 		return nil, err
 	}
 	return resp.Trades, nil
@@ -159,7 +159,7 @@ func (c *BBGoClient) GetClosedOrders(exchange, symbol string, lastGID int64) ([]
 	}
 
 	var resp BBGoOrdersResponse
-	if err := c.get("/api/orders/closed?" + q.Encode(), &resp); err != nil {
+	if err := c.get("/api/orders/closed?"+q.Encode(), &resp); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil

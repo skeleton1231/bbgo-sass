@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	JobPending    = "pending"
+	JobPending     = "pending"
 	JobDownloading = "downloading"
-	JobRunning    = "running"
-	JobCompleted  = "completed"
-	JobFailed     = "failed"
+	JobRunning     = "running"
+	JobCompleted   = "completed"
+	JobFailed      = "failed"
 )
 
 type BacktestJob struct {

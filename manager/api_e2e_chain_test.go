@@ -35,6 +35,7 @@ func TestLiveTradingChain(t *testing.T) {
 
 	// Step 2: User creates a live grid2 strategy
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -97,6 +98,7 @@ func TestPaperTradingChain(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -150,6 +152,7 @@ func TestCrossExchangeLiveChain(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -206,6 +209,7 @@ func TestCrossExchangeLiveChain(t *testing.T) {
 // TestCrossExchangeEnvPrefixAutoFill verifies that empty EnvVarPrefix is auto-computed from exchange name
 func TestCrossExchangeEnvPrefixAutoFill(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -214,7 +218,7 @@ func TestCrossExchangeEnvPrefixAutoFill(t *testing.T) {
 				Mode:          "paper",
 				Config:        rawJSON(`{"symbol":"BTCUSDT"}`),
 				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance"}, // EnvVarPrefix intentionally empty
+					{Name: "maker", Exchange: "binance"},              // EnvVarPrefix intentionally empty
 					{Name: "hedge", Exchange: "bybit", Futures: true}, // EnvVarPrefix intentionally empty
 				},
 			},
@@ -294,7 +298,8 @@ func makeStrategyRequest(method, path, body string) *http.Request {
 	return req
 }
 
-// TestMixedModePrevention verifies that creating a paper strategy alongside a live one is rejected.
+// TestMixedModePrevention verifies that creating strategies with different modes is now allowed
+// since they go to separate containers (live → bbgo-{userID}, paper → bbgo-{userID}-paper).
 func TestMixedModePrevention(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -327,17 +332,14 @@ func TestMixedModePrevention(t *testing.T) {
 		t.Fatalf("first strategy creation failed: %d %s", w.Code, w.Body.String())
 	}
 
-	// Try creating a second strategy as paper — should be rejected
-	createBody2 := `{"name":"Paper DCA","strategy":"dca","exchange":"binance","config":{"symbol":"ETHUSDT"},"mode":"paper"}`
+	// Create second strategy as paper — should now be ALLOWED (goes to paper container)
+	createBody2 := `{"name":"Paper Grid","strategy":"grid","exchange":"binance","config":{"symbol":"ETHUSDT"},"mode":"paper"}`
 	req2 := makeStrategyRequest("POST", "/api/users/"+testUUID+"/strategies", createBody2)
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
 
-	if w2.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for mixed mode, got %d: %s", w2.Code, w2.Body.String())
-	}
-	if !strings.Contains(w2.Body.String(), "cannot mix paper and live") {
-		t.Errorf("expected mixed mode error message, got: %s", w2.Body.String())
+	if w2.Code != http.StatusCreated {
+		t.Errorf("expected 201 for mixed mode (separate containers), got %d: %s", w2.Code, w2.Body.String())
 	}
 }
 
@@ -434,6 +436,7 @@ func TestEnvArgs_PaperMode(t *testing.T) {
 	cm := NewContainerManager(cfg, creds, nil)
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -475,6 +478,7 @@ func TestEnvArgs_LiveMode(t *testing.T) {
 	})
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{Exchange: "okex", Strategy: "grid2", Mode: "live"},
@@ -516,6 +520,7 @@ func TestEnvArgs_CrossExchange_MultipleExchanges(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -561,6 +566,7 @@ func TestCrossExchangePublicOnlyPartialCredentials(t *testing.T) {
 	})
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -610,7 +616,7 @@ func TestProxyStripAuthHeaders(t *testing.T) {
 	cfg := &Config{BBGOPort: 8080, BBGOGRPCPort: 9090}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	proxy.resolveAddr = func(userID string) string { return bbgoSrv.URL }
+	proxy.resolveAddr = func(userID string, _ string) string { return bbgoSrv.URL }
 
 	req := httptest.NewRequest("GET", "/api/bbgo/user-1/sessions", nil)
 	req.Header.Set("X-Manager-Token", "secret-token")
@@ -618,7 +624,7 @@ func TestProxyStripAuthHeaders(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token")
 
 	w := httptest.NewRecorder()
-	proxy.ProxyToBot(w, req, "user-1")
+	proxy.ProxyToBot(w, req, "user-1", ModeLive)
 
 	mu.Lock()
 	defer mu.Unlock()

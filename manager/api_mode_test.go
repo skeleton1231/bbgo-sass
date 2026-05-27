@@ -15,7 +15,8 @@ func setupModeTestAPI(t *testing.T, existingMode string) *API {
 	if existingMode != "" {
 		strategies[0].Mode = existingMode
 	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: strategies,
@@ -77,7 +78,7 @@ func TestAPI_CreateStrategy_LiveOnlyAcceptsLive(t *testing.T) {
 	}
 }
 
-func TestAPI_CreateStrategy_MixedModeRejectsPaper(t *testing.T) {
+func TestAPI_CreateStrategy_MixedModeAcceptsPaper(t *testing.T) {
 	api := setupModeTestAPI(t, "live")
 	r := testRouter(api)
 
@@ -93,12 +94,12 @@ func TestAPI_CreateStrategy_MixedModeRejectsPaper(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for paper strategy mixed with live, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for paper strategy alongside live (separate containers), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
-func TestAPI_CreateStrategy_MixedModeRejectsLive(t *testing.T) {
+func TestAPI_CreateStrategy_MixedModeAcceptsLive(t *testing.T) {
 	api := setupModeTestAPI(t, "paper")
 	r := testRouter(api)
 
@@ -114,8 +115,8 @@ func TestAPI_CreateStrategy_MixedModeRejectsLive(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for live strategy mixed with paper, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for live strategy alongside paper (separate containers), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -257,7 +258,7 @@ func TestAPI_CreateStrategy_NoModeWithExistingMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 when empty mode (defaults to paper) conflicts with existing live, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 when empty mode (defaults to paper) alongside live (separate containers), got %d: %s", w.Code, w.Body.String())
 	}
 }

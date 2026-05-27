@@ -23,6 +23,7 @@ func TestSyncer_MarkCredentialsVerified(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users["user-1"] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Status: StatusRunning,
 		Strategies: []StrategyEntry{
@@ -60,6 +61,7 @@ func TestSyncer_MarkCredentialsVerified_CrossExchange(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users["user-1"] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Status: StatusRunning,
 		Strategies: []StrategyEntry{
@@ -100,6 +102,7 @@ func TestSyncer_MarkCredentialsVerified_UnusedExchange(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users["user-1"] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Status: StatusRunning,
 		Strategies: []StrategyEntry{
@@ -253,6 +256,7 @@ func TestSyncer_SyncUserData_FullChain(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users["user-1"] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "user-1",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -293,6 +297,7 @@ func TestSyncer_SyncUserData_FullChain(t *testing.T) {
 
 func TestExtractSessionNames_MixedSingleAndCrossExchange(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2"},
@@ -322,6 +327,7 @@ func TestExtractSessionNames_MixedSingleAndCrossExchange(t *testing.T) {
 
 func TestExtractSessionNames_CrossExchangeDeduplicates(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{

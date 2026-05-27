@@ -43,10 +43,10 @@ func insertTestCredential(t *testing.T, cs *CredentialStore, userID, exchange, a
 		t.Fatalf("encrypt api secret: %v", err)
 	}
 	cred := ExchangeCredential{
-		ID:                generateID("cred"),
-		UserID:            userID,
-		Exchange:          exchange,
-		APIKeyEncrypted:   keyEnc,
+		ID:                 generateID("cred"),
+		UserID:             userID,
+		Exchange:           exchange,
+		APIKeyEncrypted:    keyEnc,
 		APISecretEncrypted: secretEnc,
 	}
 	if err := cs.Upsert(cred); err != nil {
@@ -57,6 +57,7 @@ func insertTestCredential(t *testing.T, cs *CredentialStore, userID, exchange, a
 func TestEnvArgs_PaperMode_SetsEnv(t *testing.T) {
 	cm, _ := setupContainerManager(t)
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -79,6 +80,7 @@ func TestEnvArgs_PaperMode_SetsEnv(t *testing.T) {
 func TestEnvArgs_LiveMode_NoPaperTradeEnv(t *testing.T) {
 	cm, _ := setupContainerManager(t)
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
@@ -98,6 +100,7 @@ func TestEnvArgs_InjectsCredentials(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "binance", "my-api-key", "my-api-secret")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
@@ -124,6 +127,7 @@ func TestEnvArgs_InjectsCredentials(t *testing.T) {
 func TestEnvArgs_NoCredentials_NoInjection(t *testing.T) {
 	cm, _ := setupContainerManager(t)
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -147,6 +151,7 @@ func TestEnvArgs_MultipleExchanges_InjectsBoth(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "okex", "okex-key", "okex-secret")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
@@ -177,6 +182,7 @@ func TestEnvArgs_CrossExchange_InjectsAllSessionExchanges(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "bybit", "bybit-key", "bybit-secret")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -221,6 +227,7 @@ func TestEnvArgs_Passphrase_Injected(t *testing.T) {
 	})
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "okex", Strategy: "grid2", Mode: "live"},
@@ -250,6 +257,7 @@ func TestEnvArgs_Passphrase_Injected(t *testing.T) {
 func TestEnvArgs_MarketDataServiceURL(t *testing.T) {
 	cm, _ := setupContainerManager(t)
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -285,6 +293,7 @@ func TestEnvArgs_NoMarketDataAddr(t *testing.T) {
 	}
 	cm := NewContainerManager(cfg, creds, nil)
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -301,6 +310,7 @@ func TestEnvArgs_NoMarketDataAddr(t *testing.T) {
 
 func TestBuildUserYAML_PublicOnly_NoCredentials(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
@@ -318,6 +328,7 @@ func TestBuildUserYAML_PublicOnly_NoCredentials(t *testing.T) {
 
 func TestBuildUserYAML_PublicOnlyFalse_WithCredentials(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
@@ -339,6 +350,7 @@ func TestWriteYAMLToDisk(t *testing.T) {
 	os.MkdirAll(userDir, 0o755)
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`)},

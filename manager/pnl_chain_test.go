@@ -232,6 +232,7 @@ func TestEnvArgs_CrossExchange_InjectsMultipleCredentials(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: userID,
 		Strategies: []StrategyEntry{
 			{
@@ -284,6 +285,7 @@ func TestEnvArgs_PassphraseInjection(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: userID,
 		Strategies: []StrategyEntry{
 			{ID: "s1", Exchange: "okex", Strategy: "grid2", Mode: "live"},
@@ -322,6 +324,7 @@ func TestEnvArgs_NoDuplicateForSameExchange(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: userID,
 		Strategies: []StrategyEntry{
 			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"},
@@ -346,6 +349,7 @@ func TestEnvArgs_NoDuplicateForSameExchange(t *testing.T) {
 
 func TestBuildUserYAML_PaperEnv_PublicOnly(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "user-yaml",
 		Strategies: []StrategyEntry{
 			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper",
@@ -371,6 +375,7 @@ func TestBuildUserYAML_PaperEnv_PublicOnly(t *testing.T) {
 
 func TestBuildUserYAML_LiveEnv_NoPublicOnly(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-yaml",
 		Strategies: []StrategyEntry{
 			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live",

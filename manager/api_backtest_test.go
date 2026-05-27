@@ -13,7 +13,8 @@ import (
 func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 	t.Helper()
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2"}},

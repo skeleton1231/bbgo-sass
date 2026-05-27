@@ -11,7 +11,8 @@ import (
 
 func setupTestAPI(bbgoHandler http.HandlerFunc) (*API, *httptest.Server) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -184,7 +185,8 @@ func TestAPI_BBGo_InvalidUserID(t *testing.T) {
 
 func TestAPI_BBGo_ContainerStopped(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status: StatusStopped,
 	}

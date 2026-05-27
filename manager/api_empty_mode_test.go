@@ -34,9 +34,14 @@ func TestCreateStrategy_EmptyMode_DefaultsToPaper(t *testing.T) {
 		t.Fatalf("expected 201 for empty-mode strategy (defaults to paper), got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get(userID)
-	if len(uc.Strategies) < 2 {
-		t.Fatalf("expected 2 strategies, got %d", len(uc.Strategies))
+	uc, _ := api.users.Get(userID, ModePaper)
+	if uc == nil || len(uc.Strategies) < 1 {
+		t.Fatalf("expected 1 strategy in paper container, got %d", func() int {
+			if uc == nil {
+				return 0
+			}
+			return len(uc.Strategies)
+		}())
 	}
 	var newStrat *StrategyEntry
 	for i := range uc.Strategies {
@@ -82,15 +87,15 @@ func TestCreateStrategy_EmptyMode_LiveOnlyRejected(t *testing.T) {
 	}
 }
 
-// TestCreateStrategy_EmptyMode_MixedWithExistingLiveRejected verifies that
-// adding a strategy without mode (defaults to paper) is rejected when existing
+// TestCreateStrategy_EmptyMode_MixedWithExistingLiveAllowed verifies that
+// adding a strategy without mode (defaults to paper) is allowed when existing
 // strategies are live.
-func TestCreateStrategy_EmptyMode_MixedWithExistingLiveRejected(t *testing.T) {
+func TestCreateStrategy_EmptyMode_MixedWithExistingLiveAllowed(t *testing.T) {
 	api, cleanup := setupTestAPIWithCreds(t)
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Strategies = []StrategyEntry{
+	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "live"},
 	}
 
@@ -108,8 +113,8 @@ func TestCreateStrategy_EmptyMode_MixedWithExistingLiveRejected(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 when empty-mode (paper) conflicts with existing live, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Errorf("expected 201 when empty-mode (paper) alongside live - separate containers, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -122,11 +127,17 @@ func TestEnvArgs_EmptyModeStrategy_ProducesPaperTrade(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080, BBGOGRPCPort: 9090}, creds: creds}
 
 	uc := &UserContainer{
+
+		Mode: ModePaper,
+
 		UserID: "test-user",
+
 		Strategies: []StrategyEntry{
+
 			{Exchange: "binance", Strategy: "grid", Mode: "paper"},
 		},
 	}
+
 	args := cm.envArgs(uc)
 
 	hasPaper := false
@@ -145,6 +156,7 @@ func TestEnvArgs_EmptyModeStrategy_ProducesPaperTrade(t *testing.T) {
 // treats empty-mode (now stored as "paper") correctly with paperTrade: "1".
 func TestBuildUserYAML_EmptyModeStrategy_ProducesPaperTrade(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "paper", Config: json.RawMessage(`{"symbol":"BTCUSDT"}`)},

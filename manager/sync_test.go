@@ -11,6 +11,7 @@ import (
 func TestSyncer_SyncUserData_PingFails(t *testing.T) {
 	users := NewUserContainerManager()
 	users.users["user-1"] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "user-1",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},

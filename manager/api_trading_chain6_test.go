@@ -41,8 +41,8 @@ func chiReq2(method, url, body string, params map[string]string) *http.Request {
 func setupProxyAPI(t *testing.T, bbgoHandler http.HandlerFunc) (*API, func()) {
 	t.Helper()
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModeLive, StatusRunning)
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(bbgoHandler))
 	api := &API{
@@ -81,7 +81,7 @@ func TestBBGoSessionDetail_Proxy(t *testing.T) {
 
 func TestBBGoSessionDetail_NotRunning(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy(proxyUID, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.AddStrategy(proxyUID, ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
 
 	api := &API{
 		users:     users,
@@ -206,8 +206,8 @@ func TestBBGoTradingVolume_Proxy(t *testing.T) {
 
 func TestSyncCredential_UpsertsUser(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "live"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "live"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", ModeLive, StatusRunning)
 
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" && strings.Contains(r.URL.Path, "user_containers") {
@@ -294,6 +294,7 @@ func TestUpsertUser_NewUser(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000021",
 		Status: StatusRunning,
 		Strategies: []StrategyEntry{
@@ -323,7 +324,7 @@ func TestUpsertUser_SupabaseError(t *testing.T) {
 
 func TestBBGoClientForUser_StoppedContainer(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy(proxyUID, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.AddStrategy(proxyUID, ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
 
 	api := &API{
 		users:     users,

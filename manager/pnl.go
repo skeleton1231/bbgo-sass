@@ -34,12 +34,12 @@ type SymbolPnL struct {
 }
 
 type PnLReport struct {
-	TotalRealizedPnL float64    `json:"totalRealizedPnl"`
-	TotalFees        float64    `json:"totalFees"`
-	TotalTrades      int        `json:"totalTrades"`
-	WinningTrades    int        `json:"winningTrades"`
-	LosingTrades     int        `json:"losingTrades"`
-	WinRate          float64    `json:"winRate"`
+	TotalRealizedPnL float64     `json:"totalRealizedPnl"`
+	TotalFees        float64     `json:"totalFees"`
+	TotalTrades      int         `json:"totalTrades"`
+	WinningTrades    int         `json:"winningTrades"`
+	LosingTrades     int         `json:"losingTrades"`
+	WinRate          float64     `json:"winRate"`
 	Symbols          []SymbolPnL `json:"symbols"`
 }
 

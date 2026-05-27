@@ -29,8 +29,8 @@ func newTradingChainSetup(t *testing.T) *tradingChainSetup {
 	proxy := NewBotProxy(cm)
 	api := NewAPI(&Config{Port: 8090, ManagerToken: "test"}, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
 	api.containerStart = func(uc *UserContainer) error { return nil }
-	api.containerStop = func(string) {}
-	api.containerRunning = func(string) bool { return false }
+	api.containerStop = func(string, _ string) {}
+	api.containerRunning = func(string, _ string) bool { return false }
 	return &tradingChainSetup{api, cm, creds, enc}
 }
 
@@ -52,6 +52,7 @@ func TestTradingChain_LiveGrid_FullYAMLAndEnv(t *testing.T) {
 	s.storeCred(t, "binance", "livekey", "livesecret")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{{
 			ID: "strat-1", Strategy: "grid", Exchange: "binance", Mode: "live",
@@ -86,6 +87,7 @@ func TestTradingChain_PaperGrid_YAMLAndEnv(t *testing.T) {
 	s := newTradingChainSetup(t)
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{{
 			ID: "strat-1", Strategy: "grid", Exchange: "binance", Mode: "paper",
@@ -112,6 +114,7 @@ func TestTradingChain_CrossExchange_YAML(t *testing.T) {
 	s.storeCred(t, "bybit", "ykey", "ysec")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{{
 			ID: "strat-x1", Strategy: "xmaker", Mode: "live", CrossExchange: true,
@@ -153,6 +156,7 @@ func TestTradingChain_LegacyAliases(t *testing.T) {
 	} {
 		t.Run(tc.frontend, func(t *testing.T) {
 			uc := &UserContainer{
+				Mode:   ModeLive,
 				UserID: testUUID,
 				Strategies: []StrategyEntry{{
 					Strategy: tc.frontend, Exchange: "binance", Mode: "live",
@@ -169,6 +173,7 @@ func TestTradingChain_LegacyAliases(t *testing.T) {
 // Test: DCA field rename interval→investmentInterval
 func TestTradingChain_DCA_FieldRename(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{{
 			Strategy: "dca", Exchange: "binance", Mode: "live",
@@ -184,6 +189,7 @@ func TestTradingChain_DCA_FieldRename(t *testing.T) {
 // Test: Multiple strategies on different exchanges produce correct multi-session YAML
 func TestTradingChain_MultipleExchanges(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{Strategy: "grid", Exchange: "binance", Mode: "live",
@@ -222,6 +228,6 @@ func TestTradingChain_BacktestYAML(t *testing.T) {
 // Test: Container DNS address format
 func TestTradingChain_ContainerAddresses(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{BBGOPort: 8080, BBGOGRPCPort: 9090}}
-	assert.Equal(t, "http://bbgo-user-123:8080", cm.APIURL("user-123"))
-	assert.Equal(t, "bbgo-user-456:9090", cm.ContainerGRPCAddr("user-456"))
+	assert.Equal(t, "http://bbgo-user-123:8080", cm.APIURL("user-123", ModeLive))
+	assert.Equal(t, "bbgo-user-456:9090", cm.ContainerGRPCAddr("user-456", ModeLive))
 }

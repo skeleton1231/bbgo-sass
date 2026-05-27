@@ -58,7 +58,7 @@ func main() {
 		users.Restore(recoveredUsers)
 		recoveryResults := containerMgr.RecoverUsers(recoveredUsers)
 		for _, r := range recoveryResults {
-			users.UpdateStatus(r.UserID, r.Status)
+			users.UpdateStatus(r.UserID, r.Mode, r.Status)
 		}
 		for _, uc := range recoveredUsers {
 			notifier.LoadUser(uc.UserID)
@@ -106,7 +106,7 @@ func main() {
 			allUsers := users.ListUsers()
 			for _, r := range containerMgr.CheckAndRecover(allUsers) {
 				if r.Error != "" {
-					users.UpdateStatus(r.UserID, StatusError)
+					users.UpdateStatus(r.UserID, r.Mode, StatusError)
 				}
 				if r.Restarted {
 					notifier.Dispatch(r.UserID, NotificationEvent{

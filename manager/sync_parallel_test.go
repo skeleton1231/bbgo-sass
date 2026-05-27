@@ -52,6 +52,7 @@ func TestSyncer_SyncAll_Concurrent(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		uid := "user-" + string(rune('0'+i))
 		users.users[uid] = &UserContainer{
+			Mode:       ModeLive,
 			UserID:     uid,
 			Status:     StatusRunning,
 			Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -100,6 +101,7 @@ func TestSyncer_SyncAll_SkipsStopped(t *testing.T) {
 	users := NewUserContainerManager()
 	users.users["user-stopped"] = &UserContainer{UserID: "user-stopped", Status: StatusStopped}
 	users.users["user-running"] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "user-running",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},

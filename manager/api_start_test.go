@@ -55,7 +55,8 @@ func TestAPI_StartUser_AcceptedAsync(t *testing.T) {
 
 func TestAPI_StartUserAsync_NoStrategies(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status: StatusStopped,
 	}
@@ -76,7 +77,8 @@ func TestAPI_StartUserAsync_NoStrategies(t *testing.T) {
 
 func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -123,7 +125,7 @@ func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 		case <-deadline:
 			t.Fatal("timed out waiting for status to become running")
 		case <-ticker.C:
-			uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+			uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
 			if uc.Status == StatusRunning {
 				mu.Lock()
 				calls := pingCalls
@@ -158,7 +160,8 @@ func setupTestAPIWithMockCM(bbgoHandler http.HandlerFunc, isRunning bool) (*API,
 	if isRunning {
 		status = StatusRunning
 	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     status,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -174,7 +177,7 @@ func setupTestAPIWithMockCM(bbgoHandler http.HandlerFunc, isRunning bool) (*API,
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_ string) bool { return isRunning }
+	api.containerRunning = func(_, _ string) bool { return isRunning }
 	api.containerStart = func(_ *UserContainer) error { return nil }
 	if bbgoHandler != nil {
 		api.newBBGoClient = func(_ string) *BBGoClient {

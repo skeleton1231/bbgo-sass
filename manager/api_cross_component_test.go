@@ -74,7 +74,7 @@ func TestIssueWSTicket_ReturnsTicket(t *testing.T) {
 func TestStartUser_NoStrategies_Returns400(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	users := NewUserContainerManager()
@@ -97,11 +97,12 @@ func TestStartUser_NoStrategies_Returns400(t *testing.T) {
 func TestStopUser_SetsStatusStopped(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -111,7 +112,7 @@ func TestStopUser_SetsStatusStopped(t *testing.T) {
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
 
 	var stopCalled bool
-	api.containerStop = func(_ string) {
+	api.containerStop = func(_, _ string) {
 		stopCalled = true
 	}
 
@@ -126,7 +127,7 @@ func TestStopUser_SetsStatusStopped(t *testing.T) {
 	if !stopCalled {
 		t.Error("expected containerStop to be called")
 	}
-	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
 	if uc.Status != StatusStopped {
 		t.Errorf("expected status stopped, got %s", uc.Status)
 	}
@@ -137,19 +138,19 @@ func TestStopUser_SetsStatusStopped(t *testing.T) {
 func TestStartUser_AlreadyRunning_Returns200(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", StrategyEntry{
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`),
 	})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", StatusRunning)
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StatusRunning)
 
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_ string) bool { return true }
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	var startCalls int
 	api.containerStart = func(_ *UserContainer) error {
@@ -177,14 +178,14 @@ func TestStartUser_AlreadyRunning_Returns200(t *testing.T) {
 func TestCreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	users := NewUserContainerManager()
-	users.AddStrategy(userID, StrategyEntry{
+	users.AddStrategy(userID, ModePaper, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`), Mode: "paper",
 	})
-	users.UpdateStatus(userID, StatusStarting)
+	users.UpdateStatus(userID, ModePaper, StatusStarting)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
@@ -213,7 +214,7 @@ func TestCreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 		t.Errorf("expected no containerStart when status is starting, got %d calls", startCalls)
 	}
 
-	uc, _ := users.Get(userID)
+	uc, _ := users.Get(userID, ModePaper)
 	if len(uc.Strategies) != 2 {
 		t.Fatalf("expected 2 strategies, got %d", len(uc.Strategies))
 	}
@@ -227,7 +228,7 @@ func TestCreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 func TestUserStatus_UnknownUser_ReturnsStopped(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
@@ -244,8 +245,9 @@ func TestUserStatus_UnknownUser_ReturnsStopped(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp["status"] != StatusStopped {
-		t.Errorf("expected stopped for unknown user, got %v", resp["status"])
+	containers, ok := resp["containers"].(map[string]interface{})
+	if !ok || len(containers) != 0 {
+		t.Errorf("expected empty containers for unknown user, got %v", resp)
 	}
 }
 
@@ -254,7 +256,7 @@ func TestUserStatus_UnknownUser_ReturnsStopped(t *testing.T) {
 func TestListStrategies_UnknownUser_ReturnsEmpty(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
@@ -271,9 +273,9 @@ func TestListStrategies_UnknownUser_ReturnsEmpty(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	strats, ok := resp["strategies"].([]interface{})
-	if !ok || len(strats) != 0 {
-		t.Errorf("expected empty strategies, got %v", resp["strategies"])
+	containers, ok := resp["containers"].(map[string]interface{})
+	if !ok || len(containers) != 0 {
+		t.Errorf("expected empty containers for unknown user, got %v", resp)
 	}
 }
 
@@ -286,7 +288,7 @@ func TestCreateCredential_UnsupportedExchange(t *testing.T) {
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
@@ -314,7 +316,7 @@ func TestCreateCredential_MissingFields(t *testing.T) {
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
@@ -352,7 +354,7 @@ func TestCreateCredential_MissingFields(t *testing.T) {
 func TestCreateStrategy_CrossExchange_RequiresSessions(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	users := NewUserContainerManager()
@@ -376,11 +378,12 @@ func TestCreateStrategy_CrossExchange_RequiresSessions(t *testing.T) {
 func TestDeleteStrategy_NotFound(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -403,12 +406,14 @@ func TestDeleteStrategy_NotFound(t *testing.T) {
 func TestHealthEndpoint_ReturnsCounts(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1"}},
 	}
-	users.users["11111111-2222-3333-4444-555555555555"] = &UserContainer{
+	users.users["11111111-2222-3333-4444-555555555555:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "11111111-2222-3333-4444-555555555555",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s2"}},
@@ -439,7 +444,7 @@ func TestHealthEndpoint_ReturnsCounts(t *testing.T) {
 func TestBacktestSync_TooManySymbols(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
-		SupabaseKey: "test",
+		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}

@@ -14,19 +14,19 @@ import (
 type BotProxy struct {
 	cm          *ContainerManager
 	client      *http.Client
-	resolveAddr func(userID string) string // defaults to cm.APIURL
+	resolveAddr func(userID, mode string) string
 }
 
 func NewBotProxy(cm *ContainerManager) *BotProxy {
 	transport := &http.Transport{
 		DialContext:           (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
-		Proxy:                func(_ *http.Request) (*url.URL, error) { return nil, nil },
+		Proxy:                 func(_ *http.Request) (*url.URL, error) { return nil, nil },
 		ResponseHeaderTimeout: 15 * time.Second,
 	}
 	return &BotProxy{
 		cm: cm,
-		resolveAddr: func(userID string) string {
-			return cm.APIURL(userID)
+		resolveAddr: func(userID, mode string) string {
+			return cm.APIURL(userID, mode)
 		},
 		client: &http.Client{
 			Timeout:   30 * time.Second,
@@ -35,13 +35,13 @@ func NewBotProxy(cm *ContainerManager) *BotProxy {
 	}
 }
 
-func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID string) {
+func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID, mode string) {
 	targetPath := strings.TrimPrefix(r.URL.Path, "/api/bbgo/"+userID)
 	if targetPath == "" || targetPath == "/" {
 		targetPath = "/"
 	}
 
-	baseURL := bp.resolveAddr(userID)
+	baseURL := bp.resolveAddr(userID, mode)
 	targetURL := fmt.Sprintf("%s/api%s", baseURL, targetPath)
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery

@@ -31,7 +31,8 @@ func testRouterWithUser(api *API, userID string) *chi.Mux {
 
 func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -60,7 +61,8 @@ func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
 
 func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -86,7 +88,8 @@ func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
 
 func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -133,7 +136,8 @@ func TestResolveUserID_InvalidUUID_Rejected(t *testing.T) {
 
 func TestResolveUserID_CreateStrategy_MismatchBlocked(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{},
@@ -165,8 +169,8 @@ func TestResolveUserID_CreateStrategy_MismatchBlocked(t *testing.T) {
 		t.Fatalf("expected 403 for strategy creation with mismatched user, got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	if len(uc.Strategies) != 0 {
+	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
+	if uc != nil && len(uc.Strategies) != 0 {
 		t.Error("strategy should NOT have been created for mismatched user")
 	}
 }
@@ -272,6 +276,7 @@ func TestCreateAndStart_WritesYAMLToDisk(t *testing.T) {
 	_ = NewContainerManager(cfg, creds, nil)
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -340,6 +345,7 @@ func TestDockerArgs_LiveMode_EnvAssembly(t *testing.T) {
 	cm := NewContainerManager(cfg, creds, nil)
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{

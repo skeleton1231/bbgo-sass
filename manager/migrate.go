@@ -12,12 +12,22 @@ import (
 
 const migrationSQL = `
 CREATE TABLE IF NOT EXISTS public.user_containers (
-  user_id UUID PRIMARY KEY REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'live' CHECK (mode IN ('live', 'paper')),
   status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'stopped', 'error', 'starting')),
   strategies JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, mode)
 );
+
+-- Migrate existing rows: add mode column if table already exists without it
+DO $$ BEGIN
+  ALTER TABLE public.user_containers ADD COLUMN mode TEXT NOT NULL DEFAULT 'live' CHECK (mode IN ('live', 'paper'));
+  ALTER TABLE public.user_containers DROP CONSTRAINT user_containers_pkey;
+  ALTER TABLE public.user_containers ADD PRIMARY KEY (user_id, mode);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 
 ALTER TABLE public.user_containers ENABLE ROW LEVEL SECURITY;
 
@@ -79,7 +89,7 @@ CREATE TABLE IF NOT EXISTS public.exchange_credentials (
   is_testnet BOOLEAN NOT NULL DEFAULT false,
   is_verified BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(user_id, exchange)
+  UNIQUE(user_id, exchange, is_testnet)
 );
 
 ALTER TABLE public.exchange_credentials ENABLE ROW LEVEL SECURITY;

@@ -298,10 +298,10 @@ func TestNotifier_Dispatch_TelegramWithMock(t *testing.T) {
 	encToken, _ := enc.Encrypt("fake-bot-token")
 
 	n := &Notifier{
-		crypto:   enc,
-		client:   telegramSrv.Client(),
-		configs:  map[string][]NotificationConfig{},
-		lastSent: map[string]map[string]time.Time{},
+		crypto:    enc,
+		client:    telegramSrv.Client(),
+		configs:   map[string][]NotificationConfig{},
+		lastSent:  map[string]map[string]time.Time{},
 		rateLimit: 0,
 	}
 	n.configs["u1"] = []NotificationConfig{{
@@ -333,10 +333,10 @@ func TestNotifier_Dispatch_SlackWithMock(t *testing.T) {
 	encURL, _ := enc.Encrypt(slackSrv.URL + "/webhook/test")
 
 	n := &Notifier{
-		crypto:   enc,
-		client:   slackSrv.Client(),
-		configs:  map[string][]NotificationConfig{},
-		lastSent: map[string]map[string]time.Time{},
+		crypto:    enc,
+		client:    slackSrv.Client(),
+		configs:   map[string][]NotificationConfig{},
+		lastSent:  map[string]map[string]time.Time{},
 		rateLimit: 0,
 	}
 	n.configs["u1"] = []NotificationConfig{{
@@ -373,7 +373,9 @@ func TestReadBodyHint(t *testing.T) {
 func TestReadBodyHint_TruncatesLargeBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		large := make([]byte, 1024)
-		for i := range large { large[i] = 'x' }
+		for i := range large {
+			large[i] = 'x'
+		}
 		w.Write(large)
 	}))
 	defer srv.Close()
@@ -388,12 +390,14 @@ func TestReadBodyHint_TruncatesLargeBody(t *testing.T) {
 
 func TestSyncUser_UpsertsAndSyncs(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("sync-u1", StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
-	users.UpdateStatus("sync-u1", StatusRunning)
+	users.AddStrategy("sync-u1", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
+	users.UpdateStatus("sync-u1", ModeLive, StatusRunning)
 
 	upserted := false
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/rest/v1/user_containers" { upserted = true }
+		if r.URL.Path == "/rest/v1/user_containers" {
+			upserted = true
+		}
 		w.WriteHeader(200)
 		w.Write([]byte(`[]`))
 	}))
@@ -416,7 +420,7 @@ func TestSyncUser_UpsertsAndSyncs(t *testing.T) {
 			return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
 		},
 	}
-	s.SyncUser("sync-u1")
+	s.SyncUser("sync-u1", ModeLive)
 	if !upserted {
 		t.Error("SyncUser did not upsert to Supabase")
 	}
@@ -424,7 +428,7 @@ func TestSyncUser_UpsertsAndSyncs(t *testing.T) {
 
 func TestSyncUser_StoppedContainer(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("sync-u2", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.AddStrategy("sync-u2", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
 
 	upserted := false
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -452,7 +456,7 @@ func TestSyncUser_StoppedContainer(t *testing.T) {
 			return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
 		},
 	}
-	s.SyncUser("sync-u2")
+	s.SyncUser("sync-u2", ModeLive)
 	if !upserted {
 		t.Error("should still upsert even when stopped")
 	}

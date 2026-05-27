@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"math"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
@@ -130,8 +130,8 @@ func TestSyncTradesViaAPI_CursorAdvance(t *testing.T) {
 
 	p := pool.New(5)
 	users := NewUserContainerManager()
-	users.AddStrategy("sync-cursor-u1", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.UpdateStatus("sync-cursor-u1", StatusRunning)
+	users.AddStrategy("sync-cursor-u1", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.UpdateStatus("sync-cursor-u1", ModeLive, StatusRunning)
 
 	s := &Syncer{
 		users:     users,
@@ -143,7 +143,7 @@ func TestSyncTradesViaAPI_CursorAdvance(t *testing.T) {
 			return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
 		},
 	}
-	client := s.bbgoClient("sync-cursor-u1").WithContext(context.Background())
+	client := s.bbgoClient("sync-cursor-u1", ModeLive).WithContext(context.Background())
 	s.syncTradesViaAPI("sync-cursor-u1", client)
 	if callCount != 1 {
 		t.Errorf("expected 1 bbgo API call (single trade, no pagination), got %d", callCount)
@@ -154,9 +154,9 @@ func TestSyncTradesViaAPI_CursorAdvance(t *testing.T) {
 
 func TestSyncAll_SkipsStoppedContainers(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("sync-all-u1", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.AddStrategy("sync-all-u2", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.UpdateStatus("sync-all-u1", StatusRunning)
+	users.AddStrategy("sync-all-u1", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.AddStrategy("sync-all-u2", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.UpdateStatus("sync-all-u1", ModeLive, StatusRunning)
 	// sync-all-u2 stays stopped
 
 	bbgoCalled := false
@@ -223,7 +223,7 @@ func TestConcurrentAddRemoveStrategies(t *testing.T) {
 		wg.Add(2)
 		go func(i int) {
 			defer wg.Done()
-			m.AddStrategy("concurrent-u1", StrategyEntry{
+			m.AddStrategy("concurrent-u1", ModeLive, StrategyEntry{
 				ID:       generateID("strat"),
 				Exchange: "binance",
 				Strategy: "grid2",
@@ -232,7 +232,7 @@ func TestConcurrentAddRemoveStrategies(t *testing.T) {
 		}(i)
 		go func(i int) {
 			defer wg.Done()
-			uc, ok := m.Get("concurrent-u1")
+			uc, ok := m.Get("concurrent-u1", ModeLive)
 			if ok && len(uc.Strategies) > 0 {
 				m.RemoveStrategy("concurrent-u1", uc.Strategies[0].ID)
 			}
@@ -371,6 +371,7 @@ func TestWSTicket_SingleUse(t *testing.T) {
 
 func TestCloneUserContainer_Isolation(t *testing.T) {
 	original := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "u1",
 		Status: StatusStopped,
 		Strategies: []StrategyEntry{
@@ -403,6 +404,7 @@ func TestNormalizeStrategyConfig_FieldRename(t *testing.T) {
 
 func TestBuildUserYAML_PaperMode(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "u1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: json.RawMessage(`{"symbol":"BTCUSDT"}`)},
@@ -423,6 +425,7 @@ func TestBuildUserYAML_PaperMode(t *testing.T) {
 
 func TestBuildUserYAML_LiveMode(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "u1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: json.RawMessage(`{"symbol":"BTCUSDT"}`)},

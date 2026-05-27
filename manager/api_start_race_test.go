@@ -12,13 +12,13 @@ import (
 
 func TestAPI_StartUser_IdempotentWhenStarting(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", StrategyEntry{
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StrategyEntry{
 		ID:       "s1",
 		Exchange: "binance",
 		Strategy: "grid",
 		Config:   rawJSON(`{}`),
 	})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", StatusStarting)
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StatusStarting)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -28,7 +28,7 @@ func TestAPI_StartUser_IdempotentWhenStarting(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_ string) bool { return false }
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	// Block startContainer so the goroutine stays alive — if the fix is wrong,
 	// the goroutine would call this and we'd detect it.
@@ -61,7 +61,7 @@ func TestAPI_StartUser_IdempotentWhenStarting(t *testing.T) {
 
 func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", StrategyEntry{
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StrategyEntry{
 		ID:       "s1",
 		Exchange: "binance",
 		Strategy: "grid",
@@ -76,7 +76,7 @@ func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_ string) bool { return false }
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	var startCalls int64
 	unblock := make(chan struct{})
@@ -120,13 +120,13 @@ func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	users := NewUserContainerManager()
-	users.AddStrategy(userID, StrategyEntry{
+	users.AddStrategy(userID, ModeLive, StrategyEntry{
 		ID:       "s1",
 		Exchange: "binance",
 		Strategy: "grid",
 		Config:   rawJSON(`{}`),
 	})
-	users.UpdateStatus(userID, StatusRunning)
+	users.UpdateStatus(userID, ModeLive, StatusRunning)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -136,7 +136,7 @@ func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_ string) bool { return false }
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	unblock := make(chan struct{})
 	var startCalls int64

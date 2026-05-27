@@ -30,9 +30,9 @@ type ContainerManager struct {
 	// test hooks
 	runBacktestFn  func(userID string, yamlContent []byte) ([]byte, error)
 	syncBacktestFn func(exchange, symbol, start, end string) (string, error)
-	logsFn         func(userID string, tail string) (string, error)
-	apiURLFn       func(userID string) string
-	checkRunningFn func(userID string) (bool, error)
+	logsFn         func(userID, mode string) (string, error)
+	apiURLFn       func(userID, mode string) string
+	checkRunningFn func(userID, mode string) (bool, error)
 	dockerFn       func(args ...string) (string, error)
 }
 
@@ -40,8 +40,12 @@ func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool) *Con
 	return &ContainerManager{cfg: cfg, creds: creds, pool: p}
 }
 
-func (cm *ContainerManager) containerName(userID string) string {
-	return containerPrefix + userID
+func (cm *ContainerManager) containerName(userID, mode string) string {
+	name := containerPrefix + userID
+	if mode == ModePaper {
+		name += "-paper"
+	}
+	return name
 }
 
 func (cm *ContainerManager) docker(args ...string) (string, error) {
@@ -74,57 +78,66 @@ func (cm *ContainerManager) EnsureNetwork() error {
 	return nil
 }
 
-func (cm *ContainerManager) userDir(userID string) string {
-	return fmt.Sprintf("/data/%s", userID)
+func (cm *ContainerManager) userDir(userID, mode string) string {
+	dir := fmt.Sprintf("/data/%s", userID)
+	if mode == ModePaper {
+		dir += "-paper"
+	}
+	return dir
 }
 
-func (cm *ContainerManager) hostDir(userID string) string {
-	return cm.cfg.DataDir + "/" + userID
+func (cm *ContainerManager) hostDir(userID, mode string) string {
+	dir := cm.cfg.DataDir + "/" + userID
+	if mode == ModePaper {
+		dir += "-paper"
+	}
+	return dir
 }
 
 // APIURL returns the internal Docker DNS URL for the user's bbgo container.
-// Works when manager and containers share the same Docker network.
-func (cm *ContainerManager) APIURL(userID string) string {
+func (cm *ContainerManager) APIURL(userID, mode string) string {
 	if cm.apiURLFn != nil {
-		return cm.apiURLFn(userID)
+		return cm.apiURLFn(userID, mode)
 	}
-	return fmt.Sprintf("http://%s:%d", cm.containerName(userID), cm.cfg.BBGOPort)
+	return fmt.Sprintf("http://%s:%d", cm.containerName(userID, mode), cm.cfg.BBGOPort)
 }
 
 func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
-	name := cm.containerName(uc.UserID)
-	cm.StopAndRemove(uc.UserID)
+	mode := uc.Mode
+	name := cm.containerName(uc.UserID, mode)
+	cm.StopAndRemove(uc.UserID, mode)
 
-	hostDir := cm.hostDir(uc.UserID)
-	if err := os.MkdirAll(hostDir, 0o755); err != nil {
+	hDir := cm.hostDir(uc.UserID, mode)
+	if err := os.MkdirAll(hDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	dbPath := hostDir + "/bbgo.db"
+	dbPath := hDir + "/bbgo.db"
 	if _, err := os.Stat(dbPath); err == nil {
 		backup := dbPath + ".backup." + time.Now().Format("20060102-150405")
 		if err := copyFile(dbPath, backup); err != nil {
 			return fmt.Errorf("backup %s: %w", dbPath, err)
 		}
 		log.Printf("backed up %s -> %s", dbPath, backup)
-		cleanupBackups(hostDir, "bbgo.db.backup", 3)
+		cleanupBackups(hDir, "bbgo.db.backup", 3)
 	}
 
 	yamlContent, err := buildUserYAML(uc, func(exchange string) bool {
 		if cm.creds == nil {
 			return false
 		}
-		_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
+		wantTestnet := mode == ModePaper
+		_, _, _, err := cm.creds.GetDecryptedByMode(uc.UserID, exchange, wantTestnet)
 		return err == nil
 	})
 	if err != nil {
 		return fmt.Errorf("build config for user %s: %w", uc.UserID, err)
 	}
-	if err := os.WriteFile(hostDir+"/bbgo.yaml", yamlContent, 0o644); err != nil {
+	if err := os.WriteFile(hDir+"/bbgo.yaml", yamlContent, 0o644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
-	containerDir := cm.userDir(uc.UserID)
+	containerDir := cm.userDir(uc.UserID, mode)
 	args := []string{
 		"run", "-d",
 		"--name", name,
@@ -162,7 +175,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 	if cm.runBacktestFn != nil {
 		return cm.runBacktestFn(userID, yamlContent)
 	}
-	hostBacktestDir := cm.hostDir(userID) + "/backtest"
+	hostBacktestDir := cm.hostDir(userID, ModeLive) + "/backtest"
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
@@ -174,7 +187,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		return nil, fmt.Errorf("write backtest config: %w", err)
 	}
 
-	containerDir := cm.userDir(userID) + "/backtest"
+	containerDir := cm.userDir(userID, ModeLive) + "/backtest"
 	name := generateID("bbgo-bt-" + safeShortID(userID))
 	args := []string{
 		"run", "--rm",
@@ -291,14 +304,13 @@ func buildSyncConfig(exchange, symbol, startTime, endTime string) ([]byte, error
 
 func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 	args := []string{}
-	for _, s := range uc.Strategies {
-		if s.Mode == "paper" {
-			args = append(args, "-e", "PAPER_TRADE=1")
-			break
-		}
+
+	// Paper containers get PAPER_TRADE=1 (bbgo uses this to enable testnet mode)
+	if uc.Mode == ModePaper {
+		args = append(args, "-e", "PAPER_TRADE=1")
 	}
 
-	dir := cm.userDir(uc.UserID)
+	dir := cm.userDir(uc.UserID, uc.Mode)
 	args = append(args,
 		"-e", "DB_DRIVER=sqlite3",
 		"-e", fmt.Sprintf("DB_DSN=%s/bbgo.db", dir),
@@ -309,8 +321,10 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
 
+	// Inject credentials: paper containers use testnet creds, live containers use live creds
 	if cm.creds != nil {
 		injected := map[string]bool{}
+		wantTestnet := uc.Mode == ModePaper
 		for _, s := range uc.Strategies {
 			exchanges := []string{}
 			if s.CrossExchange {
@@ -324,7 +338,8 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 				if injected[ex] {
 					continue
 				}
-				if apiKey, apiSecret, passphrase, isTestnet, err := cm.creds.GetDecryptedWithMeta(uc.UserID, ex); err == nil {
+				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(uc.UserID, ex, wantTestnet)
+				if err == nil {
 					prefix := exchangeEnvPrefix(ex)
 					args = append(args,
 						"-e", prefix+"_API_KEY="+apiKey,
@@ -333,11 +348,11 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 					if passphrase != "" {
 						args = append(args, "-e", prefix+"_PASSPHRASE="+passphrase)
 					}
-					injected[ex] = true
-					if isTestnet {
+					if uc.Mode == ModePaper {
 						args = append(args, "-e", prefix+"_TESTNET=1")
 					}
 				}
+				injected[ex] = true
 			}
 		}
 	}
@@ -345,8 +360,8 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 	return args
 }
 
-func (cm *ContainerManager) Stop(userID string) {
-	name := cm.containerName(userID)
+func (cm *ContainerManager) Stop(userID, mode string) {
+	name := cm.containerName(userID, mode)
 	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
 	if err != nil || out != "true" {
 		return
@@ -355,22 +370,22 @@ func (cm *ContainerManager) Stop(userID string) {
 	log.Printf("container %s stopped", name)
 }
 
-func (cm *ContainerManager) StopAndRemove(userID string) {
-	name := cm.containerName(userID)
+func (cm *ContainerManager) StopAndRemove(userID, mode string) {
+	name := cm.containerName(userID, mode)
 	cm.docker("stop", name, "-t", "10")
 	cm.docker("rm", "-f", name)
 }
 
-func (cm *ContainerManager) IsRunning(userID string) bool {
-	running, _ := cm.CheckRunning(userID)
+func (cm *ContainerManager) IsRunning(userID, mode string) bool {
+	running, _ := cm.CheckRunning(userID, mode)
 	return running
 }
 
-func (cm *ContainerManager) CheckRunning(userID string) (bool, error) {
+func (cm *ContainerManager) CheckRunning(userID, mode string) (bool, error) {
 	if cm.checkRunningFn != nil {
-		return cm.checkRunningFn(userID)
+		return cm.checkRunningFn(userID, mode)
 	}
-	name := cm.containerName(userID)
+	name := cm.containerName(userID, mode)
 	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
 	if err != nil {
 		return false, err
@@ -378,11 +393,11 @@ func (cm *ContainerManager) CheckRunning(userID string) (bool, error) {
 	return out == "true", nil
 }
 
-func (cm *ContainerManager) Logs(userID string, tail string) (string, error) {
+func (cm *ContainerManager) Logs(userID, mode, tail string) (string, error) {
 	if cm.logsFn != nil {
-		return cm.logsFn(userID, tail)
+		return cm.logsFn(userID, mode)
 	}
-	name := cm.containerName(userID)
+	name := cm.containerName(userID, mode)
 	out, err := cm.docker("logs", "--tail", tail, name)
 	if err != nil {
 		return "", fmt.Errorf("docker logs %s: %w", name, err)
@@ -390,9 +405,15 @@ func (cm *ContainerManager) Logs(userID string, tail string) (string, error) {
 	return out, nil
 }
 
+// ContainerGRPCAddr returns the gRPC address for a user's container.
+func (cm *ContainerManager) ContainerGRPCAddr(userID, mode string) string {
+	return fmt.Sprintf("%s:%d", cm.containerName(userID, mode), cm.cfg.BBGOGRPCPort)
+}
+
 // HealthCheckResult reports the outcome of checking a single container.
 type HealthCheckResult struct {
 	UserID    string
+	Mode      string
 	Alive     bool
 	Restarted bool
 	Error     string
@@ -406,30 +427,30 @@ func (cm *ContainerManager) CheckAndRecover(users []*UserContainer) []HealthChec
 
 	for i, uc := range users {
 		if uc.Status != StatusRunning {
-			results[i] = HealthCheckResult{UserID: uc.UserID, Alive: false}
+			results[i] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: false}
 			continue
 		}
 		idx, uc := i, uc
 		if err := cm.pool.Submit(func() {
-			running, _ := cm.CheckRunning(uc.UserID)
+			running, _ := cm.CheckRunning(uc.UserID, uc.Mode)
 			if running {
 				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: true}
+				results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: true}
 				mu.Unlock()
 				return
 			}
-			log.Printf("health check: container %s died, restarting", cm.containerName(uc.UserID))
+			log.Printf("health check: container %s died, restarting", cm.containerName(uc.UserID, uc.Mode))
 			if err := cm.CreateAndStart(uc); err != nil {
 				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: false, Error: err.Error()}
+				results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: false, Error: err.Error()}
 				mu.Unlock()
 				return
 			}
 			mu.Lock()
-			results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: true, Restarted: true}
+			results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: true, Restarted: true}
 			mu.Unlock()
 		}); err != nil {
-			results[idx] = HealthCheckResult{UserID: uc.UserID, Alive: false, Error: err.Error()}
+			results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: false, Error: err.Error()}
 		}
 	}
 	cm.pool.Wait()
@@ -438,6 +459,7 @@ func (cm *ContainerManager) CheckAndRecover(users []*UserContainer) []HealthChec
 
 type RecoveryResult struct {
 	UserID string
+	Mode   string
 	Status string
 }
 
@@ -448,12 +470,12 @@ func (cm *ContainerManager) RecoverUsers(users []*UserContainer) []RecoveryResul
 	for i, uc := range users {
 		idx, uc := i, uc
 		if err := cm.pool.Submit(func() {
-			name := cm.containerName(uc.UserID)
+			name := cm.containerName(uc.UserID, uc.Mode)
 			out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
 			if out == "true" {
 				log.Printf("recovered container %s (running)", name)
 				mu.Lock()
-				results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusRunning}
+				results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusRunning}
 				mu.Unlock()
 				return
 			}
@@ -462,20 +484,20 @@ func (cm *ContainerManager) RecoverUsers(users []*UserContainer) []RecoveryResul
 				if err := cm.CreateAndStart(uc); err != nil {
 					log.Printf("recover user %s failed: %v", uc.UserID, err)
 					mu.Lock()
-					results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusError}
+					results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusError}
 					mu.Unlock()
 					return
 				}
 				mu.Lock()
-				results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusRunning}
+				results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusRunning}
 				mu.Unlock()
 				return
 			}
 			mu.Lock()
-			results[idx] = RecoveryResult{UserID: uc.UserID, Status: uc.Status}
+			results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: uc.Status}
 			mu.Unlock()
 		}); err != nil {
-			results[idx] = RecoveryResult{UserID: uc.UserID, Status: StatusError}
+			results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusError}
 		}
 	}
 	cm.pool.Wait()

@@ -11,6 +11,7 @@ import (
 // xmaker cross-exchange strategy with maker+hedge sessions.
 func TestCrossExchangeYAML_XMaker(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -73,6 +74,7 @@ func TestCrossExchangeYAML_XMaker(t *testing.T) {
 // TestCrossExchangeYAML_PaperMode verifies paper mode for cross-exchange.
 func TestCrossExchangeYAML_PaperMode(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -118,6 +120,7 @@ func TestEnvArgs_MultiExchangeCredentials(t *testing.T) {
 	cm := NewContainerManager(cfg, creds, nil)
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -168,6 +171,7 @@ func TestEnvArgs_CredentialDeduplication(t *testing.T) {
 	cm := NewContainerManager(cfg, creds, nil)
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
@@ -226,7 +230,12 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			containerMode := ModeLive
+			if tt.mode == "paper" {
+				containerMode = ModePaper
+			}
 			uc := &UserContainer{
+				Mode:   containerMode,
 				UserID: "test-user",
 				Strategies: []StrategyEntry{
 					{
@@ -319,6 +328,7 @@ func TestExchangePrefixes_FrontendBackendAlignment(t *testing.T) {
 // TestYAMLStructure_ParsesCorrectly verifies generated YAML is valid bbgo config.
 func TestYAMLStructure_ParsesCorrectly(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{

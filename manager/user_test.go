@@ -7,6 +7,7 @@ import (
 
 func TestBuildUserYAML_SingleExchange(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -43,6 +44,7 @@ func TestBuildUserYAML_SingleExchange(t *testing.T) {
 
 func TestBuildUserYAML_CrossExchange(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -85,6 +87,7 @@ func TestBuildUserYAML_CrossExchange(t *testing.T) {
 
 func TestBuildUserYAML_Mixed(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -173,66 +176,66 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 		wantInYAML []string
 	}{
 		{
-			name:      "grid2_with_all_fields",
-			strategy:  "grid2",
-			config:    `{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":50000,"lowerPrice":40000}`,
-			startTime: "2024-01-01",
-			endTime:   "2024-06-01",
+			name:       "grid2_with_all_fields",
+			strategy:   "grid2",
+			config:     `{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":50000,"lowerPrice":40000}`,
+			startTime:  "2024-01-01",
+			endTime:    "2024-06-01",
 			wantInYAML: []string{"grid2:", "gridNumber:", "upperPrice:", "lowerPrice:", "BTCUSDT", "2024-01-01", "2024-06-01"},
 		},
 		{
-			name:      "empty_config_uses_defaults",
-			strategy:  "grid2",
-			config:    `{}`,
-			startTime: "",
-			endTime:   "",
+			name:       "empty_config_uses_defaults",
+			strategy:   "grid2",
+			config:     `{}`,
+			startTime:  "",
+			endTime:    "",
 			wantInYAML: []string{"grid2:", "BTCUSDT", "2024-01-01", "binance:"},
 		},
 		{
-			name:      "symbol_from_config_when_override_empty",
-			strategy:  "dca",
-			config:    `{"symbol":"ETHUSDT","investmentInterval":"1h"}`,
-			symbol:    "",
+			name:       "symbol_from_config_when_override_empty",
+			strategy:   "dca",
+			config:     `{"symbol":"ETHUSDT","investmentInterval":"1h"}`,
+			symbol:     "",
 			wantInYAML: []string{"dca:", "ETHUSDT", "investmentInterval:"},
 		},
 		{
-			name:      "override_symbol_takes_priority",
-			strategy:  "grid2",
-			config:    `{"symbol":"BTCUSDT"}`,
-			symbol:    "SOLUSDT",
+			name:       "override_symbol_takes_priority",
+			strategy:   "grid2",
+			config:     `{"symbol":"BTCUSDT"}`,
+			symbol:     "SOLUSDT",
 			wantInYAML: []string{"grid2:", "SOLUSDT"},
 		},
 		{
-			name:      "override_exchange_takes_priority",
-			strategy:  "grid2",
-			config:    `{"exchange":"kucoin","symbol":"BTCUSDT"}`,
-			exchange:  "bybit",
+			name:       "override_exchange_takes_priority",
+			strategy:   "grid2",
+			config:     `{"exchange":"kucoin","symbol":"BTCUSDT"}`,
+			exchange:   "bybit",
 			wantInYAML: []string{"bybit:", "BYBIT"},
 		},
 		{
-			name:      "exchange_from_config_when_override_empty",
-			strategy:  "grid2",
-			config:    `{"exchange":"okex","symbol":"BTCUSDT"}`,
-			exchange:  "",
+			name:       "exchange_from_config_when_override_empty",
+			strategy:   "grid2",
+			config:     `{"exchange":"okex","symbol":"BTCUSDT"}`,
+			exchange:   "",
 			wantInYAML: []string{"okex:", "OKEX"},
 		},
 		{
-			name:      "supertrend_strategy",
-			strategy:  "supertrend",
-			config:    `{"symbol":"BTCUSDT","interval":"15m"}`,
+			name:       "supertrend_strategy",
+			strategy:   "supertrend",
+			config:     `{"symbol":"BTCUSDT","interval":"15m"}`,
 			wantInYAML: []string{"supertrend:", "BTCUSDT", "15m"},
 		},
 		{
-			name:      "bollmaker_strategy",
-			strategy:  "bollmaker",
-			config:    `{"symbol":"ETHUSDT"}`,
+			name:       "bollmaker_strategy",
+			strategy:   "bollmaker",
+			config:     `{"symbol":"ETHUSDT"}`,
 			wantInYAML: []string{"bollmaker:", "ETHUSDT"},
 		},
 		{
-			name:    "invalid_json_config",
+			name:     "invalid_json_config",
 			strategy: "grid2",
-			config:  `{invalid`,
-			wantErr: true,
+			config:   `{invalid`,
+			wantErr:  true,
 		},
 		{
 			name:       "interval_not_injected_when_missing",
@@ -241,23 +244,23 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 			wantInYAML: []string{"grid2:"},
 		},
 		{
-			name:      "interval_preserved_when_set",
-			strategy:  "grid2",
-			config:    `{"symbol":"BTCUSDT","interval":"5m"}`,
+			name:       "interval_preserved_when_set",
+			strategy:   "grid2",
+			config:     `{"symbol":"BTCUSDT","interval":"5m"}`,
 			wantInYAML: []string{"interval: 5m"},
 		},
 		{
-			name:      "unknown_exchange_gets_default_prefix",
-			strategy:  "grid2",
-			config:    `{"symbol":"BTCUSDT"}`,
-			exchange:  "unknown_exchange",
+			name:       "unknown_exchange_gets_default_prefix",
+			strategy:   "grid2",
+			config:     `{"symbol":"BTCUSDT"}`,
+			exchange:   "unknown_exchange",
 			wantInYAML: []string{"unknown_exchange:", "EXCHANGE"},
 		},
 		{
-			name:      "kucoin_exchange",
-			strategy:  "grid2",
-			config:    `{"symbol":"BTCUSDT"}`,
-			exchange:  "kucoin",
+			name:       "kucoin_exchange",
+			strategy:   "grid2",
+			config:     `{"symbol":"BTCUSDT"}`,
+			exchange:   "kucoin",
 			wantInYAML: []string{"kucoin:", "KUCOIN"},
 		},
 	}
@@ -411,7 +414,6 @@ func TestFilterTradingPairs(t *testing.T) {
 		}
 	}
 }
-
 
 // TestBuildBacktestYAML_AllExchangesValidConfig verifies SyncBacktest config for all exchanges.
 func TestBuildSyncConfig_AllExchanges(t *testing.T) {

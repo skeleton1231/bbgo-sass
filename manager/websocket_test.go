@@ -10,6 +10,7 @@ import (
 
 func TestExtractSessionNames_SingleExchange(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid"},
@@ -23,6 +24,7 @@ func TestExtractSessionNames_SingleExchange(t *testing.T) {
 
 func TestExtractSessionNames_CrossExchange(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{
@@ -45,6 +47,7 @@ func TestExtractSessionNames_CrossExchange(t *testing.T) {
 
 func TestExtractSessionNames_Deduplicates(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "user-1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid"},

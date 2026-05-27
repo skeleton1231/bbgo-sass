@@ -7,6 +7,7 @@ import (
 
 func TestBuildUserYAML_PaperMode_SetsEnvironment(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -33,6 +34,7 @@ func TestBuildUserYAML_PaperMode_SetsEnvironment(t *testing.T) {
 
 func TestBuildUserYAML_LiveMode_NoPaperTrade(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -54,14 +56,15 @@ func TestBuildUserYAML_LiveMode_NoPaperTrade(t *testing.T) {
 	}
 }
 
-func TestBuildUserYAML_MixedPaperLive_PaperWins(t *testing.T) {
+func TestBuildUserYAML_PaperContainer_MultipleStrategies(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
 				Strategy: "grid2",
 				Exchange: "binance",
-				Mode:     "live",
+				Mode:     "paper",
 				Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
 			},
 			{
@@ -72,19 +75,26 @@ func TestBuildUserYAML_MixedPaperLive_PaperWins(t *testing.T) {
 			},
 		},
 	}
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return true })
+	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	yaml := string(yamlBytes)
 
 	if !strings.Contains(yaml, "PAPER_TRADE:") {
-		t.Error("expected PAPER_TRADE when at least one strategy is paper mode")
+		t.Error("expected PAPER_TRADE for paper container with multiple strategies")
+	}
+	if !strings.Contains(yaml, "grid2:") {
+		t.Error("expected grid2 strategy")
+	}
+	if !strings.Contains(yaml, "dca:") {
+		t.Error("expected dca strategy")
 	}
 }
 
 func TestBuildUserYAML_CrossExchangePaperMode(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -115,6 +125,7 @@ func TestBuildUserYAML_CrossExchangePaperMode(t *testing.T) {
 
 func TestBuildUserYAML_CrossExchangeLiveMode(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -142,6 +153,7 @@ func TestBuildUserYAML_CrossExchangeLiveMode(t *testing.T) {
 
 func TestBuildUserYAML_MultipleStrategies_AllLive(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{

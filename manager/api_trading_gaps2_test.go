@@ -80,7 +80,8 @@ func TestAPI_CreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusStarting
+	api.users.AddStrategy(userID, ModePaper, StrategyEntry{ID: "s0", Exchange: "binance", Strategy: "grid", Mode: "paper"})
+	api.users.UpdateStatus(userID, ModePaper, StatusStarting)
 
 	startCount := 0
 	api.containerStart = func(uc *UserContainer) error {
@@ -112,7 +113,7 @@ func TestAPI_CreateStrategy_ModeInheritsFromExisting(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Strategies = []StrategyEntry{
+	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
 	}
 
@@ -137,6 +138,7 @@ func TestEnvArgs_PaperStrategy_SetsPaperTrade(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080, BBGOGRPCPort: 9090}, creds: creds}
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid", Mode: "paper"},
@@ -176,6 +178,7 @@ func TestEnvArgs_LiveStrategy_NoPaperTrade(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080, BBGOGRPCPort: 9090, MarketDataAddr: "marketdata:9090"}, creds: creds}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid", Mode: "live"},
@@ -214,8 +217,8 @@ func TestAPI_DeleteCredential_RunningContainer_SetsStarting(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusRunning
-	api.containerRunning = func(string) bool { return true }
+	api.users.users[userID+":"+ModeLive].Status = StatusRunning
+	api.containerRunning = func(string, _ string) bool { return true }
 
 	credBody := `{"exchange":"binance","api_key":"testkey","api_secret":"testsecret"}`
 	r := testRouter(api)
@@ -243,7 +246,7 @@ func TestAPI_DeleteCredential_RunningContainer_SetsStarting(t *testing.T) {
 	}
 
 	// Verify status changed to starting (triggers async restart)
-	uc, _ := api.users.Get(userID)
+	uc, _ := api.users.Get(userID, ModeLive)
 	if uc.Status != StatusStarting {
 		t.Errorf("expected status=starting after credential delete on running container, got %s", uc.Status)
 	}

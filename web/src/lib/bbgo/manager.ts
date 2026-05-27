@@ -43,8 +43,14 @@ export interface StrategyEntry {
 
 export interface UserContainer {
   user_id: string
+  mode: 'live' | 'paper'
   status: 'running' | 'stopped' | 'error' | 'starting'
   strategies: StrategyEntry[]
+}
+
+export interface UserContainersResponse {
+  user_id: string
+  containers: Partial<Record<'live' | 'paper', UserContainer>>
 }
 
 export interface BacktestResult {
@@ -166,7 +172,7 @@ export interface PnLReport {
 // --- Strategy CRUD ---
 
 export function fetchUserStrategies(userId: string) {
-  return request<UserContainer>(`/users/${userId}/strategies`)
+  return request<UserContainersResponse>(`/users/${userId}/strategies`)
 }
 
 export function createStrategy(userId: string, data: {
@@ -192,16 +198,16 @@ export function deleteStrategy(userId: string, strategyId: string) {
 
 // --- User lifecycle ---
 
-export function startUser(userId: string) {
-  return request<UserContainer>(`/users/${userId}/start`, { method: 'POST' })
+export function startUser(userId: string, mode: 'live' | 'paper' = 'live') {
+  return request<UserContainer>(`/users/${userId}/start?mode=${mode}`, { method: 'POST' })
 }
 
-export function stopUser(userId: string) {
-  return request<{ status: string; user_id: string }>(`/users/${userId}/stop`, { method: 'POST' })
+export function stopUser(userId: string, mode: 'live' | 'paper' = 'live') {
+  return request<{ status: string; user_id: string }>(`/users/${userId}/stop?mode=${mode}`, { method: 'POST' })
 }
 
 export function fetchUserStatus(userId: string) {
-  return request<UserContainer>(`/users/${userId}/status`)
+  return request<UserContainersResponse>(`/users/${userId}/status`)
 }
 
 // --- Backtest ---
@@ -250,62 +256,64 @@ export function listBacktestJobs() {
 
 // --- Bot data via Manager → bbgo container REST API ---
 
-export function fetchBotPing(userId: string) {
-  return request<{ status: string }>(`/users/${userId}/bbgo/ping`)
+export function fetchBotPing(userId: string, mode?: 'live' | 'paper') {
+  return request<{ status: string }>(`/users/${userId}/bbgo/ping?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessions(userId: string) {
-  return request<{ sessions: BBGoSession[] }>(`/users/${userId}/bbgo/sessions`)
+export function fetchBotSessions(userId: string, mode?: 'live' | 'paper') {
+  return request<{ sessions: BBGoSession[] }>(`/users/${userId}/bbgo/sessions?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessionDetail(userId: string, session: string) {
-  return request<{ session: BBGoSession }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}`)
+export function fetchBotSessionDetail(userId: string, session: string, mode?: 'live' | 'paper') {
+  return request<{ session: BBGoSession }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessionTrades(userId: string, session: string) {
-  return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/trades`)
+export function fetchBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper') {
+  return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/trades?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotOpenOrders(userId: string, session: string) {
-  return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/open-orders`)
+export function fetchBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper') {
+  return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/open-orders?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessionAccount(userId: string, session: string) {
-  return request<{ account: unknown }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/account`)
+export function fetchBotSessionAccount(userId: string, session: string, mode?: 'live' | 'paper') {
+  return request<{ account: unknown }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/account?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessionBalances(userId: string, session: string) {
-  return request<{ balances: Record<string, BBGoBalance> }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/balances`)
+export function fetchBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper') {
+  return request<{ balances: Record<string, BBGoBalance> }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/balances?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessionSymbols(userId: string, session: string) {
-  return request<{ symbols: string[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/symbols`)
+export function fetchBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper') {
+  return request<{ symbols: string[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/symbols?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotAssets(userId: string) {
-  return request<{ assets: Record<string, BBGoAsset> }>(`/users/${userId}/bbgo/assets`)
+export function fetchBotAssets(userId: string, mode?: 'live' | 'paper') {
+  return request<{ assets: Record<string, BBGoAsset> }>(`/users/${userId}/bbgo/assets?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotStrategies(userId: string) {
-  return request<{ strategies: BBGoStrategyState[] }>(`/users/${userId}/bbgo/strategies`)
+export function fetchBotStrategies(userId: string, mode?: 'live' | 'paper') {
+  return request<{ strategies: BBGoStrategyState[] }>(`/users/${userId}/bbgo/strategies?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotTrades(userId: string, exchange?: string, symbol?: string, gid?: number) {
+export function fetchBotTrades(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper') {
   const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
   if (exchange) params.set('exchange', exchange)
   if (symbol) params.set('symbol', symbol)
   if (gid) params.set('gid', String(gid))
   const qs = params.toString()
-  return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/trades${qs ? `?${qs}` : ''}`)
+  return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/trades?${qs}`)
 }
 
-export function fetchBotClosedOrders(userId: string, exchange?: string, symbol?: string, gid?: number) {
+export function fetchBotClosedOrders(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper') {
   const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
   if (exchange) params.set('exchange', exchange)
   if (symbol) params.set('symbol', symbol)
   if (gid) params.set('gid', String(gid))
   const qs = params.toString()
-  return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/orders/closed${qs ? `?${qs}` : ''}`)
+  return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/orders/closed?${qs}`)
 }
 
 export interface TradingVolumeEntry {
@@ -318,27 +326,27 @@ export interface TradingVolumeEntry {
   quoteVolume: number
 }
 
-export function fetchBotTradingVolume(userId: string, period?: string, segment?: string) {
+export function fetchBotTradingVolume(userId: string, period?: string, segment?: string, mode?: 'live' | 'paper') {
   const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
   if (period) params.set('period', period)
   if (segment) params.set('segment', segment)
-  const qs = params.toString()
-  return request<{ tradingVolumes: TradingVolumeEntry[] }>(`/users/${userId}/bbgo/trading-volume${qs ? `?${qs}` : ''}`)
+  return request<{ tradingVolumes: TradingVolumeEntry[] }>(`/users/${userId}/bbgo/trading-volume?${params}`)
 }
 
-export function fetchContainerLogs(userId: string, tail?: string) {
+export function fetchContainerLogs(userId: string, tail?: string, mode?: 'live' | 'paper') {
   const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
   if (tail) params.set('tail', tail)
-  const qs = params.toString()
-  return request<{ logs: string }>(`/users/${userId}/logs${qs ? `?${qs}` : ''}`)
+  return request<{ logs: string }>(`/users/${userId}/logs?${params}`)
 }
 
-export function fetchBotPnL(userId: string, exchange?: string, symbol?: string) {
+export function fetchBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
   const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
   if (exchange) params.set('exchange', exchange)
   if (symbol) params.set('symbol', symbol)
-  const qs = params.toString()
-  return request<PnLReport>(`/users/${userId}/bbgo/pnl${qs ? `?${qs}` : ''}`)
+  return request<PnLReport>(`/users/${userId}/bbgo/pnl?${params}`)
 }
 
 // --- Market data (from shared marketdata service via Manager) ---

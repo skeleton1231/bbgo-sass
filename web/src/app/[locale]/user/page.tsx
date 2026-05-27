@@ -37,19 +37,26 @@ export default function DashboardPage() {
   const bt = useTranslations('Bots')
   const userId = useUserId()
 
-  const { data: userContainer } = useUserStrategies(userId)
-  const isActive = userContainer?.status === 'running'
-  const strategyCount = userContainer?.strategies?.length ?? 0
+  const { data: containersResp } = useUserStrategies(userId)
+  const containers = containersResp?.containers ?? {}
+  const liveContainer = containers.live
+  const paperContainer = containers.paper
+  const anyActive = liveContainer?.status === 'running' || paperContainer?.status === 'running'
+  const strategyCount = (liveContainer?.strategies?.length ?? 0) + (paperContainer?.strategies?.length ?? 0)
 
-  const { data: tradesData } = useBotTrades(userId, undefined, undefined)
-  const { data: assetsData } = useBotAssets(userId)
-  const { data: sessionsData } = useBotSessions(userId)
-  const { data: volumeData } = useBotTradingVolume(userId)
-  const { data: pnlData } = useBotPnL(userId)
+  const dashboardMode = liveContainer?.status === 'running' ? 'live' as const
+    : paperContainer?.status === 'running' ? 'paper' as const
+    : undefined
 
-  const trades = isActive ? (tradesData?.trades ?? []) : []
-  const assets = isActive ? (assetsData?.assets ?? {}) : {}
-  const sessionCount = isActive ? (sessionsData?.sessions?.length ?? 0) : 0
+  const { data: tradesData } = useBotTrades(userId, undefined, undefined, dashboardMode)
+  const { data: assetsData } = useBotAssets(userId, dashboardMode)
+  const { data: sessionsData } = useBotSessions(userId, dashboardMode)
+  const { data: volumeData } = useBotTradingVolume(userId, undefined, dashboardMode)
+  const { data: pnlData } = useBotPnL(userId, undefined, undefined, dashboardMode)
+
+  const trades = anyActive ? (tradesData?.trades ?? []) : []
+  const assets = anyActive ? (assetsData?.assets ?? {}) : {}
+  const sessionCount = anyActive ? (sessionsData?.sessions?.length ?? 0) : 0
 
   const totalValue = Object.values(assets).reduce((sum, a: BBGoAsset) => {
     return sum + parseFloat(a.netAssetInUSD || '0')
@@ -60,7 +67,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {isActive
+          {anyActive
             ? t('strategyCount', { count: strategyCount })
             : t('noStrategies')}
         </p>
@@ -76,7 +83,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold">{isActive ? 1 : 0}</span>
+              <span className="text-2xl font-semibold">{anyActive ? 1 : 0}</span>
               <span className="text-sm text-muted-foreground">/ {strategyCount}</span>
             </div>
           </CardContent>
@@ -115,7 +122,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="mt-3 text-2xl font-semibold font-mono">
-              {isActive && totalValue > 0
+              {anyActive && totalValue > 0
                 ? `$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : '—'}
             </p>
@@ -123,7 +130,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {isActive && (
+      {anyActive && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="rounded-xl">
             <CardHeader className="pb-2">
@@ -145,7 +152,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isActive && pnlData && pnlData.totalTrades > 0 && (
+      {anyActive && pnlData && pnlData.totalTrades > 0 && (
         <Card className="rounded-xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">{t('pnlSummary')}</CardTitle>
@@ -156,7 +163,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {isActive && trades.length > 0 && (
+      {anyActive && trades.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="rounded-xl">
             <CardHeader className="pb-2">
@@ -178,7 +185,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isActive && strategyCount > 0 && (
+      {anyActive && strategyCount > 0 && (
         <Card className="rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-sm font-medium">{t('strategies')}</CardTitle>
@@ -189,7 +196,7 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <div className="divide-y">
-            {userContainer!.strategies.map((s) => (
+            {[liveContainer, paperContainer].filter(Boolean).flatMap(uc => uc!.strategies.map(s => ({ ...s, containerStatus: uc!.status }))).map((s) => (
               <div key={s.id} className="flex items-center justify-between px-6 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
@@ -203,13 +210,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <Badge
-                  variant={isActive ? 'default' : 'secondary'}
+                  variant={s.containerStatus === 'running' ? 'default' : 'secondary'}
                   className={cn(
                     'rounded-full text-[11px] font-medium',
-                    isActive && 'bg-trade-up text-white hover:bg-trade-up'
+                    s.containerStatus === 'running' && 'bg-trade-up text-white hover:bg-trade-up'
                   )}
                 >
-                  {isActive ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
+                  {s.containerStatus === 'running' ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
                 </Badge>
               </div>
             ))}
@@ -269,7 +276,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {userId && !isActive && strategyCount === 0 && (
+      {userId && !anyActive && strategyCount === 0 && (
         <Card className="rounded-xl">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">

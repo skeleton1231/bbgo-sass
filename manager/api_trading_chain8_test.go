@@ -18,7 +18,8 @@ func setupCredsAPI(t *testing.T) (*API, func()) {
 	}
 	creds := NewCredentialStore(tmpDir, enc)
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeee000070"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeee000070:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeee000070",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -27,7 +28,7 @@ func setupCredsAPI(t *testing.T) (*API, func()) {
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
-	api.containerRunning = func(string) bool { return false }
+	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(*UserContainer) error { return nil }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +198,7 @@ func TestAPI_CreateCredential_TriggersRestart(t *testing.T) {
 	api, cleanup := setupCredsAPI(t)
 	defer cleanup()
 
-	api.users.users[credsUID].Status = StatusRunning
+	api.users.users[credsUID+":"+ModeLive].Status = StatusRunning
 
 	body := `{"exchange":"binance","api_key":"k","api_secret":"s"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/credentials", strings.NewReader(body))
@@ -209,7 +210,7 @@ func TestAPI_CreateCredential_TriggersRestart(t *testing.T) {
 		t.Fatalf("status = %d, want 201: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get(credsUID)
+	uc, _ := api.users.Get(credsUID, ModeLive)
 	if uc.Status != StatusStarting {
 		t.Errorf("expected status starting after credential create, got %s", uc.Status)
 	}
@@ -248,7 +249,8 @@ func TestAPI_PnL_ContainerFallback_Running(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	users := NewUserContainerManager()
-	users.users[credsUID] = &UserContainer{
+	users.users[credsUID+":"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     credsUID,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -258,7 +260,7 @@ func TestAPI_PnL_ContainerFallback_Running(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	api := NewAPI(&Config{DataDir: tmpDir, ManagerToken: "t"}, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
-	api.containerRunning = func(string) bool { return true }
+	api.containerRunning = func(string, _ string) bool { return true }
 	api.containerStart = func(*UserContainer) error { return nil }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}

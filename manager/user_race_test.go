@@ -7,14 +7,14 @@ import (
 
 func TestGetReturnsSnapshot(t *testing.T) {
 	m := NewUserContainerManager()
-	m.AddStrategy("user-1", StrategyEntry{
+	m.AddStrategy("user-1", ModeLive, StrategyEntry{
 		ID:       "s1",
 		Strategy: "grid2",
 		Exchange: "binance",
 		Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
-	uc1, ok := m.Get("user-1")
+	uc1, ok := m.Get("user-1", ModeLive)
 	if !ok {
 		t.Fatal("expected to find user-1")
 	}
@@ -22,7 +22,7 @@ func TestGetReturnsSnapshot(t *testing.T) {
 	// Mutate the returned value — should NOT affect the stored entry
 	uc1.Status = StatusRunning
 
-	uc2, _ := m.Get("user-1")
+	uc2, _ := m.Get("user-1", ModeLive)
 	if uc2.Status == StatusRunning {
 		t.Error("Get() should return a snapshot, but mutating it affected the stored entry")
 	}
@@ -30,7 +30,7 @@ func TestGetReturnsSnapshot(t *testing.T) {
 
 func TestListUsersReturnsSnapshots(t *testing.T) {
 	m := NewUserContainerManager()
-	m.AddStrategy("user-1", StrategyEntry{ID: "s1", Strategy: "grid2", Exchange: "binance", Config: rawJSON(`{}`)})
+	m.AddStrategy("user-1", ModeLive, StrategyEntry{ID: "s1", Strategy: "grid2", Exchange: "binance", Config: rawJSON(`{}`)})
 
 	users := m.ListUsers()
 	if len(users) != 1 {
@@ -49,7 +49,7 @@ func TestListUsersReturnsSnapshots(t *testing.T) {
 
 func TestConcurrentAccessNoRace(t *testing.T) {
 	m := NewUserContainerManager()
-	m.AddStrategy("user-1", StrategyEntry{ID: "s1", Strategy: "grid2", Exchange: "binance", Config: rawJSON(`{}`)})
+	m.AddStrategy("user-1", ModeLive, StrategyEntry{ID: "s1", Strategy: "grid2", Exchange: "binance", Config: rawJSON(`{}`)})
 
 	var wg sync.WaitGroup
 	const goroutines = 20
@@ -59,7 +59,7 @@ func TestConcurrentAccessNoRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			uc, ok := m.Get("user-1")
+			uc, ok := m.Get("user-1", ModeLive)
 			if ok {
 				_ = uc.Status
 			}
@@ -75,8 +75,8 @@ func TestConcurrentAccessNoRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			m.UpdateStatus("user-1", StatusRunning)
-			m.UpdateStatus("user-1", StatusStopped)
+			m.UpdateStatus("user-1", ModeLive, StatusRunning)
+			m.UpdateStatus("user-1", ModeLive, StatusStopped)
 		}()
 	}
 
@@ -86,7 +86,7 @@ func TestConcurrentAccessNoRace(t *testing.T) {
 func TestAddStrategyReturnsSnapshot(t *testing.T) {
 	m := NewUserContainerManager()
 
-	uc, created := m.AddStrategy("user-1", StrategyEntry{
+	uc, created := m.AddStrategy("user-1", ModeLive, StrategyEntry{
 		ID:       "s1",
 		Strategy: "grid2",
 		Exchange: "binance",
@@ -99,7 +99,7 @@ func TestAddStrategyReturnsSnapshot(t *testing.T) {
 
 	uc.Status = StatusRunning
 
-	uc2, _ := m.Get("user-1")
+	uc2, _ := m.Get("user-1", ModeLive)
 	if uc2.Status == StatusRunning {
 		t.Error("AddStrategy() should return a snapshot, not a pointer to internal state")
 	}
@@ -107,18 +107,18 @@ func TestAddStrategyReturnsSnapshot(t *testing.T) {
 
 func TestGet_StrategiesSliceIsDeepCopy(t *testing.T) {
 	m := NewUserContainerManager()
-	m.AddStrategy("user-1", StrategyEntry{
+	m.AddStrategy("user-1", ModeLive, StrategyEntry{
 		ID:       "s1",
 		Strategy: "grid2",
 		Exchange: "binance",
 		Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
 
-	uc1, _ := m.Get("user-1")
+	uc1, _ := m.Get("user-1", ModeLive)
 	// Modify element through returned copy — should NOT affect stored data
 	uc1.Strategies[0].Exchange = "okex"
 
-	uc2, _ := m.Get("user-1")
+	uc2, _ := m.Get("user-1", ModeLive)
 	if uc2.Strategies[0].Exchange == "okex" {
 		t.Fatal("Get() must deep-copy Strategies slice — modifying returned copy affected internal state")
 	}
@@ -126,7 +126,7 @@ func TestGet_StrategiesSliceIsDeepCopy(t *testing.T) {
 
 func TestListUsers_StrategiesSliceIsDeepCopy(t *testing.T) {
 	m := NewUserContainerManager()
-	m.AddStrategy("user-1", StrategyEntry{ID: "s1", Exchange: "binance", Config: rawJSON(`{}`)})
+	m.AddStrategy("user-1", ModeLive, StrategyEntry{ID: "s1", Exchange: "binance", Config: rawJSON(`{}`)})
 
 	users := m.ListUsers()
 	users[0].Strategies[0].Exchange = "okex"

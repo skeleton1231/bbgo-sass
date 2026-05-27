@@ -42,8 +42,8 @@ func TestAPI_CreateStrategy(t *testing.T) {
 	if resp.UserID != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
 		t.Errorf("expected user ID in response, got %s", resp.UserID)
 	}
-	if len(resp.Strategies) != 2 {
-		t.Errorf("expected 2 strategies (1 existing + 1 new), got %d", len(resp.Strategies))
+	if len(resp.Strategies) != 1 {
+		t.Errorf("expected 1 strategy (new paper strategy), got %d", len(resp.Strategies))
 	}
 	found := false
 	for _, s := range resp.Strategies {
@@ -159,13 +159,17 @@ func TestAPI_ListStrategies(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp UserContainer
+	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if len(resp.Strategies) != 1 {
-		t.Errorf("expected 1 strategy, got %d", len(resp.Strategies))
+	containers, _ := resp["containers"].(map[string]interface{})
+	liveContainer, _ := containers["live"].(map[string]interface{})
+	strategies, _ := liveContainer["strategies"].([]interface{})
+	if len(strategies) != 1 {
+		t.Fatalf("expected 1 strategy, got %d", len(strategies))
 	}
-	if resp.Strategies[0].Strategy != "grid" {
-		t.Errorf("expected grid strategy, got %s", resp.Strategies[0].Strategy)
+	firstStrategy, _ := strategies[0].(map[string]interface{})
+	if firstStrategy["strategy"] != "grid" {
+		t.Errorf("expected grid strategy, got %v", firstStrategy["strategy"])
 	}
 }
 
@@ -183,8 +187,9 @@ func TestAPI_ListStrategies_UserNotFound(t *testing.T) {
 
 	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp["status"] != StatusStopped {
-		t.Errorf("expected stopped status for unknown user, got %v", resp["status"])
+	containers, _ := resp["containers"].(map[string]interface{})
+	if len(containers) != 0 {
+		t.Errorf("expected empty containers for unknown user, got %v", containers)
 	}
 }
 
@@ -200,8 +205,8 @@ func TestAPI_DeleteStrategy(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	if len(uc.Strategies) != 0 {
+	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
+	if uc != nil && len(uc.Strategies) != 0 {
 		t.Errorf("expected 0 strategies after delete, got %d", len(uc.Strategies))
 	}
 }
@@ -237,7 +242,7 @@ func TestAPI_StopUser(t *testing.T) {
 		t.Errorf("expected stopped status, got %s", resp["status"])
 	}
 
-	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
 	if uc.Status != StatusStopped {
 		t.Errorf("expected user status stopped, got %s", uc.Status)
 	}
@@ -245,7 +250,8 @@ func TestAPI_StopUser(t *testing.T) {
 
 func TestAPI_StartUser_NoStrategies(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status: StatusStopped,
 	}
@@ -276,13 +282,15 @@ func TestAPI_UserStatus(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp UserContainer
+	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp.UserID != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
-		t.Errorf("expected user ID, got %s", resp.UserID)
+	containers, _ := resp["containers"].(map[string]interface{})
+	liveContainer, _ := containers["live"].(map[string]interface{})
+	if liveContainer["user_id"] != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
+		t.Errorf("expected user ID, got %v", liveContainer["user_id"])
 	}
-	if resp.Status != StatusRunning {
-		t.Errorf("expected running status, got %s", resp.Status)
+	if liveContainer["status"] != StatusRunning {
+		t.Errorf("expected running status, got %v", liveContainer["status"])
 	}
 }
 
@@ -345,7 +353,8 @@ func TestAPI_BBGoStrategies(t *testing.T) {
 func setupStoppedTestAPI(t *testing.T) *API {
 	t.Helper()
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -390,7 +399,7 @@ func TestContainerManager_RecoverUsers_Concurrent(t *testing.T) {
 	}
 
 	// Verify original UserContainer structs were NOT mutated
-	orig1, _ := users.Get(uc1.UserID)
+	orig1, _ := users.Get(uc1.UserID, ModeLive)
 	if orig1.Status != StatusStopped {
 		t.Errorf("original user status should not be mutated by RecoverUsers, got %s", orig1.Status)
 	}

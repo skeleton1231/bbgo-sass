@@ -29,6 +29,7 @@ func TestCreateAndStart_PreservesDB(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live",
@@ -86,6 +87,7 @@ func TestCreateAndStart_SecondRestart_KeepsDB(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live",
@@ -126,6 +128,7 @@ func TestCreateAndStart_NoDB_NoBackup(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper",

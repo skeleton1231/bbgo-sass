@@ -60,7 +60,8 @@ func (cs *CredentialStore) saveAll(userID string, creds []ExchangeCredential) er
 	return os.WriteFile(cs.filePath(userID), data, 0o600)
 }
 
-// Upsert inserts a credential or replaces an existing one for the same exchange.
+// Upsert inserts a credential or replaces an existing one for the same exchange + mode.
+// A user can have both live and testnet credentials for the same exchange.
 func (cs *CredentialStore) Upsert(cred ExchangeCredential) error {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -69,7 +70,7 @@ func (cs *CredentialStore) Upsert(cred ExchangeCredential) error {
 		return err
 	}
 	for i, c := range creds {
-		if c.Exchange == cred.Exchange {
+		if c.Exchange == cred.Exchange && c.IsTestnet == cred.IsTestnet {
 			creds[i] = cred
 			return cs.saveAll(cred.UserID, creds)
 		}
@@ -151,4 +152,42 @@ func (cs *CredentialStore) GetDecryptedWithMeta(userID, exchange string) (apiKey
 		}
 	}
 	return "", "", "", false, fmt.Errorf("no credentials for exchange %s", exchange)
+}
+
+// GetDecryptedByMode fetches credentials matching the desired mode.
+// wantTestnet=true returns testnet credentials, wantTestnet=false returns live credentials.
+func (cs *CredentialStore) GetDecryptedByMode(userID, exchange string, wantTestnet bool) (apiKey, apiSecret, passphrase string, err error) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	creds, err := cs.loadAll(userID)
+	if err != nil {
+		return "", "", "", err
+	}
+	for _, c := range creds {
+		if c.Exchange == exchange && c.IsTestnet == wantTestnet {
+			apiKey, err = cs.crypto.Decrypt(c.APIKeyEncrypted)
+			if err != nil {
+				return "", "", "", fmt.Errorf("decrypt api key: %w", err)
+			}
+			apiSecret, err = cs.crypto.Decrypt(c.APISecretEncrypted)
+			if err != nil {
+				return "", "", "", fmt.Errorf("decrypt api secret: %w", err)
+			}
+			if c.PassphraseEncrypted != "" {
+				passphrase, err = cs.crypto.Decrypt(c.PassphraseEncrypted)
+				if err != nil {
+					return "", "", "", fmt.Errorf("decrypt passphrase: %w", err)
+				}
+			}
+			return apiKey, apiSecret, passphrase, nil
+		}
+	}
+	return "", "", "", fmt.Errorf("no %s credentials for exchange %s", modeLabel(wantTestnet), exchange)
+}
+
+func modeLabel(isTestnet bool) string {
+	if isTestnet {
+		return "testnet"
+	}
+	return "live"
 }

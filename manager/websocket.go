@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -144,16 +143,21 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Subscribe to user data if container is running
 	var userCh chan json.RawMessage
-	uc, found := api.users.Get(userID)
-	if found && uc.Status == StatusRunning {
-		containerAddr := api.container.ContainerGRPCAddr(userID)
-		sessions := extractSessionNames(uc)
-		userCh, err = api.hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
-		if err != nil {
-			log.Printf("ws user data subscribe error for %s: %v", userID, err)
-		} else {
-			defer api.hub.Unsubscribe("user:"+userID, userCh)
+	containers := api.users.GetByUser(userID)
+	for _, uc := range containers {
+		if uc.Status != StatusRunning {
+			continue
 		}
+		containerAddr := api.container.ContainerGRPCAddr(userID, uc.Mode)
+		sessions := extractSessionNames(uc)
+		ch, err := api.hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
+		if err != nil {
+			log.Printf("ws user data subscribe error for %s (%s): %v", userID, uc.Mode, err)
+			continue
+		}
+		userCh = ch
+		defer api.hub.Unsubscribe("user:"+userID, userCh)
+		break
 	}
 
 	var writeMu sync.Mutex
@@ -206,10 +210,6 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	conn.Close(websocket.StatusNormalClosure, "")
-}
-
-func (cm *ContainerManager) ContainerGRPCAddr(userID string) string {
-	return fmt.Sprintf("%s:%d", cm.containerName(userID), cm.cfg.BBGOGRPCPort)
 }
 
 func wsWrite(conn *websocket.Conn, ctx context.Context, mu *sync.Mutex, msg []byte) bool {

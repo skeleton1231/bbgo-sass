@@ -35,7 +35,7 @@ func TestExchangeEnvPrefix_UnknownFallsBack(t *testing.T) {
 
 func TestContainerName_Format(t *testing.T) {
 	cm := &ContainerManager{}
-	name := cm.containerName("abc-123")
+	name := cm.containerName("abc-123", ModeLive)
 	if name != "bbgo-abc-123" {
 		t.Errorf("containerName = %q, want bbgo-abc-123", name)
 	}
@@ -43,17 +43,17 @@ func TestContainerName_Format(t *testing.T) {
 
 func TestHostDir_And_UserDir(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataDir: "/data"}}
-	if got := cm.hostDir("u1"); got != "/data/u1" {
+	if got := cm.hostDir("u1", ModeLive); got != "/data/u1" {
 		t.Errorf("hostDir = %q, want /data/u1", got)
 	}
-	if got := cm.userDir("u1"); got != "/data/u1" {
+	if got := cm.userDir("u1", ModeLive); got != "/data/u1" {
 		t.Errorf("userDir = %q, want /data/u1", got)
 	}
 }
 
 func TestAPIURL_UsesDockerDNS(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{BBGOPort: 8080}}
-	url := cm.APIURL("user42")
+	url := cm.APIURL("user42", ModeLive)
 	if url != "http://bbgo-user42:8080" {
 		t.Errorf("APIURL = %q, want http://bbgo-user42:8080", url)
 	}
@@ -62,9 +62,9 @@ func TestAPIURL_UsesDockerDNS(t *testing.T) {
 func TestAPIURL_TestHook(t *testing.T) {
 	cm := &ContainerManager{
 		cfg:      &Config{BBGOPort: 8080},
-		apiURLFn: func(userID string) string { return "http://mock:9999" },
+		apiURLFn: func(userID, mode string) string { return "http://mock:9999" },
 	}
-	if got := cm.APIURL("any"); got != "http://mock:9999" {
+	if got := cm.APIURL("any", ModeLive); got != "http://mock:9999" {
 		t.Errorf("APIURL with hook = %q, want http://mock:9999", got)
 	}
 }
@@ -171,6 +171,7 @@ func TestNormalizeStrategyConfig_FieldAlias(t *testing.T) {
 
 func TestBuildUserYAML_LegacyAlias_Normalized(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "u1",
 		Strategies: []StrategyEntry{
 			{Strategy: "sentinel_anomaly", Exchange: "binance", Mode: "live",
@@ -192,6 +193,7 @@ func TestBuildUserYAML_LegacyAlias_Normalized(t *testing.T) {
 
 func TestCloneUserContainer_DeepCopy(t *testing.T) {
 	original := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "u1",
 		Status: StatusRunning,
 		Strategies: []StrategyEntry{
@@ -228,6 +230,7 @@ func TestDBBackup_OnCreateAndStart(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper",
@@ -275,6 +278,7 @@ func TestDBBackup_NoDB_NoError(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper",

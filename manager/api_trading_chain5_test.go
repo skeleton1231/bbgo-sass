@@ -29,8 +29,8 @@ func chiReqWithParam(method, url string, body string, key, val string) *http.Req
 
 func TestCreateStrategy_StoppedUser_NoAutoStart(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", StatusStopped)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModePaper, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModePaper, StatusStopped)
 
 	started := false
 	api := &API{
@@ -38,8 +38,8 @@ func TestCreateStrategy_StoppedUser_NoAutoStart(t *testing.T) {
 		wsTickets:        NewWSTicketStore(),
 		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
 		containerStart:   func(uc *UserContainer) error { started = true; return nil },
-		containerStop:    func(string) {},
-		containerRunning: func(string) bool { return false },
+		containerStop:    func(string, string) {},
+		containerRunning: func(string, string) bool { return false },
 	}
 	defer api.Close()
 
@@ -75,8 +75,8 @@ func TestCreateStrategy_NewUser_AutoStarts(t *testing.T) {
 		wsTickets:        NewWSTicketStore(),
 		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
 		containerStart:   func(uc *UserContainer) error { started <- uc.UserID; return nil },
-		containerStop:    func(string) {},
-		containerRunning: func(string) bool { return false },
+		containerStop:    func(string, string) {},
+		containerRunning: func(string, string) bool { return false },
 		newBBGoClient:    func(baseURL string) *BBGoClient { return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()} },
 	}
 	defer api.Close()
@@ -105,9 +105,9 @@ func TestCreateStrategy_NewUser_AutoStarts(t *testing.T) {
 
 func TestDeleteStrategy_RemainingStrategies_RestartsContainer(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000003", StrategyEntry{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper"})
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000003", StrategyEntry{ID: "s2", Exchange: "binance", Strategy: "grid2", Mode: "paper"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000003", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000003", ModeLive, StrategyEntry{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper"})
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000003", ModeLive, StrategyEntry{ID: "s2", Exchange: "binance", Strategy: "grid2", Mode: "paper"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000003", ModeLive, StatusRunning)
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`ok`))
@@ -120,8 +120,8 @@ func TestDeleteStrategy_RemainingStrategies_RestartsContainer(t *testing.T) {
 		wsTickets:        NewWSTicketStore(),
 		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
 		containerStart:   func(uc *UserContainer) error { restarted <- uc.UserID; return nil },
-		containerStop:    func(string) {},
-		containerRunning: func(string) bool { return true },
+		containerStop:    func(string, string) {},
+		containerRunning: func(string, string) bool { return true },
 		newBBGoClient:    func(baseURL string) *BBGoClient { return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()} },
 	}
 	defer api.Close()
@@ -149,16 +149,16 @@ func TestDeleteStrategy_RemainingStrategies_RestartsContainer(t *testing.T) {
 
 func TestDeleteStrategy_LastStrategy_StopsContainer(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000004", StrategyEntry{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000004", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000004", ModeLive, StrategyEntry{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000004", ModeLive, StatusRunning)
 
 	stopped := false
 	api := &API{
 		users:            users,
 		wsTickets:        NewWSTicketStore(),
 		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
-		containerStop:    func(string) { stopped = true },
-		containerRunning: func(string) bool { return true },
+		containerStop:    func(string, string) { stopped = true },
+		containerRunning: func(string, string) bool { return true },
 	}
 	defer api.Close()
 
@@ -174,9 +174,9 @@ func TestDeleteStrategy_LastStrategy_StopsContainer(t *testing.T) {
 	if !stopped {
 		t.Error("container should stop when last strategy deleted")
 	}
-	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeee000004")
-	if uc.Status != StatusStopped {
-		t.Errorf("status = %q, want stopped", uc.Status)
+	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeee000004", ModeLive)
+	if uc != nil {
+		t.Errorf("expected container deleted after last strategy removed, got status %q", uc.Status)
 	}
 }
 
@@ -184,7 +184,7 @@ func TestDeleteStrategy_LastStrategy_StopsContainer(t *testing.T) {
 
 func TestCreateStrategy_ModeMixing_FirstUnspecified(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000005", StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: ""})
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000005", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: ""})
 
 	api := &API{users: users, wsTickets: NewWSTicketStore()}
 	defer api.Close()
@@ -203,7 +203,7 @@ func TestCreateStrategy_ModeMixing_FirstUnspecified(t *testing.T) {
 
 func TestCreateStrategy_ModeMixing_PaperThenLive(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000006", StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000006", ModePaper, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
 
 	api := &API{users: users, wsTickets: NewWSTicketStore()}
 	defer api.Close()
@@ -215,8 +215,8 @@ func TestCreateStrategy_ModeMixing_PaperThenLive(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.CreateStrategy(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("paper->live should be rejected, got status %d", w.Code)
+	if w.Code != http.StatusCreated {
+		t.Errorf("paper->live should succeed (separate containers), got status %d", w.Code)
 	}
 }
 
@@ -247,6 +247,7 @@ func TestCreateStrategy_LiveMode_NilCredsStore(t *testing.T) {
 
 func TestBuildUserYAML_LiveWithCredentials(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "live-yaml-u1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: json.RawMessage(`{"symbol":"BTCUSDT","grid_num":5,"lower_price":40000,"upper_price":50000}`)},
@@ -276,6 +277,7 @@ func TestBuildUserYAML_LiveWithCredentials(t *testing.T) {
 
 func TestBuildUserYAML_CrossExchange_AutoEnvVarPrefix(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "xenv-u1",
 		Strategies: []StrategyEntry{
 			{
@@ -311,8 +313,8 @@ func TestBuildUserYAML_CrossExchange_AutoEnvVarPrefix(t *testing.T) {
 
 func TestCreateCredential_RunningContainer_TriggersRestart(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000008", StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "live"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000008", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000008", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "live"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000008", ModeLive, StatusRunning)
 
 	enc, _ := NewEncryptor("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 	creds := NewCredentialStore("/tmp/test-creds-chain5", enc)
@@ -330,8 +332,8 @@ func TestCreateCredential_RunningContainer_TriggersRestart(t *testing.T) {
 		wsTickets:        NewWSTicketStore(),
 		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
 		containerStart:   func(uc *UserContainer) error { restarted <- uc.UserID; return nil },
-		containerStop:    func(string) {},
-		containerRunning: func(string) bool { return true },
+		containerStop:    func(string, string) {},
+		containerRunning: func(string, string) bool { return true },
 		newBBGoClient:    func(baseURL string) *BBGoClient { return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()} },
 	}
 	defer api.Close()
@@ -385,8 +387,8 @@ func TestCreateCredential_UnsupportedExchange_Verify(t *testing.T) {
 
 func TestBBGoPnL_SupabaseFallback(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000009", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000009", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000009", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000009", ModeLive, StatusRunning)
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"trades":[{"id":1,"symbol":"BTCUSDT","side":"BUY","price":"40000","quantity":"1","fee":"0.01","tradedAt":"2024-01-01","gid":1},{"id":2,"symbol":"BTCUSDT","side":"SELL","price":"50000","quantity":"1","fee":"0.01","tradedAt":"2024-01-02","gid":2}]}`))
@@ -434,8 +436,8 @@ func TestBBGoPnL_SupabaseFallback(t *testing.T) {
 
 func TestSyncAll_RunningContainer_SyncsData(t *testing.T) {
 	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000010", StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000010", StatusRunning)
+	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000010", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000010", ModeLive, StatusRunning)
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -492,8 +494,9 @@ func TestUserStatus_UnknownUser(t *testing.T) {
 	}
 	var result map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&result)
-	if result["status"] != StatusStopped {
-		t.Errorf("unknown user status = %v, want stopped", result["status"])
+	containers, _ := result["containers"].(map[string]interface{})
+	if len(containers) != 0 {
+		t.Errorf("unknown user should have empty containers, got %v", containers)
 	}
 }
 
@@ -504,7 +507,7 @@ func TestStartUser_NoStrategies(t *testing.T) {
 	api := &API{
 		users:         users,
 		wsTickets:     NewWSTicketStore(),
-		containerStop: func(string) {},
+		containerStop: func(string, string) {},
 	}
 	defer api.Close()
 
@@ -621,6 +624,7 @@ func TestCredentialStore_RoundTrip(t *testing.T) {
 func TestContainerManager_EnvArgs_PaperMode(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{}, creds: nil}
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "env-u1",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -641,6 +645,7 @@ func TestContainerManager_EnvArgs_PaperMode(t *testing.T) {
 func TestContainerManager_EnvArgs_LiveMode(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{}, creds: nil}
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "env-u2",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
@@ -665,7 +670,7 @@ func TestSyncer_BBGoClient_Injection(t *testing.T) {
 			return &BBGoClient{}
 		},
 	}
-	client := s.bbgoClient("test-u1")
+	client := s.bbgoClient("test-u1", ModeLive)
 	if !called {
 		t.Error("should call injected newBBGoClientFn")
 	}
@@ -718,6 +723,7 @@ func TestMarketDataHub_SubscribeMarket_Close(t *testing.T) {
 
 func TestFullChain_LiveYAMLWithoutCredentials(t *testing.T) {
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000011",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: json.RawMessage(`{"symbol":"BTCUSDT"}`)},

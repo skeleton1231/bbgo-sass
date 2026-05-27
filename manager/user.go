@@ -16,41 +16,44 @@ const (
 	StatusStarting = "starting"
 )
 
+const (
+	ModeLive  = "live"
+	ModePaper = "paper"
+)
+
 // legacyStrategyAliases maps frontend strategy IDs to the correct bbgo registered IDs.
-// bbgo only knows: sentinel, autobuy, rebalance, ewo_dgtrd — not the longer frontend variants.
 var legacyStrategyAliases = map[string]string{
-	"ewoDgtrd":           "ewo_dgtrd",
-	"sentinel_anomaly":   "sentinel",
-	"autobuy_scheduled":  "autobuy",
+	"ewoDgtrd":            "ewo_dgtrd",
+	"sentinel_anomaly":    "sentinel",
+	"autobuy_scheduled":   "autobuy",
 	"rebalance_portfolio": "rebalance",
 }
 
-// liveOnlyStrategies are strategies that only work in live mode (they require
-// real-time exchange features not available in paper trading).
+// liveOnlyStrategies are strategies that only work in live mode.
 var liveOnlyStrategies = map[string]bool{
-	"bollmaker":       true,
-	"linregmaker":     true,
-	"rsmaker":         true,
-	"scmaker":         true,
-	"supertrend":      true,
-	"dca2":            true,
-	"dca3":            true,
-	"wall":            true,
-	"sentinel": true,
-	"audacitymaker":   true,
-	"liquiditymaker":  true,
-	"drift":           true,
-	"elliottwave":     true,
-	"factorzoo":       true,
-	"xvs":             true,
-	"autoborrow":      true,
-	"convert":         true,
+	"bollmaker":        true,
+	"linregmaker":      true,
+	"rsmaker":          true,
+	"scmaker":          true,
+	"supertrend":       true,
+	"dca2":             true,
+	"dca3":             true,
+	"wall":             true,
+	"sentinel":         true,
+	"audacitymaker":    true,
+	"liquiditymaker":   true,
+	"drift":            true,
+	"elliottwave":      true,
+	"factorzoo":        true,
+	"xvs":              true,
+	"autoborrow":       true,
+	"convert":          true,
 	"deposit2transfer": true,
-	"autobuy": true,
-	"rebalance": true,
-	"support":         true,
-	"xpremium":        true,
-	"xnav":            true,
+	"autobuy":          true,
+	"rebalance":        true,
+	"support":          true,
+	"xpremium":         true,
+	"xnav":             true,
 }
 
 // legacyFieldAliases maps strategy IDs to old→new field renames.
@@ -82,6 +85,11 @@ func normalizeStrategyConfig(strategy string, params map[string]interface{}) (st
 	return strategy, params
 }
 
+// userContainerKey returns the composite key for the user container map.
+func userContainerKey(userID, mode string) string {
+	return userID + ":" + mode
+}
+
 type SessionRoleConfig struct {
 	Name         string `json:"name"`
 	Exchange     string `json:"exchange"`
@@ -102,69 +110,119 @@ type StrategyEntry struct {
 
 type UserContainer struct {
 	UserID     string          `json:"user_id"`
+	Mode       string          `json:"mode"`
 	Status     string          `json:"status"`
 	Strategies []StrategyEntry `json:"strategies"`
 }
 
 type UserContainerManager struct {
 	mu    sync.RWMutex
-	users map[string]*UserContainer
+	users map[string]*UserContainer // key: "{userID}:{mode}"
 }
 
 func NewUserContainerManager() *UserContainerManager {
 	return &UserContainerManager{users: make(map[string]*UserContainer)}
 }
 
-func (m *UserContainerManager) Get(userID string) (*UserContainer, bool) {
+func (m *UserContainerManager) Get(userID, mode string) (*UserContainer, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	uc, ok := m.users[userID]
+	uc, ok := m.users[userContainerKey(userID, mode)]
 	if !ok {
 		return nil, false
 	}
 	return cloneUserContainer(uc), true
 }
 
-func (m *UserContainerManager) UpdateStatus(userID, status string) {
+// GetByUser returns all containers for a user (live and/or paper).
+func (m *UserContainerManager) GetByUser(userID string) []*UserContainer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []*UserContainer
+	for _, uc := range m.users {
+		if uc.UserID == userID {
+			result = append(result, cloneUserContainer(uc))
+		}
+	}
+	return result
+}
+
+// FindStrategy searches all containers for a user to find one containing the given strategyID.
+// Returns the container mode and whether it was found.
+func (m *UserContainerManager) FindStrategy(userID, strategyID string) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, uc := range m.users {
+		if uc.UserID != userID {
+			continue
+		}
+		for _, s := range uc.Strategies {
+			if s.ID == strategyID {
+				return uc.Mode, true
+			}
+		}
+	}
+	return "", false
+}
+
+func (m *UserContainerManager) UpdateStatus(userID, mode, status string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if uc, ok := m.users[userID]; ok {
+	if uc, ok := m.users[userContainerKey(userID, mode)]; ok {
 		uc.Status = status
 	}
 }
 
-func (m *UserContainerManager) AddStrategy(userID string, entry StrategyEntry) (*UserContainer, bool) {
+func (m *UserContainerManager) CompareAndSetStatus(userID, mode, oldStatus, newStatus string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if uc, ok := m.users[userContainerKey(userID, mode)]; ok && uc.Status == oldStatus {
+		uc.Status = newStatus
+		return true
+	}
+	return false
+}
+
+func (m *UserContainerManager) AddStrategy(userID, mode string, entry StrategyEntry) (*UserContainer, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	uc, ok := m.users[userID]
+	key := userContainerKey(userID, mode)
+	uc, ok := m.users[key]
 	created := !ok
 	if !ok {
 		uc = &UserContainer{
 			UserID:     userID,
+			Mode:       mode,
 			Status:     StatusStopped,
 			Strategies: []StrategyEntry{},
 		}
-		m.users[userID] = uc
+		m.users[key] = uc
 	}
 	uc.Strategies = append(uc.Strategies, entry)
 	return cloneUserContainer(uc), created
 }
 
-func (m *UserContainerManager) RemoveStrategy(userID, strategyID string) bool {
+// RemoveStrategy removes a strategy from whichever container holds it.
+// Returns (found, modeOfContainer).
+func (m *UserContainerManager) RemoveStrategy(userID, strategyID string) (bool, string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	uc, ok := m.users[userID]
-	if !ok {
-		return false
-	}
-	for i, s := range uc.Strategies {
-		if s.ID == strategyID {
-			uc.Strategies = append(uc.Strategies[:i], uc.Strategies[i+1:]...)
-			return true
+	for key, uc := range m.users {
+		if uc.UserID != userID {
+			continue
+		}
+		for i, s := range uc.Strategies {
+			if s.ID == strategyID {
+				uc.Strategies = append(uc.Strategies[:i], uc.Strategies[i+1:]...)
+				if len(uc.Strategies) == 0 {
+					delete(m.users, key)
+				}
+				return true, uc.Mode
+			}
 		}
 	}
-	return false
+	return false, ""
 }
 
 func (m *UserContainerManager) ListUsers() []*UserContainer {
@@ -180,17 +238,21 @@ func (m *UserContainerManager) ListUsers() []*UserContainer {
 func (m *UserContainerManager) Restore(users []*UserContainer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.users = make(map[string]*UserContainer)
 	for _, uc := range users {
-		m.users[uc.UserID] = uc
+		if uc.Mode == "" {
+			uc.Mode = ModeLive
+		}
+		m.users[userContainerKey(uc.UserID, uc.Mode)] = uc
 	}
 }
 
 type bbgoConfig struct {
-	Sessions               map[string]sessionConfig    `yaml:"sessions,omitempty"`
-	Exchange               map[string]exchangeConfig   `yaml:"exchange"`
-	Environment            *environmentConfig          `yaml:"environment,omitempty"`
-	ExchangeStrategies     []map[string]interface{}    `yaml:"exchangeStrategies,omitempty"`
-	CrossExchangeStrategies []map[string]interface{}   `yaml:"crossExchangeStrategies,omitempty"`
+	Sessions                map[string]sessionConfig  `yaml:"sessions,omitempty"`
+	Exchange                map[string]exchangeConfig `yaml:"exchange"`
+	Environment             *environmentConfig        `yaml:"environment,omitempty"`
+	ExchangeStrategies      []map[string]interface{}  `yaml:"exchangeStrategies,omitempty"`
+	CrossExchangeStrategies []map[string]interface{}  `yaml:"crossExchangeStrategies,omitempty"`
 }
 
 type sessionConfig struct {
@@ -205,16 +267,17 @@ type exchangeConfig struct {
 }
 
 type environmentConfig struct {
-	PaperTrade                string `yaml:"PAPER_TRADE,omitempty"`
+	PaperTrade                 string `yaml:"PAPER_TRADE,omitempty"`
 	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery"`
 }
 
+// buildUserYAML generates the bbgo YAML config for a container. The mode is determined
+// by uc.Mode — paper containers get PAPER_TRADE=1, live containers do not.
 func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool) ([]byte, error) {
 	exchanges := map[string]exchangeConfig{}
 	sessions := map[string]sessionConfig{}
 	var exchangeStrategies []map[string]interface{}
 	var crossStrategies []map[string]interface{}
-	hasPaper := false
 
 	for _, s := range uc.Strategies {
 		var params map[string]interface{}
@@ -226,8 +289,8 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 					strategyID = alias
 				}
 				entry := map[string]interface{}{
-					"on":         s.Exchange,
-					strategyID:   rawStr,
+					"on":       s.Exchange,
+					strategyID: rawStr,
 				}
 				exchangeStrategies = append(exchangeStrategies, entry)
 			}
@@ -239,9 +302,6 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		if s.CrossExchange {
 			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials)
 			crossStrategies = append(crossStrategies, csEntry)
-			if s.Mode == "paper" {
-				hasPaper = true
-			}
 			continue
 		}
 
@@ -260,14 +320,10 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		}
 
 		entry := map[string]interface{}{
-				"on":         s.Exchange,
-				s.Strategy:   params,
-			}
-		exchangeStrategies = append(exchangeStrategies, entry)
-
-		if s.Mode == "paper" {
-			hasPaper = true
+			"on":       s.Exchange,
+			s.Strategy: params,
 		}
+		exchangeStrategies = append(exchangeStrategies, entry)
 	}
 
 	cfg := bbgoConfig{
@@ -277,7 +333,7 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		CrossExchangeStrategies: crossStrategies,
 	}
 	cfg.Environment = &environmentConfig{DisableStartupBalanceQuery: true}
-	if hasPaper {
+	if uc.Mode == ModePaper {
 		cfg.Environment.PaperTrade = "1"
 	}
 
@@ -351,12 +407,7 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	if symbol == "" {
 		symbol = "BTCUSDT"
 	}
-	// Ensure symbol is in the strategy config for bbgo dependency injection
 	allParams["symbol"] = symbol
-
-	// Interval comes from the frontend when the strategy needs it.
-	// Do not force a default — strategies without interval (grid, flashcrash)
-	// should not have one injected.
 
 	btCfg := struct {
 		Exchange map[string]struct {
@@ -367,7 +418,7 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 			EnvVarPrefix string `yaml:"envVarPrefix"`
 		} `yaml:"sessions"`
 		ExchangeStrategies []map[string]interface{} `yaml:"exchangeStrategies"`
-		Backtest struct {
+		Backtest           struct {
 			Sessions  []string `yaml:"sessions"`
 			Symbols   []string `yaml:"symbols"`
 			StartTime string   `yaml:"startTime"`
@@ -390,8 +441,8 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 		},
 		ExchangeStrategies: []map[string]interface{}{
 			{
-				"on":       exchange,
-				strategy:   allParams,
+				"on":     exchange,
+				strategy: allParams,
 			},
 		},
 		Backtest: struct {

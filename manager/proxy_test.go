@@ -12,7 +12,7 @@ import (
 func newTestProxy(backendURL string, clientTimeout time.Duration) *BotProxy {
 	return &BotProxy{
 		cm:          &ContainerManager{cfg: &Config{BBGOPort: 0}},
-		resolveAddr: func(_ string) string { return backendURL },
+		resolveAddr: func(_, _ string) string { return backendURL },
 		client:      &http.Client{Timeout: clientTimeout},
 	}
 }
@@ -25,7 +25,7 @@ func TestProxyToBot_BackendDown(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		proxy.ProxyToBot(w, r, "user-1")
+		proxy.ProxyToBot(w, r, "user-1", ModeLive)
 		close(done)
 	}()
 
@@ -58,7 +58,7 @@ func TestProxyToBot_CancelledRequest(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		w := httptest.NewRecorder()
-		proxy.ProxyToBot(w, r, "user-1")
+		proxy.ProxyToBot(w, r, "user-1", ModeLive)
 		close(done)
 	}()
 
@@ -88,7 +88,7 @@ func TestProxyToBot_StripAuthHeaders(t *testing.T) {
 	r.Header.Set("Authorization", "Bearer tok")
 
 	w := httptest.NewRecorder()
-	proxy.ProxyToBot(w, r, "user-1")
+	proxy.ProxyToBot(w, r, "user-1", ModeLive)
 
 	if receivedHeaders.Get("X-Manager-Token") != "" {
 		t.Error("X-Manager-Token should be stripped")
@@ -114,7 +114,7 @@ func TestProxyToBot_ResponseHeaderPassthrough(t *testing.T) {
 
 	r := httptest.NewRequest("GET", "/api/bbgo/user-1/api/ping", nil)
 	w := httptest.NewRecorder()
-	proxy.ProxyToBot(w, r, "user-1")
+	proxy.ProxyToBot(w, r, "user-1", ModeLive)
 
 	if w.Header().Get("X-Custom") != "value" {
 		t.Errorf("expected X-Custom=value, got %q", w.Header().Get("X-Custom"))
@@ -136,7 +136,7 @@ func TestProxyToBot_LargeBody(t *testing.T) {
 
 	r := httptest.NewRequest("GET", "/api/bbgo/user-1/api/data", nil)
 	w := httptest.NewRecorder()
-	proxy.ProxyToBot(w, r, "user-1")
+	proxy.ProxyToBot(w, r, "user-1", ModeLive)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)

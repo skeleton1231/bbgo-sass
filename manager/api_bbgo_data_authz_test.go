@@ -20,6 +20,7 @@ func TestBBGoDataEndpoints_UserIDMismatch_Rejected(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users[victimID] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     victimID,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -89,7 +90,8 @@ func TestBBGoDataEndpoints_MatchingUserID_Accepted(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 	users := NewUserContainerManager()
-	users.users[userID] = &UserContainer{
+	users.users[userID+":"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     userID,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -135,6 +137,7 @@ func TestPnLEndpoint_UserIDMismatch_Rejected(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users[victimID] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     victimID,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -182,7 +185,8 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"}},
@@ -203,7 +207,7 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 		restartCalled = true
 		return nil
 	}
-	api.containerRunning = func(_ string) bool { return true }
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
@@ -244,7 +248,8 @@ func TestCredentialDelete_TriggersContainerRestart(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"}},
@@ -269,7 +274,7 @@ func TestCredentialDelete_TriggersContainerRestart(t *testing.T) {
 		restartCalled = true
 		return nil
 	}
-	api.containerRunning = func(_ string) bool { return true }
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 

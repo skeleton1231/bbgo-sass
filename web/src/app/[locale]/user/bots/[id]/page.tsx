@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from '@/i18n/navigation'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import {
@@ -72,16 +72,21 @@ export default function BotDetailPage() {
   const t = useTranslations('Bots')
   const router = useRouter()
   const params = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
   const userId = params.id
+  const rawMode = searchParams.get('mode')
+  const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper' : 'live'
   const [activeSession, setActiveSession] = useState<string>('')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
 
-  const { data: userContainer, isLoading, isError } = useUserStrategies(userId)
+  const { data: containersResp, isLoading, isError } = useUserStrategies(userId)
   const startUser = useStartUser()
   const stopUser = useStopUser()
 
-  const { data: sessionsData } = useBotSessions(userId)
+  const userContainer = containersResp?.containers?.[mode]
+
+  const { data: sessionsData } = useBotSessions(userId, mode)
   const sessions = sessionsData?.sessions ?? []
   const firstSession = sessions[0]?.name ?? ''
 
@@ -90,17 +95,17 @@ export default function BotDetailPage() {
   }, [firstSession, activeSession])
 
   const isRunning = userContainer?.status === 'running'
-  const { data: openOrdersData } = useBotOpenOrders(userId, activeSession)
-  const { data: closedOrdersData } = useBotClosedOrders(userId)
-  const { data: tradesData } = useBotTrades(userId)
-  const { data: balancesData } = useBotSessionBalances(userId, activeSession)
-  const { data: strategyStatesData } = useBotStrategiesState(userId)
-  const { data: pingData } = useBotPing(userId)
-  const { data: logsData } = useContainerLogs(userId, '100')
-  const { data: pnlData } = useBotPnL(userId)
+  const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode)
+  const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, undefined, mode)
+  const { data: tradesData } = useBotTrades(userId, undefined, undefined, mode)
+  const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode)
+  const { data: strategyStatesData } = useBotStrategiesState(userId, mode)
+  const { data: pingData } = useBotPing(userId, mode)
+  const { data: logsData } = useContainerLogs(userId, '100', mode)
+  const { data: pnlData } = useBotPnL(userId, undefined, undefined, mode)
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchangeName ?? ''
-  const activeSymbol = (userContainer?.strategies?.[0]?.config?.symbol as string | undefined) ?? ''
+  const activeSymbol = (userContainer?.strategies?.find(s => s.mode === mode)?.config?.symbol ?? userContainer?.strategies?.[0]?.config?.symbol ?? '') as string
 
   const { candles, isLoading: klinesLoading } = useKlineData({
     userId,
@@ -196,7 +201,7 @@ export default function BotDetailPage() {
           </button>
           <h1 className="text-2xl font-semibold tracking-tight">{t('tradingDashboard')}</h1>
           <p className="text-sm text-muted-foreground">
-            {t('strategiesCount', { count: strategies.length })} · {t('containerName', { id: userId.slice(0, 8) })}
+            {t('strategiesCount', { count: strategies.length })} · {t('containerName', { id: userId.slice(0, 8) })} · {t(`mode.${mode}`)}
           </p>
         </div>
 
@@ -235,7 +240,7 @@ export default function BotDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => stopUser.mutate(userId, { onError: (err) => toast.error(err.message) })}
+              onClick={() => stopUser.mutate({ userId, mode }, { onError: (err) => toast.error(err.message) })}
               disabled={stopUser.isPending}
               className="rounded-full"
             >
@@ -245,7 +250,7 @@ export default function BotDetailPage() {
           ) : (
             <Button
               size="sm"
-              onClick={() => startUser.mutate(userId, { onError: (err) => toast.error(err.message) })}
+              onClick={() => startUser.mutate({ userId, mode }, { onError: (err) => toast.error(err.message) })}
               disabled={startUser.isPending}
               className="rounded-full"
             >

@@ -15,7 +15,8 @@ func setupTestAPIWithNotifier(t *testing.T) (*API, func()) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(tmpDir, enc)
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:   ModeLive,
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status: StatusStopped,
 	}
@@ -24,7 +25,7 @@ func setupTestAPIWithNotifier(t *testing.T) (*API, func()) {
 	proxy := NewBotProxy(cm)
 	notifier := NewNotifier(tmpDir, enc)
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, notifier, nil, NewBacktestJobStore(tmpDir))
-	api.containerRunning = func(string) bool { return false }
+	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(*UserContainer) error { return nil }
 	return api, func() { api.Close() }
 }

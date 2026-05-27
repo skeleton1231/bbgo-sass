@@ -222,11 +222,11 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 	assertJobEventually(t, store, "bt-slot-1", JobFailed, 5*time.Second)
 
 	job2 := &BacktestJob{
-		ID:        "bt-slot-2",
-		UserID:    "user-1",
-		Strategy:  "grid2",
-		Config:    json.RawMessage(`{}`),
-		NeedSync:  false,
+		ID:       "bt-slot-2",
+		UserID:   "user-1",
+		Strategy: "grid2",
+		Config:   json.RawMessage(`{}`),
+		NeedSync: false,
 	}
 	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
 		return []byte("ok"), nil
@@ -326,11 +326,11 @@ func TestBacktestExecutor_InvalidConfig(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-badcfg",
-		UserID:    "user-1",
-		Strategy:  "grid2",
-		Config:    json.RawMessage(`{invalid json`),
-		NeedSync:  false,
+		ID:       "bt-badcfg",
+		UserID:   "user-1",
+		Strategy: "grid2",
+		Config:   json.RawMessage(`{invalid json`),
+		NeedSync: false,
 	}
 
 	exec.Submit(job)

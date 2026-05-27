@@ -100,6 +100,22 @@ func storeCred(t *testing.T, creds *CredentialStore, enc *Encryptor, userID, exc
 	}))
 }
 
+func storeTestnetCred(t *testing.T, creds *CredentialStore, enc *Encryptor, userID, exchange, key, secret string) {
+	t.Helper()
+	keyEnc, err := enc.Encrypt(key)
+	require.NoError(t, err)
+	secEnc, err := enc.Encrypt(secret)
+	require.NoError(t, err)
+	require.NoError(t, creds.Upsert(ExchangeCredential{
+		ID:                 "cred-" + exchange + "-testnet",
+		UserID:             userID,
+		Exchange:           exchange,
+		APIKeyEncrypted:    keyEnc,
+		APISecretEncrypted: secEnc,
+		IsTestnet:          true,
+	}))
+}
+
 // TestCrossLayerDockerEnvArgsLive verifies live mode has credentials, no PAPER_TRADE.
 func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
@@ -112,6 +128,7 @@ func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 	}
 
 	args := cm.envArgs(&UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{ID: "grid", Exchange: "binance", Mode: "live"},
@@ -130,7 +147,7 @@ func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(t.TempDir(), enc)
-	storeCred(t, creds, enc, testUUID, "binance", "mykey", "mysecret", "")
+	storeTestnetCred(t, creds, enc, testUUID, "binance", "mykey", "mysecret")
 
 	cm := &ContainerManager{
 		cfg:   &Config{DataVolume: "bbgo-data"},
@@ -138,6 +155,7 @@ func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
 	}
 
 	args := cm.envArgs(&UserContainer{
+		Mode:   ModePaper,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{ID: "grid", Exchange: "binance", Mode: "paper"},
@@ -147,6 +165,7 @@ func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
 
 	assert.Contains(t, s, "PAPER_TRADE=1")
 	assert.Contains(t, s, "BINANCE_API_KEY=mykey")
+	assert.Contains(t, s, "BINANCE_TESTNET=1")
 }
 
 // TestCrossLayerDockerEnvArgsCrossExchange verifies multi-exchange credential injection.
@@ -162,6 +181,7 @@ func TestCrossLayerDockerEnvArgsCrossExchange(t *testing.T) {
 	}
 
 	args := cm.envArgs(&UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{
@@ -185,6 +205,7 @@ func TestCrossLayerPaperModeIsGlobal(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataVolume: "bbgo-data"}}
 
 	args := cm.envArgs(&UserContainer{
+		Mode:   ModePaper,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{ID: "grid", Exchange: "binance", Mode: "paper"},
@@ -203,6 +224,7 @@ func TestCrossLayerMarketDataEnv(t *testing.T) {
 	}}
 
 	args := cm.envArgs(&UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{ID: "grid", Exchange: "binance", Mode: "live"},
@@ -214,6 +236,7 @@ func TestCrossLayerMarketDataEnv(t *testing.T) {
 // TestCrossLayerBuildYAMLLive verifies YAML generation for a live strategy.
 func TestCrossLayerBuildYAMLLive(t *testing.T) {
 	yamlBytes, err := buildUserYAML(&UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{
@@ -232,6 +255,7 @@ func TestCrossLayerBuildYAMLLive(t *testing.T) {
 // TestCrossLayerBuildYAMLPaper verifies YAML generation for a paper strategy.
 func TestCrossLayerBuildYAMLPaper(t *testing.T) {
 	yamlBytes, err := buildUserYAML(&UserContainer{
+		Mode:   ModeLive,
 		UserID: testUUID,
 		Strategies: []StrategyEntry{
 			{

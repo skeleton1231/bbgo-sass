@@ -16,7 +16,8 @@ import (
 // strategy for a stopped container stores it but does NOT trigger a start.
 func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{},
@@ -43,7 +44,7 @@ func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 		"exchange": "binance",
 		"strategy": "grid2",
 		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
-		"mode":     "paper",
+		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -54,7 +55,7 @@ func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
 	if len(uc.Strategies) != 1 {
 		t.Fatalf("expected 1 strategy, got %d", len(uc.Strategies))
 	}
@@ -70,7 +71,8 @@ func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 // strategy when container is in error state does NOT trigger a start.
 func TestCreateStrategy_ErrorContainer_NoAutoStart(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusError,
 		Strategies: []StrategyEntry{},
@@ -97,7 +99,7 @@ func TestCreateStrategy_ErrorContainer_NoAutoStart(t *testing.T) {
 		"exchange": "binance",
 		"strategy": "grid2",
 		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
-		"mode":     "paper",
+		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -116,7 +118,8 @@ func TestCreateStrategy_ErrorContainer_NoAutoStart(t *testing.T) {
 // a strategy while the container is running triggers an async restart.
 func TestCreateStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{},
@@ -140,7 +143,7 @@ func TestCreateStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 		startCalled = true
 		return nil
 	}
-	api.containerRunning = func(_ string) bool { return true }
+	api.containerRunning = func(_, _ string) bool { return true }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
@@ -152,7 +155,7 @@ func TestCreateStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 		"exchange": "binance",
 		"strategy": "grid2",
 		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
-		"mode":     "paper",
+		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -185,6 +188,7 @@ func TestContainerLogs_UserIDMismatch_Rejected(t *testing.T) {
 
 	users := NewUserContainerManager()
 	users.users[victimID] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     victimID,
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -221,7 +225,8 @@ func TestCredentialCreate_StoppedContainer_NoRestart(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusStopped,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper"}},
@@ -278,10 +283,11 @@ func TestProxyToBot_StripsAuthHeaders(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	proxy.resolveAddr = func(_ string) string { return bbgoSrv.URL }
+	proxy.resolveAddr = func(_, _ string) string { return bbgoSrv.URL }
 
 	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"] = &UserContainer{
+	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
+		Mode:       ModeLive,
 		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Status:     StatusRunning,
 		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
@@ -331,6 +337,7 @@ func TestBuildUserYAML_AllExchanges(t *testing.T) {
 	for _, ex := range exchanges {
 		t.Run(ex.name, func(t *testing.T) {
 			uc := &UserContainer{
+				Mode:   ModeLive,
 				UserID: "test-user",
 				Strategies: []StrategyEntry{
 					{
@@ -391,6 +398,7 @@ func TestEnvArgs_AllExchanges(t *testing.T) {
 			insertTestCredential(t, creds, "test-user", ex.name, "key-"+ex.name, "secret-"+ex.name)
 
 			uc := &UserContainer{
+				Mode:   ModeLive,
 				UserID: "test-user",
 				Strategies: []StrategyEntry{
 					{

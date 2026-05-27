@@ -29,6 +29,7 @@ func TestE2E_PaperTradingChain(t *testing.T) {
 	cm := NewContainerManager(cfg, creds, nil)
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -119,6 +120,7 @@ func TestE2E_LiveTradingChain(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "binance", "live-key-123", "live-secret-456")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{
@@ -192,6 +194,7 @@ func TestE2E_CrossExchangeChain(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "bybit", "byb-key", "byb-secret")
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{

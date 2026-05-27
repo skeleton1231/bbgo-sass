@@ -36,6 +36,7 @@ func TestCreateAndStart_FullDockerCommand_LiveMode(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live",
@@ -123,6 +124,7 @@ func TestCreateAndStart_FullDockerCommand_PaperMode(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModePaper,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper",
@@ -164,6 +166,7 @@ func TestCreateAndStart_YAMLWrittenForLive(t *testing.T) {
 	}
 
 	uc := &UserContainer{
+		Mode:   ModeLive,
 		UserID: "test-user",
 		Strategies: []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "live",

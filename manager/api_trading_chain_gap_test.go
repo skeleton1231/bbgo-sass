@@ -19,14 +19,14 @@ func TestDeleteLastStrat_StopsContainer(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusRunning
-	api.users.users[userID].Strategies = []StrategyEntry{
+	api.users.users[userID+":"+ModeLive].Status = StatusRunning
+	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "strat-1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
 	}
-	api.containerRunning = func(string) bool { return true }
+	api.containerRunning = func(string, _ string) bool { return true }
 
 	stopCalled := false
-	api.containerStop = func(userID string) {
+	api.containerStop = func(userID string, _ string) {
 		stopCalled = true
 	}
 	api.containerStart = func(uc *UserContainer) error { return nil }
@@ -43,12 +43,9 @@ func TestDeleteLastStrat_StopsContainer(t *testing.T) {
 	if !stopCalled {
 		t.Error("expected container stop when last strategy deleted")
 	}
-	uc, _ := api.users.Get(userID)
-	if uc.Status != StatusStopped {
-		t.Errorf("expected status stopped, got %s", uc.Status)
-	}
-	if len(uc.Strategies) != 0 {
-		t.Errorf("expected 0 strategies, got %d", len(uc.Strategies))
+	uc, _ := api.users.Get(userID, ModeLive)
+	if uc != nil {
+		t.Errorf("expected container deleted after last strategy removed, got status %s", uc.Status)
 	}
 }
 
@@ -59,12 +56,12 @@ func TestDeleteStrategy_RemainingStrategies_RestartsRunningContainer(t *testing.
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusRunning
-	api.users.users[userID].Strategies = []StrategyEntry{
+	api.users.users[userID+":"+ModeLive].Status = StatusRunning
+	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "strat-1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
 		{ID: "strat-2", Exchange: "binance", Strategy: "grid2", Mode: "paper"},
 	}
-	api.containerRunning = func(string) bool { return true }
+	api.containerRunning = func(string, _ string) bool { return true }
 
 	startCalled := false
 	api.containerStart = func(uc *UserContainer) error {
@@ -82,7 +79,7 @@ func TestDeleteStrategy_RemainingStrategies_RestartsRunningContainer(t *testing.
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get(userID)
+	uc, _ := api.users.Get(userID, ModeLive)
 	if len(uc.Strategies) != 1 || uc.Strategies[0].ID != "strat-2" {
 		t.Errorf("expected 1 remaining strategy (strat-2), got %v", uc.Strategies)
 	}
@@ -100,8 +97,8 @@ func TestDeleteStrategy_StoppedContainer_NoRestart(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusStopped
-	api.users.users[userID].Strategies = []StrategyEntry{
+	api.users.users[userID+":"+ModeLive].Status = StatusStopped
+	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "strat-1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
 		{ID: "strat-2", Exchange: "binance", Strategy: "grid2", Mode: "paper"},
 	}
@@ -134,7 +131,7 @@ func TestDeleteMissingStrat_NotFound(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Strategies = []StrategyEntry{
+	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "strat-1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
 	}
 
@@ -158,7 +155,7 @@ func TestBBGoDataEndpoint_ContainerStopped_Returns503(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID].Status = StatusStopped
+	api.users.users[userID+":"+ModeLive].Status = StatusStopped
 
 	r := testRouter(api)
 	req := httptest.NewRequest(http.MethodGet, "/api/users/"+userID+"/bbgo/ping", nil)
@@ -186,7 +183,7 @@ func TestProxyToBot_PathStripping(t *testing.T) {
 
 	cm := &ContainerManager{cfg: &Config{}}
 	proxy := NewBotProxy(cm)
-	proxy.resolveAddr = func(string) string { return bbgoSrv.URL }
+	proxy.resolveAddr = func(string, _ string) string { return bbgoSrv.URL }
 
 	for _, tc := range []struct {
 		input    string
@@ -199,7 +196,7 @@ func TestProxyToBot_PathStripping(t *testing.T) {
 		proxyCalls = nil
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, tc.input, nil)
-		proxy.ProxyToBot(w, r, "user-1")
+		proxy.ProxyToBot(w, r, "user-1", ModeLive)
 
 		if len(proxyCalls) == 0 || proxyCalls[0] != tc.expected {
 			t.Errorf("proxy(%s): expected path %q, got %v", tc.input, tc.expected, proxyCalls)
@@ -222,14 +219,14 @@ func TestProxyToBot_RemovesSensitiveHeaders(t *testing.T) {
 
 	cm := &ContainerManager{cfg: &Config{}}
 	proxy := NewBotProxy(cm)
-	proxy.resolveAddr = func(string) string { return bbgoSrv.URL }
+	proxy.resolveAddr = func(string, _ string) string { return bbgoSrv.URL }
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/api/bbgo/user-1/sessions", nil)
 	r.Header.Set("X-Manager-Token", "secret-token")
 	r.Header.Set("X-User-Id", "user-123")
 	r.Header.Set("Accept", "application/json")
-	proxy.ProxyToBot(w, r, "user-1")
+	proxy.ProxyToBot(w, r, "user-1", ModeLive)
 
 	if receivedHeaders.Get("X-Manager-Token") != "" {
 		t.Error("X-Manager-Token should be stripped before forwarding to bbgo container")
@@ -273,7 +270,9 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 	api.containerStart = func(uc *UserContainer) error {
 		capturedArgs = cm.envArgs(uc)
 		yamlContent, _ := buildUserYAML(uc, func(exchange string) bool {
-			if cm.creds == nil { return false }
+			if cm.creds == nil {
+				return false
+			}
 			_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
 			return err == nil
 		})
@@ -283,7 +282,7 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 		}
 		return nil
 	}
-	api.containerRunning = func(string) bool { return false }
+	api.containerRunning = func(string, _ string) bool { return false }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`ok`)) }))
 		t.Cleanup(srv.Close)
@@ -303,7 +302,7 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 	}
 
 	// Step 2: Start user container
-	req2 := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/start", nil)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/start?mode=paper", nil)
 	req2.Header.Set("X-User-Id", userID)
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
@@ -354,15 +353,15 @@ func TestTradingChain_LiveMode_FullFlow(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 	cfg := &Config{
-		DataDir:       tmpDir,
-		ManagerToken:  "test-token",
-		SupabaseURL:   "http://localhost:1",
-		SupabaseKey:   "test",
-		BBGOPort:      8080,
-		BBGOGRPCPort:  9090,
-		BBGOImage:     "bbgo-base:latest",
-		DockerNetwork: "test-net",
-		DataVolume:    "test-data",
+		DataDir:        tmpDir,
+		ManagerToken:   "test-token",
+		SupabaseURL:    "http://localhost:1",
+		SupabaseKey:    "test",
+		BBGOPort:       8080,
+		BBGOGRPCPort:   9090,
+		BBGOImage:      "bbgo-base:latest",
+		DockerNetwork:  "test-net",
+		DataVolume:     "test-data",
 		MarketDataAddr: "marketdata:9090",
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
@@ -373,7 +372,9 @@ func TestTradingChain_LiveMode_FullFlow(t *testing.T) {
 	api.containerStart = func(uc *UserContainer) error {
 		capturedArgs = cm.envArgs(uc)
 		yamlContent, _ := buildUserYAML(uc, func(exchange string) bool {
-			if cm.creds == nil { return false }
+			if cm.creds == nil {
+				return false
+			}
 			_, _, _, err := cm.creds.GetDecrypted(uc.UserID, exchange)
 			return err == nil
 		})
@@ -383,7 +384,7 @@ func TestTradingChain_LiveMode_FullFlow(t *testing.T) {
 		}
 		return nil
 	}
-	api.containerRunning = func(string) bool { return false }
+	api.containerRunning = func(string, _ string) bool { return false }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`ok`)) }))
 		t.Cleanup(srv.Close)
@@ -413,7 +414,7 @@ func TestTradingChain_LiveMode_FullFlow(t *testing.T) {
 	}
 
 	// Step 3: Start container
-	req3 := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/start", nil)
+	req3 := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/start?mode=live", nil)
 	req3.Header.Set("X-User-Id", userID)
 	w3 := httptest.NewRecorder()
 	r.ServeHTTP(w3, req3)
@@ -468,7 +469,7 @@ func TestCreateCredential_NilEncryptor_Returns503(t *testing.T) {
 	proxy := NewBotProxy(cm)
 	// No encryptor, no creds
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(string) bool { return false }
+	api.containerRunning = func(string, _ string) bool { return false }
 
 	r := testRouter(api)
 	req := httptest.NewRequest(http.MethodPost, "/api/credentials", strings.NewReader(`{"exchange":"binance","api_key":"k","api_secret":"s"}`))
