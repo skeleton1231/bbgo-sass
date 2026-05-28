@@ -13,6 +13,7 @@ interface GridStrategyState {
     quote?: number | string
     averageCost?: number | string
     strategyInstanceID?: string
+    openedAt?: string
   }
   GridProfitStats?: {
     profit?: number | string
@@ -50,9 +51,7 @@ export function extractGridLines(
   return lines
 }
 
-export function extractStrategyStats(
-  strategyState: Record<string, unknown>
-): {
+export interface StrategyStats {
   symbol: string
   strategy: string
   upperPrice: number
@@ -61,8 +60,16 @@ export function extractStrategyStats(
   quantity: number
   base: number
   quote: number
+  averageCost: number
   instanceId: string
-} | null {
+  openedAt: string
+  stopLossPrice: number
+  takeProfitPrice: number
+}
+
+export function extractStrategyStats(
+  strategyState: Record<string, unknown>
+): StrategyStats | null {
   const strategy = strategyState['strategy'] as string | undefined
   if (!strategy) return null
 
@@ -78,6 +85,10 @@ export function extractStrategyStats(
     quantity: state.quantity ?? 0,
     base: typeof state.Position?.base === 'number' ? state.Position.base : parseFloat(String(state.Position?.base ?? '0')),
     quote: typeof state.Position?.quote === 'number' ? state.Position.quote : parseFloat(String(state.Position?.quote ?? '0')),
+    averageCost: typeof state.Position?.averageCost === 'number' ? state.Position.averageCost : parseFloat(String(state.Position?.averageCost ?? '0')),
     instanceId: state.Position?.strategyInstanceID ?? '',
+    openedAt: state.Position?.openedAt ?? '',
+    stopLossPrice: state.stopLossPrice ?? 0,
+    takeProfitPrice: state.takeProfitPrice ?? 0,
   }
 }

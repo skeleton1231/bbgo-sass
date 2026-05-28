@@ -542,7 +542,24 @@ export default function BotDetailPage() {
                             <span>Qty/Grid</span>
                             <span className="text-foreground">{strategyStats.quantity}</span>
                           </div>
+                          {strategyStats.stopLossPrice > 0 && (
+                            <div className="flex justify-between">
+                              <span>Stop Loss</span>
+                              <span className="text-trade-down">{strategyStats.stopLossPrice.toLocaleString()}</span>
+                            </div>
+                          )}
+                          {strategyStats.takeProfitPrice > 0 && (
+                            <div className="flex justify-between">
+                              <span>Take Profit</span>
+                              <span className="text-trade-up">{strategyStats.takeProfitPrice.toLocaleString()}</span>
+                            </div>
+                          )}
                           <hr className="border-border" />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                        <p className="font-medium text-sm">Position</p>
+                        <div className="space-y-1.5 font-mono text-muted-foreground">
                           <div className="flex justify-between">
                             <span>Base</span>
                             <span className={cn("text-foreground", strategyStats.base > 0 && "text-trade-up")}>
@@ -555,6 +572,30 @@ export default function BotDetailPage() {
                               {strategyStats.quote.toFixed(2)}
                             </span>
                           </div>
+                          {strategyStats.averageCost > 0 && (
+                            <div className="flex justify-between">
+                              <span>Avg Cost</span>
+                              <span className="text-foreground">{strategyStats.averageCost.toLocaleString()}</span>
+                            </div>
+                          )}
+                          {currentPrice && strategyStats.base > 0 && strategyStats.averageCost > 0 && (
+                            <div className="flex justify-between">
+                              <span>Unrealized</span>
+                              <span className={cn(
+                                "font-medium",
+                                currentPrice > strategyStats.averageCost ? "text-trade-up" : "text-trade-down"
+                              )}>
+                                {currentPrice > strategyStats.averageCost ? '+' : ''}
+                                {((currentPrice - strategyStats.averageCost) * strategyStats.base).toFixed(2)} USDT
+                              </span>
+                            </div>
+                          )}
+                          {currentPrice && strategyStats.base > 0 && (
+                            <div className="flex justify-between">
+                              <span>Value</span>
+                              <span className="text-foreground">{(currentPrice * strategyStats.base).toFixed(2)}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       {gridLines.length > 0 && (

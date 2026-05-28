@@ -105,7 +105,11 @@ describe('extractStrategyStats', () => {
       quantity: 0.001,
       base: 0.5,
       quote: 10000,
+      averageCost: 49000,
       instanceId: 'instance-123',
+      openedAt: '',
+      stopLossPrice: 0,
+      takeProfitPrice: 0,
     })
   })
 
@@ -141,7 +145,11 @@ describe('extractStrategyStats', () => {
       quantity: 0,
       base: 0,
       quote: 0,
+      averageCost: 0,
       instanceId: '',
+      openedAt: '',
+      stopLossPrice: 0,
+      takeProfitPrice: 0,
     })
   })
 })
