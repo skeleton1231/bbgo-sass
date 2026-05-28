@@ -1,6 +1,5 @@
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import type { BBGoOrder } from '@/lib/bbgo/queries'
 
 interface OrderRowProps {
@@ -10,37 +9,53 @@ interface OrderRowProps {
 }
 
 export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
+  const executed = parseFloat(order.executedQuantity || '0')
+  const total = parseFloat(order.quantity)
+  const fillPct = total > 0 ? Math.round((executed / total) * 100) : 0
+  const isBuy = order.side === 'BUY'
+  const sideColor = isBuy ? 'text-trade-up' : 'text-trade-down'
+  const sideBg = isBuy ? 'bg-trade-up/10' : 'bg-trade-down/10'
+
   return (
-    <div className="flex items-center justify-between px-6 py-3">
-      <div className="flex items-center gap-3">
-        <div className={cn(
-          'flex h-7 w-7 items-center justify-center rounded-full',
-          order.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'
-        )}>
-          {order.side === 'BUY'
-            ? <ArrowDownRight className="h-3.5 w-3.5 text-trade-up" />
-            : <ArrowUpRight className="h-3.5 w-3.5 text-trade-down" />}
+    <div className={cn(
+      'flex items-center justify-between px-6 py-3 border-l-2',
+      isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
+    )}>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={cn('flex h-6 w-6 items-center justify-center rounded text-xs font-bold', sideBg, sideColor)}>
+          {isBuy ? 'B' : 'S'}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{order.symbol}</span>
-          <Badge variant="secondary" className="rounded-md text-[10px]">{order.orderType}</Badge>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium truncate">{order.symbol}</span>
+            <Badge variant="secondary" className="rounded-md text-[10px] shrink-0">{order.orderType}</Badge>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-mono">{order.price}</span>
+            <span>×</span>
+            <span className="font-mono">{executed > 0 ? order.executedQuantity : order.quantity}</span>
+            {executed > 0 && executed < total && (
+              <span className={cn('text-[10px] px-1 rounded', sideBg, sideColor)}>
+                {fillPct}% filled
+              </span>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground font-mono">
-          {order.price} × {order.executedQuantity || order.quantity}
-        </span>
+      <div className="flex items-center gap-3 shrink-0">
         {showStatus && order.status && (
           <Badge variant="outline" className={cn(
             'rounded-full text-[10px]',
             order.status === 'Filled' && 'border-trade-up/30 text-trade-up',
-            order.status === 'Canceled' && 'border-border text-muted-foreground'
+            order.status === 'Canceled' && 'border-border text-muted-foreground',
+            order.status === 'New' && 'border-blue-500/30 text-blue-500',
+            order.status === 'PartiallyFilled' && 'border-yellow-500/30 text-yellow-600',
           )}>
             {order.status}
           </Badge>
         )}
         {showTime && order.creationTime && (
-          <span className="text-xs text-muted-foreground">{new Date(order.creationTime).toLocaleString()}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{new Date(order.creationTime).toLocaleString()}</span>
         )}
       </div>
     </div>

@@ -41,8 +41,6 @@ import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
 import {
   ArrowLeft,
-  ArrowUpRight,
-  ArrowDownRight,
   Play,
   Square,
   TrendingUp,
@@ -699,38 +697,41 @@ export default function BotDetailPage() {
             {trades.length > 0 ? (
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
-                  {trades.map((trade: BBGoTrade) => (
-                    <div key={trade.id} className="flex items-center justify-between px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          'flex h-7 w-7 items-center justify-center rounded-full',
-                          trade.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'
-                        )}>
-                          {trade.side === 'BUY'
-                            ? <ArrowDownRight className="h-3.5 w-3.5 text-trade-up" />
-                            : <ArrowUpRight className="h-3.5 w-3.5 text-trade-down" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{trade.symbol}</span>
-                            <Badge variant="secondary" className="rounded-md text-[10px]">{trade.side}</Badge>
-                            {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">{t('maker')}</Badge>}
+                  {trades.map((trade: BBGoTrade) => {
+                    const isBuy = trade.side === 'BUY'
+                    return (
+                      <div key={trade.id} className={cn(
+                        'flex items-center justify-between px-6 py-3 border-l-2',
+                        isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
+                      )}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={cn(
+                            'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
+                            isBuy ? 'bg-trade-up/10 text-trade-up' : 'bg-trade-down/10 text-trade-down'
+                          )}>
+                            {isBuy ? 'B' : 'S'}
                           </div>
-                          <p className="text-xs text-muted-foreground">{trade.exchange}</p>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">{trade.symbol}</span>
+                              {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">Maker</Badge>}
+                            </div>
+                            <span className="text-xs text-muted-foreground">{trade.exchange}</span>
+                          </div>
+                        </div>
+                        <div className="text-right space-y-0.5 shrink-0">
+                          <p className="text-sm font-mono">{trade.price} × {trade.quantity}</p>
+                          <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
+                            {trade.quoteQuantity && parseFloat(trade.quoteQuantity) > 0 && (
+                              <span>${parseFloat(trade.quoteQuantity).toFixed(2)}</span>
+                            )}
+                            <span>{trade.fee} {trade.feeCurrency}</span>
+                            {trade.tradedAt && <span className="tabular-nums">{new Date(trade.tradedAt).toLocaleString()}</span>}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right space-y-0.5">
-                        <p className="text-sm font-mono">{trade.price} × {trade.quantity}</p>
-                        <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-                          {trade.quoteQuantity && parseFloat(trade.quoteQuantity) > 0 && (
-                            <span>${parseFloat(trade.quoteQuantity).toFixed(2)}</span>
-                          )}
-                          <span>{trade.fee} {trade.feeCurrency}</span>
-                          {trade.tradedAt && <span>{new Date(trade.tradedAt).toLocaleString()}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </ScrollArea>
             ) : (
