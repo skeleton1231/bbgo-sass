@@ -77,25 +77,24 @@ interface CandlestickChartProps {
 }
 
 function getChartTheme(): DeepPartial<ChartOptions> {
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   return {
     layout: {
-      background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
-      textColor: isDark ? '#a1a1aa' : '#71717a',
+      background: { type: ColorType.Solid, color: '#0c0e14' },
+      textColor: '#798089',
     },
     grid: {
-      vertLines: { color: isDark ? '#1e1e1e' : '#f4f4f5' },
-      horzLines: { color: isDark ? '#1e1e1e' : '#f4f4f5' },
+      vertLines: { color: '#1b1e26' },
+      horzLines: { color: '#1b1e26' },
     },
     crosshair: {
       vertLine: { color: '#71717a', width: 1, style: 2 },
       horzLine: { color: '#71717a', width: 1, style: 2 },
     },
     rightPriceScale: {
-      borderColor: isDark ? '#27272a' : '#e4e4e7',
+      borderColor: '#1b1e26',
     },
     timeScale: {
-      borderColor: isDark ? '#27272a' : '#e4e4e7',
+      borderColor: '#1b1e26',
       timeVisible: true,
       secondsVisible: false,
     },
