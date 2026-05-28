@@ -504,6 +504,40 @@ func (cm *ContainerManager) RecoverUsers(users []*UserContainer) []RecoveryResul
 	return results
 }
 
+// DiscoverContainers scans Docker for running bbgo-* containers and returns
+// the userIDs and modes found. Used during startup to detect orphaned containers
+// that aren't in the Supabase user_containers table.
+func (cm *ContainerManager) DiscoverContainers() map[string][]string {
+	out, err := cm.docker("ps", "--filter", "name="+containerPrefix, "--format", "{{.Names}}")
+	if err != nil {
+		log.Printf("discover containers: %v", err)
+		return nil
+	}
+
+	result := make(map[string][]string)
+	for _, name := range strings.Split(out, "\n") {
+		name = strings.TrimSpace(name)
+		if !strings.HasPrefix(name, containerPrefix) {
+			continue
+		}
+		suffix := strings.TrimPrefix(name, containerPrefix)
+
+		var userID, mode string
+		if strings.HasSuffix(suffix, "-paper") {
+			userID = strings.TrimSuffix(suffix, "-paper")
+			mode = ModePaper
+		} else {
+			userID = suffix
+			mode = ModeLive
+		}
+		if userID == "" || userID == "marketdata" {
+			continue
+		}
+		result[userID] = append(result[userID], mode)
+	}
+	return result
+}
+
 var exchangePrefixes = map[string]string{
 	"binance":  "BINANCE",
 	"okex":     "OKEX",

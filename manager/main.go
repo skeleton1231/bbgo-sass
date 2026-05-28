@@ -66,6 +66,19 @@ func main() {
 		log.Printf("restored %d users from supabase", len(recoveredUsers))
 	}
 
+	// Discover orphaned Docker containers not tracked in Supabase
+	discovered := containerMgr.DiscoverContainers()
+	for uid, modes := range discovered {
+		for _, m := range modes {
+			if _, exists := users.Get(uid, m); exists {
+				continue
+			}
+			log.Printf("discovered orphaned container: %s (%s), registering", uid, m)
+			users.AddStrategy(uid, m, StrategyEntry{})
+			users.UpdateStatus(uid, m, StatusRunning)
+		}
+	}
+
 	syncer.SyncAll()
 
 	// Auto-sync backtest data on startup (background, non-blocking)

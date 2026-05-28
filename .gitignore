@@ -19,3 +19,4 @@ Thumbs.db
 *.test.exe
 .claude/
 CLAUDE.md
+web/supabase/.temp/

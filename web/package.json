@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev --turbopack -p 3142",
-    "build": "next build",
+    "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint .",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sb": "node scripts/sb.mjs",
+    "sb:types": "node scripts/sb.mjs types",
+    "sb:deploy": "node scripts/sb.mjs deploy",
+    "sb:push": "node scripts/sb.mjs push"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

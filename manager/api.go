@@ -378,6 +378,13 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	go api.startUserContainer(userID, mode)
 }
 
+func (api *API) updateAndPersistStatus(userID, mode, status string) {
+	api.users.UpdateStatus(userID, mode, status)
+	if api.syncer != nil {
+		go api.syncer.SyncUser(userID, mode)
+	}
+}
+
 func (api *API) startUserContainer(userID, mode string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -389,7 +396,7 @@ func (api *API) startUserContainer(userID, mode string) {
 
 	if err := api.startContainer(uc); err != nil {
 		log.Printf("start %s container for user %s failed: %v", mode, userID, err)
-		api.users.UpdateStatus(userID, mode, StatusError)
+		api.updateAndPersistStatus(userID, mode, StatusError)
 		return
 	}
 
@@ -399,12 +406,12 @@ func (api *API) startUserContainer(userID, mode string) {
 		baseURL = api.container.APIURL(userID, mode)
 	}
 	if baseURL == "" {
-		api.users.UpdateStatus(userID, mode, StatusError)
+		api.updateAndPersistStatus(userID, mode, StatusError)
 		log.Printf("user %s %s: cannot determine container URL", userID, mode)
 		return
 	}
 	if api.newBBGoClient == nil {
-		api.users.UpdateStatus(userID, mode, StatusError)
+		api.updateAndPersistStatus(userID, mode, StatusError)
 		log.Printf("user %s %s: bbgo client factory not configured", userID, mode)
 		return
 	}
@@ -412,7 +419,7 @@ func (api *API) startUserContainer(userID, mode string) {
 	for i := 0; i < 30; i++ {
 		select {
 		case <-ctx.Done():
-			api.users.UpdateStatus(userID, mode, StatusError)
+			api.updateAndPersistStatus(userID, mode, StatusError)
 			log.Printf("user %s %s health check cancelled: %v", userID, mode, ctx.Err())
 			return
 		default:
@@ -425,12 +432,12 @@ func (api *API) startUserContainer(userID, mode string) {
 	}
 
 	if !reachable {
-		api.users.UpdateStatus(userID, mode, StatusError)
+		api.updateAndPersistStatus(userID, mode, StatusError)
 		log.Printf("user %s %s container started but health check failed", userID, mode)
 		return
 	}
 
-	api.users.UpdateStatus(userID, mode, StatusRunning)
+	api.updateAndPersistStatus(userID, mode, StatusRunning)
 	log.Printf("user %s %s container started and healthy", userID, mode)
 
 	go func() {
@@ -1212,7 +1219,7 @@ func (api *API) refreshContainerStatus(uc *UserContainer) {
 		return
 	}
 	if !running {
-		api.users.UpdateStatus(uc.UserID, uc.Mode, StatusStopped)
+		api.updateAndPersistStatus(uc.UserID, uc.Mode, StatusStopped)
 		uc.Status = StatusStopped
 	}
 }
