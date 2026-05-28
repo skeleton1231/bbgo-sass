@@ -39,6 +39,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
+import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import {
   ArrowLeft,
   Play,
@@ -124,85 +125,54 @@ export default function BotDetailPage() {
     enabled: isRunning && !!activeExchange && !!symbol,
   })
 
-  const tradeMarkers: TradeMarker[] = useMemo(() => {
-    const markers: TradeMarker[] = []
+  const tradeMarkers: TradeMarker[] = useMemo(
+    () => buildTradeMarkers(tradesData?.trades ?? null, closedOrdersData?.orders ?? null, symbol),
+    [tradesData?.trades, closedOrdersData?.orders, symbol]
+  )
 
-    // From actual trades
-    if (tradesData?.trades) {
-      markers.push(...tradesData.trades
-        .filter((tr) => !symbol || tr.symbol === symbol)
-        .slice(0, 200)
-        .map((tr) => ({
-          time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker["time"],
-          side: tr.side as 'BUY' | 'SELL',
-          price: parseFloat(tr.price),
-          quantity: parseFloat(tr.quantity),
-        })))
-    }
-
-    // From closed orders (fills)
-    if (closedOrdersData?.orders) {
-      markers.push(...closedOrdersData.orders
-        .filter((o) => (!symbol || o.symbol === symbol) && parseFloat(o.executedQuantity) > 0)
-        .map((o) => ({
-          time: Math.floor(new Date(o.creationTime ?? Date.now()).getTime() / 1000) as TradeMarker["time"],
-          side: o.side as 'BUY' | 'SELL',
-          price: parseFloat(o.price),
-          quantity: parseFloat(o.executedQuantity || o.quantity),
-          orderId: o.orderID,
-        })))
-    }
-
-    // Deduplicate by time+side+price
-    const seen = new Set<string>()
-    return markers
-      .sort((a, b) => (a.time as number) - (b.time as number))
-      .filter((m) => {
-        const key = `${m.time}-${m.side}-${m.price}`
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
-  }, [tradesData?.trades, closedOrdersData?.orders, symbol])
-
-  const orderLevels: OrderLevel[] = useMemo(() => {
-    if (!openOrdersData?.orders) return []
-    return openOrdersData.orders
-      .filter((o) => !symbol || o.symbol === symbol)
-      .map((o) => ({
-        price: parseFloat(o.price),
-        side: o.side as 'BUY' | 'SELL',
-        quantity: o.executedQuantity || o.quantity,
-      }))
-  }, [openOrdersData?.orders, symbol])
+  const orderLevels: OrderLevel[] = useMemo(
+    () => buildOrderLevels(openOrdersData?.orders ?? null, symbol),
+    [openOrdersData?.orders, symbol]
+  )
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
 
-  const gridLines: GridLine[] = useMemo(() => {
-    if (!strategyStatesData?.strategies) return []
-    const matching = strategyStatesData.strategies.find(
-      (s: Record<string, unknown>) => {
+  const findMatchingStrategy = useCallback((strategies: Record<string, unknown>[]) => {
+    if (!strategies.length) return undefined
+    // If only one strategy, use it
+    if (strategies.length === 1) return strategies[0]
+    // Match by bot config (lowerPrice/upperPrice) to disambiguate multiple strategies on same symbol
+    const botLower = bot?.config?.lowerPrice as number | undefined
+    const botUpper = bot?.config?.upperPrice as number | undefined
+    if (botLower != null && botUpper != null) {
+      const matched = strategies.find((s) => {
         const strategy = s.strategy as string
         const inner = s[strategy] as Record<string, unknown> | undefined
-        return inner?.symbol === symbol || (!symbol && inner?.symbol)
-      }
-    )
+        return inner?.lowerPrice === botLower && inner?.upperPrice === botUpper
+      })
+      if (matched) return matched
+    }
+    // Fallback: first strategy matching symbol
+    return strategies.find((s) => {
+      const strategy = s.strategy as string
+      const inner = s[strategy] as Record<string, unknown> | undefined
+      return inner?.symbol === symbol || (!symbol && inner?.symbol)
+    })
+  }, [bot?.config?.lowerPrice, bot?.config?.upperPrice, symbol])
+
+  const gridLines: GridLine[] = useMemo(() => {
+    if (!strategyStatesData?.strategies) return []
+    const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
     if (!matching) return []
     return extractGridLines(matching as Record<string, unknown>, currentPrice)
-  }, [strategyStatesData?.strategies, symbol, currentPrice])
+  }, [strategyStatesData?.strategies, currentPrice, findMatchingStrategy])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
-    const matching = strategyStatesData.strategies.find(
-      (s: Record<string, unknown>) => {
-        const strategy = s.strategy as string
-        const inner = s[strategy] as Record<string, unknown> | undefined
-        return inner?.symbol === symbol || (!symbol && inner?.symbol)
-      }
-    )
+    const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
     if (!matching) return null
     return extractStrategyStats(matching as Record<string, unknown>)
-  }, [strategyStatesData?.strategies, symbol])
+  }, [strategyStatesData?.strategies, findMatchingStrategy])
 
   interface DepthMessage {
     type: string
