@@ -104,6 +104,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
