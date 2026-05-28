@@ -40,6 +40,7 @@ import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/Candl
 import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
+import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 import {
   ArrowLeft,
   Play,
@@ -95,6 +96,13 @@ export default function BotDetailPage() {
 
   const [activeSession, setactiveSession] = useState('')
   const [klineInterval, setKlineInterval] = useState('1h')
+  const [indicators, setIndicators] = useState<IndicatorConfig[]>(DEFAULT_INDICATORS)
+
+  const toggleIndicator = useCallback((id: string) => {
+    setIndicators((prev) =>
+      prev.map((ic) => (ic.id === id ? { ...ic, enabled: !ic.enabled } : ic))
+    )
+  }, [])
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
   const [ohlcvData, setOhlcvData] = useState<{ time: number; open: number; high: number; low: number; close: number; volume?: number } | null>(null)
 
@@ -166,6 +174,38 @@ export default function BotDetailPage() {
     if (!matching) return []
     return extractGridLines(matching as Record<string, unknown>, currentPrice)
   }, [strategyStatesData?.strategies, currentPrice, findMatchingStrategy])
+
+  const indicatorLines = useMemo(() => {
+    if (candles.length === 0) return []
+    const closes = candles.map((c) => ({ time: c.time, close: c.close }))
+    const lines: Array<{
+      id: string
+      name: string
+      color: string
+      lineWidth?: number
+      lineStyle?: number
+      data: Array<{ time: import('lightweight-charts').Time; value: number }>
+    }> = []
+
+    for (const ic of indicators) {
+      if (!ic.enabled) continue
+      if (ic.type === 'sma') {
+        const data = computeSMA(closes, ic.period)
+        if (data.length > 0) lines.push({ id: ic.id, name: ic.name, color: ic.color, data })
+      } else if (ic.type === 'ema') {
+        const data = computeEMA(closes, ic.period)
+        if (data.length > 0) lines.push({ id: ic.id, name: ic.name, color: ic.color, data })
+      } else if (ic.type === 'bollinger') {
+        const { upper, middle, lower } = computeBollingerBands(closes, ic.period, 2)
+        if (middle.length > 0) {
+          lines.push({ id: `${ic.id}-upper`, name: `${ic.name} Upper`, color: ic.color, lineStyle: 2, data: upper })
+          lines.push({ id: `${ic.id}-mid`, name: ic.name, color: ic.color, data: middle })
+          lines.push({ id: `${ic.id}-lower`, name: `${ic.name} Lower`, color: ic.color, lineStyle: 2, data: lower })
+        }
+      }
+    }
+    return lines
+  }, [candles, indicators])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
@@ -463,6 +503,23 @@ export default function BotDetailPage() {
                     </button>
                   ))}
                 </div>
+                <div className="flex gap-1 mt-1">
+                  {indicators.map((ic) => (
+                    <button
+                      key={ic.id}
+                      onClick={() => toggleIndicator(ic.id)}
+                      className={cn(
+                        'rounded-md px-2 py-0.5 text-xs font-medium transition-colors border',
+                        ic.enabled
+                          ? 'text-white'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80 border-transparent'
+                      )}
+                      style={ic.enabled ? { backgroundColor: ic.color, borderColor: ic.color } : undefined}
+                    >
+                      {ic.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -479,6 +536,7 @@ export default function BotDetailPage() {
                   tradeMarkers={tradeMarkers}
                   orderLevels={orderLevels}
                   gridLines={gridLines}
+                  indicatorLines={indicatorLines}
                   height={450}
                   isLoading={klinesLoading}
                   dataKey={`${activeExchange}-${symbol}-${klineInterval}`}
