@@ -1,5 +1,6 @@
 import type { BBGoOrder, BBGoTrade } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
+import { computePositionTags } from './position-tags'
 
 export function buildTradeMarkers(
   trades: BBGoTrade[] | null | undefined,
@@ -46,19 +47,10 @@ export function buildTradeMarkers(
     return true
   })
 
-  // Tag open/close: track running net position (base units)
-  let netPosition = 0
-  for (const m of deduped) {
-    const qty = m.side === 'BUY' ? m.quantity : -m.quantity
-    const prevPos = netPosition
-    netPosition += qty
-    if (prevPos === 0 && netPosition !== 0) {
-      m.positionAction = 'open'
-    } else if (prevPos !== 0 && netPosition === 0) {
-      m.positionAction = 'close'
-    } else {
-      m.positionAction = prevPos !== 0 ? (m.side === 'BUY' ? 'add' : 'reduce') : 'trade'
-    }
+  // Tag open/close/add/reduce: use shared position tag logic
+  const tags = computePositionTags(deduped.map((m) => ({ side: m.side, quantity: String(m.quantity) })))
+  for (let i = 0; i < deduped.length; i++) {
+    deduped[i]!.positionAction = tags[i]!.tag ?? 'trade'
   }
 
   return deduped

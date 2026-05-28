@@ -42,6 +42,7 @@ import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-stat
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 import { computePnlCurve } from '@/lib/bbgo/pnl-curve'
+import { computePositionTags } from '@/lib/bbgo/position-tags'
 import {
   ArrowLeft,
   Play,
@@ -257,18 +258,10 @@ export default function BotDetailPage() {
   const stopUser = useStopUser()
 
   const trades = tradesData?.trades ?? []
-  const tradePositionTags = useMemo(() => {
-    let net = 0
-    return trades.map((t) => {
-      const qty = t.side === 'BUY' ? parseFloat(t.quantity) : -parseFloat(t.quantity)
-      const prev = net
-      net += qty
-      const tag = prev === 0 && net !== 0 ? 'open' as const
-        : prev !== 0 && net === 0 ? 'close' as const
-        : null
-      return { tag, netPos: net }
-    })
-  }, [trades])
+  const tradePositionTags = useMemo(
+    () => computePositionTags(trades),
+    [trades]
+  )
 
   if (botLoading || !userId) {
     return (
@@ -632,6 +625,8 @@ export default function BotDetailPage() {
                               <span className="text-sm font-medium truncate">{trade.symbol}</span>
                               {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">Open</Badge>}
                               {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">Close</Badge>}
+                              {tag === 'add' && <Badge variant="outline" className="rounded-md text-[10px] border-emerald-400 text-emerald-400">Add</Badge>}
+                              {tag === 'reduce' && <Badge variant="outline" className="rounded-md text-[10px] border-amber-400 text-amber-400">Reduce</Badge>}
                               {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">Maker</Badge>}
                               <span className="text-[10px] text-muted-foreground tabular-nums">net {netPos.toFixed(6)}</span>
                             </div>
