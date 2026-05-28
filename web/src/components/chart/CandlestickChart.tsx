@@ -36,6 +36,7 @@ export interface TradeMarker {
   fee?: string
   feeCurrency?: string
   orderId?: number
+  positionAction?: 'open' | 'close' | 'add' | 'reduce' | 'trade'
 }
 
 export interface OrderLevel {
@@ -281,13 +282,19 @@ export function CandlestickChart({
     if (tradeMarkers && tradeMarkers.length > 0) {
       const markers = tradeMarkers
         .sort((a, b) => (a.time as number) - (b.time as number))
-        .map((t) => ({
-          time: t.time,
-          position: t.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
-          color: t.side === 'BUY' ? '#22c55e' : '#ef4444',
-          shape: t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
-          text: `${t.side === 'BUY' ? '▲' : '▼'} ${t.quantity}`,
-        }))
+        .map((t) => {
+          const action = t.positionAction
+          const actionLabel = action === 'open' ? ' Open' : action === 'close' ? ' Close' : action === 'add' ? ' Add' : action === 'reduce' ? ' Reduce' : ''
+          const isOpen = action === 'open'
+          const isClose = action === 'close'
+          return {
+            time: t.time,
+            position: t.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
+            color: isOpen ? '#3b82f6' : isClose ? '#f97316' : t.side === 'BUY' ? '#22c55e' : '#ef4444',
+            shape: isOpen ? 'circle' as const : isClose ? 'square' as const : t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
+            text: `${t.side === 'BUY' ? '▲' : '▼'}${actionLabel} ${t.quantity}`,
+          }
+        })
       const markersKey = markers.map((m) => `${m.time}-${m.shape}-${m.text}`).join('|')
       if (markersKey !== prevMarkersKeyRef.current) {
         prevMarkersKeyRef.current = markersKey

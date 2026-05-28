@@ -36,15 +36,32 @@ export function buildTradeMarkers(
     )
   }
 
+  const sorted = markers.sort((a, b) => (a.time as number) - (b.time as number))
+
   const seen = new Set<string>()
-  return markers
-    .sort((a, b) => (a.time as number) - (b.time as number))
-    .filter((m) => {
-      const key = `${m.time}-${m.side}-${m.price}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
+  const deduped = sorted.filter((m) => {
+    const key = `${m.time}-${m.side}-${m.price}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  // Tag open/close: track running net position (base units)
+  let netPosition = 0
+  for (const m of deduped) {
+    const qty = m.side === 'BUY' ? m.quantity : -m.quantity
+    const prevPos = netPosition
+    netPosition += qty
+    if (prevPos === 0 && netPosition !== 0) {
+      m.positionAction = 'open'
+    } else if (prevPos !== 0 && netPosition === 0) {
+      m.positionAction = 'close'
+    } else {
+      m.positionAction = prevPos !== 0 ? (m.side === 'BUY' ? 'add' : 'reduce') : 'trade'
+    }
+  }
+
+  return deduped
 }
 
 export function buildOrderLevels(
