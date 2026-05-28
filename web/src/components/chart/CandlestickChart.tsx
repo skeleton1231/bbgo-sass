@@ -259,7 +259,7 @@ export function CandlestickChart({
         const visibleStart = candles[candles.length - 80]
         const visibleEnd = candles[candles.length - 1]
         if (visibleStart && visibleEnd) {
-          ts.setVisibleRange({ from: visibleStart.time as number, to: visibleEnd.time as number })
+          ts.setVisibleRange({ from: visibleStart.time, to: visibleEnd.time })
         }
       } else {
         ts?.fitContent()
