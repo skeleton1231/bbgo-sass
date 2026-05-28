@@ -128,6 +128,7 @@ export function CandlestickChart({
   onCrosshairMoveRef.current = onCrosshairMove
   const onCandleHoverRef = useRef(onCandleHover)
   onCandleHoverRef.current = onCandleHover
+  const prevMarkersKeyRef = useRef('')
 
   if (prevDataKeyRef.current !== dataKey) {
     prevDataKeyRef.current = dataKey
@@ -287,7 +288,18 @@ export function CandlestickChart({
           shape: t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
           text: `${t.side === 'BUY' ? '▲' : '▼'} ${t.quantity}`,
         }))
-      markersRef.current = createSeriesMarkers(candleSeriesRef.current, markers)
+      const markersKey = markers.map((m) => `${m.time}-${m.shape}-${m.text}`).join('|')
+      if (markersKey !== prevMarkersKeyRef.current) {
+        prevMarkersKeyRef.current = markersKey
+        if (markersRef.current) {
+          markersRef.current.setMarkers(markers)
+        } else {
+          markersRef.current = createSeriesMarkers(candleSeriesRef.current, markers)
+        }
+      }
+    } else if (markersRef.current) {
+      markersRef.current.setMarkers([])
+      prevMarkersKeyRef.current = ''
     }
   }, [candles, tradeMarkers])
 
