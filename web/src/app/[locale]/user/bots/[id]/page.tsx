@@ -267,6 +267,19 @@ export default function BotDetailPage() {
   const startUser = useStartUser()
   const stopUser = useStopUser()
 
+  const trades = tradesData?.trades ?? []
+  const tradePositionTags = useMemo(() => {
+    let net = 0
+    return trades.map((t) => {
+      const qty = t.side === 'BUY' ? parseFloat(t.quantity) : -parseFloat(t.quantity)
+      const prev = net
+      net += qty
+      if (prev === 0 && net !== 0) return 'open' as const
+      if (prev !== 0 && net === 0) return 'close' as const
+      return null
+    })
+  }, [trades])
+
   if (botLoading || !userId) {
     return (
       <div className="space-y-6">
@@ -293,18 +306,6 @@ export default function BotDetailPage() {
   const botReachable = isRunning && pingData?.status === 'ok'
   const openOrders = openOrdersData?.orders ?? []
   const closedOrders = closedOrdersData?.orders ?? []
-  const trades = tradesData?.trades ?? []
-  const tradePositionTags = useMemo(() => {
-    let net = 0
-    return trades.map((t) => {
-      const qty = t.side === 'BUY' ? parseFloat(t.quantity) : -parseFloat(t.quantity)
-      const prev = net
-      net += qty
-      if (prev === 0 && net !== 0) return 'open' as const
-      if (prev !== 0 && net === 0) return 'close' as const
-      return null
-    })
-  }, [trades])
   const balances = balancesData?.balances ?? {}
   const liveStrategies = strategyStatesData?.strategies ?? []
   const nonZeroBalances = Object.entries(balances).filter(
