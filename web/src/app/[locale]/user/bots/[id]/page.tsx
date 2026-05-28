@@ -526,6 +526,8 @@ export default function BotDetailPage() {
             currentPrice={currentPrice}
             noSymbolText={t('noSymbolForChart')}
             startToSeeDataText={t('startToSeeData')}
+            klineInterval={klineInterval}
+            onIntervalChange={setKlineInterval}
           />
         </TabsContent>
 

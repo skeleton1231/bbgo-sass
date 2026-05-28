@@ -40,6 +40,8 @@ interface BotChartPanelProps {
   currentPrice?: number
   noSymbolText: string
   startToSeeDataText: string
+  klineInterval: string
+  onIntervalChange: (interval: string) => void
 }
 
 export function BotChartPanel({
@@ -58,8 +60,9 @@ export function BotChartPanel({
   currentPrice,
   noSymbolText,
   startToSeeDataText,
+  klineInterval,
+  onIntervalChange,
 }: BotChartPanelProps) {
-  const [klineInterval, setKlineInterval] = useState('1h')
   const [indicators, setIndicators] = useState<IndicatorConfig[]>([])
   const [showPnlCurve, setShowPnlCurve] = useState(true)
   const [ohlcvData, setOhlcvData] = useState<{
@@ -89,7 +92,7 @@ export function BotChartPanel({
               {KLINE_INTERVALS.map((iv) => (
                 <button
                   key={iv.key}
-                  onClick={() => setKlineInterval(iv.key)}
+                  onClick={() => onIntervalChange(iv.key)}
                   className={cn(
                     'rounded px-2 py-0.5 text-xs font-medium transition-colors',
                     klineInterval === iv.key
