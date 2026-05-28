@@ -247,7 +247,13 @@ func (m *UserContainerManager) Restore(users []*UserContainer) {
 	}
 }
 
+type databaseConfig struct {
+	Driver string `yaml:"driver"`
+	DSN    string `yaml:"dsn"`
+}
+
 type bbgoConfig struct {
+	Database                *databaseConfig           `yaml:"database,omitempty"`
 	Sessions                map[string]sessionConfig  `yaml:"sessions,omitempty"`
 	Exchange                map[string]exchangeConfig `yaml:"exchange"`
 	Environment             *environmentConfig        `yaml:"environment,omitempty"`
@@ -300,7 +306,7 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		s.Strategy, params = normalizeStrategyConfig(s.Strategy, params)
 
 		if s.CrossExchange {
-			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials)
+			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials, uc.Mode)
 			crossStrategies = append(crossStrategies, csEntry)
 			continue
 		}
@@ -327,6 +333,10 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 	}
 
 	cfg := bbgoConfig{
+		Database: &databaseConfig{
+			Driver: "sqlite3",
+			DSN:    fmt.Sprintf("file:/data/%s/bbgo.db?cache=shared&_journal_mode=WAL", uc.UserID),
+		},
 		Sessions:                sessions,
 		Exchange:                exchanges,
 		ExchangeStrategies:      exchangeStrategies,
@@ -344,7 +354,7 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 	return out, nil
 }
 
-func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool) map[string]interface{} {
+func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool, mode string) map[string]interface{} {
 	for _, sr := range s.Sessions {
 		prefix := sr.EnvVarPrefix
 		if prefix == "" {

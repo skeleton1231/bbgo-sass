@@ -56,22 +56,38 @@ func (c *BBGoClient) Ping() error {
 	return c.get("/api/ping", &resp)
 }
 
+type flexString string
+
+func (f *flexString) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = flexString(s)
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = flexString(n.String())
+		return nil
+	}
+	return fmt.Errorf("flexString: cannot unmarshal %s", string(data))
+}
+
 type BBGoTrade struct {
-	GID           int64  `json:"gid"`
-	ID            uint64 `json:"id"`
-	OrderID       uint64 `json:"orderID"`
-	OrderUUID     string `json:"orderUUID,omitempty"`
-	Exchange      string `json:"exchange"`
-	Symbol        string `json:"symbol"`
-	Side          string `json:"side"`
-	Price         string `json:"price"`
-	Quantity      string `json:"quantity"`
-	QuoteQuantity string `json:"quoteQuantity"`
-	IsBuyer       bool   `json:"isBuyer"`
-	IsMaker       bool   `json:"isMaker"`
-	TradedAt      string `json:"tradedAt"`
-	Fee           string `json:"fee"`
-	FeeCurrency   string `json:"feeCurrency"`
+	GID           int64      `json:"gid"`
+	ID            uint64     `json:"id"`
+	OrderID       uint64     `json:"orderID"`
+	OrderUUID     string     `json:"orderUUID,omitempty"`
+	Exchange      string     `json:"exchange"`
+	Symbol        string     `json:"symbol"`
+	Side          string     `json:"side"`
+	Price         flexString `json:"price"`
+	Quantity      flexString `json:"quantity"`
+	QuoteQuantity flexString `json:"quoteQuantity"`
+	IsBuyer       bool       `json:"isBuyer"`
+	IsMaker       bool       `json:"isMaker"`
+	TradedAt      string     `json:"tradedAt"`
+	Fee           flexString `json:"fee"`
+	FeeCurrency   string     `json:"feeCurrency"`
 }
 
 type BBGoTradesResponse struct {
@@ -128,21 +144,21 @@ func (c *BBGoClient) GetAllTradesFrom(exchange, symbol string, lastGID int64) ([
 }
 
 type BBGoOrder struct {
-	GID              uint64 `json:"gid"`
-	OrderID          uint64 `json:"orderID"`
-	UUID             string `json:"uuid,omitempty"`
-	ClientOrderID    string `json:"clientOrderID,omitempty"`
-	Exchange         string `json:"exchange"`
-	Symbol           string `json:"symbol"`
-	Side             string `json:"side"`
-	Type             string `json:"orderType"`
-	Price            string `json:"price"`
-	Quantity         string `json:"quantity"`
-	ExecutedQuantity string `json:"executedQuantity"`
-	Status           string `json:"status"`
-	StopPrice        string `json:"stopPrice,omitempty"`
-	CreationTime     string `json:"creationTime"`
-	IsWorking        bool   `json:"isWorking"`
+	GID              uint64     `json:"gid"`
+	OrderID          uint64     `json:"orderID"`
+	UUID             string     `json:"uuid,omitempty"`
+	ClientOrderID    string     `json:"clientOrderID,omitempty"`
+	Exchange         string     `json:"exchange"`
+	Symbol           string     `json:"symbol"`
+	Side             string     `json:"side"`
+	Type             string     `json:"orderType"`
+	Price            flexString `json:"price"`
+	Quantity         flexString `json:"quantity"`
+	ExecutedQuantity flexString `json:"executedQuantity"`
+	Status           string     `json:"status"`
+	StopPrice        flexString `json:"stopPrice,omitempty"`
+	CreationTime     string     `json:"creationTime"`
+	IsWorking        bool       `json:"isWorking"`
 }
 
 type BBGoOrdersResponse struct {

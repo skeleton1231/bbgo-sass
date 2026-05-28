@@ -81,9 +81,9 @@ func (q *fifoQueue) remaining() []fifoItem {
 func calculatePnL(trades []BBGoTrade) PnLReport {
 	grouped := make(map[string][]PnLTrade)
 	for _, t := range trades {
-		price, _ := strconv.ParseFloat(t.Price, 64)
-		qty, _ := strconv.ParseFloat(t.Quantity, 64)
-		fee, _ := strconv.ParseFloat(t.Fee, 64)
+		price, _ := strconv.ParseFloat(string(t.Price), 64)
+		qty, _ := strconv.ParseFloat(string(t.Quantity), 64)
+		fee, _ := strconv.ParseFloat(string(t.Fee), 64)
 		if price == 0 || qty == 0 {
 			continue
 		}

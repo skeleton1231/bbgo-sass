@@ -528,8 +528,8 @@ func (s *Syncer) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
 
 		for _, r := range rows {
 			allTrades = append(allTrades, BBGoTrade{
-				Symbol: r.Symbol, Side: r.Side, Price: r.Price,
-				Quantity: r.Quantity, Fee: r.Fee, TradedAt: r.TradedAt,
+				Symbol: r.Symbol, Side: r.Side, Price: flexString(r.Price),
+				Quantity: flexString(r.Quantity), Fee: flexString(r.Fee), TradedAt: r.TradedAt,
 			})
 		}
 

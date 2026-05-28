@@ -26,7 +26,7 @@ func TestGetAllTrades_Pagination(t *testing.T) {
 				id := gid + i + 1
 				trades = append(trades, BBGoTrade{
 					GID: id, ID: uint64(id), Symbol: "BTCUSDT", Side: "BUY",
-					Price: fmt.Sprintf("%d", 100+id), Quantity: "1",
+					Price: flexString(fmt.Sprintf("%d", 100+id)), Quantity: "1",
 				})
 			}
 		} else {
@@ -35,7 +35,7 @@ func TestGetAllTrades_Pagination(t *testing.T) {
 				id := gid + i + 1
 				trades = append(trades, BBGoTrade{
 					GID: id, ID: uint64(id), Symbol: "BTCUSDT", Side: "BUY",
-					Price: fmt.Sprintf("%d", 100+id), Quantity: "1",
+					Price: flexString(fmt.Sprintf("%d", 100+id)), Quantity: "1",
 				})
 			}
 		}
