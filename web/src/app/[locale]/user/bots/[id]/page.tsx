@@ -36,7 +36,8 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
+import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
+import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -146,6 +147,34 @@ export default function BotDetailPage() {
         quantity: o.executedQuantity || o.quantity,
       }))
   }, [openOrdersData?.orders, symbol])
+
+  const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
+
+  const gridLines: GridLine[] = useMemo(() => {
+    if (!strategyStatesData?.strategies) return []
+    const matching = strategyStatesData.strategies.find(
+      (s: Record<string, unknown>) => {
+        const strategy = s.strategy as string
+        const inner = s[strategy] as Record<string, unknown> | undefined
+        return inner?.symbol === symbol || (!symbol && inner?.symbol)
+      }
+    )
+    if (!matching) return []
+    return extractGridLines(matching as Record<string, unknown>, currentPrice)
+  }, [strategyStatesData?.strategies, symbol, currentPrice])
+
+  const strategyStats = useMemo(() => {
+    if (!strategyStatesData?.strategies) return null
+    const matching = strategyStatesData.strategies.find(
+      (s: Record<string, unknown>) => {
+        const strategy = s.strategy as string
+        const inner = s[strategy] as Record<string, unknown> | undefined
+        return inner?.symbol === symbol || (!symbol && inner?.symbol)
+      }
+    )
+    if (!matching) return null
+    return extractStrategyStats(matching as Record<string, unknown>)
+  }, [strategyStatesData?.strategies, symbol])
 
   interface DepthMessage {
     type: string
@@ -444,10 +473,13 @@ export default function BotDetailPage() {
                   {botReachable ? t('noSymbolForChart') : t('startToSeeData')}
                 </div>
               ) : (
-                <CandlestickChart
+                <div className="flex gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CandlestickChart
                   candles={candles}
                   tradeMarkers={tradeMarkers}
                   orderLevels={orderLevels}
+                  gridLines={gridLines}
                   height={450}
                   isLoading={klinesLoading}
                   dataKey={`${activeExchange}-${symbol}-${klineInterval}`}
@@ -460,6 +492,55 @@ export default function BotDetailPage() {
                     }
                   }}
                 />
+                  </div>
+                  {strategyStats && (
+                    <div className="hidden lg:flex flex-col gap-2 w-48 shrink-0 text-xs">
+                      <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                        <p className="font-medium text-sm">{strategyStats.strategy}</p>
+                        <div className="space-y-1.5 font-mono text-muted-foreground">
+                          <div className="flex justify-between">
+                            <span>Range</span>
+                            <span className="text-foreground">{strategyStats.lowerPrice.toLocaleString()}–{strategyStats.upperPrice.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Grids</span>
+                            <span className="text-foreground">{strategyStats.gridNumber}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Qty/Grid</span>
+                            <span className="text-foreground">{strategyStats.quantity}</span>
+                          </div>
+                          <hr className="border-border" />
+                          <div className="flex justify-between">
+                            <span>Base</span>
+                            <span className={cn("text-foreground", strategyStats.base > 0 && "text-trade-up")}>
+                              {strategyStats.base.toFixed(6)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Quote</span>
+                            <span className={cn("text-foreground", strategyStats.quote > 0 && "text-trade-up")}>
+                              {strategyStats.quote.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {gridLines.length > 0 && (
+                        <div className="rounded-lg border bg-muted/30 p-3">
+                          <p className="font-medium mb-1.5">Grid Levels</p>
+                          <div className="max-h-40 overflow-y-auto space-y-0.5 font-mono text-muted-foreground">
+                            {gridLines.filter((_, i) => i === 0 || i === gridLines.length - 1 || Math.abs(strategyStats.upperPrice - strategyStats.lowerPrice) / strategyStats.gridNumber > 0).slice(0, 12).map((g, i) => (
+                              <div key={i} className="flex justify-between">
+                                <span className="text-[10px]">{g.label}</span>
+                                <span className="w-1.5 h-1.5 rounded-full mt-1.5" style={{ backgroundColor: g.color }} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import {
   createChart,
   createSeriesMarkers,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type SeriesType,
@@ -13,6 +14,7 @@ import {
   type DeepPartial,
   type ChartOptions,
   type ISeriesMarkersPluginApi,
+  type LineStyle,
   ColorType,
 } from 'lightweight-charts'
 
@@ -30,6 +32,10 @@ export interface TradeMarker {
   side: 'BUY' | 'SELL'
   price: number
   quantity: number
+  isMaker?: boolean
+  fee?: string
+  feeCurrency?: string
+  orderId?: number
 }
 
 export interface OrderLevel {
@@ -38,14 +44,32 @@ export interface OrderLevel {
   quantity: string
 }
 
+export interface GridLine {
+  price: number
+  label: string
+  color: string
+}
+
+export interface IndicatorLine {
+  id: string
+  name: string
+  color: string
+  lineWidth?: number
+  lineStyle?: number
+  data: Array<{ time: Time; value: number }>
+}
+
 interface CandlestickChartProps {
   candles: KlineCandle[]
   tradeMarkers?: TradeMarker[]
   orderLevels?: OrderLevel[]
+  gridLines?: GridLine[]
+  indicatorLines?: IndicatorLine[]
   height?: number
   isLoading?: boolean
   dataKey?: string
   onVisibleTimeRangeChange?: (range: { from: number; to: number } | null) => void
+  onCrosshairMove?: (data: { time?: number; price?: number } | null) => void
 }
 
 function getChartTheme(): DeepPartial<ChartOptions> {
@@ -78,26 +102,34 @@ export function CandlestickChart({
   candles,
   tradeMarkers,
   orderLevels,
+  gridLines,
+  indicatorLines,
   height = 400,
   isLoading,
   dataKey,
   onVisibleTimeRangeChange,
+  onCrosshairMove,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<SeriesType>>>(new Map())
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const priceLinesRef = useRef<ReturnType<ISeriesApi<SeriesType>['createPriceLine']>[]>([])
   const prevCandleCountRef = useRef(0)
   const prevDataKeyRef = useRef(dataKey)
   const onVisibleRangeChangeRef = useRef(onVisibleTimeRangeChange)
+  const onCrosshairMoveRef = useRef(onCrosshairMove)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; data: TradeMarker } | null>(null)
   onVisibleRangeChangeRef.current = onVisibleTimeRangeChange
+  onCrosshairMoveRef.current = onCrosshairMove
 
   if (prevDataKeyRef.current !== dataKey) {
     prevDataKeyRef.current = dataKey
     prevCandleCountRef.current = 0
   }
+
   const initChart = useCallback(() => {
     if (!containerRef.current) return
 
@@ -130,9 +162,21 @@ export function CandlestickChart({
       scaleMargins: { top: 0.85, bottom: 0 },
     })
 
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.point) {
+        onCrosshairMoveRef.current?.(null)
+        return
+      }
+      const price = param.seriesData.get(candleSeries)?.['close']
+      if (typeof price === 'number') {
+        onCrosshairMoveRef.current?.({ time: param.time as number, price })
+      }
+    })
+
     chartRef.current = chart
     candleSeriesRef.current = candleSeries
     volumeSeriesRef.current = volumeSeries
+    indicatorSeriesRef.current.clear()
     priceLinesRef.current = []
     markersRef.current = null
 
@@ -166,6 +210,7 @@ export function CandlestickChart({
     return () => cleanup?.()
   }, [initChart])
 
+  // Candle data + trade markers
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return
 
@@ -176,55 +221,33 @@ export function CandlestickChart({
     prevCandleCountRef.current = candles.length
 
     if (isInitialLoad || candles.length < prevCount) {
-      // Full dataset replacement: initial load or interval change
-      const candleData = candles.map((c) => ({
-        time: c.time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }))
-      candleSeriesRef.current.setData(candleData)
-
-      const volumeData = candles
+      candleSeriesRef.current.setData(candles.map((c) => ({
+        time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
+      })))
+      volumeSeriesRef.current.setData(candles
         .filter((c) => c.volume != null && c.volume > 0)
         .map((c) => ({
           time: c.time,
           value: c.volume!,
           color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-        }))
-      volumeSeriesRef.current.setData(volumeData)
+        })))
       chartRef.current?.timeScale().fitContent()
     } else if (hasMoreHistory) {
-      // Prepending older candles — replace data but don't fit
-      const candleData = candles.map((c) => ({
-        time: c.time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }))
-      candleSeriesRef.current.setData(candleData)
-
-      const volumeData = candles
+      candleSeriesRef.current.setData(candles.map((c) => ({
+        time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
+      })))
+      volumeSeriesRef.current.setData(candles
         .filter((c) => c.volume != null && c.volume > 0)
         .map((c) => ({
           time: c.time,
           value: c.volume!,
           color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-        }))
-      volumeSeriesRef.current.setData(volumeData)
-      // Don't call fitContent — preserve user's scroll position
+        })))
     } else {
-      // Incremental update — only update last candle (WS tick)
       const lastCandle = candles[candles.length - 1]
       if (!lastCandle) return
       candleSeriesRef.current.update({
-        time: lastCandle.time,
-        open: lastCandle.open,
-        high: lastCandle.high,
-        low: lastCandle.low,
-        close: lastCandle.close,
+        time: lastCandle.time, open: lastCandle.open, high: lastCandle.high, low: lastCandle.low, close: lastCandle.close,
       })
       if (lastCandle.volume != null && lastCandle.volume > 0) {
         volumeSeriesRef.current.update({
@@ -243,38 +266,129 @@ export function CandlestickChart({
           position: t.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
           color: t.side === 'BUY' ? '#22c55e' : '#ef4444',
           shape: t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
-          text: `${t.side} ${t.quantity}`,
+          text: `${t.side === 'BUY' ? '▲' : '▼'} ${t.quantity}`,
         }))
       markersRef.current = createSeriesMarkers(candleSeriesRef.current, markers)
     }
   }, [candles, tradeMarkers])
 
+  // Order levels + grid lines as price lines
   useEffect(() => {
-    if (!candleSeriesRef.current || !orderLevels) return
+    if (!candleSeriesRef.current) return
 
     for (const pl of priceLinesRef.current) {
       candleSeriesRef.current.removePriceLine(pl)
     }
     priceLinesRef.current = []
 
-    if (orderLevels.length === 0) return
+    const allLines: Array<{ price: number; color: string; lineStyle: number; title: string }> = []
 
-    for (const o of orderLevels) {
-      const pl = candleSeriesRef.current.createPriceLine({
+    for (const o of orderLevels ?? []) {
+      allLines.push({
         price: o.price,
         color: o.side === 'BUY' ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)',
-        lineWidth: 1,
         lineStyle: 2,
-        axisLabelVisible: true,
         title: `${o.side} ${o.quantity}`,
+      })
+    }
+
+    for (const g of gridLines ?? []) {
+      allLines.push({
+        price: g.price,
+        color: g.color,
+        lineStyle: 3,
+        title: g.label,
+      })
+    }
+
+    if (allLines.length === 0) return
+
+    for (const line of allLines) {
+      const pl = candleSeriesRef.current.createPriceLine({
+        price: line.price,
+        color: line.color,
+        lineWidth: 1,
+        lineStyle: line.lineStyle as LineStyle,
+        axisLabelVisible: true,
+        title: line.title,
       })
       priceLinesRef.current.push(pl)
     }
-  }, [orderLevels])
+  }, [orderLevels, gridLines])
+
+  // Indicator lines as overlay series
+  useEffect(() => {
+    if (!chartRef.current) return
+
+    for (const [id, series] of indicatorSeriesRef.current) {
+      const stillExists = indicatorLines?.some((il) => il.id === id)
+      if (!stillExists) {
+        try { chartRef.current.removeSeries(series) } catch { /* ignore */ }
+        indicatorSeriesRef.current.delete(id)
+      }
+    }
+
+    if (!indicatorLines || indicatorLines.length === 0) return
+
+    for (const il of indicatorLines) {
+      if (il.data.length === 0) continue
+      let series = indicatorSeriesRef.current.get(il.id)
+      if (!series) {
+        series = chartRef.current.addSeries(LineSeries, {
+          color: il.color,
+          lineWidth: (il.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: il.lineStyle as LineStyle,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: false,
+        })
+        indicatorSeriesRef.current.set(il.id, series)
+      }
+      series.setData(il.data.map((d) => ({ time: d.time, value: d.value })))
+    }
+  }, [indicatorLines])
+
+  // Click handler for trade marker tooltips
+  useEffect(() => {
+    if (!chartRef.current || !tradeMarkers || tradeMarkers.length === 0) return
+
+    const handler = (param: { point?: { x: number; y: number }; time?: Time }) => {
+      if (!param.point || !param.time) {
+        setTooltip(null)
+        return
+      }
+      const clickTime = param.time as number
+      const closest = [...tradeMarkers]
+        .map((t) => ({ marker: t, timeDist: Math.abs((t.time as number) - clickTime) }))
+        .filter((t) => t.timeDist < 300)
+        .sort((a, b) => a.timeDist - b.timeDist)[0]
+
+      if (closest) {
+        setTooltip({
+          x: param.point.x,
+          y: closest.marker.side === 'BUY' ? param.point.y - 30 : param.point.y + 10,
+          data: closest.marker,
+        })
+      } else {
+        setTooltip(null)
+      }
+    }
+
+    chartRef.current.subscribeClick(handler)
+    return () => { chartRef.current?.unsubscribeClick(handler) }
+  }, [tradeMarkers])
 
   return (
     <div className="relative">
       <div ref={containerRef} className="rounded-lg overflow-hidden" style={{ height }} />
+      {tooltip && (
+        <TradeTooltip
+          x={tooltip.x}
+          y={tooltip.y}
+          data={tooltip.data}
+          onClose={() => setTooltip(null)}
+        />
+      )}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/80">
           <span className="text-sm text-muted-foreground">Loading chart...</span>
@@ -285,6 +399,53 @@ export function CandlestickChart({
           <span className="text-sm text-muted-foreground">No candlestick data available</span>
         </div>
       )}
+    </div>
+  )
+}
+
+function TradeTooltip({ x, y, data, onClose }: {
+  x: number
+  y: number
+  data: TradeMarker
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="absolute z-50 w-52 rounded-lg border bg-card p-2.5 shadow-lg text-xs"
+      style={{ left: Math.min(x, 300), top: Math.max(y, 10) }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-1 right-1.5 text-muted-foreground hover:text-foreground text-sm leading-none"
+      >
+        ×
+      </button>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span className={`inline-block h-2 w-2 rounded-full ${data.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'}`} />
+        <span className={`font-semibold ${data.side === 'BUY' ? 'text-trade-up' : 'text-trade-down'}`}>
+          {data.side}
+        </span>
+        {data.isMaker && (
+          <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">Maker</span>
+        )}
+      </div>
+      <div className="space-y-0.5 font-mono text-muted-foreground">
+        <div className="flex justify-between">
+          <span>Price</span>
+          <span className="text-foreground">{data.price}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Qty</span>
+          <span className="text-foreground">{data.quantity}</span>
+        </div>
+        {data.fee && (
+          <div className="flex justify-between">
+            <span>Fee</span>
+            <span className="text-foreground">{data.fee} {data.feeCurrency}</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
