@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useUserStrategies, useStartUser, useStopUser, useDeleteStrategy } from '@/lib/bbgo/queries'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function StrategyList({ userId, activeMode }: { userId: string; activeMode?: 'live' | 'paper' }) {
   const t = useTranslations('Bots')
@@ -14,7 +15,21 @@ export function StrategyList({ userId, activeMode }: { userId: string; activeMod
   const deleteStrategy = useDeleteStrategy()
 
   if (isLoading) {
-    return <div className="text-muted-foreground">{t('loading')}</div>
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded-lg border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-8 w-20 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   const containers = containersResp?.containers ?? {}

@@ -27,6 +27,7 @@ import { useKlineData } from '@/hooks/useKlineData'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -397,6 +398,7 @@ export default function BotDetailPage() {
         </TabsList>
 
         <TabsContent value="chart">
+          <ErrorBoundary>
           <Card className="rounded-xl">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -437,9 +439,11 @@ export default function BotDetailPage() {
               )}
             </CardContent>
           </Card>
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="depth">
+          <ErrorBoundary>
           <Card className="rounded-xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">{t('orderBook')}</CardTitle>
@@ -448,6 +452,7 @@ export default function BotDetailPage() {
               <DepthChart bids={depthData.bids} asks={depthData.asks} height={350} />
             </CardContent>
           </Card>
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="balances">

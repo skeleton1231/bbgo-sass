@@ -14,6 +14,7 @@ import {
   type BBGoAsset,
 } from '@/lib/bbgo/queries'
 import { cn } from '@/lib/utils'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -138,58 +139,64 @@ export default function DashboardPage() {
       </div>
 
       {isActive && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="rounded-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">{t('assetAllocation')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AssetAllocationChart assets={assets} />
-            </CardContent>
-          </Card>
+        <ErrorBoundary>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t('assetAllocation')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AssetAllocationChart assets={assets} />
+              </CardContent>
+            </Card>
 
-          <Card className="rounded-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">{t('tradingVolume')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TradingVolumeChart volumes={volumeData?.tradingVolumes ?? []} />
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t('tradingVolume')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TradingVolumeChart volumes={volumeData?.tradingVolumes ?? []} />
+              </CardContent>
+            </Card>
+          </div>
+        </ErrorBoundary>
       )}
 
       {isActive && pnlData && pnlData.totalTrades > 0 && (
-        <Card className="rounded-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('pnlSummary')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PnlSummary report={pnlData} />
-          </CardContent>
-        </Card>
+        <ErrorBoundary>
+          <Card className="rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{t('pnlSummary')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PnlSummary report={pnlData} />
+            </CardContent>
+          </Card>
+        </ErrorBoundary>
       )}
 
       {isActive && trades.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="rounded-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">{t('pnlChart')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PnlChart trades={trades} />
-            </CardContent>
-          </Card>
+        <ErrorBoundary>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t('pnlChart')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PnlChart trades={trades} />
+              </CardContent>
+            </Card>
 
-          <Card className="rounded-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">{t('equityCurve')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EquityChart assets={assets} />
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t('equityCurve')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EquityChart assets={assets} />
+              </CardContent>
+            </Card>
+          </div>
+        </ErrorBoundary>
       )}
 
       {anyActive && strategyCount > 0 && (
