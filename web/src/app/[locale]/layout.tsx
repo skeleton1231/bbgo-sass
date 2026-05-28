@@ -25,6 +25,7 @@ export default async function LocaleLayout({
 
   const clientNamespaces = [
     'Common', 'Errors', 'Auth', 'Nav', 'Dashboard', 'Bots', 'Backtest', 'Settings',
+    'Categories', 'StrategyFields',
   ]
   const filteredMessages: Record<string, unknown> = {}
   for (const ns of clientNamespaces) {
