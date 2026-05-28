@@ -172,7 +172,17 @@ export default function BotDetailPage() {
     if (!strategyStatesData?.strategies) return []
     const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
     if (!matching) return []
-    return extractGridLines(matching as Record<string, unknown>, currentPrice)
+    const lines = extractGridLines(matching as Record<string, unknown>, currentPrice)
+    const strategyKey = matching['strategy'] as string | undefined
+    const posState = strategyKey ? (matching[strategyKey] as Record<string, unknown>)?.Position as Record<string, unknown> | undefined : undefined
+    if (posState?.averageCost) {
+      const ac = typeof posState.averageCost === 'number' ? posState.averageCost : parseFloat(String(posState.averageCost))
+      const base = typeof posState.base === 'number' ? posState.base : parseFloat(String(posState.base ?? '0'))
+      if (ac > 0 && base > 0) {
+        lines.push({ price: ac, label: `Avg Cost ${ac.toLocaleString()}`, color: 'rgba(251, 146, 60, 0.7)' })
+      }
+    }
+    return lines
   }, [strategyStatesData?.strategies, currentPrice, findMatchingStrategy])
 
   const indicatorLines = useMemo(() => {
@@ -742,6 +752,17 @@ export default function BotDetailPage() {
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium truncate">{trade.symbol}</span>
+                              {(() => {
+                                const idx = trades.indexOf(trade)
+                                let pos = 0
+                                for (let i = 0; i <= idx; i++) {
+                                  pos += trades[i]!.side === 'BUY' ? parseFloat(trades[i]!.quantity) : -parseFloat(trades[i]!.quantity)
+                                }
+                                const prevPos = pos + (isBuy ? -parseFloat(trade.quantity) : parseFloat(trade.quantity))
+                                if (prevPos === 0 && pos !== 0) return <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">Open</Badge>
+                                if (prevPos !== 0 && pos === 0) return <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">Close</Badge>
+                                return null
+                              })()}
                               {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">Maker</Badge>}
                             </div>
                             <span className="text-xs text-muted-foreground">{trade.exchange}</span>
