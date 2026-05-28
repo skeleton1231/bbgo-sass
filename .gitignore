@@ -20,3 +20,7 @@ Thumbs.db
 .claude/
 CLAUDE.md
 web/supabase/.temp/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+*.png

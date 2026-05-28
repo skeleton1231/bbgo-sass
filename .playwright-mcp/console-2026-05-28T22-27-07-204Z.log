@@ -1,7 +1,0 @@
-[    1167ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
-[    1223ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
-[   17147ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-[   17148ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-[   17149ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-[   17149ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-[   92425ms] [WARNING] Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently @ :17
