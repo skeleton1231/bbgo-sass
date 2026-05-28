@@ -1,0 +1,72 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: BBGO
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Bots" [ref=e16] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e17]
+          - text: Bots
+        - link "Backtest" [ref=e20] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e21]
+          - text: Backtest
+        - link "Settings" [ref=e23] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e24]
+          - text: Settings
+      - button "Sign Out" [ref=e28]:
+        - img [ref=e29]
+        - text: Sign Out
+    - generic [ref=e32]:
+      - banner [ref=e33]:
+        - navigation [ref=e35]:
+          - generic [ref=e37]: Dashboard
+          - generic [ref=e143]:
+            - generic [ref=e144]: /
+            - generic [ref=e145]: Bots
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - button "Live" [ref=e40]
+            - button "Paper" [active] [ref=e41]
+          - button "TA" [ref=e42]:
+            - generic [ref=e44]: TA
+      - main [ref=e45]:
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - heading "Trading Bots" [level=1] [ref=e149]
+            - button "Create Bot" [ref=e150]:
+              - img
+              - text: Create Bot
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - generic [ref=e154]:
+                  - paragraph [ref=e155]: Paper User Container
+                  - generic [ref=e156]: Paper
+                - paragraph [ref=e157]: "2 strategies · Container: bbgo-73a0e592-Paper"
+              - generic [ref=e158]:
+                - link "Dashboard" [ref=e159] [cursor=pointer]:
+                  - /url: /user/bots/73a0e592-45df-40be-8088-304011f976a3?mode=paper
+                - generic [ref=e160]: Running
+                - button "Stop" [ref=e161]
+            - generic [ref=e162]:
+              - generic [ref=e163]:
+                - paragraph [ref=e164]: Test Grid Bot
+                - paragraph [ref=e165]: binance · grid2 · Paper
+              - button "Remove" [ref=e166]
+            - generic [ref=e167]:
+              - generic [ref=e168]:
+                - paragraph [ref=e169]: Paper Grid BTC
+                - paragraph [ref=e170]: binance · grid2 · Paper
+              - button "Remove" [ref=e171]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e101] [cursor=pointer]:
+    - img [ref=e102]
+  - alert [ref=e142]

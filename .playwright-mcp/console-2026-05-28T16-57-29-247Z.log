@@ -1,0 +1,71 @@
+[    2152ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    2336ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   42115ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   42115ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   42115ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   42115ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   42116ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   42117ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   84581ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3142/api/manager/users/73a0e592-45df-40be-8088-304011f976a3/bbgo/orders/closed?mode=paper:0
+[   87008ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3142/user/login:0
+[   87466ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   87537ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  109971ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/user/login?_rsc=hH39JckubxYt4lsY:0
+[  110194ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/user/login?_rsc=hH39JckubxYt4lsY:0
+[  110707ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/user/login:0
+[  111414ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0a8t_react-dom_07.400g._.js:15305
+[  111579ms] Unexpected end of input
+[  111579ms] Invalid or unexpected token
+[  111579ms] Error: ./src/app/[locale]/user/bots/[id]/page.tsx:173:5
+Expression expected
+  171 |     if (!strategyStatesData?.strategies) return null
+  172 |     const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string,...
+> 173 |     )
+      |     ^
+  174 |     if (!matching) return null
+  175 |     return extractStrategyStats(matching as Record<string, unknown>)
+  176 |   }, [strategyStatesData?.strategies, symbol])
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component Browser]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component SSR]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/[locale]/user/bots/[id]/page.tsx:173:5)
+    at Object.getCompilationErrors (file://D:\git_projects\bbgo\saas\web\node_modules\.pnpm\next@16.2.6_@babel+core@7.2_254017c60be10ba7f4b780f8f1e06ef4\node_modules\next\dist\server\dev\hot-reloader-turbopack.js:1186:59)
+    at DevBundlerService.getCompilationError (file://D:\git_projects\bbgo\saas\web\node_modules\.pnpm\next@16.2.6_@babel+core@7.2_254017c60be10ba7f4b780f8f1e06ef4\node_modules\next\dist\server\lib\dev-bundler-service.js:44:55)
+    at DevServer.getCompilationError (file://D:\git_projects\bbgo\saas\web\node_modules\.pnpm\next@16.2.6_@babel+core@7.2_254017c60be10ba7f4b780f8f1e06ef4\node_modules\next\dist\server\dev\next-dev-server.js:720:42)
+    at DevServer.findPageComponents (file://D:\git_projects\bbgo\saas\web\node_modules\.pnpm\next@16.2.6_@babel+core@7.2_254017c60be10ba7f4b780f8f1e06ef4\node_modules\next\dist\server\dev\next-dev-server.js:690:43)
+    at async DevServer.renderErrorToResponseImpl (file://D:\git_projects\bbgo\saas\web\node_modules\.pnpm\next@16.2.6_@babel+core@7.2_254017c60be10ba7f4b780f8f1e06ef4\node_modules\next\dist\server\base-server.js:1753:26)
+[  111586ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1226
+[  111659ms] [ERROR] ./src/app/[locale]/user/bots/[id]/page.tsx:173:5
+Expression expected
+  171 |     if (!strategyStatesData?.strategies) return null
+  172 |     const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string,...
+> 173 |     )
+      |     ^
+  174 |     if (!matching) return null
+  175 |     return extractStrategyStats(matching as Record<string, unknown>)
+  176 |   }, [strategyStatesData?.strategies, symbol])
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component Browser]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component SSR]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component] @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1945
+[  111781ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/favicon.ico:0
+[  133787ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3142/user/login:0
+[  134373ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  134457ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477

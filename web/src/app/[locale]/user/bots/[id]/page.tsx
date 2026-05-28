@@ -41,6 +41,7 @@ import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
+import { computePnlCurve } from '@/lib/bbgo/pnl-curve'
 import {
   ArrowLeft,
   Play,
@@ -97,6 +98,7 @@ export default function BotDetailPage() {
   const [activeSession, setactiveSession] = useState('')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [indicators, setIndicators] = useState<IndicatorConfig[]>(DEFAULT_INDICATORS)
+  const [showPnlCurve, setShowPnlCurve] = useState(true)
 
   const toggleIndicator = useCallback((id: string) => {
     setIndicators((prev) =>
@@ -216,6 +218,22 @@ export default function BotDetailPage() {
     }
     return lines
   }, [candles, indicators])
+
+  const pnlLine = useMemo(() => {
+    if (!showPnlCurve || !tradesData?.trades || tradesData.trades.length === 0) return null
+    const curve = computePnlCurve(
+      tradesData.trades.map((t) => ({
+        time: t.tradedAt,
+        side: t.side,
+        price: t.price,
+        quantity: t.quantity,
+        fee: t.fee,
+        feeCurrency: t.feeCurrency,
+      }))
+    )
+    if (curve.length < 2) return null
+    return { id: 'pnl-curve', name: 'P&L', color: '#a855f7', lineWidth: 2, data: curve }
+  }, [tradesData?.trades])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
@@ -541,6 +559,20 @@ export default function BotDetailPage() {
                     </button>
                   ))}
                 </div>
+                <div className="flex gap-1 mt-1">
+                  <button
+                    onClick={() => setShowPnlCurve((v) => !v)}
+                    className={cn(
+                      'rounded-md px-2 py-0.5 text-xs font-medium transition-colors border',
+                      showPnlCurve
+                        ? 'text-white'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80 border-transparent'
+                    )}
+                    style={showPnlCurve ? { backgroundColor: '#a855f7', borderColor: '#a855f7' } : undefined}
+                  >
+                    P&L
+                  </button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -557,7 +589,7 @@ export default function BotDetailPage() {
                   tradeMarkers={tradeMarkers}
                   orderLevels={orderLevels}
                   gridLines={gridLines}
-                  indicatorLines={indicatorLines}
+                  indicatorLines={pnlLine ? [...indicatorLines, pnlLine] : indicatorLines}
                   height={450}
                   isLoading={klinesLoading}
                   dataKey={`${activeExchange}-${symbol}-${klineInterval}`}

@@ -1,0 +1,264 @@
+[    1047ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    1250ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    2785ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[    2787ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[    2788ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[    3496ms] [LOG] [chart] markers effect {candleCount: 500, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    3498ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    4284ms] [LOG] [chart] markers effect {candleCount: 1000, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    4286ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    5267ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    5268ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    7350ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    7352ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    9250ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    9251ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   11254ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   11256ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   13255ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   13257ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   15244ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   15245ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   17232ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   17234ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   19264ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   19266ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   21251ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   21253ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   23301ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   23302ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   25261ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   25263ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   27312ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   27313ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   29305ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   29306ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   31251ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   31252ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   32520ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   33312ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   33314ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   35319ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   35321ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   39311ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   39313ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   41248ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   41249ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   43241ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   43242ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   45240ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   45242ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   47284ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   47286ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   49437ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   49439ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   51280ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   51281ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   53367ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   53369ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   55285ms] [LOG] [chart] markers effect {candleCount: 1001, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   55287ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   57320ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   57322ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   59303ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   59306ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   61389ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   61392ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   63264ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   63267ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   65257ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   65259ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   67491ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   67492ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   69295ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   69297ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   71322ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   71324ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   73618ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   73620ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   75347ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   75348ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   77270ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   77272ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   79285ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   79286ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   81246ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   81248ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   83248ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   83250ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   85260ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   85262ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   87255ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   87256ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   89246ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   89248ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   91258ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   91259ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   93238ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   93240ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   95398ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   95400ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   97276ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   97277ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   99268ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   99270ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  101307ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  101308ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  103292ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  103294ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  105219ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  105220ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  107219ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  107220ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  111250ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  111252ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  113240ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  113241ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  115227ms] [LOG] [chart] markers effect {candleCount: 1002, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  115229ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  117256ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  117257ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  119323ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  119324ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  121256ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  121258ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  123257ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  123259ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  123668ms] [WARNING] Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently @ :20
+[  125303ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  125305ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  127378ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  127379ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  129249ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  129250ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  131298ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  131300ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  133263ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  133265ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  135233ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  135234ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  137527ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  137528ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  139302ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  139303ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  141271ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  141274ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  143260ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  143261ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  145340ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  145341ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  147276ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  147277ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  149275ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  149276ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  151266ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  151267ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  153313ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  153314ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  155267ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  155268ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  157373ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  157375ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  159269ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  159271ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  161274ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  161277ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  163271ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  163273ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  165256ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  165258ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  167264ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  167266ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  169320ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  169322ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  171272ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  171274ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  173256ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  173257ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  175262ms] [LOG] [chart] markers effect {candleCount: 1003, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  175264ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  177271ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  177272ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  179255ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  179256ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  181266ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  181267ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  183259ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  183260ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  185252ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  185254ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  187301ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  187303ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  189330ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  189332ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  191291ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  191293ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  193261ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  193263ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  195255ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  195256ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  197308ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  197310ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  199302ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  199303ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  201270ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  201272ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  203287ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  203289ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  205252ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  205253ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  207294ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  207295ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  209275ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  209277ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  211289ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  211291ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  213269ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  213271ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  215321ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  215323ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  217255ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  217256ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  219293ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  219295ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  221330ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  221331ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  223316ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  223317ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  225240ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  225242ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  227260ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  227261ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  229286ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  229287ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  231274ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  231276ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  233409ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  233410ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  235272ms] [LOG] [chart] markers effect {candleCount: 1004, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  235273ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  237292ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  237294ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  239274ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  239276ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  241248ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  241249ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  243296ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  243298ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  245241ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  245242ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  247288ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  247291ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  249401ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  249402ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  251249ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  251250ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  253275ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  253278ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  255242ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  255244ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  257284ms] [LOG] [chart] markers effect {candleCount: 1005, markerCount: 20, hasSeries: true} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  257288ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  259267ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  261233ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  263384ms] [LOG] [chart] creating markers 20 first: {time: 1779955200, position: belowBar, color: #22c55e, shape: arrowUp, text: ▲ 0.001} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477

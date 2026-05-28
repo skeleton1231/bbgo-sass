@@ -1,0 +1,80 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: BBGO
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Bots" [ref=e16] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e17]
+          - text: Bots
+        - link "Backtest" [ref=e20] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e21]
+          - text: Backtest
+        - link "Settings" [ref=e23] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e24]
+          - text: Settings
+      - button "Sign Out" [ref=e28]:
+        - img [ref=e29]
+        - text: Sign Out
+    - generic [ref=e32]:
+      - banner [ref=e33]:
+        - navigation [ref=e35]:
+          - generic [ref=e37]: Dashboard
+          - generic [ref=e38]:
+            - generic [ref=e39]: /
+            - generic [ref=e40]: Bots
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - button "Live" [ref=e43]
+            - button "Paper" [ref=e44]
+          - button "TA" [ref=e45]:
+            - generic [ref=e47]: TA
+      - main [ref=e48]:
+        - generic [ref=e185]:
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - button "Back to bots" [ref=e188]:
+                - img [ref=e189]
+                - text: Back to bots
+              - heading "Trading Dashboard" [level=1] [ref=e191]
+              - paragraph [ref=e192]: "2 strategies · Container: bbgo-73a0e592 · Paper"
+            - generic [ref=e193]:
+              - generic [ref=e194]: Live
+              - generic [ref=e196]: Running
+              - button "Stop" [ref=e197]:
+                - img
+                - text: Stop
+          - button "binance" [ref=e199]
+          - generic [ref=e200]:
+            - tablist [ref=e201]:
+              - tab "Chart" [ref=e202]
+              - tab "Depth" [ref=e203]
+              - tab "Balances" [ref=e204]
+              - tab "Open Orders (0)" [ref=e205]
+              - tab "Closed Orders (0)" [ref=e206]
+              - tab "Recent Trades" [ref=e207]
+              - tab "Strategies" [ref=e208]
+              - tab "Container Logs" [active] [selected] [ref=e209]
+            - tabpanel "Container Logs" [ref=e290]:
+              - generic [ref=e292]: time="2026-05-28T12:27:06Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:27:06 | 200 | 1.451006ms | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:27:06 | 200 | 461.784µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:28:38 | 200 | 165.145029ms | 172.19.0.3 | GET "/api/sessions" [GIN] 2026/05/28 - 12:28:39 | 200 | 3.976072ms | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:28:39 | 200 | 71.625µs | 172.19.0.3 | GET "/api/ping" time="2026-05-28T12:28:39Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:28:39 | 200 | 5.457386ms | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:28:39 | 200 | 15.010617ms | 172.19.0.3 | GET "/api/strategies/single" [GIN] 2026/05/28 - 12:28:39 | 200 | 769.878µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:28:39 | 200 | 54.551µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:28:39 | 200 | 2.922762ms | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:28:49 | 200 | 93.389µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:28:54 | 200 | 493.357µs | 172.19.0.3 | GET "/api/sessions" [GIN] 2026/05/28 - 12:28:54 | 200 | 204.331µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:28:54 | 200 | 768.087µs | 172.19.0.3 | GET "/api/trades?gid=0" time="2026-05-28T12:28:54Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:28:54 | 200 | 819.506µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:28:59 | 200 | 33.254µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:29:09 | 200 | 37.598µs | 172.19.0.3 | GET "/api/ping" [GIN] 2026/05/28 - 12:29:09 | 200 | 1.003702ms | 172.19.0.3 | GET "/api/strategies/single" [GIN] 2026/05/28 - 12:29:09 | 200 | 37.427µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:29:09 | 200 | 97.144µs | 172.19.0.3 | GET "/api/sessions" [GIN] 2026/05/28 - 12:29:09 | 200 | 867.994µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:29:10 | 200 | 291.664µs | 172.19.0.3 | GET "/api/trades?gid=0" time="2026-05-28T12:29:10Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:29:10 | 200 | 596.742µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:29:10 | 200 | 29.696µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:29:18 | 200 | 52.095µs | 172.19.0.3 | GET "/api/ping" time="2026-05-28T12:29:18Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:29:18 | 200 | 896.802µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:29:18 | 200 | 428.489µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:29:21 | 200 | 33.364µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:29:25 | 200 | 100.474µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:29:25 | 200 | 378.826µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:29:25Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:29:25 | 200 | 571.674µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:29:25 | 200 | 222.628µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:29:31 | 200 | 24.765µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:29:40 | 200 | 22.09µs | 172.19.0.3 | GET "/api/ping" [GIN] 2026/05/28 - 12:29:40 | 200 | 799.022µs | 172.19.0.3 | GET "/api/strategies/single" [GIN] 2026/05/28 - 12:29:40 | 200 | 346.085µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:29:40 | 200 | 24.859µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:29:40 | 200 | 51.053µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:29:40Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:29:40 | 200 | 351.54µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:29:40 | 200 | 313.644µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:29:41 | 200 | 21.262µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:29:52 | 200 | 37.9µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:29:55 | 200 | 101.081µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:29:55 | 200 | 90.761µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:29:55Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:29:55 | 200 | 361.608µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:29:56 | 200 | 291.041µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:30:02 | 200 | 26.442µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:30:10 | 200 | 1.018121ms | 172.19.0.3 | GET "/api/strategies/single" [GIN] 2026/05/28 - 12:30:10 | 200 | 24.378µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:30:11 | 200 | 111.573µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:30:11Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:30:11 | 200 | 345.49µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:30:11 | 200 | 231.699µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:30:11 | 200 | 477.48µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:30:13 | 200 | 104.633µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:30:14 | 200 | 36.189µs | 172.19.0.3 | GET "/api/ping" [GIN] 2026/05/28 - 12:30:25 | 200 | 26.039µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:30:28 | 200 | 56.58µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:30:29 | 200 | 65.726µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:30:29Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:30:29 | 200 | 444.316µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:30:29 | 200 | 329.223µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:30:44 | 200 | 51.928µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:30:44 | 200 | 475.59µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:30:44 | 200 | 38.682µs | 172.19.0.3 | GET "/api/ping" [GIN] 2026/05/28 - 12:30:44 | 200 | 133.767µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:30:45Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:30:45 | 200 | 530.805µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:30:45 | 200 | 290.29µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:30:50 | 200 | 1.389679ms | 172.19.0.3 | GET "/api/strategies/single" [GIN] 2026/05/28 - 12:30:50 | 200 | 42.065µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:31:00 | 200 | 202.189µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:31:00 | 200 | 442.869µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:31:00Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:31:00 | 200 | 715.255µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:31:00 | 200 | 762.169µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:31:01 | 200 | 30.678µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:31:13 | 200 | 35.379µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:31:15 | 200 | 357.851µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:31:15 | 200 | 37.51µs | 172.19.0.3 | GET "/api/ping" [GIN] 2026/05/28 - 12:31:16 | 200 | 60.147µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:31:16 | 200 | 105.097µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:31:16Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:31:16 | 200 | 375.86µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:31:16 | 200 | 259.254µs | 172.19.0.3 | GET "/api/trades?gid=0" [GIN] 2026/05/28 - 12:31:20 | 200 | 919.128µs | 172.19.0.3 | GET "/api/strategies/single" [GIN] 2026/05/28 - 12:31:23 | 200 | 35.575µs | 172.19.0.3 | GET "/api/sessions/binance/open-orders" [GIN] 2026/05/28 - 12:31:31 | 200 | 46.595µs | 172.19.0.3 | GET "/api/sessions/binance/account/balances" [GIN] 2026/05/28 - 12:31:31 | 200 | 66.834µs | 172.19.0.3 | GET "/api/sessions" time="2026-05-28T12:31:31Z" level=info msg="SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders LEFT JOIN trades AS t ON (t.order_id = orders.order_id) GROUP BY orders.gid ORDER BY orders.gid DESC LIMIT 500" [GIN] 2026/05/28 - 12:31:31 | 200 | 738.512µs | 172.19.0.3 | GET "/api/orders/closed?gid=0" [GIN] 2026/05/28 - 12:31:31 | 200 | 310.181µs | 172.19.0.3 | GET "/api/trades?gid=0"
+  - region "Notifications alt+T"
+  - generic [ref=e71] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e72]:
+      - img [ref=e73]
+    - generic [ref=e174]:
+      - button "Open issues overlay" [ref=e175]:
+        - generic [ref=e176]:
+          - generic [ref=e177]: "0"
+          - generic [ref=e178]: "1"
+        - generic [ref=e179]: Issue
+      - button "Collapse issues badge" [ref=e180]:
+        - img [ref=e181]
+  - alert [ref=e76]

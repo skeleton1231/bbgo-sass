@@ -1,0 +1,65 @@
+[    2052ms] [WARNING] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2056ms] [WARNING] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2203ms] [WARNING] ObjectMultiplex - orphaned data for stream "app-init-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2206ms] [WARNING] ObjectMultiplex - orphaned data for stream "app-init-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2209ms] [WARNING] ObjectMultiplex - orphaned data for stream "background-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2210ms] [WARNING] ObjectMultiplex - orphaned data for stream "background-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2212ms] [WARNING] ObjectMultiplex - malformed chunk without name "[object Object]" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    2213ms] [WARNING] ObjectMultiplex - malformed chunk without name "[object Object]" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    3191ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    3712ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    6454ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=e5ff0093bece330089dfc197486cfa36a19a7c6ce8f2de5f' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[    6480ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=2b675a52e30043ad946733df998fbab0e70ff3ad5aac7dd6' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   11750ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=1c59b55c6e060033074de626356f062be21cf7951b003f58' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   11893ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=f32d60a3f4e168b78cb0435723bb03ba762e938341e44d3b' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   16964ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=ec95946dab5cb68fc31aebff9cfca0fccef8b3623691ac2f' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   17099ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=3ea74ecf537a0b13905eb55c61d212af692f026151f47798' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   22273ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=4e2b9d4401ebefe4158ba3459e92ffd4250010003a7180d1' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   22422ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   22422ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   22422ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   22424ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   22424ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   22417ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=8040a34cd00a91afcfe5fe4c373f7026cd2ab46bb908e403' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   27637ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=454856328c401f1c7c623ad2855fcb0e0136e36f27560f5c' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   27867ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=ccbfec188245b79f313d7f7a5c6eff6e6901b143a603ac9c' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   32841ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=afdf07a1301e0b3b4fef60d83ff5701f601e5bbdcd1a0c0e' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   33080ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=b4066a07147ebd52b9a8d5bb68dcf5b57a15aa03095af489' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   38650ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   38657ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   38841ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=2a9cf8dc89192570c62ba15d2f24d91ff72fc3a2c6704604' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   39027ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=7e354a49d18303e56ce7018736dcfc974ccfeaddfdf97298' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   44189ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=cd3d592b23f656f514527503c6640c83b2f9760cfbeb7ffd' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   44336ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=b906183ce18db1264d300664126fb5d8eb7719b7a5018a44' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   52351ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=5d0048e910be9dc9440b82356003679d2d20196baf34c5f4' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   52907ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=ae2d52d934645347e65ee54c654b6712ef44c257977f6f5c' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   57617ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=be5be28f8c899e422ec5680a1e334df61c1cde3b0d4f9120' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   58376ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=58a4af61e9842030487c2b61871e7de11eff8e4533779119' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   62871ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=aa68f15e658705fb51970bb9aaf46180e7ff3a2ba578090c' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   63606ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=066ffec6e5e875934d13be5b0da58fa31e6290bca6632b1d' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   70877ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=5ef04fe579291221e5b979211d139962a4289c9b7975d258' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   71072ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=1292465ec328f2c3a5e1e740186ff43bf648314aa6052273' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   76469ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=91e638d6e8e68994756aa05c930c158aa16ceda6a7248bc5' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   76672ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=1473488d4748aa6f27e7b811b1be8444c867505029c99dec' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   82144ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=cf19dc5c6d49906c1fa95b55e103efee8ce13f65816598eb' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   82775ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=89538e736d9571303bff990618562eab1a8813d9ccc7372d' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   88464ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=560a41fff8aded6cd3e16011f240bc507dd56ad7b30c7d73' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   90347ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=a92961da8e136b56b4fab5491fbed853a3c6b148bad20e67' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   95453ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=bac8500bc7e1b528d5dbc3a8e245cc3da73ae671e27ff169' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[   97250ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=4dbc763e68bfa9b4ff04d3e8dd215a326d539fe9f799cf5e' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  102665ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=30a9c2d2f753606ea3115e96a7f088e224b946e2be8e5784' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  104848ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=209b93874f26473ee5836bdc88a940536372b843dd967d6f' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  111249ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=a8736be4c2b23773feb427a15dfba3bf44150d22ffd417e0' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  111297ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=50ed5ad3913358a0c85a1816c1009a63b60e8bfaa9a71906' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  120275ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=7231cd9d4dac91392c6feb1f092a7ffed234653e3df708a4' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  121210ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=1dd77c98b6cf690f099f875217e0116ddaeacaf4467043f9' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  128245ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=e8103d2437af02bec04edf122810f9d814f2eeb2b97f5034' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  130088ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=5200a7c037f10d35134eddc796e7bbfc41a093a8b8508256' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  137692ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=83df830a65ecbbf9fc6a8de7adccd1c6939a3b2f790d4bfe' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  137969ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=0bdcdfac6ba5ed63872a121a2e35a283ba02281a27caeda7' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  144741ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=37531c73a0da28ff3f60e26e96af0c41eb5f71aa61443bb5' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  148357ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=7844d861b43ad23a572bb5ed8635a233954f50eb7df8601a' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  153961ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=838f46fac534882eeb178a63e9f6a3c7bf7e87db8edb2809' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  154826ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=133a439da70ee2b90ffb4d5d29536563c946654177650d19' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  160822ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=20fb45f860ed6a1eb773da7893efe3e36d3fda55444ee409' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943
+[  165871ms] [ERROR] WebSocket connection to 'ws://localhost:3142/api/ws?ticket=eeea7bb5f955e8c77bdaddf756f34eb5df43fdcf52eefcb0' failed:  @ http://localhost:3142/_next/static/chunks/src_0s48en2._.js:943

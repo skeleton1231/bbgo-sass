@@ -1,0 +1,8 @@
+[     840ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[    1160ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    1373ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   45450ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   45451ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   45451ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   92194ms] [LOG] [Chart] data effect {candles: 502, series: true, volume: true, markers: 20} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   94154ms] [LOG] [Chart] data effect {candles: 502, series: true, volume: true, markers: 20} @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477

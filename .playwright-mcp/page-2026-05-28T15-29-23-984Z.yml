@@ -1,0 +1,85 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: BBGO
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Bots" [active] [ref=e16] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e17]
+          - text: Bots
+        - link "Backtest" [ref=e20] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e21]
+          - text: Backtest
+        - link "Settings" [ref=e23] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e24]
+          - text: Settings
+      - button "Sign Out" [ref=e28]:
+        - img [ref=e29]
+        - text: Sign Out
+    - generic [ref=e32]:
+      - banner [ref=e33]:
+        - navigation [ref=e35]:
+          - generic [ref=e37]: Dashboard
+          - generic [ref=e143]:
+            - generic [ref=e144]: /
+            - generic [ref=e145]: Bots
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - button "Live" [ref=e40]
+            - button "Paper" [ref=e41]
+          - button "TA" [ref=e42]:
+            - generic [ref=e44]: TA
+      - main [ref=e45]:
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - generic [ref=e148]:
+              - heading "Trading Bots" [level=1] [ref=e149]
+              - paragraph [ref=e150]: Paper bots
+            - button "Create Bot" [ref=e151]:
+              - img
+              - text: Create Bot
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - generic [ref=e154]:
+                - img [ref=e156]
+                - generic [ref=e159]:
+                  - generic [ref=e160]:
+                    - paragraph [ref=e161]: Test Grid Bot
+                    - generic [ref=e162]: Paper
+                  - paragraph [ref=e163]: binance · BTCUSDT · grid2
+              - generic [ref=e164]:
+                - generic [ref=e165]: Running
+                - link "Dashboard" [ref=e166] [cursor=pointer]:
+                  - /url: /user/bots/strat-94a8d62b2c45cd28?mode=paper
+                - button [ref=e167]:
+                  - img [ref=e168]
+                - button [ref=e170]:
+                  - img [ref=e171]
+            - generic [ref=e174]:
+              - generic [ref=e175]:
+                - img [ref=e177]
+                - generic [ref=e180]:
+                  - generic [ref=e181]:
+                    - paragraph [ref=e182]: Paper Grid BTC
+                    - generic [ref=e183]: Paper
+                  - paragraph [ref=e184]: binance · BTCUSDT · grid2
+              - generic [ref=e185]:
+                - generic [ref=e186]: Running
+                - link "Dashboard" [ref=e187] [cursor=pointer]:
+                  - /url: /user/bots/strat-4fe382f91288990d?mode=paper
+                - button [ref=e188]:
+                  - img [ref=e189]
+                - button [ref=e191]:
+                  - img [ref=e192]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e101] [cursor=pointer]:
+    - img [ref=e102]
+  - alert [ref=e142]

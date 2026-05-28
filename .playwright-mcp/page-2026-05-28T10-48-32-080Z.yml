@@ -1,0 +1,92 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: BBGO
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Bots" [ref=e16] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e17]
+          - text: Bots
+        - link "Backtest" [ref=e20] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e21]
+          - text: Backtest
+        - link "Settings" [ref=e23] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e24]
+          - text: Settings
+      - button "Sign Out" [ref=e28]:
+        - img [ref=e29]
+        - text: Sign Out
+    - generic [ref=e32]:
+      - banner [ref=e33]:
+        - navigation [ref=e35]:
+          - generic [ref=e37]: Dashboard
+          - generic [ref=e133]:
+            - generic [ref=e134]: /
+            - generic [ref=e135]: Bots
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - button "Live" [ref=e40]
+            - button "Paper" [ref=e41]
+          - button "TA" [ref=e42]:
+            - generic [ref=e44]: TA
+      - main [ref=e45]:
+        - generic [ref=e162]:
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - button "Back to bots" [ref=e165]:
+                - img [ref=e166]
+                - text: Back to bots
+              - heading "Trading Dashboard" [level=1] [ref=e168]
+              - paragraph [ref=e169]: "1 strategies · Container: bbgo-73a0e592 · Paper"
+            - generic [ref=e170]:
+              - generic [ref=e171]: Live
+              - generic [ref=e173]: Running
+              - button "Stop" [ref=e174]:
+                - img
+                - text: Stop
+          - button "binance" [ref=e176]
+          - generic [ref=e177]:
+            - tablist [ref=e178]:
+              - tab "Chart" [active] [selected] [ref=e179]
+              - tab "Depth" [ref=e180]
+              - tab "Balances" [ref=e181]
+              - tab "Open Orders (0)" [ref=e182]
+              - tab "Closed Orders (0)" [ref=e183]
+              - tab "Recent Trades" [ref=e184]
+              - tab "Strategies" [ref=e185]
+              - tab "Container Logs" [ref=e186]
+            - tabpanel "Chart" [ref=e187]:
+              - generic [ref=e249]:
+                - generic [ref=e251]:
+                  - generic [ref=e252]: BTCUSDT · binance
+                  - generic [ref=e253]:
+                    - button "1m" [ref=e254]
+                    - button "5m" [ref=e255]
+                    - button "15m" [ref=e256]
+                    - button "1H" [ref=e257]
+                    - button "4H" [ref=e258]
+                    - button "1D" [ref=e259]
+                - table [ref=e264]:
+                  - row [ref=e265]:
+                    - cell
+                    - cell [ref=e266]:
+                      - link "Charting by TradingView" [ref=e270] [cursor=pointer]:
+                        - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/user/bots/73a0e592-45df-40be-8088-304011f976a3
+                        - img [ref=e271]
+                    - cell [ref=e275]
+                  - row [ref=e279]:
+                    - cell
+                    - cell [ref=e280]
+                    - cell [ref=e284]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e101] [cursor=pointer]:
+    - img [ref=e102]
+  - alert [ref=e132]: Trading Dashboard

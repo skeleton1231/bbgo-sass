@@ -1,0 +1,79 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: BBGO
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Bots" [ref=e16] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e17]
+          - text: Bots
+        - link "Backtest" [ref=e20] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e21]
+          - text: Backtest
+        - link "Settings" [ref=e23] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e24]
+          - text: Settings
+      - button "Sign Out" [ref=e28]:
+        - img [ref=e29]
+        - text: Sign Out
+    - generic [ref=e32]:
+      - banner [ref=e33]:
+        - navigation [ref=e35]:
+          - generic [ref=e37]: Dashboard
+          - generic [ref=e38]:
+            - generic [ref=e39]: /
+            - generic [ref=e40]: Bots
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - button "Live" [ref=e43]
+            - button "Paper" [ref=e44]
+          - button "TA" [ref=e45]:
+            - generic [ref=e47]: TA
+      - main [ref=e48]:
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - heading "Trading Bots" [level=1] [ref=e52]
+            - button "Create Bot" [ref=e53]:
+              - img
+              - text: Create Bot
+          - generic [ref=e54]:
+            - generic [ref=e77]:
+              - generic [ref=e78]:
+                - generic [ref=e79]:
+                  - paragraph [ref=e80]: Paper User Container
+                  - generic [ref=e81]: Paper
+                - paragraph [ref=e82]: "2 strategies · Container: bbgo-73a0e592-Paper"
+              - generic [ref=e83]:
+                - generic [ref=e85]: Bots.status.starting
+                - button "Start" [disabled] [ref=e168]
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - paragraph [ref=e89]: Test Grid Bot
+                - paragraph [ref=e90]: binance · grid2 · Paper
+              - button "Remove" [ref=e91]
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - paragraph [ref=e171]: Paper Grid BTC
+                - paragraph [ref=e172]: binance · grid2 · Paper
+              - button "Remove" [ref=e173]
+  - region "Notifications alt+T"
+  - generic [ref=e71] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e72]:
+      - img [ref=e73]
+    - generic [ref=e174]:
+      - button "Open issues overlay" [ref=e175]:
+        - generic [ref=e176]:
+          - generic [ref=e177]: "0"
+          - generic [ref=e178]: "1"
+        - generic [ref=e179]: Issue
+      - button "Collapse issues badge" [ref=e180]:
+        - img [ref=e181]
+  - alert [ref=e76]

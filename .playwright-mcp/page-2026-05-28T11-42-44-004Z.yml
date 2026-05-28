@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e39]:
+    - complementary [ref=e40]:
+      - generic [ref=e41]:
+        - img [ref=e43]
+        - generic [ref=e45]: BBGO
+      - navigation [ref=e46]:
+        - link "Dashboard" [ref=e47] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e48]
+          - text: Dashboard
+        - link "Bots" [ref=e53] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e54]
+          - text: Bots
+        - link "Backtest" [ref=e57] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e58]
+          - text: Backtest
+        - link "Settings" [ref=e60] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e61]
+          - text: Settings
+      - button "Sign Out" [ref=e65]:
+        - img [ref=e66]
+        - text: Sign Out
+    - generic [ref=e69]:
+      - banner [ref=e70]:
+        - navigation [ref=e72]:
+          - generic [ref=e74]: Dashboard
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - button "Live" [ref=e77]
+            - button "Paper" [ref=e78]
+          - button "TA" [ref=e79]:
+            - generic [ref=e81]: TA
+      - main [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - heading "Dashboard" [level=1] [ref=e86]
+              - generic [ref=e87]: Paper
+            - paragraph [ref=e88]: No strategies configured yet.
+          - generic [ref=e89]:
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - paragraph [ref=e93]: Active Bots
+                - img [ref=e95]
+              - generic [ref=e98]:
+                - generic [ref=e99]: "0"
+                - generic [ref=e100]: / 0
+            - generic [ref=e102]:
+              - generic [ref=e103]:
+                - paragraph [ref=e104]: Sessions
+                - img [ref=e106]
+              - paragraph [ref=e108]: "0"
+            - generic [ref=e110]:
+              - generic [ref=e111]:
+                - paragraph [ref=e112]: Recent Trades
+                - img [ref=e114]
+              - paragraph [ref=e116]: "0"
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - paragraph [ref=e120]: Portfolio Value
+                - img [ref=e122]
+              - paragraph [ref=e125]: —
+          - generic [ref=e127]:
+            - img [ref=e129]
+            - paragraph [ref=e130]: No strategies configured yet.
+            - link "Create a strategy" [ref=e131] [cursor=pointer]:
+              - /url: /user/bots
+              - button "Create a strategy" [ref=e132]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e34] [cursor=pointer]:
+    - img [ref=e35]
+  - alert [ref=e38]

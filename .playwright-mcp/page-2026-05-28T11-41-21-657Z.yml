@@ -1,0 +1,36 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e133]:
+    - generic [ref=e135]:
+      - generic [ref=e136]:
+        - img [ref=e138]
+        - generic [ref=e140]: BBGO
+      - heading "Professional crypto trading, automated." [level=1] [ref=e141]
+      - paragraph [ref=e142]: Deploy trading strategies, backtest with historical data, and monitor performance — all from one platform.
+    - generic [ref=e144]:
+      - generic [ref=e145]:
+        - heading "Welcome back" [level=2] [ref=e146]
+        - paragraph [ref=e147]: Sign in to your account to continue
+      - generic [ref=e148]:
+        - img [ref=e149]
+        - paragraph [ref=e151]: Your session has expired. Please sign in again.
+        - button "Dismiss" [ref=e152]: ×
+      - generic [ref=e153]:
+        - generic [ref=e154]:
+          - generic [ref=e155]: Email
+          - textbox "Email" [ref=e156]:
+            - /placeholder: you@example.com
+        - generic [ref=e157]:
+          - generic [ref=e158]:
+            - generic [ref=e159]: Password
+            - link "Forgot password?" [ref=e160] [cursor=pointer]:
+              - /url: /forgot-password
+          - textbox "Password" [ref=e161]
+        - button "Sign In" [ref=e162]
+        - paragraph [ref=e163]:
+          - text: Don't have an account?
+          - link "Sign Up" [ref=e164] [cursor=pointer]:
+            - /url: /signup
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e101] [cursor=pointer]:
+    - img [ref=e102]
+  - alert [ref=e132]

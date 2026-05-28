@@ -1,0 +1,86 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: BBGO
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: /user
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Bots" [ref=e16] [cursor=pointer]:
+          - /url: /user/bots
+          - img [ref=e17]
+          - text: Bots
+        - link "Backtest" [ref=e20] [cursor=pointer]:
+          - /url: /user/backtest
+          - img [ref=e21]
+          - text: Backtest
+        - link "Settings" [ref=e23] [cursor=pointer]:
+          - /url: /user/settings
+          - img [ref=e24]
+          - text: Settings
+      - button "Sign Out" [ref=e28]:
+        - img [ref=e29]
+        - text: Sign Out
+    - generic [ref=e32]:
+      - banner [ref=e33]:
+        - navigation [ref=e35]:
+          - generic [ref=e37]: Dashboard
+          - generic [ref=e133]:
+            - generic [ref=e134]: /
+            - generic [ref=e135]: Bots
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - button "Live" [ref=e40]
+            - button "Paper" [ref=e41]
+          - button "TA" [ref=e42]:
+            - generic [ref=e44]: TA
+      - main [ref=e45]:
+        - generic [ref=e162]:
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - button "Back to bots" [ref=e165]:
+                - img [ref=e166]
+                - text: Back to bots
+              - heading "Trading Dashboard" [level=1] [ref=e168]
+              - paragraph [ref=e169]: "1 strategies · Container: bbgo-73a0e592 · Paper"
+            - generic [ref=e170]:
+              - generic [ref=e171]: Live
+              - generic [ref=e173]: Running
+              - button "Stop" [ref=e174]:
+                - img
+                - text: Stop
+          - button "binance" [ref=e176]
+          - generic [ref=e177]:
+            - tablist [ref=e178]:
+              - tab "Chart" [ref=e179]
+              - tab "Depth" [ref=e180]
+              - tab "Balances" [ref=e181]
+              - tab "Open Orders (0)" [ref=e182]
+              - tab "Closed Orders (0)" [ref=e183]
+              - tab "Recent Trades" [ref=e184]
+              - tab "Strategies" [active] [selected] [ref=e185]
+              - tab "Container Logs" [ref=e186]
+            - tabpanel "Strategies" [ref=e229]:
+              - generic [ref=e330]:
+                - generic [ref=e331]:
+                  - generic [ref=e332]:
+                    - img [ref=e334]
+                    - generic [ref=e337]:
+                      - paragraph [ref=e338]: Test Grid Bot
+                      - paragraph [ref=e339]: binance · grid2 · Paper
+                  - generic [ref=e340]: running
+                - generic [ref=e341]:
+                  - generic [ref=e342]: "grid2: {\"Environment\":{\"AccountService\":{\"DB\":{\"Mapper\":{}}},\"BacktestService\":null,\"DatabaseService\":{\"DB\":{\"Mapper\":{}},\"DSN\":\"/data/73a0e592-45df-40be-8088-304011f976a3-paper/bbgo.db\",\"Driver\":\"sqlite3\"},\"DepositService\":{\"DB\":{\"Mapper\":{}}},\"GoogleSpreadSheetService\":null,\"MarginService\":{\"DB\":{\"Mapper\":{}}},\"OrderService\":{\"DB\":{\"Mapper\":{}}},\"PersistentService\":null,\"PositionService\":{\"DB\":{\"Mapper\":{}}},\"ProfilingService\":null,\"ProfitService\":{\"DB\":{\"Mapper\":{}}},\"RewardService\":{\"DB\":{\"Mapper\":{}}},\"SyncService\":{\"DepositService\":{\"DB\":{\"Mapper\":{}}},\"MarginService\":{\"DB\":{\"Mapper\":{}}},\"OrderService\":{\"DB\":{\"Mapper\":{}}},\"RewardService\":{\"DB\":{\"Mapper\":{}}},\"TradeService\":{\"DB\":{\"Mapper\":{}}},\"WithdrawService\":{\"DB\":{\"Mapper\":{}}}},\"TradeService\":{\"DB\":{\"Mapper\":{}}},\"WithdrawService\":{\"DB\":{\"Mapper\":{}}}},\"ExchangeSession\":{\"envVarPrefix\":\"BINANCE\",\"exchange\":\"binance\",\"makerFeeRate\":0.00075,\"marginInfoUpdaterInterval\":\"0s\",\"name\":\"binance\",\"orderExecutor\":{},\"publicOnly\":true,\"takerFeeRate\":0.00075},\"GridProfitStats\":{\"initialOrderID\":0,\"market\":{\"baseCurrency\":\"BTC\",\"exchange\":\"binance\",\"localSymbol\":\"BTCUSDT\",\"maxPrice\":1000000,\"maxQuantity\":9000,\"minAmount\":5,\"minNotional\":5,\"minPrice\":0.01,\"minQuantity\":0.00001,\"pricePrecision\":8,\"quoteCurrency\":\"USDT\",\"quotePrecision\":8,\"stepSize\":0.00001,\"symbol\":\"BTCUSDT\",\"tickSize\":0.01,\"volumePrecision\":8},\"symbol\":\"BTCUSDT\"},\"Position\":{\"averageCost\":0,\"base\":0,\"baseCurrency\":\"BTC\",\"changedAt\":\"0001-01-01T00:00:00Z\",\"exchangeFeeRates\":{},\"feeAverageCosts\":{},\"market\":{\"baseCurrency\":\"BTC\",\"exchange\":\"binance\",\"localSymbol\":\"BTCUSDT\",\"maxPrice\":1000000,\"maxQuantity\":9000,\"minAmount\":5,\"minNotional\":5,\"minPrice\":0.01,\"minQuantity\":0.00001,\"pricePrecision\":8,\"quoteCurrency\":\"USDT\",\"quotePrecision\":8,\"stepSize\":0.00001,\"symbol\":\"BTCUSDT\",\"tickSize\":0.01,\"volumePrecision\":8},\"openedAt\":\"0001-01-01T00:00:00Z\",\"quote\":0,\"quoteCurrency\":\"USDT\",\"strategy\":\"grid2\",\"strategyInstanceID\":\"grid2-BTCUSDT-size-10-70000-50000\",\"symbol\":\"BTCUSDT\",\"totalFee\":{}},\"autoRange\":null,\"baseInvestment\":0,\"clearDuplicatedPriceOpenOrders\":false,\"clearOpenOrdersIfMismatch\":false,\"clearOpenOrdersWhenStart\":false,\"compound\":false,\"debug\":false,\"earnBase\":false,\"enableProfitFixer\":false,\"feeRate\":0,\"fixProfitSince\":null,\"gridNumber\":10,\"keepOrdersWhenShutdown\":false,\"logFields\":{\"strategy\":\"grid2\",\"symbol\":\"BTCUSDT\"},\"lowerPrice\":50000,\"orderFillDelay\":\"0s\",\"orderGroupID\":248303498,\"persistenceTTL\":\"0s\",\"profitSpread\":0,\"prometheusLabels\":null,\"quantity\":0.001,\"quoteInvestment\":0,\"recoverGridByScanningTrades\":false,\"recoverGridWithin\":0,\"recoverOrdersWhenStart\":false,\"resetPositionWhenStart\":false,\"skipSpreadCheck\":false,\"stopIfLessThanMinimalQuoteInvestment\":false,\"stopLossPrice\":0,\"symbol\":\"BTCUSDT\",\"takeProfitPrice\":0,\"triggerPrice\":0,\"upperPrice\":70000,\"useCancelAllOrdersApiWhenClose\":false}"
+                  - generic [ref=e343]: "on: [\"binance\"]"
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e311] [cursor=pointer]:
+    - generic [ref=e314]:
+      - text: Compiling
+      - generic [ref=e315]:
+        - generic [ref=e316]: .
+        - generic [ref=e317]: .
+        - generic [ref=e318]: .
+  - alert [ref=e132]: BBGO — Crypto Trading Bot Platform

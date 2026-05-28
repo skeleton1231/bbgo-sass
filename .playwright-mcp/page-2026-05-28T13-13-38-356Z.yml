@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e97]:
+    - generic [ref=e98]:
+      - img [ref=e100]
+      - generic [ref=e102]: BBGO
+    - heading "404" [level=1] [ref=e103]
+    - paragraph [ref=e104]: This page could not be found.
+    - link "Go Home" [ref=e105] [cursor=pointer]:
+      - /url: /user
+      - button "Go Home" [ref=e106]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e72] [cursor=pointer]:
+    - img [ref=e73]
+  - alert [ref=e96]

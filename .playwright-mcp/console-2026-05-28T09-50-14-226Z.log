@@ -1,0 +1,18 @@
+[     888ms] [WARNING] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     890ms] [WARNING] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     917ms] [WARNING] ObjectMultiplex - orphaned data for stream "app-init-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     919ms] [WARNING] ObjectMultiplex - orphaned data for stream "app-init-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     921ms] [WARNING] ObjectMultiplex - orphaned data for stream "background-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     921ms] [WARNING] ObjectMultiplex - orphaned data for stream "background-liveness" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     923ms] [WARNING] ObjectMultiplex - malformed chunk without name "[object Object]" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[     924ms] [WARNING] ObjectMultiplex - malformed chunk without name "[object Object]" @ chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14082
+[    1130ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[    1236ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    1331ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   19307ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   19310ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   19310ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   19310ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  146325ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  154973ms] [LOG] [Fast Refresh] done in 8776ms @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  155079ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
