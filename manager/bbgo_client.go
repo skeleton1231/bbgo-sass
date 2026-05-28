@@ -167,7 +167,7 @@ func (c *BBGoClient) GetClosedOrders(exchange, symbol string, lastGID int64) ([]
 
 type BBGoSession struct {
 	Name         string `json:"name"`
-	ExchangeName string `json:"exchangeName"`
+	ExchangeName string `json:"exchange"`
 }
 
 type BBGoSessionsResponse struct {

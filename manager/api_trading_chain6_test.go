@@ -63,7 +63,7 @@ const proxyUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeee000001"
 func TestBBGoSessionDetail_Proxy(t *testing.T) {
 	api, cleanup := setupProxyAPI(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions/binance" {
-			w.Write([]byte(`{"session":{"name":"binance","exchangeName":"binance"}}`))
+			w.Write([]byte(`{"session":{"name":"binance","exchange":"binance"}}`))
 		}
 	})
 	defer cleanup()

@@ -136,7 +136,7 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 		case "/api/sessions":
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"sessions": []map[string]interface{}{
-					{"name": "binance", "exchangeName": "binance"},
+					{"name": "binance", "exchange": "binance"},
 				},
 			})
 		case "/api/trades":

@@ -15,7 +15,7 @@ func TestBBGoClient_GetSession(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"session": map[string]interface{}{
 				"name":         "binance",
-				"exchangeName": "binance",
+				"exchange": "binance",
 			},
 		})
 	}))

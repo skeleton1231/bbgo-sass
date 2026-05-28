@@ -107,7 +107,7 @@ export default function BotDetailPage() {
   const { data: logsData } = useContainerLogs(userId, '100', mode)
   const { data: pnlData } = useBotPnL(userId, undefined, undefined, mode)
 
-  const activeExchange = sessions.find((s) => s.name === activeSession)?.exchangeName ?? ''
+  const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? ''
   const activeSymbol = (userContainer?.strategies?.find(s => s.mode === mode)?.config?.symbol ?? userContainer?.strategies?.[0]?.config?.symbol ?? '') as string
 
   const { candles, isLoading: klinesLoading } = useKlineData({
@@ -288,7 +288,7 @@ export default function BotDetailPage() {
               onClick={() => setActiveSession(s.name)}
               className="rounded-full text-xs"
             >
-              {s.exchangeName || s.name}
+              {s.exchange || s.name}
             </Button>
           ))}
         </div>

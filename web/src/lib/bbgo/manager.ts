@@ -81,7 +81,7 @@ export interface BacktestJob {
 
 export interface BBGoSession {
   name: string
-  exchangeName: string
+  exchange: string
 }
 
 export interface BBGoTrade {
