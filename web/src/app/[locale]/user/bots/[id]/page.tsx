@@ -276,6 +276,17 @@ export default function BotDetailPage() {
   const openOrders = openOrdersData?.orders ?? []
   const closedOrders = closedOrdersData?.orders ?? []
   const trades = tradesData?.trades ?? []
+  const tradePositionTags = useMemo(() => {
+    let net = 0
+    return trades.map((t) => {
+      const qty = t.side === 'BUY' ? parseFloat(t.quantity) : -parseFloat(t.quantity)
+      const prev = net
+      net += qty
+      if (prev === 0 && net !== 0) return 'open' as const
+      if (prev !== 0 && net === 0) return 'close' as const
+      return null
+    })
+  }, [trades])
   const balances = balancesData?.balances ?? {}
   const liveStrategies = strategyStatesData?.strategies ?? []
   const nonZeroBalances = Object.entries(balances).filter(
@@ -735,12 +746,13 @@ export default function BotDetailPage() {
             {trades.length > 0 ? (
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
-                  {trades.map((trade: BBGoTrade) => {
+                  {trades.map((trade: BBGoTrade, tradeIdx: number) => {
                     const isBuy = trade.side === 'BUY'
+                    const tag = tradePositionTags[tradeIdx]
                     return (
                       <div key={trade.id} className={cn(
                         'flex items-center justify-between px-6 py-3 border-l-2',
-                        isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
+                        tag === 'open' ? 'border-l-blue-400' : tag === 'close' ? 'border-l-orange-400' : isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
                       )}>
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={cn(
@@ -752,17 +764,8 @@ export default function BotDetailPage() {
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium truncate">{trade.symbol}</span>
-                              {(() => {
-                                const idx = trades.indexOf(trade)
-                                let pos = 0
-                                for (let i = 0; i <= idx; i++) {
-                                  pos += trades[i]!.side === 'BUY' ? parseFloat(trades[i]!.quantity) : -parseFloat(trades[i]!.quantity)
-                                }
-                                const prevPos = pos + (isBuy ? -parseFloat(trade.quantity) : parseFloat(trade.quantity))
-                                if (prevPos === 0 && pos !== 0) return <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">Open</Badge>
-                                if (prevPos !== 0 && pos === 0) return <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">Close</Badge>
-                                return null
-                              })()}
+                              {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">Open</Badge>}
+                              {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">Close</Badge>}
                               {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">Maker</Badge>}
                             </div>
                             <span className="text-xs text-muted-foreground">{trade.exchange}</span>
