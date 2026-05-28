@@ -203,18 +203,15 @@ export function CandlestickChart({
     }
   }, [orderLevels])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border bg-card" style={{ height }}>
-        <span className="text-sm text-muted-foreground">Loading chart...</span>
-      </div>
-    )
-  }
-
   return (
     <div className="relative">
-      <div ref={containerRef} className="rounded-lg overflow-hidden" />
-      {candles.length === 0 && (
+      <div ref={containerRef} className="rounded-lg overflow-hidden" style={{ height }} />
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/80">
+          <span className="text-sm text-muted-foreground">Loading chart...</span>
+        </div>
+      )}
+      {!isLoading && candles.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-sm text-muted-foreground">No candlestick data available</span>
         </div>

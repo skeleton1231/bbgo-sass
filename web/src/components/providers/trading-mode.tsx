@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export type TradingMode = 'live' | 'paper'
 
@@ -15,20 +16,27 @@ const TradingModeContext = createContext<{
   setMode: () => {},
 })
 
-function readStoredMode(): TradingMode {
-  if (typeof window === 'undefined') return DEFAULT_MODE
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'live' || stored === 'paper') return stored
-  return DEFAULT_MODE
-}
-
 export function TradingModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<TradingMode>(readStoredMode)
+  const searchParams = useSearchParams()
+  const [mode, setModeState] = useState<TradingMode>(DEFAULT_MODE)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored === 'live' || stored === 'paper') setModeState(stored)
+  }, [])
 
   const setMode = useCallback((m: TradingMode) => {
     setModeState(m)
     localStorage.setItem(STORAGE_KEY, m)
   }, [])
+
+  useEffect(() => {
+    const urlMode = searchParams.get('mode')
+    if (urlMode === 'live' || urlMode === 'paper') {
+      setModeState(urlMode)
+      localStorage.setItem(STORAGE_KEY, urlMode)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {

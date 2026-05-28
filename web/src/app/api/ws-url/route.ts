@@ -31,9 +31,8 @@ export async function GET(request: NextRequest) {
   if (MANAGER_WS_URL) {
     wsBase = MANAGER_WS_URL
   } else {
-    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:8090'
-    const protocol = request.headers.get('x-forwarded-proto') === 'https' ? 'wss' : 'ws'
-    wsBase = `${protocol}://${host}`
+    const httpBase = MANAGER_API_URL.replace(/\/$/, '')
+    wsBase = httpBase.replace(/^http/, 'ws')
   }
 
   const wsUrl = `${wsBase}/api/ws?ticket=${encodeURIComponent(ticket)}`

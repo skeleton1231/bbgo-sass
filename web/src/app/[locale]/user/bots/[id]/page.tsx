@@ -599,7 +599,7 @@ export default function BotDetailPage() {
                             .slice(0, 6)
                             .map(([key, val]) => (
                               <span key={key} className="text-xs text-muted-foreground">
-                                {key}: <span className="text-foreground font-mono">{String(val)}</span>
+                                {key}: <span className="text-foreground font-mono">{typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val)}</span>
                               </span>
                             ))}
                         </div>
