@@ -118,7 +118,7 @@ describe('Strategy trading chain contracts', () => {
 
   describe('Backend YAML alignment', () => {
     // Portfolio-level strategies that don't target a specific symbol
-    const PORTFOLIO_STRATEGIES = new Set(['rebalance', 'deposit2transfer', 'rebalance_portfolio'])
+    const PORTFOLIO_STRATEGIES = new Set(['rebalance', 'deposit2transfer'])
 
     it('every non-cross-exchange symbol-targeting strategy has "symbol" field', () => {
       // Backend: if v, ok := params["symbol"].(string); ok && v != "" { symbol = v }
