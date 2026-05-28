@@ -115,6 +115,26 @@ describe('buildTradeMarkers', () => {
     expect(result).toHaveLength(1)
     expect(result[0]!.time).toBeGreaterThan(0)
   })
+
+  it('tags first BUY as open, last SELL as close', () => {
+    const buy1: BBGoTrade = { ...baseTrade, side: 'BUY', quantity: '0.001', price: '72000', tradedAt: '2026-05-28T10:00:00Z' }
+    const buy2: BBGoTrade = { ...baseTrade, side: 'BUY', quantity: '0.001', price: '72200', tradedAt: '2026-05-28T10:30:00Z' }
+    const sell1: BBGoTrade = { ...baseTrade, side: 'SELL', quantity: '0.001', price: '72800', tradedAt: '2026-05-28T11:00:00Z' }
+    const sell2: BBGoTrade = { ...baseTrade, side: 'SELL', quantity: '0.001', price: '73000', tradedAt: '2026-05-28T11:30:00Z' }
+    const result = buildTradeMarkers([buy1, buy2, sell1, sell2], null, 'BTCUSDT')
+    expect(result[0]!.positionAction).toBe('open')
+    expect(result[1]!.positionAction).toBe('add')
+    expect(result[2]!.positionAction).toBe('reduce')
+    expect(result[3]!.positionAction).toBe('close')
+  })
+
+  it('tags single BUY then single SELL as open then close', () => {
+    const buy: BBGoTrade = { ...baseTrade, side: 'BUY', quantity: '0.001', price: '72000', tradedAt: '2026-05-28T10:00:00Z' }
+    const sell: BBGoTrade = { ...baseTrade, side: 'SELL', quantity: '0.001', price: '73000', tradedAt: '2026-05-28T11:00:00Z' }
+    const result = buildTradeMarkers([buy, sell], null, 'BTCUSDT')
+    expect(result[0]!.positionAction).toBe('open')
+    expect(result[1]!.positionAction).toBe('close')
+  })
 })
 
 describe('buildOrderLevels', () => {
