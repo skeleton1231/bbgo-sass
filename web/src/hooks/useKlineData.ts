@@ -44,7 +44,7 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
       const params = new URLSearchParams({
         symbol,
         interval: interval || '1h',
-        limit: '500',
+        limit: '200',
       })
       const res = await fetch(`/api/manager/markets/${encodeURIComponent(exchange)}/klines?${params}`)
       if (!res.ok) {
@@ -86,7 +86,7 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
       const params = new URLSearchParams({
         symbol,
         interval: interval || '1h',
-        limit: '500',
+        limit: '200',
         end_time: String(endTime),
       })
       const res = await fetch(`/api/manager/markets/${encodeURIComponent(exchange)}/klines?${params}`)
