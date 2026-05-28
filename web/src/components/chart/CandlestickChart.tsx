@@ -200,6 +200,7 @@ export function CandlestickChart({
     indicatorSeriesRef.current.clear()
     priceLinesRef.current = []
     markersRef.current = null
+    prevMarkersKeyRef.current = ''
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
