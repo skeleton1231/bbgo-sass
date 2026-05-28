@@ -57,6 +57,8 @@ export interface IndicatorLine {
   color: string
   lineWidth?: number
   lineStyle?: number
+  priceScaleId?: string
+  scaleMargins?: { top: number; bottom: number }
   data: Array<{ time: Time; value: number }>
 }
 
@@ -373,14 +375,23 @@ export function CandlestickChart({
       if (il.data.length === 0) continue
       let series = indicatorSeriesRef.current.get(il.id)
       if (!series) {
-        series = chartRef.current.addSeries(LineSeries, {
+        const opts: Record<string, unknown> = {
           color: il.color,
           lineWidth: (il.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           lineStyle: il.lineStyle as LineStyle,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: false,
-        })
+        }
+        if (il.priceScaleId) {
+          opts.priceScaleId = il.priceScaleId
+        }
+        series = chartRef.current.addSeries(LineSeries, opts)
+        if (il.priceScaleId && il.scaleMargins) {
+          chartRef.current.priceScale(il.priceScaleId).applyOptions({
+            scaleMargins: il.scaleMargins,
+          })
+        }
         indicatorSeriesRef.current.set(il.id, series)
       }
       series.setData(il.data.map((d) => ({ time: d.time, value: d.value })))

@@ -232,7 +232,11 @@ export default function BotDetailPage() {
       }))
     )
     if (curve.length < 2) return null
-    return { id: 'pnl-curve', name: 'P&L', color: '#a855f7', lineWidth: 2, data: curve }
+    return {
+      id: 'pnl-curve', name: 'P&L', color: '#a855f7', lineWidth: 2,
+      priceScaleId: 'pnl', scaleMargins: { top: 0.75, bottom: 0 },
+      data: curve,
+    }
   }, [tradesData?.trades])
 
   const strategyStats = useMemo(() => {
