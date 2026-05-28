@@ -27,6 +27,9 @@ import {
   fetchBotPnL,
   fetchMarketSymbols,
   fetchMarketKlines,
+  fetchBotList,
+  fetchBotDetail,
+  fetchMarketTicker,
   type TradingVolumeEntry,
   type StrategyEntry,
   type UserContainer,
@@ -43,7 +46,7 @@ import {
   type BBGoStrategyState,
   type PnLReport,
   type MarketTicker,
-  fetchMarketTicker,
+  type Bot,
 } from './manager'
 
 // --- Strategy & container queries ---
@@ -129,6 +132,26 @@ export function useBacktestJobs() {
       const hasActive = jobs.some(j => j.status === 'pending' || j.status === 'downloading' || j.status === 'running')
       return hasActive ? 5_000 : 60_000
     },
+  })
+}
+
+// --- Bot list & detail ---
+
+export function useBotList(userId: string, mode?: 'live' | 'paper') {
+  return useQuery<{ bots: Bot[] }>({
+    queryKey: ['bot-list', userId, mode],
+    queryFn: () => fetchBotList(userId, mode),
+    enabled: !!userId,
+    refetchInterval: 10_000,
+  })
+}
+
+export function useBotDetail(userId: string, botId: string | null) {
+  return useQuery<Bot>({
+    queryKey: ['bot-detail', userId, botId],
+    queryFn: () => fetchBotDetail(userId, botId!),
+    enabled: !!userId && !!botId,
+    refetchInterval: 15_000,
   })
 }
 
@@ -305,6 +328,7 @@ export function useDeleteCredential() {
 }
 
 export type {
+  Bot,
   StrategyEntry,
   UserContainer,
   UserContainersResponse,

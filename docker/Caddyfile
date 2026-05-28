@@ -1,4 +1,8 @@
 {$DOMAIN:localhost} {
+	handle /api/ws* {
+		reverse_proxy manager:8090
+	}
+
 	reverse_proxy web:3000
 
 	encode gzip

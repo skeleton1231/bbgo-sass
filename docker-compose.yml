@@ -80,6 +80,7 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - MANAGER_API_URL=http://manager:8090
       - MANAGER_TOKEN=${MANAGER_TOKEN}
+      - MANAGER_WS_URL=ws://localhost:8090
     depends_on:
       manager:
         condition: service_healthy

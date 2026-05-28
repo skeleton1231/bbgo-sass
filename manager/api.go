@@ -16,6 +16,7 @@ import (
 	pb "github.com/c9s/bbgo/saas/manager/pb"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type API struct {
@@ -63,59 +64,69 @@ func (api *API) Close() {
 }
 
 func (api *API) RegisterRoutes(r chi.Router) {
-	r.Get("/api/health", api.Health)
-
-	r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
-	r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
-	r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
-
-	r.Route("/", func(r chi.Router) {
-		r.Use(UserRateLimit(3*time.Second, 20))
-		r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
-		r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
-		r.Post("/api/users/{userID}/start", api.StartUser)
-		r.Post("/api/users/{userID}/stop", api.StopUser)
-		r.Post("/api/credentials", api.CreateCredential)
-		r.Delete("/api/credentials/{id}", api.DeleteCredential)
-		r.Post("/api/notifications/config", api.CreateNotificationConfig)
-		r.Delete("/api/notifications/config/{id}", api.DeleteNotificationConfig)
-		r.Post("/api/notifications/test", api.TestNotification)
-		r.Post("/api/backtest", api.RunBacktest)
-		r.Post("/api/backtest/submit", api.SubmitBacktest)
-		r.Post("/api/backtest/sync", api.SyncBacktestData)
-	})
-
-	r.Get("/api/users/{userID}/strategies", api.ListStrategies)
-	r.Get("/api/users/{userID}/status", api.UserStatus)
-
-	r.Get("/api/users/{userID}/bbgo/ping", api.BBGoPing)
-	r.Get("/api/users/{userID}/bbgo/sessions", api.BBGoSessions)
-	r.Get("/api/users/{userID}/bbgo/session/{session}", api.BBGoSessionDetail)
-	r.Get("/api/users/{userID}/bbgo/session/{session}/trades", api.BBGoSessionTrades)
-	r.Get("/api/users/{userID}/bbgo/session/{session}/open-orders", api.BBGoSessionOpenOrders)
-	r.Get("/api/users/{userID}/bbgo/session/{session}/account", api.BBGoSessionAccount)
-	r.Get("/api/users/{userID}/bbgo/session/{session}/balances", api.BBGoSessionBalances)
-	r.Get("/api/users/{userID}/bbgo/session/{session}/symbols", api.BBGoSessionSymbols)
-	r.Get("/api/users/{userID}/bbgo/assets", api.BBGoAssets)
-	r.Get("/api/users/{userID}/bbgo/strategies", api.BBGoStrategies)
-	r.Get("/api/users/{userID}/bbgo/trades", api.BBGoTrades)
-	r.Get("/api/users/{userID}/bbgo/orders/closed", api.BBGoClosedOrders)
-	r.Get("/api/users/{userID}/bbgo/trading-volume", api.BBGoTradingVolume)
-	r.Get("/api/users/{userID}/bbgo/pnl", api.BBGoPnL)
-
-	r.Get("/api/users/{userID}/logs", api.ContainerLogs)
-
-	r.Get("/api/notifications/config", api.ListNotificationConfigs)
-
+	// WS routes — no request timeout (long-lived connections)
 	r.Get("/api/ws/ticket", api.IssueWSTicket)
 	r.Get("/api/ws", api.HandleWebSocket)
 
-	r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
+	// Long-running operations — no request timeout
+	r.Post("/api/backtest/sync", api.SyncBacktestData)
 
-	r.Get("/api/backtest/jobs", api.ListBacktestJobs)
-	r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)
-	r.Get("/api/backtest/status", api.BacktestSyncStatus)
-	r.Get("/api/credentials", api.ListCredentials)
+	// Standard routes — 60s request timeout
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Timeout(60 * time.Second))
+
+		r.Get("/api/health", api.Health)
+
+		r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
+		r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
+		r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
+
+		r.Route("/", func(r chi.Router) {
+			r.Use(UserRateLimit(3*time.Second, 20))
+			r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
+			r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
+			r.Post("/api/users/{userID}/start", api.StartUser)
+			r.Post("/api/users/{userID}/stop", api.StopUser)
+			r.Post("/api/credentials", api.CreateCredential)
+			r.Delete("/api/credentials/{id}", api.DeleteCredential)
+			r.Post("/api/notifications/config", api.CreateNotificationConfig)
+			r.Delete("/api/notifications/config/{id}", api.DeleteNotificationConfig)
+			r.Post("/api/notifications/test", api.TestNotification)
+			r.Post("/api/backtest", api.RunBacktest)
+			r.Post("/api/backtest/submit", api.SubmitBacktest)
+		})
+
+		r.Get("/api/users/{userID}/bots", api.ListBots)
+		r.Get("/api/users/{userID}/bots/{botID}", api.GetBot)
+		r.Get("/api/users/{userID}/strategies", api.ListStrategies)
+		r.Get("/api/users/{userID}/status", api.UserStatus)
+
+		r.Get("/api/users/{userID}/bbgo/ping", api.BBGoPing)
+		r.Get("/api/users/{userID}/bbgo/sessions", api.BBGoSessions)
+		r.Get("/api/users/{userID}/bbgo/session/{session}", api.BBGoSessionDetail)
+		r.Get("/api/users/{userID}/bbgo/session/{session}/trades", api.BBGoSessionTrades)
+		r.Get("/api/users/{userID}/bbgo/session/{session}/open-orders", api.BBGoSessionOpenOrders)
+		r.Get("/api/users/{userID}/bbgo/session/{session}/account", api.BBGoSessionAccount)
+		r.Get("/api/users/{userID}/bbgo/session/{session}/balances", api.BBGoSessionBalances)
+		r.Get("/api/users/{userID}/bbgo/session/{session}/symbols", api.BBGoSessionSymbols)
+		r.Get("/api/users/{userID}/bbgo/assets", api.BBGoAssets)
+		r.Get("/api/users/{userID}/bbgo/strategies", api.BBGoStrategies)
+		r.Get("/api/users/{userID}/bbgo/trades", api.BBGoTrades)
+		r.Get("/api/users/{userID}/bbgo/orders/closed", api.BBGoClosedOrders)
+		r.Get("/api/users/{userID}/bbgo/trading-volume", api.BBGoTradingVolume)
+		r.Get("/api/users/{userID}/bbgo/pnl", api.BBGoPnL)
+
+		r.Get("/api/users/{userID}/logs", api.ContainerLogs)
+
+		r.Get("/api/notifications/config", api.ListNotificationConfigs)
+
+		r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
+
+		r.Get("/api/backtest/jobs", api.ListBacktestJobs)
+		r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)
+		r.Get("/api/backtest/status", api.BacktestSyncStatus)
+		r.Get("/api/credentials", api.ListCredentials)
+	})
 }
 
 func (api *API) Health(w http.ResponseWriter, _ *http.Request) {

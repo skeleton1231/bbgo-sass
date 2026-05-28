@@ -164,7 +164,6 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(maxBodySize(2 << 20)) // 2MB max request body
 
 	r.Use(SharedSecretAuth(cfg.ManagerToken))

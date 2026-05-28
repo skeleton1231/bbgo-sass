@@ -44,6 +44,8 @@ interface CandlestickChartProps {
   orderLevels?: OrderLevel[]
   height?: number
   isLoading?: boolean
+  dataKey?: string
+  onVisibleTimeRangeChange?: (range: { from: number; to: number } | null) => void
 }
 
 function getChartTheme(): DeepPartial<ChartOptions> {
@@ -78,6 +80,8 @@ export function CandlestickChart({
   orderLevels,
   height = 400,
   isLoading,
+  dataKey,
+  onVisibleTimeRangeChange,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -85,7 +89,15 @@ export function CandlestickChart({
   const volumeSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const priceLinesRef = useRef<ReturnType<ISeriesApi<SeriesType>['createPriceLine']>[]>([])
+  const prevCandleCountRef = useRef(0)
+  const prevDataKeyRef = useRef(dataKey)
+  const onVisibleRangeChangeRef = useRef(onVisibleTimeRangeChange)
+  onVisibleRangeChangeRef.current = onVisibleTimeRangeChange
 
+  if (prevDataKeyRef.current !== dataKey) {
+    prevDataKeyRef.current = dataKey
+    prevCandleCountRef.current = 0
+  }
   const initChart = useCallback(() => {
     if (!containerRef.current) return
 
@@ -132,6 +144,17 @@ export function CandlestickChart({
     })
     resizeObserver.observe(containerRef.current)
 
+    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (!range) return
+      const timeRange = chart.timeScale().getVisibleRange()
+      if (timeRange && onVisibleRangeChangeRef.current) {
+        onVisibleRangeChangeRef.current({
+          from: timeRange.from as number,
+          to: timeRange.to as number,
+        })
+      }
+    })
+
     return () => {
       resizeObserver.disconnect()
       chart.remove()
@@ -146,23 +169,71 @@ export function CandlestickChart({
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return
 
-    const candleData = candles.map((c) => ({
-      time: c.time,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }))
-    candleSeriesRef.current.setData(candleData)
+    const prevCount = prevCandleCountRef.current
+    const isInitialLoad = prevCount === 0
+    const hasMoreHistory = candles.length > prevCount && prevCount > 0 &&
+      candles[0] !== undefined
+    prevCandleCountRef.current = candles.length
 
-    const volumeData = candles
-      .filter((c) => c.volume != null && c.volume > 0)
-      .map((c) => ({
+    if (isInitialLoad || candles.length < prevCount) {
+      // Full dataset replacement: initial load or interval change
+      const candleData = candles.map((c) => ({
         time: c.time,
-        value: c.volume!,
-        color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
       }))
-    volumeSeriesRef.current.setData(volumeData)
+      candleSeriesRef.current.setData(candleData)
+
+      const volumeData = candles
+        .filter((c) => c.volume != null && c.volume > 0)
+        .map((c) => ({
+          time: c.time,
+          value: c.volume!,
+          color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+        }))
+      volumeSeriesRef.current.setData(volumeData)
+      chartRef.current?.timeScale().fitContent()
+    } else if (hasMoreHistory) {
+      // Prepending older candles — replace data but don't fit
+      const candleData = candles.map((c) => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }))
+      candleSeriesRef.current.setData(candleData)
+
+      const volumeData = candles
+        .filter((c) => c.volume != null && c.volume > 0)
+        .map((c) => ({
+          time: c.time,
+          value: c.volume!,
+          color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+        }))
+      volumeSeriesRef.current.setData(volumeData)
+      // Don't call fitContent — preserve user's scroll position
+    } else {
+      // Incremental update — only update last candle (WS tick)
+      const lastCandle = candles[candles.length - 1]
+      if (!lastCandle) return
+      candleSeriesRef.current.update({
+        time: lastCandle.time,
+        open: lastCandle.open,
+        high: lastCandle.high,
+        low: lastCandle.low,
+        close: lastCandle.close,
+      })
+      if (lastCandle.volume != null && lastCandle.volume > 0) {
+        volumeSeriesRef.current.update({
+          time: lastCandle.time,
+          value: lastCandle.volume,
+          color: lastCandle.close >= lastCandle.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+        })
+      }
+    }
 
     if (tradeMarkers && tradeMarkers.length > 0) {
       const markers = tradeMarkers
@@ -176,8 +247,6 @@ export function CandlestickChart({
         }))
       markersRef.current = createSeriesMarkers(candleSeriesRef.current, markers)
     }
-
-    chartRef.current?.timeScale().fitContent()
   }, [candles, tradeMarkers])
 
   useEffect(() => {

@@ -54,6 +54,24 @@ export interface UserContainersResponse {
   containers: Partial<Record<'live' | 'paper', UserContainer>>
 }
 
+// --- Bot (strategy instance in web UI) ---
+
+export interface Bot {
+  id: string
+  name: string
+  exchange: string
+  strategy: string
+  config: Record<string, unknown>
+  mode: 'live' | 'paper'
+  crossExchange: boolean
+  sessions: SessionRoleConfig[]
+  container_status: 'running' | 'stopped' | 'error' | 'starting'
+}
+
+export interface BotListResponse {
+  bots: Bot[]
+}
+
 export interface BacktestResult {
   output: string
 }
@@ -195,6 +213,19 @@ export function deleteStrategy(userId: string, strategyId: string) {
   return request<UserContainer>(`/users/${userId}/strategies/${strategyId}`, {
     method: 'DELETE',
   })
+}
+
+// --- Bot list & detail ---
+
+export function fetchBotList(userId: string, mode?: 'live' | 'paper') {
+  const params = new URLSearchParams()
+  if (mode) params.set('mode', mode)
+  const qs = params.toString()
+  return request<BotListResponse>(`/users/${userId}/bots${qs ? `?${qs}` : ''}`)
+}
+
+export function fetchBotDetail(userId: string, botId: string) {
+  return request<Bot>(`/users/${userId}/bots/${botId}`)
 }
 
 // --- User lifecycle ---

@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import {
-  useUserStrategies,
+  useBotDetail,
   useStartUser,
   useStopUser,
   useBotSessions,
@@ -22,6 +22,8 @@ import {
   type BBGoTrade,
   type BBGoBalance,
 } from '@/lib/bbgo/queries'
+import { useUserId } from '@/components/providers/user-id'
+import { OrderRow } from '@/components/user/OrderRow'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
 import { useKlineData } from '@/hooks/useKlineData'
 import { useTradingMode } from '@/components/providers/trading-mode'
@@ -75,53 +77,56 @@ export default function BotDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
-  const userId = params.id
+  const userId = useUserId()
+  const botId = params.id
   const rawMode = searchParams.get('mode')
   const { mode: globalMode } = useTradingMode()
-  const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper' : rawMode === 'live' ? 'live' : globalMode
-  const [activeSession, setActiveSession] = useState<string>('')
+
+  const { data: bot, isLoading: botLoading, isError: botError } = useBotDetail(userId, botId)
+
+  const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper'
+    : rawMode === 'live' ? 'live'
+    : bot?.mode ?? globalMode
+
+  const isRunning = bot?.container_status === 'running'
+  const exchange = bot?.exchange ?? ''
+  const symbol = (bot?.config?.symbol as string) ?? ''
+
+  const [activeSession, setactiveSession] = useState('')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
-
-  const { data: containersResp, isLoading, isError } = useUserStrategies(userId)
-  const startUser = useStartUser()
-  const stopUser = useStopUser()
-
-  const userContainer = containersResp?.containers?.[mode]
 
   const { data: sessionsData } = useBotSessions(userId, mode)
   const sessions = sessionsData?.sessions ?? []
   const firstSession = sessions[0]?.name ?? ''
 
   useEffect(() => {
-    if (!activeSession && firstSession) setActiveSession(firstSession)
+    if (!activeSession && firstSession) setactiveSession(firstSession)
   }, [firstSession, activeSession])
 
-  const isRunning = userContainer?.status === 'running'
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode)
   const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, undefined, mode)
-  const { data: tradesData } = useBotTrades(userId, undefined, undefined, mode)
+  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode)
   const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode)
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode)
   const { data: pingData } = useBotPing(userId, mode)
   const { data: logsData } = useContainerLogs(userId, '100', mode)
-  const { data: pnlData } = useBotPnL(userId, undefined, undefined, mode)
+  const { data: pnlData } = useBotPnL(userId, undefined, symbol || undefined, mode)
 
-  const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? ''
-  const activeSymbol = (userContainer?.strategies?.find(s => s.mode === mode)?.config?.symbol ?? userContainer?.strategies?.[0]?.config?.symbol ?? '') as string
+  const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
 
-  const { candles, isLoading: klinesLoading } = useKlineData({
+  const { candles, isLoading: klinesLoading, loadEarlierKlines } = useKlineData({
     userId,
     exchange: activeExchange,
-    symbol: activeSymbol,
+    symbol,
     interval: klineInterval,
-    enabled: isRunning && !!activeExchange && !!activeSymbol,
+    enabled: isRunning && !!activeExchange && !!symbol,
   })
 
   const tradeMarkers: TradeMarker[] = useMemo(() => {
     if (!tradesData?.trades) return []
     return tradesData.trades
-      .filter((tr) => !activeSymbol || tr.symbol === activeSymbol)
+      .filter((tr) => !symbol || tr.symbol === symbol)
       .slice(0, 200)
       .map((tr) => ({
         time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker["time"],
@@ -129,20 +134,28 @@ export default function BotDetailPage() {
         price: parseFloat(tr.price),
         quantity: parseFloat(tr.quantity),
       }))
-  }, [tradesData?.trades, activeSymbol])
+  }, [tradesData?.trades, symbol])
 
   const orderLevels: OrderLevel[] = useMemo(() => {
     if (!openOrdersData?.orders) return []
     return openOrdersData.orders
-      .filter((o) => !activeSymbol || o.symbol === activeSymbol)
+      .filter((o) => !symbol || o.symbol === symbol)
       .map((o) => ({
         price: parseFloat(o.price),
         side: o.side as 'BUY' | 'SELL',
         quantity: o.executedQuantity || o.quantity,
       }))
-  }, [openOrdersData?.orders, activeSymbol])
+  }, [openOrdersData?.orders, symbol])
 
-  const handleWSMessage = useCallback((msg: { type: string; data: { channel?: string; depth?: { bids: Array<{ price: string; volume: string }>; asks: Array<{ price: string; volume: string }> } } }) => {
+  interface DepthMessage {
+    type: string
+    data: {
+      channel?: string
+      depth?: { bids: Array<{ price: string; volume: string }>; asks: Array<{ price: string; volume: string }> }
+    }
+  }
+
+  const handleWSMessage = useCallback((msg: DepthMessage) => {
     if (msg.type !== 'market' || !msg.data.depth) return
     setDepthData({
       bids: msg.data.depth.bids.slice(0, 20).map((b) => ({ price: parseFloat(b.price), volume: parseFloat(b.volume) })),
@@ -156,7 +169,10 @@ export default function BotDetailPage() {
     onMessage: handleWSMessage,
   })
 
-  if (isLoading) {
+  const startUser = useStartUser()
+  const stopUser = useStopUser()
+
+  if (botLoading || !userId) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
@@ -167,7 +183,7 @@ export default function BotDetailPage() {
     )
   }
 
-  if (isError) {
+  if (botError || !bot) {
     return (
       <Card className="rounded-xl border-destructive/50">
         <CardContent className="flex flex-col items-center py-12">
@@ -178,14 +194,13 @@ export default function BotDetailPage() {
     )
   }
 
-  const strategies = userContainer?.strategies ?? []
-  const status = userContainer?.status ?? 'stopped'
+  const status = bot.container_status
+  const botReachable = isRunning && pingData?.status === 'ok'
   const openOrders = openOrdersData?.orders ?? []
   const closedOrders = closedOrdersData?.orders ?? []
   const trades = tradesData?.trades ?? []
   const balances = balancesData?.balances ?? {}
   const liveStrategies = strategyStatesData?.strategies ?? []
-  const botReachable = isRunning && pingData?.status === 'ok'
   const nonZeroBalances = Object.entries(balances).filter(
     ([, b]) => parseFloat(b.available) > 0 || parseFloat(b.locked) > 0
   )
@@ -202,9 +217,9 @@ export default function BotDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             {t('backToBots')}
           </button>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('tradingDashboard')}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{bot.name || bot.strategy}</h1>
           <p className="text-sm text-muted-foreground">
-            {t('strategiesCount', { count: strategies.length })} · {t('containerName', { id: userId.slice(0, 8) })} · {t(`mode.${mode}`)}
+            {exchange}{symbol ? ` · ${symbol}` : ''} · {bot.strategy} · {t(`mode.${mode}`)}
           </p>
         </div>
 
@@ -254,7 +269,7 @@ export default function BotDetailPage() {
             <Button
               size="sm"
               onClick={() => startUser.mutate({ userId, mode }, { onError: (err) => toast.error(err.message) })}
-              disabled={startUser.isPending}
+              disabled={startUser.isPending || status === 'starting'}
               className="rounded-full"
             >
               <Play className="mr-1.5 h-3.5 w-3.5" />
@@ -285,7 +300,7 @@ export default function BotDetailPage() {
               key={s.name}
               variant={activeSession === s.name ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveSession(s.name)}
+              onClick={() => setactiveSession(s.name)}
               className="rounded-full text-xs"
             >
               {s.exchange || s.name}
@@ -403,7 +418,7 @@ export default function BotDetailPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium">
-                  {activeSymbol || 'Price Chart'} · {activeExchange}
+                  {symbol || 'Price Chart'} · {activeExchange}
                 </CardTitle>
                 <div className="flex gap-1">
                   {KLINE_INTERVALS.map((iv) => (
@@ -424,7 +439,7 @@ export default function BotDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {!activeSymbol ? (
+              {!symbol ? (
                 <div className="flex h-[450px] items-center justify-center text-sm text-muted-foreground">
                   {botReachable ? t('noSymbolForChart') : t('startToSeeData')}
                 </div>
@@ -435,6 +450,15 @@ export default function BotDetailPage() {
                   orderLevels={orderLevels}
                   height={450}
                   isLoading={klinesLoading}
+                  dataKey={`${activeExchange}-${symbol}-${klineInterval}`}
+                  onVisibleTimeRangeChange={(range) => {
+                    if (!range || candles.length === 0 || !candles[0]) return
+                    const earliest = (candles[0].time as number)
+                    const visibleSpan = range.to - range.from
+                    if (range.from < earliest + visibleSpan * 0.5) {
+                      loadEarlierKlines?.()
+                    }
+                  }}
                 />
               )}
             </CardContent>
@@ -565,48 +589,41 @@ export default function BotDetailPage() {
 
         <TabsContent value="strategies">
           <Card className="rounded-xl">
-            {strategies.length > 0 ? (
+            {liveStrategies.length > 0 ? (
               <div className="divide-y">
-                {strategies.map((s) => {
-                  const liveState = liveStrategies.find((ls) => ls.strategy === s.strategy)
-                  return (
-                    <div key={s.id} className="px-6 py-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                            <Bot className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{s.name || s.strategy}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {s.exchange}{s.crossExchange ? ` (${t('crossExchange')})` : ''} · {s.strategy} · {t(`mode.${s.mode}`)}
-                            </p>
-                          </div>
+                {liveStrategies.map((ls, idx) => (
+                  <div key={idx} className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                          <Bot className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        {isRunning && (
-                          <Badge
-                            variant={liveState ? 'default' : 'secondary'}
-                            className={cn('rounded-full text-[11px]', liveState && 'bg-trade-up text-white hover:bg-trade-up')}
-                          >
-                            {liveState ? t('strategyStatus.running') : t('strategyStatus.idle')}
-                          </Badge>
-                        )}
+                        <div>
+                          <p className="text-sm font-medium">{ls.strategy}</p>
+                          <p className="text-xs text-muted-foreground">{exchange} · {mode}</p>
+                        </div>
                       </div>
-                      {liveState && Object.keys(liveState).length > 1 && (
-                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-11">
-                          {Object.entries(liveState)
-                            .filter(([k]) => k !== 'strategy')
-                            .slice(0, 6)
-                            .map(([key, val]) => (
-                              <span key={key} className="text-xs text-muted-foreground">
-                                {key}: <span className="text-foreground font-mono">{typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val)}</span>
-                              </span>
-                            ))}
-                        </div>
-                      )}
+                      <Badge
+                        variant="default"
+                        className="rounded-full text-[11px] bg-trade-up text-white hover:bg-trade-up"
+                      >
+                        {t('strategyStatus.running')}
+                      </Badge>
                     </div>
-                  )
-                })}
+                    {Object.keys(ls).length > 1 && (
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-11">
+                        {Object.entries(ls)
+                          .filter(([k]) => k !== 'strategy')
+                          .slice(0, 6)
+                          .map(([key, val]) => (
+                            <span key={key} className="text-xs text-muted-foreground">
+                              {key}: <span className="text-foreground font-mono">{typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val)}</span>
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             ) : (
               <CardContent className="py-8 text-center text-sm text-muted-foreground">{t('noStrategiesTab')}</CardContent>
@@ -628,50 +645,6 @@ export default function BotDetailPage() {
           </TabsContent>
         )}
       </Tabs>
-    </div>
-  )
-}
-
-interface OrderRowProps {
-  order: BBGoOrder
-  showStatus?: boolean
-  showTime?: boolean
-}
-
-function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
-  return (
-    <div className="flex items-center justify-between px-6 py-3">
-      <div className="flex items-center gap-3">
-        <div className={cn(
-          'flex h-7 w-7 items-center justify-center rounded-full',
-          order.side === 'BUY' ? 'bg-trade-up' : 'bg-trade-down'
-        )}>
-          {order.side === 'BUY'
-            ? <ArrowDownRight className="h-3.5 w-3.5 text-trade-up" />
-            : <ArrowUpRight className="h-3.5 w-3.5 text-trade-down" />}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{order.symbol}</span>
-          <Badge variant="secondary" className="rounded-md text-[10px]">{order.orderType}</Badge>
-        </div>
-      </div>
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground font-mono">
-          {order.price} × {order.executedQuantity || order.quantity}
-        </span>
-        {showStatus && order.status && (
-          <Badge variant="outline" className={cn(
-            'rounded-full text-[10px]',
-            order.status === 'Filled' && 'border-trade-up/30 text-trade-up',
-            order.status === 'Canceled' && 'border-border text-muted-foreground'
-          )}>
-            {order.status}
-          </Badge>
-        )}
-        {showTime && order.creationTime && (
-          <span className="text-xs text-muted-foreground">{new Date(order.creationTime).toLocaleString()}</span>
-        )}
-      </div>
     </div>
   )
 }

@@ -242,7 +242,7 @@ export default function DashboardPage() {
         <Card className="rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-sm font-medium">{t('recentTrades')}</CardTitle>
-            <Link href={`/user/bots/${userId}?mode=${globalMode}`}>
+            <Link href={`/user/bots?mode=${globalMode}`}>
               <Button variant="ghost" size="sm" className="text-xs text-primary">
                 {t('viewAll')} <ArrowUpRight className="ml-1 h-3 w-3" />
               </Button>
