@@ -173,7 +173,7 @@ export function BotChartPanel({
                   orderLevels={orderLevels}
                   gridLines={gridLines}
                   indicatorLines={allIndicators}
-                  height={450}
+                  height={520}
                   isLoading={klinesLoading}
                   dataKey={`${exchange}-${symbol}-${klineInterval}`}
                   onVisibleTimeRangeChange={(range) => {

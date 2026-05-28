@@ -1,0 +1,82 @@
+[    1054ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[    1104ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[   19966ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   19966ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   19966ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[   19967ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  596602ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/api/manager/users/73a0e592-45df-40be-8088-304011f976a3/bbgo/session/binance/open-orders?mode=paper:0
+[  597024ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/user/bots/strat-a1af38ffa23205c2?mode=paper&_rsc=6iK745ISIDVOu2fO:0
+[  597233ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/user/bots/strat-a1af38ffa23205c2?mode=paper&_rsc=6iK745ISIDVOu2fO:0
+[  597504ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3142/user/bots/strat-a1af38ffa23205c2?mode=paper:0
+[  602193ms] Invalid or unexpected token
+[  602288ms] Invalid regular expression: missing /
+[  602340ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0a8t_react-dom_07.400g._.js:15305
+[  602493ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1226
+[  602613ms] [WARNING] [HMR] Invalid message: {"type":"isrManifest","data":{"/user/bots/strat-a1af38ffa23205c2?mode=paper":false,"/user/bots/strat-a1af38ffa23205c2?mode=paper&_rsc=6iK745ISIDVOu2fO":false,"/api/manager/users/73a0e592-45df-40be-8088-304011f976a3/bbgo/session/binance/open-orders?mode=paper":false,"/user/bots/strat-a1af38ffa23205c2":false}}
+TypeError: Cannot read properties of undefined (reading 'components')
+    at handleStaticIndicator (http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2792:46)
+    at processMessage (http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2806:17)
+    at http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2680:13
+    at WebSocket.handleMessage (http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2325:17) @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1226
+[  602638ms] [ERROR] ./src/app/[locale]/user/bots/[id]/page.tsx:530:21
+Expected '</', got 'jsx text'
+  528 |           <Card className="rounded-xl">
+  529 |             <CardHeader className="pb-2">
+> 530 |               </div>
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 531 |             </CardHeader>
+      | ^^^^^^^^^^^^
+  532 |             <CardContent>
+  533 |               {!symbol ? (
+  534 |                 <div className="flex h-[450px] items-center justify-center text-sm text-m...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component Browser]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component SSR]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component] @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1945
+[  619958ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  619959ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  619960ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  619960ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  654019ms] [ERROR] ./src/app/[locale]/user/bots/[id]/page.tsx:597:21
+Expected '</', got 'jsx text'
+  595 |                 </div>
+  596 |               )}
+> 597 |               </div>
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 598 |             </CardHeader>
+      | ^^^^^^^^^^^^
+  599 |             <CardContent>
+  600 |               {!symbol ? (
+  601 |                 <div className="flex h-[450px] items-center justify-center text-sm text-m...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component Browser]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Client Component SSR]
+    ./src/app/[locale]/user/bots/[id]/page.tsx [Server Component] @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1945
+[  654123ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1226
+[  679418ms] [WARNING] [HMR] Invalid message: {"type":"isrManifest","data":{"/user/bots/strat-a1af38ffa23205c2?mode=paper":false,"/user/bots/strat-a1af38ffa23205c2?mode=paper&_rsc=6iK745ISIDVOu2fO":false,"/api/manager/users/73a0e592-45df-40be-8088-304011f976a3/bbgo/session/binance/open-orders?mode=paper":false}}
+TypeError: Cannot read properties of undefined (reading 'components')
+    at handleStaticIndicator (http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2792:46)
+    at processMessage (http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2806:17)
+    at http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2680:13
+    at WebSocket.handleMessage (http://localhost:3142/_next/static/chunks/0bl2_next_dist_client_010gaeq._.js:2325:17) @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_13vkcrh._.js:1226
+[  681513ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  681590ms] [LOG] [HMR] connected @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  685156ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  685177ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  685177ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+[  700230ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3142/_next/static/chunks/0bl2_next_dist_126uayc._.js:2477
+[  722940ms] A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received

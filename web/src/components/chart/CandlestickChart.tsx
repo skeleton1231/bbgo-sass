@@ -254,7 +254,16 @@ export function CandlestickChart({
           value: c.volume!,
           color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
         })))
-      chartRef.current?.timeScale().fitContent()
+      const ts = chartRef.current?.timeScale()
+      if (ts && candles.length > 80) {
+        const visibleStart = candles[candles.length - 80]
+        const visibleEnd = candles[candles.length - 1]
+        if (visibleStart && visibleEnd) {
+          ts.setVisibleRange({ from: visibleStart.time as number, to: visibleEnd.time as number })
+        }
+      } else {
+        ts?.fitContent()
+      }
     } else if (hasMoreHistory) {
       candleSeriesRef.current.setData(candles.map((c) => ({
         time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
