@@ -526,18 +526,18 @@ export default function BotDetailPage() {
         <TabsContent value="chart">
           <ErrorBoundary>
           <Card className="rounded-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-sm font-medium">
                   {symbol || 'Price Chart'} · {activeExchange}
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1 flex-wrap">
                   {KLINE_INTERVALS.map((iv) => (
                     <button
                       key={iv.key}
                       onClick={() => setKlineInterval(iv.key)}
                       className={cn(
-                        'rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
+                        'rounded px-2 py-0.5 text-xs font-medium transition-colors',
                         klineInterval === iv.key
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -546,39 +546,54 @@ export default function BotDetailPage() {
                       {iv.label}
                     </button>
                   ))}
-                </div>
-                <div className="flex gap-1 mt-1">
+                  <span className="mx-1 h-3 w-px bg-border" />
                   {indicators.map((ic) => (
                     <button
                       key={ic.id}
                       onClick={() => toggleIndicator(ic.id)}
                       className={cn(
-                        'rounded-md px-2 py-0.5 text-xs font-medium transition-colors border',
-                        ic.enabled
-                          ? 'text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80 border-transparent'
+                        'rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors',
+                        ic.enabled ? 'text-white' : 'text-muted-foreground hover:text-foreground'
                       )}
-                      style={ic.enabled ? { backgroundColor: ic.color, borderColor: ic.color } : undefined}
+                      style={ic.enabled ? { backgroundColor: ic.color } : undefined}
                     >
                       {ic.name}
                     </button>
                   ))}
-                </div>
-                <div className="flex gap-1 mt-1">
                   <button
                     onClick={() => setShowPnlCurve((v) => !v)}
                     className={cn(
-                      'rounded-md px-2 py-0.5 text-xs font-medium transition-colors border',
-                      showPnlCurve
-                        ? 'text-white'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80 border-transparent'
+                      'rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors',
+                      showPnlCurve ? 'text-white' : 'text-muted-foreground hover:text-foreground'
                     )}
-                    style={showPnlCurve ? { backgroundColor: '#a855f7', borderColor: '#a855f7' } : undefined}
+                    style={showPnlCurve ? { backgroundColor: '#a855f7' } : undefined}
                   >
                     P&L
                   </button>
                 </div>
               </div>
+              {strategyStats && strategyStats.base > 0 && currentPrice && (
+                <div className="flex items-center gap-4 mt-1.5 pt-2 border-t text-xs font-mono">
+                  <span className="text-muted-foreground">
+                    Pos: <span className="text-trade-up font-medium">{strategyStats.base.toFixed(6)}</span>
+                  </span>
+                  {strategyStats.averageCost > 0 && (
+                    <span className="text-muted-foreground">
+                      Entry: <span className="text-foreground font-medium">{strategyStats.averageCost.toLocaleString()}</span>
+                    </span>
+                  )}
+                  <span className={cn(
+                    'font-medium',
+                    currentPrice > strategyStats.averageCost ? 'text-trade-up' : 'text-trade-down'
+                  )}>
+                    {currentPrice > strategyStats.averageCost ? '+' : ''}
+                    {((currentPrice - strategyStats.averageCost) * strategyStats.base).toFixed(2)} USDT
+                  </span>
+                  <span className="text-muted-foreground">
+                    ≈ {(currentPrice * strategyStats.base).toFixed(2)} USDT
+                  </span>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {!symbol ? (
