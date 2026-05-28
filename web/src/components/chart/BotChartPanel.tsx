@@ -42,6 +42,8 @@ interface BotChartPanelProps {
   startToSeeDataText: string
   klineInterval: string
   onIntervalChange: (interval: string) => void
+  indicatorConfigs?: IndicatorConfig[]
+  onToggleIndicator?: (id: string) => void
 }
 
 export function BotChartPanel({
@@ -62,18 +64,13 @@ export function BotChartPanel({
   startToSeeDataText,
   klineInterval,
   onIntervalChange,
+  indicatorConfigs = [],
+  onToggleIndicator,
 }: BotChartPanelProps) {
-  const [indicators, setIndicators] = useState<IndicatorConfig[]>([])
   const [showPnlCurve, setShowPnlCurve] = useState(true)
   const [ohlcvData, setOhlcvData] = useState<{
     time: number; open: number; high: number; low: number; close: number; volume?: number
   } | null>(null)
-
-  const toggleIndicator = useCallback((id: string) => {
-    setIndicators((prev) =>
-      prev.map((ic) => (ic.id === id ? { ...ic, enabled: !ic.enabled } : ic))
-    )
-  }, [])
 
   const allIndicators = useMemo(() =>
     pnlLine && showPnlCurve ? [...indicatorLines, pnlLine] : indicatorLines,
@@ -104,10 +101,10 @@ export function BotChartPanel({
                 </button>
               ))}
               <span className="mx-1 h-3 w-px bg-border" />
-              {indicators.map((ic) => (
+              {indicatorConfigs.map((ic) => (
                 <button
                   key={ic.id}
-                  onClick={() => toggleIndicator(ic.id)}
+                  onClick={() => onToggleIndicator?.(ic.id)}
                   className={cn(
                     'rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors',
                     ic.enabled ? 'text-white' : 'text-muted-foreground hover:text-foreground'

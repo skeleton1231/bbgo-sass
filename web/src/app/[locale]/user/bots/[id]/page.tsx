@@ -528,6 +528,8 @@ export default function BotDetailPage() {
             startToSeeDataText={t('startToSeeData')}
             klineInterval={klineInterval}
             onIntervalChange={setKlineInterval}
+            indicatorConfigs={indicators}
+            onToggleIndicator={toggleIndicator}
           />
         </TabsContent>
 
