@@ -278,9 +278,10 @@ export default function BotDetailPage() {
       const qty = t.side === 'BUY' ? parseFloat(t.quantity) : -parseFloat(t.quantity)
       const prev = net
       net += qty
-      if (prev === 0 && net !== 0) return 'open' as const
-      if (prev !== 0 && net === 0) return 'close' as const
-      return null
+      const tag = prev === 0 && net !== 0 ? 'open' as const
+        : prev !== 0 && net === 0 ? 'close' as const
+        : null
+      return { tag, netPos: net }
     })
   }, [trades])
 
@@ -800,7 +801,7 @@ export default function BotDetailPage() {
                 <div className="divide-y">
                   {trades.map((trade: BBGoTrade, tradeIdx: number) => {
                     const isBuy = trade.side === 'BUY'
-                    const tag = tradePositionTags[tradeIdx]
+                    const { tag, netPos } = tradePositionTags[tradeIdx] ?? { tag: null, netPos: 0 }
                     return (
                       <div key={trade.id} className={cn(
                         'flex items-center justify-between px-6 py-3 border-l-2',
@@ -819,6 +820,7 @@ export default function BotDetailPage() {
                               {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">Open</Badge>}
                               {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">Close</Badge>}
                               {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">Maker</Badge>}
+                              <span className="text-[10px] text-muted-foreground tabular-nums">net {netPos.toFixed(6)}</span>
                             </div>
                             <span className="text-xs text-muted-foreground">{trade.exchange}</span>
                           </div>
