@@ -9,6 +9,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (res.status === 401) {
     const locale = window.location.pathname.split('/')[1] || ''
+    sessionStorage.setItem('bbgo-auth-message', 'session_expired')
     window.location.href = `/${locale}/login`
     throw new Error('Session expired')
   }

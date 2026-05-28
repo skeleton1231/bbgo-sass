@@ -1,9 +1,10 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Link, usePathname } from '@/i18n/navigation'
+import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
-import { signOutAction } from '@/actions/auth'
+import { createClient } from '@/lib/supabase/client'
+import { LOGIN_PATH } from '@/lib/routes'
 import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard,
@@ -24,6 +25,14 @@ const navItems = [
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const t = useTranslations('Nav')
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push(LOGIN_PATH)
+    router.refresh()
+  }
 
   return (
     <>
@@ -53,15 +62,14 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <Separator className="bg-sidebar-border" />
 
       <div className="p-3">
-        <form action={signOutAction}>
-          <button
-            type="submit"
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            {t('signOut')}
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+        >
+          <LogOut className="h-4 w-4" />
+          {t('signOut')}
+        </button>
       </div>
     </>
   )

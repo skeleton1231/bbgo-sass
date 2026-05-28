@@ -11,6 +11,7 @@ interface StrategyConfigFormProps {
 
 export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigFormProps) {
   const t = useTranslations('Bots')
+  const ft = useTranslations('StrategyFields')
 
   function handleChange(key: string, value: unknown) {
     onChange({ ...values, [key]: value })
@@ -33,7 +34,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
       {fields.map((field) => (
         <div key={field.key}>
           <label className="block text-sm font-medium mb-1">
-            {field.label}
+            {ft(field.key as Parameters<typeof ft>[0])}
             {field.required && <span className="text-destructive ml-0.5">*</span>}
           </label>
 
@@ -59,7 +60,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
                 onChange={(e) => handleChange(field.key, e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm">{field.label}</span>
+              <span className="text-sm">{ft(field.key as Parameters<typeof ft>[0])}</span>
             </label>
           ) : (
             <input

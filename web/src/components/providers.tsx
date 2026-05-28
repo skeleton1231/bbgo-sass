@@ -12,7 +12,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000,
-            retry: 1,
+            retry: (failureCount, error: unknown) => {
+              if (error instanceof Error) {
+                const msg = error.message
+                if (msg === 'Session expired') return false
+                if (/API error: [45]\d\d/.test(msg)) return false
+              }
+              return failureCount < 1
+            },
           },
         },
       })

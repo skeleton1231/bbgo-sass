@@ -19,6 +19,13 @@ function filterSymbols(symbols: string[]): string[] {
   return symbols.filter(isValidTradingPair)
 }
 
+function toLocalDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function BacktestPanel({ userId }: { userId: string }) {
   const t = useTranslations('Backtest')
   const ct = useTranslations('Categories')
@@ -75,7 +82,6 @@ export function BacktestPanel({ userId }: { userId: string }) {
   useEffect(() => {
     if (activeJob && (activeJob.status === 'completed' || activeJob.status === 'failed')) {
       setLastResult(activeJob)
-      setActiveJobId(null)
     }
   }, [activeJob])
 
@@ -87,18 +93,22 @@ export function BacktestPanel({ userId }: { userId: string }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLastResult(null)
-    const result = await submitBacktest.mutateAsync({
-      strategy,
-      config: { ...config, exchange, symbol: displaySymbol },
-      exchange,
-      symbol: displaySymbol,
-      start_time: startTime,
-      end_time: endTime,
-    })
-    setActiveJobId(result.job_id)
+    try {
+      const result = await submitBacktest.mutateAsync({
+        strategy,
+        config: { ...config, exchange, symbol: displaySymbol },
+        exchange,
+        symbol: displaySymbol,
+        start_time: startTime,
+        end_time: endTime,
+      })
+      setActiveJobId(result.job_id)
+    } catch {
+      // Error is displayed via submitBacktest.isError below
+    }
   }
 
-  const isRunning = activeJob?.status === 'pending' || activeJob?.status === 'downloading' || activeJob?.status === 'running'
+  const isRunning = !!activeJobId && (activeJob?.status === 'pending' || activeJob?.status === 'downloading' || activeJob?.status === 'running')
 
   const recentJobs = (jobsData?.jobs ?? [])
     .filter((j) => j.status === 'completed' || j.status === 'failed')
@@ -210,8 +220,8 @@ export function BacktestPanel({ userId }: { userId: string }) {
                 const end = new Date()
                 const start = new Date()
                 start.setMonth(start.getMonth() - months)
-                setEndTime(end.toISOString().slice(0, 10))
-                setStartTime(start.toISOString().slice(0, 10))
+                setEndTime(toLocalDate(end))
+                setStartTime(toLocalDate(start))
               }}
               disabled={isRunning}
               className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50 disabled:opacity-50"
@@ -224,8 +234,8 @@ export function BacktestPanel({ userId }: { userId: string }) {
             onClick={() => {
               const now = new Date()
               const ytd = new Date(now.getFullYear(), 0, 1)
-              setEndTime(now.toISOString().slice(0, 10))
-              setStartTime(ytd.toISOString().slice(0, 10))
+              setEndTime(toLocalDate(now))
+              setStartTime(toLocalDate(ytd))
             }}
             disabled={isRunning}
             className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50 disabled:opacity-50"

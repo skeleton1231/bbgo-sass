@@ -2,6 +2,7 @@
 
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
+import { createClient } from '@/lib/supabase/client'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { signOutAction } from '@/actions/auth'
 import { Settings, LogOut } from 'lucide-react'
+import { LOGIN_PATH } from '@/lib/routes'
 
 interface UserNavProps {
   email?: string
@@ -22,6 +23,13 @@ export function UserNav({ email }: UserNavProps) {
   const t = useTranslations('Nav')
 
   const initials = email ? email.slice(0, 2).toUpperCase() : 'U'
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push(LOGIN_PATH)
+    router.refresh()
+  }
 
   return (
     <DropdownMenu>
@@ -48,14 +56,10 @@ export function UserNav({ email }: UserNavProps) {
           {t('settings')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <form action={signOutAction}>
-          <DropdownMenuItem asChild>
-            <button type="submit" className="w-full text-left">
-              <LogOut className="mr-2 h-4 w-4" />
-              {t('signOut')}
-            </button>
-          </DropdownMenuItem>
-        </form>
+        <DropdownMenuItem onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          {t('signOut')}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     template: '%s | BBGO',
   },
   description: 'Manage your crypto trading bots, run backtests, and monitor performance.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({

@@ -124,7 +124,11 @@ export function useBacktestJobs() {
   return useQuery<{ jobs: BacktestJob[] }>({
     queryKey: ['backtest-jobs'],
     queryFn: apiListBacktestJobs,
-    refetchInterval: 10_000,
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs ?? []
+      const hasActive = jobs.some(j => j.status === 'pending' || j.status === 'downloading' || j.status === 'running')
+      return hasActive ? 5_000 : 60_000
+    },
   })
 }
 

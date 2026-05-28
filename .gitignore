@@ -16,5 +16,6 @@ bash.exe.stackdump
 .DS_Store
 Thumbs.db
 *.swp
+*.test.exe
 .claude/
 CLAUDE.md

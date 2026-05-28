@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 import { SignInForm } from '@/components/auth/SignInForm'
+import { SessionExpiredBanner } from '@/components/auth/SessionExpiredBanner'
 import { Activity } from 'lucide-react'
 
 export default async function LoginPage({
@@ -49,6 +50,7 @@ export default async function LoginPage({
               <p className="text-sm text-primary">{t('signupSuccess')}</p>
             </div>
           )}
+          <SessionExpiredBanner />
           <SignInForm />
         </div>
       </div>
