@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
+import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
 import {
   ArrowLeft,
@@ -96,6 +97,7 @@ export default function BotDetailPage() {
   const [activeSession, setactiveSession] = useState('')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
+  const [ohlcvData, setOhlcvData] = useState<{ time: number; open: number; high: number; low: number; close: number; volume?: number } | null>(null)
 
   const { data: sessionsData } = useBotSessions(userId, mode)
   const sessions = sessionsData?.sessions ?? []
@@ -125,17 +127,45 @@ export default function BotDetailPage() {
   })
 
   const tradeMarkers: TradeMarker[] = useMemo(() => {
-    if (!tradesData?.trades) return []
-    return tradesData.trades
-      .filter((tr) => !symbol || tr.symbol === symbol)
-      .slice(0, 200)
-      .map((tr) => ({
-        time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker["time"],
-        side: tr.side as 'BUY' | 'SELL',
-        price: parseFloat(tr.price),
-        quantity: parseFloat(tr.quantity),
-      }))
-  }, [tradesData?.trades, symbol])
+    const markers: TradeMarker[] = []
+
+    // From actual trades
+    if (tradesData?.trades) {
+      markers.push(...tradesData.trades
+        .filter((tr) => !symbol || tr.symbol === symbol)
+        .slice(0, 200)
+        .map((tr) => ({
+          time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker["time"],
+          side: tr.side as 'BUY' | 'SELL',
+          price: parseFloat(tr.price),
+          quantity: parseFloat(tr.quantity),
+        })))
+    }
+
+    // From closed orders (fills)
+    if (closedOrdersData?.orders) {
+      markers.push(...closedOrdersData.orders
+        .filter((o) => (!symbol || o.symbol === symbol) && parseFloat(o.executedQuantity) > 0)
+        .map((o) => ({
+          time: Math.floor(new Date(o.creationTime ?? Date.now()).getTime() / 1000) as TradeMarker["time"],
+          side: o.side as 'BUY' | 'SELL',
+          price: parseFloat(o.price),
+          quantity: parseFloat(o.executedQuantity || o.quantity),
+          orderId: o.orderID,
+        })))
+    }
+
+    // Deduplicate by time+side+price
+    const seen = new Set<string>()
+    return markers
+      .sort((a, b) => (a.time as number) - (b.time as number))
+      .filter((m) => {
+        const key = `${m.time}-${m.side}-${m.price}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+  }, [tradesData?.trades, closedOrdersData?.orders, symbol])
 
   const orderLevels: OrderLevel[] = useMemo(() => {
     if (!openOrdersData?.orders) return []
@@ -475,6 +505,7 @@ export default function BotDetailPage() {
               ) : (
                 <div className="flex gap-4">
                   <div className="flex-1 min-w-0">
+                    <OhlcvLegend data={ohlcvData} symbol={symbol} previousClose={candles.length > 1 ? candles[candles.length - 2]?.close : undefined} />
                     <CandlestickChart
                   candles={candles}
                   tradeMarkers={tradeMarkers}
@@ -491,6 +522,7 @@ export default function BotDetailPage() {
                       loadEarlierKlines?.()
                     }
                   }}
+                  onCandleHover={setOhlcvData}
                 />
                   </div>
                   {strategyStats && (

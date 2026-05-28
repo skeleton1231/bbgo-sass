@@ -25,41 +25,42 @@ describe('extractGridLines', () => {
     const lines = extractGridLines({
       grid2: { upperPrice: 200, lowerPrice: 100, gridNumber: 4 },
     })
-    expect(lines[0].price).toBe(100)
-    expect(lines[1].price).toBe(125)
-    expect(lines[2].price).toBe(150)
-    expect(lines[3].price).toBe(175)
-    expect(lines[4].price).toBe(200)
+    expect(lines).toHaveLength(5)
+    expect(lines[0]!.price).toBe(100)
+    expect(lines[1]!.price).toBe(125)
+    expect(lines[2]!.price).toBe(150)
+    expect(lines[3]!.price).toBe(175)
+    expect(lines[4]!.price).toBe(200)
   })
 
   it('colors bounds darker than inner lines', () => {
     const lines = extractGridLines({
       grid2: { upperPrice: 200, lowerPrice: 100, gridNumber: 4 },
     })
-    expect(lines[0].color).toContain('0.6')
-    expect(lines[2].color).toContain('0.2')
-    expect(lines[4].color).toContain('0.6')
+    expect(lines[0]!.color).toContain('0.6')
+    expect(lines[2]!.color).toContain('0.2')
+    expect(lines[4]!.color).toContain('0.6')
   })
 
   it('highlights line near current price', () => {
     const lines = extractGridLines({
       grid2: { upperPrice: 200, lowerPrice: 100, gridNumber: 4 },
     }, 126)
-    expect(lines[1].color).toContain('0.45')
+    expect(lines[1]!.color).toContain('0.45')
   })
 
   it('formats labels with decimals for prices under 1000', () => {
     const lines = extractGridLines({
       grid2: { upperPrice: 200, lowerPrice: 100, gridNumber: 4 },
     })
-    expect(lines[0].label).toBe('100.00')
+    expect(lines[0]!.label).toBe('100.00')
   })
 
   it('formats labels without decimals for prices over 1000', () => {
     const lines = extractGridLines({
       grid2: { upperPrice: 50000, lowerPrice: 48000, gridNumber: 4 },
     })
-    expect(lines[0].label).toBe('48000')
+    expect(lines[0]!.label).toBe('48000')
   })
 })
 

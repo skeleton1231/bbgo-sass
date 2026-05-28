@@ -70,6 +70,7 @@ interface CandlestickChartProps {
   dataKey?: string
   onVisibleTimeRangeChange?: (range: { from: number; to: number } | null) => void
   onCrosshairMove?: (data: { time?: number; price?: number } | null) => void
+  onCandleHover?: (data: { time: number; open: number; high: number; low: number; close: number; volume?: number } | null) => void
 }
 
 function getChartTheme(): DeepPartial<ChartOptions> {
@@ -109,6 +110,7 @@ export function CandlestickChart({
   dataKey,
   onVisibleTimeRangeChange,
   onCrosshairMove,
+  onCandleHover,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -124,6 +126,8 @@ export function CandlestickChart({
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: TradeMarker } | null>(null)
   onVisibleRangeChangeRef.current = onVisibleTimeRangeChange
   onCrosshairMoveRef.current = onCrosshairMove
+  const onCandleHoverRef = useRef(onCandleHover)
+  onCandleHoverRef.current = onCandleHover
 
   if (prevDataKeyRef.current !== dataKey) {
     prevDataKeyRef.current = dataKey
@@ -165,11 +169,26 @@ export function CandlestickChart({
     chart.subscribeCrosshairMove((param) => {
       if (!param.time || !param.point) {
         onCrosshairMoveRef.current?.(null)
+        onCandleHoverRef.current?.(null)
         return
       }
-      const price = param.seriesData.get(candleSeries)?.['close']
-      if (typeof price === 'number') {
-        onCrosshairMoveRef.current?.({ time: param.time as number, price })
+      const candleData = param.seriesData.get(candleSeries)
+      if (candleData) {
+        const close = candleData['close']
+        if (typeof close === 'number') {
+          onCrosshairMoveRef.current?.({ time: param.time as number, price: close })
+        }
+        const open = candleData['open']
+        const high = candleData['high']
+        const low = candleData['low']
+        const vol = candleData['volume']
+        if (typeof open === 'number' && typeof high === 'number' && typeof low === 'number') {
+          onCandleHoverRef.current?.({
+            time: param.time as number,
+            open, high, low, close: typeof close === 'number' ? close : 0,
+            volume: typeof vol === 'number' ? vol : undefined,
+          })
+        }
       }
     })
 
