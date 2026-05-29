@@ -697,7 +697,7 @@ func TestTradingChain_CreateStrategy_LiveWithCreds_Accepted(t *testing.T) {
 	}
 }
 
-func TestTradingChain_CreateStrategy_PaperNoCreds_Accepted(t *testing.T) {
+func TestTradingChain_CreateStrategy_PaperNoCreds_Rejected(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -711,8 +711,8 @@ func TestTradingChain_CreateStrategy_PaperNoCreds_Accepted(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("paper no creds = %d, want 201; body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("paper no testnet creds = %d, want 400; body: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -753,6 +753,18 @@ func TestTradingChain_CreateStrategy_ModeConflict(t *testing.T) {
 		APIKeyEncrypted:    keyEnc,
 		APISecretEncrypted: secretEnc,
 	})
+
+		// Paper mode requires testnet credentials
+		tnKeyEnc, _ := api.encryptor.Encrypt("tn-key")
+		tnSecretEnc, _ := api.encryptor.Encrypt("tn-secret")
+		api.creds.Upsert(ExchangeCredential{
+			ID:                 "cred-tn1",
+			UserID:             chain10UID,
+			Exchange:           "binance",
+			APIKeyEncrypted:    tnKeyEnc,
+			APISecretEncrypted: tnSecretEnc,
+			IsTestnet:          true,
+		})
 
 	// Add paper strategy — goes to separate container, allowed
 	body, _ := json.Marshal(map[string]interface{}{
@@ -1060,6 +1072,13 @@ func TestTradingChain_ContainerLogs(t *testing.T) {
 func TestTradingChain_StartUser_AlreadyRunning(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 
+	keyEnc, _ := api.encryptor.Encrypt("key")
+	secretEnc, _ := api.encryptor.Encrypt("secret")
+	api.creds.Upsert(ExchangeCredential{
+		ID: "cred-live", UserID: chain10UID, Exchange: "binance",
+		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
+	})
+
 	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
 		ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`),
 	})
@@ -1088,6 +1107,13 @@ func TestTradingChain_StartUser_NoStrategies(t *testing.T) {
 
 func TestTradingChain_StartUser_StartsAsync(t *testing.T) {
 	api, r, _ := chain10Setup(t)
+
+	keyEnc, _ := api.encryptor.Encrypt("key")
+	secretEnc, _ := api.encryptor.Encrypt("secret")
+	api.creds.Upsert(ExchangeCredential{
+		ID: "cred-live", UserID: chain10UID, Exchange: "binance",
+		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
+	})
 
 	// Mock bbgo container that responds to ping
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useCredentials, useCreateCredential, useDeleteCredential } from '@/lib/bbgo/queries'
 import { EXCHANGES, EXCHANGES_REQUIRING_PASSPHRASE } from '@/lib/bbgo/constants'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 
 export function ApiKeyList() {
@@ -43,17 +44,24 @@ export function ApiKeyList() {
       return
     }
     setErrors({})
-    if (!userId) return
+    if (!userId) {
+      toast.error(t('authRequired'))
+      return
+    }
 
     createMut.mutate(
       { exchange, api_key: apiKey, api_secret: apiSecret, passphrase: passphrase || undefined, is_testnet: isTestnet },
       {
         onSuccess: () => {
+          toast.success(isTestnet ? t('testnetAdded') : t('added'))
           setShowAdd(false)
           setApiKey('')
           setApiSecret('')
           setPassphrase('')
           setIsTestnet(false)
+        },
+        onError: (err) => {
+          toast.error(err.message)
         },
       },
     )

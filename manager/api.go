@@ -226,18 +226,13 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Mode == ModeLive && api.creds != nil {
-		exchanges := []string{}
-		if req.CrossExchange {
-			for _, sr := range req.Sessions {
-				exchanges = append(exchanges, sr.Exchange)
-			}
-		} else {
-			exchanges = append(exchanges, req.Exchange)
-		}
-		for _, ex := range exchanges {
-			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, false); err != nil {
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("live mode requires API credentials for %s — add them in Settings first", ex))
+	if api.creds != nil {
+		wantTestnet := req.Mode == ModePaper
+		for _, ex := range collectExchanges([]StrategyEntry{{
+			Exchange: req.Exchange, CrossExchange: req.CrossExchange, Sessions: req.Sessions,
+		}}) {
+			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, wantTestnet); err != nil {
+				writeError(w, http.StatusBadRequest, credModeError(req.Mode, ex))
 				return
 			}
 		}
@@ -365,6 +360,17 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	if !found || len(uc.Strategies) == 0 {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("no strategies configured for %s mode", mode))
 		return
+	}
+
+	// Validate credentials before starting the container.
+	if api.creds != nil {
+		wantTestnet := mode == ModePaper
+		for _, ex := range collectExchanges(uc.Strategies) {
+			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, wantTestnet); err != nil {
+				writeError(w, http.StatusBadRequest, credModeError(mode, ex))
+				return
+			}
+		}
 	}
 
 	if api.isContainerRunning(userID, mode) {
@@ -1511,4 +1517,30 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
 	return false
+}
+
+func credModeError(mode, ex string) string {
+	if mode == ModeLive {
+		return fmt.Sprintf("live mode requires API credentials for %s — add them in Settings first", ex)
+	}
+	return fmt.Sprintf("paper mode requires testnet API credentials for %s — add them in Settings first", ex)
+}
+
+func collectExchanges(strategies []StrategyEntry) []string {
+	seen := map[string]bool{}
+	var result []string
+	for _, s := range strategies {
+		if s.CrossExchange {
+			for _, sr := range s.Sessions {
+				if !seen[sr.Exchange] {
+					seen[sr.Exchange] = true
+					result = append(result, sr.Exchange)
+				}
+			}
+		} else if s.Exchange != "" && !seen[s.Exchange] {
+			seen[s.Exchange] = true
+			result = append(result, s.Exchange)
+		}
+	}
+	return result
 }

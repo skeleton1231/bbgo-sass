@@ -7,6 +7,7 @@ import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, type S
 import { EXCHANGES } from '@/lib/bbgo/constants'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { StrategyConfigForm } from './StrategyConfigForm'
+import { toast } from 'sonner'
 
 const ENV_PREFIXES: Record<string, string> = {
   binance: 'BINANCE',
@@ -24,7 +25,8 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const ct = useTranslations('Categories')
   const createStrategy = useCreateStrategy()
   const { data: credentials } = useCredentials(userId)
-  const hasExchangeCreds = (ex: string) => (credentials ?? []).some(c => c.exchange === ex)
+  const hasExchangeCreds = (ex: string, testnet = false) =>
+    (credentials ?? []).some(c => c.exchange === ex && c.is_testnet === testnet)
 
   const [name, setName] = useState('')
   const [exchange, setExchange] = useState('binance')
@@ -59,6 +61,9 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const onError = (err: Error) => {
+      toast.error(err.message)
+    }
     if (isCrossExchange && schema?.sessionRoles) {
       const sessions = schema.sessionRoles.map((role: SessionRole) => {
         const ex = sessionExchanges[role.name] || 'binance'
@@ -80,7 +85,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           crossExchange: true,
           sessions,
         },
-        { onSuccess: onClose }
+        { onSuccess: onClose, onError }
       )
     } else {
       createStrategy.mutate(
@@ -92,7 +97,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           config,
           mode,
         },
-        { onSuccess: onClose }
+        { onSuccess: onClose, onError }
       )
     }
   }
@@ -186,20 +191,36 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
                 {t(`mode.${m}`)}
               </label>
             ))}
-            {isLiveOnly && (
-              <p className="text-xs text-muted-foreground">{t('liveOnlyHint')}</p>
-            )}
           </div>
-          {mode === 'live' && !isCrossExchange && !hasExchangeCreds(exchange) && (
+          {isLiveOnly && globalMode === 'paper' && (
+            <p className="mt-1 text-xs text-yellow-600 bg-yellow-50 rounded px-2 py-1">
+              {t('liveOnlyOverrideHint')}
+            </p>
+          )}
+          {mode === 'live' && !isCrossExchange && !hasExchangeCreds(exchange, false) && (
             <p className="mt-1 text-xs text-destructive">
               {t('noCredsForExchange', { exchange })}
             </p>
           )}
+          {mode === 'paper' && !isCrossExchange && !hasExchangeCreds(exchange, true) && (
+            <p className="mt-1 text-xs text-destructive">
+              {t('noTestnetCredsForExchange', { exchange })}
+            </p>
+          )}
           {mode === 'live' && isCrossExchange && schema?.sessionRoles && (
             <div className="mt-1 space-y-0.5">
-              {schema.sessionRoles.filter(r => !hasExchangeCreds(sessionExchanges[r.name] || 'binance')).map(r => (
+              {schema.sessionRoles.filter(r => !hasExchangeCreds(sessionExchanges[r.name] || 'binance', false)).map(r => (
                 <p key={r.name} className="text-xs text-destructive">
                   {t('noCredsForRole', { role: r.label, exchange: sessionExchanges[r.name] || 'binance' })}
+                </p>
+              ))}
+            </div>
+          )}
+          {mode === 'paper' && isCrossExchange && schema?.sessionRoles && (
+            <div className="mt-1 space-y-0.5">
+              {schema.sessionRoles.filter(r => !hasExchangeCreds(sessionExchanges[r.name] || 'binance', true)).map(r => (
+                <p key={r.name} className="text-xs text-destructive">
+                  {t('noTestnetCredsForRole', { role: r.label, exchange: sessionExchanges[r.name] || 'binance' })}
                 </p>
               ))}
             </div>

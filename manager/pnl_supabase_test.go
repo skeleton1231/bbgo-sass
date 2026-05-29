@@ -48,7 +48,11 @@ func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http
 		ManagerToken: "test-token",
 	}
 	cm := &ContainerManager{cfg: cfg}
-	syncer := &Syncer{users: users, cfg: cfg, container: cm, client: &http.Client{}}
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	syncer := NewSyncer(users, supaClient)
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, nil, nil, syncer, nil, nil, nil, nil)
 	if bbgoURL != "" {
@@ -197,8 +201,11 @@ func TestSyncer_GetTradesForPnL(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
-	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	syncer := NewSyncer(NewUserContainerManager(), supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err != nil {
@@ -227,8 +234,11 @@ func TestSyncer_GetTradesForPnL_ServerError(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
-	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	syncer := NewSyncer(NewUserContainerManager(), supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err == nil {
@@ -246,8 +256,11 @@ func TestSyncer_GetTradesForPnL_Empty(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
-	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	syncer := NewSyncer(NewUserContainerManager(), supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err != nil {
@@ -287,8 +300,11 @@ func TestSyncer_GetTradesForPnL_Pagination(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
-	syncer := NewSyncer(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, nil)
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	syncer := NewSyncer(NewUserContainerManager(), supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err != nil {

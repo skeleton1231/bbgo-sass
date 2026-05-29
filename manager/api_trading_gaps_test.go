@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 var errTestSyncFail = errors.New("data sync failed: network error")
@@ -250,8 +248,11 @@ func TestAPI_PnL_SupabaseFallback_WhenStopped(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	syncerCfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "key"}
-	api.syncer = NewSyncer(api.users, syncerCfg, api.container, pool.New(5))
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	api.syncer = NewSyncer(api.users, supaClient)
 
 	r := testRouter(api)
 	req := httptest.NewRequest(http.MethodGet, "/api/users/"+userID+"/bbgo/pnl", nil)

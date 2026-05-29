@@ -241,21 +241,9 @@ func TestDBBackup_OnCreateAndStart(t *testing.T) {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
-	// DB must still exist (not renamed away)
+	// Legacy db file should not be touched (Supabase is the DB driver now)
 	if _, err := os.Stat(dbPath); err != nil {
 		t.Errorf("bbgo.db should be preserved: %v", err)
-	}
-
-	entries, _ := os.ReadDir(userDir)
-	found := false
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "bbgo.db.backup.") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected backup file bbgo.db.backup.* to exist")
 	}
 }
 

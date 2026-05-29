@@ -319,6 +319,13 @@ func TestMixedModePrevention(t *testing.T) {
 		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
 	})
 
+	tnKeyEnc, _ := enc.Encrypt("tn-key")
+	tnSecretEnc, _ := enc.Encrypt("tn-secret")
+	credStore.Upsert(ExchangeCredential{
+		ID: "c2", UserID: testUUID, Exchange: "binance",
+		APIKeyEncrypted: tnKeyEnc, APISecretEncrypted: tnSecretEnc, IsTestnet: true,
+	})
+
 	users := NewUserContainerManager()
 	api := NewAPI(cfg, users, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil)
 	r := testRouter(api)
@@ -449,7 +456,7 @@ func TestEnvArgs_PaperMode(t *testing.T) {
 	if !strings.Contains(argsStr, "PAPER_TRADE=1") {
 		t.Error("paper mode must inject PAPER_TRADE=1")
 	}
-	if !strings.Contains(argsStr, "DB_DRIVER=sqlite3") {
+	if !strings.Contains(argsStr, "DB_DRIVER=supabase") {
 		t.Error("must inject DB_DRIVER")
 	}
 	if !strings.Contains(argsStr, "MARKET_DATA_SERVICE_URL") {

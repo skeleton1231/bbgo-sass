@@ -31,6 +31,8 @@ loadEnv();
 
 const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const TYPES_PATH = resolve(ROOT, process.env.SUPABASE_TYPES_PATH || "src/types/database.types.ts");
+const GO_TYPES_PATH = resolve(ROOT, process.env.SUPABASE_GO_TYPES_PATH || "../manager/supabase_types.go");
+const BBGO_GO_TYPES_PATH = resolve(ROOT, process.env.BBGO_GO_TYPES_PATH || "../../pkg/supabasetypes/database_types.go");
 
 function getRef() {
   return process.env.SUPABASE_PROJECT_REF || extractRef(process.env.SUPABASE_URL);
@@ -68,6 +70,27 @@ function cmdTypes() {
   mkdirSync(dirname(TYPES_PATH), { recursive: true });
   writeFileSync(TYPES_PATH, output);
   console.log(`Types written to ${TYPES_PATH}`);
+}
+
+function cmdGoTypes() {
+  const dbURL = process.env.SUPABASE_DB_URL;
+  if (!dbURL) {
+    console.error("Set SUPABASE_DB_URL in .env (e.g. postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres)");
+    process.exit(1);
+  }
+  console.log("Generating Go types from database schema...");
+  const output = run(`npx supabase gen types --lang=go --db-url "${dbURL}" --schema public`, { capture: true });
+
+  const managerOutput = output.replace("package database", "package main");
+  const bbgoOutput = output.replace("package database", "package supabasetypes");
+
+  mkdirSync(dirname(GO_TYPES_PATH), { recursive: true });
+  writeFileSync(GO_TYPES_PATH, managerOutput);
+  console.log(`Go types written to ${GO_TYPES_PATH}`);
+
+  mkdirSync(dirname(BBGO_GO_TYPES_PATH), { recursive: true });
+  writeFileSync(BBGO_GO_TYPES_PATH, bbgoOutput);
+  console.log(`Go types written to ${BBGO_GO_TYPES_PATH}`);
 }
 
 function cmdDeploy(args) {
@@ -114,10 +137,41 @@ function cmdSecrets(args) {
   }
 }
 
-function cmdPush() { run(`npx supabase db push --project-ref ${requireRef()}`); }
-function cmdPull() { run(`npx supabase db pull --project-ref ${requireRef()}`); }
-function cmdDiff() { run(`npx supabase db diff --project-ref ${requireRef()}`); }
+function cmdPush(args) {
+  const dbURL = process.env.SUPABASE_DB_URL;
+  if (!dbURL) { console.error("Set SUPABASE_DB_URL in .env"); process.exit(1); }
+  run(`npx supabase db push --db-url "${dbURL}" --include-all`);
+}
+function cmdPull() { run(`npx supabase db pull --db-url "${process.env.SUPABASE_DB_URL}"`); }
+function cmdDiff() { run(`npx supabase db diff --linked`); }
 function cmdLink() { run(`npx supabase link --project-ref ${requireRef()}`); }
+
+function cmdRepair(args) {
+  const ref = requireRef();
+  const migDir = resolve(ROOT, "supabase", "migrations");
+  if (!existsSync(migDir)) { console.error("No supabase/migrations/ directory"); process.exit(1); }
+
+  const files = readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort();
+  if (files.length === 0) { console.log("No migration files found"); return; }
+
+  // If specific versions given, use those; otherwise mark all
+  const targets = args.length > 0
+    ? files.filter((f) => args.some((a) => f.startsWith(a)))
+    : files;
+
+  if (targets.length === 0) { console.error("No matching migrations found"); process.exit(1); }
+
+  // Ensure project is linked first
+  console.log("Linking project...");
+  try { run(`npx supabase link --project-ref ${ref}`); } catch {}
+
+  for (const f of targets) {
+    const version = f.split("_")[0];
+    console.log(`Repairing ${f} (version ${version}) as applied...`);
+    run(`npx supabase migration repair ${version} --status applied`);
+  }
+  console.log(`Repaired ${targets.length} migration(s). Run "pnpm sb push" to apply remaining.`);
+}
 
 function cmdStatus() {
   console.log(`Project ref:   ${getRef() || "(not set)"}`);
@@ -125,6 +179,8 @@ function cmdStatus() {
   console.log(`Access token:  ${ACCESS_TOKEN ? "configured" : "MISSING"}`);
   console.log(`Secret key:    ${process.env.SUPABASE_SECRET_KEY ? "configured" : "(not set)"}`);
   console.log(`Types path:    ${TYPES_PATH}`);
+  console.log(`Go types path: ${GO_TYPES_PATH}`);
+  console.log(`BBGO types path: ${BBGO_GO_TYPES_PATH}`);
   console.log();
   run("npx supabase projects list");
 }
@@ -137,8 +193,10 @@ Usage: node scripts/sb.mjs <command> [args]
 
 Commands:
   types                Generate TypeScript types
+  go-types             Generate Go types (requires SUPABASE_DB_URL)
   deploy [name|--all]  Deploy edge functions (default: --all)
   secrets [set|list|unset]  Manage secrets (no args = set SB_SECRET_KEY)
+  repair [versions]    Mark local migrations as applied (default: all)
   push                 Push migrations to remote
   pull                 Pull remote schema to local
   diff                 Diff local migrations against remote
@@ -149,8 +207,11 @@ Commands:
 Environment (.env):
   SUPABASE_PROJECT_REF   Project ref (or auto-detected from URL)
   SUPABASE_ACCESS_TOKEN  CLI auth token (required)
+  SUPABASE_DB_URL        PostgreSQL connection string (for go-types)
   SUPABASE_SECRET_KEY    Auto-set as SB_SECRET_KEY
   SUPABASE_TYPES_PATH    Output path (default: src/types/database.types.ts)
+  SUPABASE_GO_TYPES_PATH Go output path (default: ../manager/supabase_types.go)
+  BBGO_GO_TYPES_PATH     BBGO repo output path (default: ../../pkg/supabasetypes/database_types.go)
   SUPABASE_URL           Auto-detect project ref from this
 
 Examples:
@@ -164,9 +225,11 @@ Examples:
 const [,, command, ...args] = process.argv;
 const handlers = {
   types: cmdTypes,
+  "go-types": cmdGoTypes,
   deploy: () => cmdDeploy(args),
   secrets: () => cmdSecrets(args),
-  push: cmdPush,
+  push: () => cmdPush(args),
+  repair: () => cmdRepair(args),
   pull: cmdPull,
   diff: cmdDiff,
   link: cmdLink,

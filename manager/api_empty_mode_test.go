@@ -16,6 +16,20 @@ func TestCreateStrategy_EmptyMode_DefaultsToPaper(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+	// Paper mode requires testnet credentials
+	enc, _ := NewEncryptor(testEncryptionKey)
+	keyEnc, _ := enc.Encrypt("tn-key")
+	secretEnc, _ := enc.Encrypt("tn-secret")
+	api.creds.Upsert(ExchangeCredential{
+		ID:                 "tc1",
+		UserID:             userID,
+		Exchange:           "binance",
+		APIKeyEncrypted:    keyEnc,
+		APISecretEncrypted: secretEnc,
+		IsTestnet:          true,
+	})
+
 	r := testRouter(api)
 
 	body := map[string]interface{}{
@@ -98,6 +112,19 @@ func TestCreateStrategy_EmptyMode_MixedWithExistingLiveAllowed(t *testing.T) {
 	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "live"},
 	}
+
+	// Paper mode now requires testnet credentials
+	enc, _ := NewEncryptor(testEncryptionKey)
+	keyEnc, _ := enc.Encrypt("tn-key")
+	secretEnc, _ := enc.Encrypt("tn-secret")
+	api.creds.Upsert(ExchangeCredential{
+		ID:                 "tc1",
+		UserID:             userID,
+		Exchange:           "binance",
+		APIKeyEncrypted:    keyEnc,
+		APISecretEncrypted: secretEnc,
+		IsTestnet:          true,
+	})
 
 	r := testRouter(api)
 

@@ -1,2 +1,1 @@
-[project]
-id = "gnsrryqowuipiwomnhcg"
+# Project ref is passed via --project-id flag in sb.mjs

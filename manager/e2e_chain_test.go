@@ -88,7 +88,7 @@ func TestE2E_PaperTradingChain(t *testing.T) {
 	}
 
 	// Step 4: Verify DB and market data env vars present
-	if !findEnv("DB_DRIVER=sqlite3") {
+	if !findEnv("DB_DRIVER=supabase") {
 		t.Error("step 4: envArgs missing DB_DRIVER")
 	}
 	if !findEnv("MARKET_DATA_SERVICE_URL=bbgo-marketdata:9090") {

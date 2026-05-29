@@ -10,7 +10,6 @@ import (
 	"time"
 
 	pb "github.com/c9s/bbgo/saas/manager/pb"
-	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 // --- Real-time data serialization (marketdata.go) ---
@@ -356,36 +355,6 @@ func TestNotifier_Dispatch_SlackWithMock(t *testing.T) {
 	}
 }
 
-// --- readBodyHint (sync.go) ---
-
-func TestReadBodyHint(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"message":"Rate limit exceeded"}`))
-	}))
-	defer srv.Close()
-	resp, _ := http.Get(srv.URL)
-	hint := readBodyHint(resp)
-	if hint != `{"message":"Rate limit exceeded"}` {
-		t.Errorf("readBodyHint = %q", hint)
-	}
-}
-
-func TestReadBodyHint_TruncatesLargeBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		large := make([]byte, 1024)
-		for i := range large {
-			large[i] = 'x'
-		}
-		w.Write(large)
-	}))
-	defer srv.Close()
-	resp, _ := http.Get(srv.URL)
-	hint := readBodyHint(resp)
-	if len(hint) > 512 {
-		t.Errorf("readBodyHint len = %d, want <= 512", len(hint))
-	}
-}
-
 // --- SyncUser (sync.go) ---
 
 func TestSyncUser_UpsertsAndSyncs(t *testing.T) {
@@ -403,23 +372,12 @@ func TestSyncUser_UpsertsAndSyncs(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
-	}))
-	defer bbgoSrv.Close()
-
-	p := pool.New(5)
-	s := &Syncer{
-		users:     users,
-		cfg:       &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "k"},
-		container: &ContainerManager{cfg: &Config{BBGOPort: 8080}},
-		pool:      p,
-		client:    supabaseSrv.Client(),
-		newBBGoClientFn: func(_ string) *BBGoClient {
-			return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
-		},
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	s := NewSyncer(users, supaClient)
 	s.SyncUser("sync-u1", ModeLive)
 	if !upserted {
 		t.Error("SyncUser did not upsert to Supabase")
@@ -438,30 +396,15 @@ func TestSyncUser_StoppedContainer(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	bbgoCalled := false
-	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bbgoCalled = true
-		w.Write([]byte(`[]`))
-	}))
-	defer bbgoSrv.Close()
-
-	p := pool.New(5)
-	s := &Syncer{
-		users:     users,
-		cfg:       &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "k"},
-		container: &ContainerManager{cfg: &Config{BBGOPort: 8080}},
-		pool:      p,
-		client:    supabaseSrv.Client(),
-		newBBGoClientFn: func(_ string) *BBGoClient {
-			return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
-		},
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	s := NewSyncer(users, supaClient)
 	s.SyncUser("sync-u2", ModeLive)
 	if !upserted {
 		t.Error("should still upsert even when stopped")
-	}
-	if bbgoCalled {
-		t.Error("should not call bbgo API for stopped container")
 	}
 }
 

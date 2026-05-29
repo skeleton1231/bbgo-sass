@@ -138,7 +138,10 @@
     "testnet": "测试网",
     "noCredsForExchange": "未配置 {exchange} 的 API 凭证，请先在设置中添加。",
     "noCredsForRole": "{role} ({exchange}) 未配置 API 凭证。",
+    "noTestnetCredsForExchange": "未配置 {exchange} 的测试网 API 凭证，请先在设置中添加。",
+    "noTestnetCredsForRole": "{role} ({exchange}) 未配置测试网 API 凭证。",
     "liveOnlyHint": "此策略仅支持实盘模式。",
+    "liveOnlyOverrideHint": "此策略仅支持实盘模式，已自动从模拟切换为实盘。",
     "containerLogs": "容器日志",
     "loadingLogs": "加载日志...",
     "noStrategiesTab": "暂无策略",
@@ -208,7 +211,10 @@
       "delete": "删除",
       "verified": "已验证",
       "verificationFailed": "验证失败",
-      "required": "此字段为必填项"
+      "required": "此字段为必填项",
+      "authRequired": "请重新登录后再添加 API 密钥。",
+      "testnetAdded": "测试网 API 密钥已添加。",
+      "added": "API 密钥已添加。"
     },
     "notifications": {
       "title": "通知",

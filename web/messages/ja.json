@@ -138,6 +138,8 @@
     "testnet": "テストネット",
     "noCredsForExchange": "{exchange} の API 認証情報が設定されていません。先に設定で追加してください。",
     "noCredsForRole": "{role} ({exchange}) の API 認証情報が設定されていません。",
+    "noTestnetCredsForExchange": "{exchange} のテストネット API 認証情報が設定されていません。先に設定で追加してください。",
+    "noTestnetCredsForRole": "{role} ({exchange}) のテストネット API 認証情報が設定されていません。",
     "containerLogs": "コンテナログ",
     "loadingLogs": "ログを読み込み中...",
     "noStrategiesTab": "ストラテジーなし",
@@ -161,7 +163,8 @@
       "disconnected": "オフライン",
       "connecting": "接続中..."
     },
-    "liveOnlyHint": "このストラテジーはライブモードが必要です。"
+    "liveOnlyHint": "このストラテジーはライブモードが必要です。",
+    "liveOnlyOverrideHint": "このストラテジーはライブモードのみ対応しています。ペーパーモードからライブモードに自動切替しました。"
   },
   "Backtest": {
     "title": "バックテスト",
@@ -208,7 +211,10 @@
       "delete": "削除",
       "verified": "検証済み",
       "verificationFailed": "検証失敗",
-      "required": "この項目は必須です"
+      "required": "この項目は必須です",
+      "authRequired": "APIキーを追加するには再度ログインしてください。",
+      "testnetAdded": "テストネットAPIキーを追加しました。",
+      "added": "APIキーを追加しました。"
     },
     "notifications": {
       "title": "通知",

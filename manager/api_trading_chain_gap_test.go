@@ -251,6 +251,13 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 	users := NewUserContainerManager()
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
+	tnKey, _ := enc.Encrypt("tn-key")
+	tnSec, _ := enc.Encrypt("tn-secret")
+	creds.Upsert(ExchangeCredential{
+		ID: "tn1", UserID: userID, Exchange: "binance",
+		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+	})
+
 	cfg := &Config{
 		DataDir:       tmpDir,
 		ManagerToken:  "test-token",
@@ -332,11 +339,15 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 		t.Errorf("expected PAPER_TRADE=1 in env args, got %v", capturedArgs)
 	}
 
-	// Step 5: Verify no API key injection for paper mode without credentials
+	// Step 5: Verify testnet API keys are injected for paper mode
+	hasApiKey := false
 	for _, a := range capturedArgs {
-		if strings.Contains(a, "API_KEY") || strings.Contains(a, "API_SECRET") {
-			t.Errorf("paper mode without credentials should not inject API keys, got: %s", a)
+		if strings.Contains(a, "BINANCE_API_KEY=tn-key") {
+			hasApiKey = true
 		}
+	}
+	if !hasApiKey {
+		t.Errorf("expected testnet API key injection for paper mode, got %v", capturedArgs)
 	}
 }
 

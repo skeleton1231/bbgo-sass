@@ -34,8 +34,11 @@ func main() {
 
 	containerPool := pool.New(5)
 	defer containerPool.Release()
-	syncPool := pool.New(5)
-	defer syncPool.Release()
+
+	supaClient, err := NewSupabaseClient(cfg.SupabaseURL, cfg.SupabaseKey)
+	if err != nil {
+		log.Fatalf("supabase client error: %v", err)
+	}
 
 	containerMgr := NewContainerManager(cfg, credStore, containerPool)
 
@@ -43,11 +46,7 @@ func main() {
 		log.Fatalf("network error: %v", err)
 	}
 
-	if err := RunMigration(cfg.SupabaseDBURL); err != nil {
-		log.Printf("warning: auto-migration failed: %v", err)
-	}
-
-	syncer := NewSyncerWithCreds(users, cfg, containerMgr, credStore, syncPool)
+	syncer := NewSyncerWithCreds(users, supaClient, credStore)
 
 	notifier := NewNotifier(cfg.DataDir, enc)
 	syncer.SetNotifier(notifier)
@@ -70,6 +69,9 @@ func main() {
 	// Discover orphaned Docker containers not tracked in Supabase
 	discovered := containerMgr.DiscoverContainers()
 	for uid, modes := range discovered {
+		if !isValidUUID(uid) {
+			continue
+		}
 		for _, m := range modes {
 			if _, exists := users.Get(uid, m); exists {
 				continue

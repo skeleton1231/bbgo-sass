@@ -6,8 +6,6 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-
-	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 // --- Sync chain: credential verification during data sync ---
@@ -31,9 +29,7 @@ func TestSyncer_MarkCredentialsVerified(t *testing.T) {
 		},
 	}
 
-	cfg := &Config{SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
-	cm := &ContainerManager{cfg: cfg}
-	syncer := NewSyncerWithCreds(users, cfg, cm, creds, pool.New(1))
+	syncer := NewSyncerWithCreds(users, nil, creds)
 
 	syncer.markCredentialsVerified(users.users["user-1"])
 
@@ -76,9 +72,7 @@ func TestSyncer_MarkCredentialsVerified_CrossExchange(t *testing.T) {
 		},
 	}
 
-	cfg := &Config{SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
-	cm := &ContainerManager{cfg: cfg}
-	syncer := NewSyncerWithCreds(users, cfg, cm, creds, pool.New(1))
+	syncer := NewSyncerWithCreds(users, nil, creds)
 
 	syncer.markCredentialsVerified(users.users["user-1"])
 
@@ -110,9 +104,7 @@ func TestSyncer_MarkCredentialsVerified_UnusedExchange(t *testing.T) {
 		},
 	}
 
-	cfg := &Config{SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
-	cm := &ContainerManager{cfg: cfg}
-	syncer := NewSyncerWithCreds(users, cfg, cm, creds, pool.New(1))
+	syncer := NewSyncerWithCreds(users, nil, creds)
 
 	syncer.markCredentialsVerified(users.users["user-1"])
 
@@ -146,10 +138,14 @@ func TestSyncer_SyncCredential(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	dir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
-	syncer := NewSyncerWithCreds(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, NewCredentialStore(dir, enc), nil)
+	syncer := NewSyncerWithCreds(NewUserContainerManager(), supaClient, NewCredentialStore(dir, enc))
 
 	keyEnc, _ := enc.Encrypt("my-key")
 	secretEnc, _ := enc.Encrypt("my-secret")
@@ -186,10 +182,14 @@ func TestSyncer_DeleteCredential(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test-key"}
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	dir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
-	syncer := NewSyncerWithCreds(NewUserContainerManager(), cfg, &ContainerManager{cfg: cfg}, NewCredentialStore(dir, enc), nil)
+	syncer := NewSyncerWithCreds(NewUserContainerManager(), supaClient, NewCredentialStore(dir, enc))
 
 	syncer.DeleteCredential("user-1", "binance")
 
@@ -200,96 +200,6 @@ func TestSyncer_DeleteCredential(t *testing.T) {
 	}
 	if deletedPath != "/rest/v1/exchange_credentials" {
 		t.Errorf("expected path /rest/v1/exchange_credentials, got %s", deletedPath)
-	}
-}
-
-// --- Full sync chain: running container → ping → sync orders + trades ---
-
-func TestSyncer_SyncUserData_FullChain(t *testing.T) {
-	var supabaseMu sync.Mutex
-	var syncedOrders []map[string]interface{}
-	var syncedTrades []map[string]interface{}
-
-	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/ping":
-			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
-		case "/api/orders/closed":
-			json.NewEncoder(w).Encode(BBGoOrdersResponse{
-				Orders: []BBGoOrder{
-					{GID: 1, OrderID: 100, Symbol: "BTCUSDT", Side: "BUY", Price: "50000", Quantity: "0.1", Status: "FILLED"},
-				},
-			})
-		case "/api/trades":
-			json.NewEncoder(w).Encode(BBGoTradesResponse{
-				Trades: []BBGoTrade{
-					{GID: 1, ID: 500, OrderID: 100, Symbol: "BTCUSDT", Side: "BUY", Price: "50000", Quantity: "0.1", Fee: "0.05"},
-				},
-			})
-		}
-	}))
-	defer bbgoSrv.Close()
-
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == "GET" && r.URL.Path == "/rest/v1/sync_cursors":
-			json.NewEncoder(w).Encode([]interface{}{})
-		case r.Method == "POST" && r.URL.Path == "/rest/v1/sync_orders":
-			var rows []map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&rows)
-			supabaseMu.Lock()
-			syncedOrders = rows
-			supabaseMu.Unlock()
-			w.WriteHeader(http.StatusOK)
-		case r.Method == "POST" && r.URL.Path == "/rest/v1/sync_trades":
-			var rows []map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&rows)
-			supabaseMu.Lock()
-			syncedTrades = rows
-			supabaseMu.Unlock()
-			w.WriteHeader(http.StatusOK)
-		default:
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	defer supabaseSrv.Close()
-
-	users := NewUserContainerManager()
-	users.users["user-1"] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "user-1",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
-
-	cfg := &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "test"}
-	cm := &ContainerManager{cfg: cfg}
-	syncer := &Syncer{
-		users:     users,
-		cfg:       cfg,
-		container: cm,
-		client:    &http.Client{},
-	}
-	syncer.newBBGoClientFn = func(_ string) *BBGoClient {
-		return NewBBGoClient(bbgoSrv.URL)
-	}
-
-	syncer.syncUserData(users.users["user-1"])
-
-	supabaseMu.Lock()
-	defer supabaseMu.Unlock()
-
-	if len(syncedOrders) != 1 {
-		t.Fatalf("expected 1 order synced, got %d", len(syncedOrders))
-	}
-	if syncedOrders[0]["symbol"] != "BTCUSDT" {
-		t.Errorf("expected BTCUSDT order, got %v", syncedOrders[0]["symbol"])
-	}
-	if len(syncedTrades) != 1 {
-		t.Fatalf("expected 1 trade synced, got %d", len(syncedTrades))
-	}
-	if syncedTrades[0]["price"] != "50000" {
-		t.Errorf("expected trade price 50000, got %v", syncedTrades[0]["price"])
 	}
 }
 

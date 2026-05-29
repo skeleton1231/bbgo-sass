@@ -378,7 +378,7 @@ func TestDockerArgs_LiveMode_EnvAssembly(t *testing.T) {
 	if !findEnv("BINANCE_API_SECRET=live-secret") {
 		t.Error("expected BINANCE_API_SECRET for live mode")
 	}
-	if !findEnv("DB_DRIVER=sqlite3") {
+	if !findEnv("DB_DRIVER=supabase") {
 		t.Error("expected DB_DRIVER")
 	}
 	if !findEnv("MARKET_DATA_SERVICE_URL=bbgo-marketdata:9090") {

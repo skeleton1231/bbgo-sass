@@ -220,11 +220,11 @@ func TestSyncCredential_UpsertsUser(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	s := &Syncer{
-		users:  users,
-		cfg:    &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "k"},
-		client: supabaseSrv.Client(),
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
+	if err != nil {
+		t.Fatal(err)
 	}
+	s := NewSyncer(users, supaClient)
 	s.SyncCredential(ExchangeCredential{UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", Exchange: "binance"})
 }
 
@@ -288,10 +288,11 @@ func TestUpsertUser_NewUser(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	s := &Syncer{
-		cfg:    &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "k"},
-		client: supabaseSrv.Client(),
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
+	if err != nil {
+		t.Fatal(err)
 	}
+	s := NewSyncer(nil, supaClient)
 
 	uc := &UserContainer{
 		Mode:   ModeLive,
@@ -310,10 +311,11 @@ func TestUpsertUser_SupabaseError(t *testing.T) {
 	}))
 	defer supabaseSrv.Close()
 
-	s := &Syncer{
-		cfg:    &Config{SupabaseURL: supabaseSrv.URL, SupabaseKey: "k"},
-		client: supabaseSrv.Client(),
+	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
+	if err != nil {
+		t.Fatal(err)
 	}
+	s := NewSyncer(nil, supaClient)
 
 	uc := &UserContainer{UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000022", Status: StatusRunning}
 	// UpsertUser logs errors but does not return them; just ensure it doesn't panic

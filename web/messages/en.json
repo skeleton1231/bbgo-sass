@@ -138,7 +138,10 @@
     "testnet": "Testnet",
     "noCredsForExchange": "No API credentials configured for {exchange}. Add them in Settings first.",
     "noCredsForRole": "No API credentials for {role} ({exchange}).",
+    "noTestnetCredsForExchange": "No testnet API credentials configured for {exchange}. Add them in Settings first.",
+    "noTestnetCredsForRole": "No testnet API credentials for {role} ({exchange}).",
     "liveOnlyHint": "This strategy requires live mode.",
+    "liveOnlyOverrideHint": "This strategy only supports live mode. Your paper mode selection has been overridden to live.",
     "containerLogs": "Container Logs",
     "loadingLogs": "Loading logs...",
     "noStrategiesTab": "No strategies",
@@ -208,7 +211,10 @@
       "delete": "Delete",
       "verified": "Verified",
       "verificationFailed": "Verification failed",
-      "required": "This field is required"
+      "required": "This field is required",
+      "authRequired": "Please sign in again to add API keys.",
+      "testnetAdded": "Testnet API key added.",
+      "added": "API key added."
     },
     "notifications": {
       "title": "Notifications",

@@ -138,6 +138,8 @@
     "testnet": "測試網",
     "noCredsForExchange": "未設定 {exchange} 的 API 憑證，請先在設定中新增。",
     "noCredsForRole": "{role} ({exchange}) 未設定 API 憑證。",
+    "noTestnetCredsForExchange": "未設定 {exchange} 的測試網 API 憑證，請先在設定中新增。",
+    "noTestnetCredsForRole": "{role} ({exchange}) 未設定測試網 API 憑證。",
     "containerLogs": "容器日誌",
     "loadingLogs": "載入日誌...",
     "noStrategiesTab": "暫無策略",
@@ -161,7 +163,8 @@
       "disconnected": "離線",
       "connecting": "連線中..."
     },
-    "liveOnlyHint": "此策略需要實盤模式。"
+    "liveOnlyHint": "此策略需要實盤模式。",
+    "liveOnlyOverrideHint": "此策略僅支援實盤模式，已自動從模擬切換為實盤。"
   },
   "Backtest": {
     "title": "回測",
@@ -208,7 +211,10 @@
       "delete": "刪除",
       "verified": "已驗證",
       "verificationFailed": "驗證失敗",
-      "required": "此欄位為必填"
+      "required": "此欄位為必填",
+      "authRequired": "請重新登入後再新增 API 金鑰。",
+      "testnetAdded": "測試網 API 金鑰已新增。",
+      "added": "API 金鑰已新增。"
     },
     "notifications": {
       "title": "通知",

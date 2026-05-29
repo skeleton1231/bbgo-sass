@@ -7,7 +7,7 @@ import (
 
 // configEnvKeys are all environment variables read by LoadConfig.
 var configEnvKeys = []string{
-	"SUPABASE_URL", "SUPABASE_SERVICE_KEY", "SUPABASE_DB_URL",
+	"SUPABASE_URL", "SUPABASE_SERVICE_KEY",
 	"MANAGER_TOKEN", "ENCRYPTION_KEY", "MANAGER_PORT",
 	"DATA_DIR", "DATA_VOLUME", "DOCKER_NETWORK",
 	"BBGO_IMAGE", "BBGO_PORT", "BBGO_GRPC_PORT",

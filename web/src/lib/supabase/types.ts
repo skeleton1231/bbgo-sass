@@ -85,65 +85,6 @@ export type Database = {
           },
         ]
       }
-      bots: {
-        Row: {
-          bbgo_pid: number | null
-          config: Json
-          config_path: string | null
-          created_at: string
-          exchange: string
-          grpc_port: number | null
-          id: string
-          mode: string
-          name: string
-          status: string
-          strategy: string
-          updated_at: string
-          user_id: string
-          webserver_port: number | null
-        }
-        Insert: {
-          bbgo_pid?: number | null
-          config?: Json
-          config_path?: string | null
-          created_at?: string
-          exchange: string
-          grpc_port?: number | null
-          id?: string
-          mode?: string
-          name: string
-          status?: string
-          strategy: string
-          updated_at?: string
-          user_id: string
-          webserver_port?: number | null
-        }
-        Update: {
-          bbgo_pid?: number | null
-          config?: Json
-          config_path?: string | null
-          created_at?: string
-          exchange?: string
-          grpc_port?: number | null
-          id?: string
-          mode?: string
-          name?: string
-          status?: string
-          strategy?: string
-          updated_at?: string
-          user_id?: string
-          webserver_port?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bots_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       exchange_credentials: {
         Row: {
           api_key_encrypted: string
@@ -191,95 +132,80 @@ export type Database = {
           },
         ]
       }
-      sync_cursors: {
+      orders: {
         Row: {
-          bot_id: string
-          id: string
-          last_synced_at: string
-          last_synced_id: string
-          table_name: string
-        }
-        Insert: {
-          bot_id: string
-          id?: string
-          last_synced_at?: string
-          last_synced_id: string
-          table_name: string
-        }
-        Update: {
-          bot_id?: string
-          id?: string
-          last_synced_at?: string
-          last_synced_id?: string
-          table_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sync_cursors_bot_id_fkey"
-            columns: ["bot_id"]
-            isOneToOne: false
-            referencedRelation: "bots"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sync_orders: {
-        Row: {
-          bot_id: string | null
+          actual_order_id: number
+          client_order_id: string
           created_at: string
-          creation_time: string | null
+          exchange: string
           executed_quantity: string | null
           id: string
+          is_futures: boolean
+          is_isolated: boolean
+          is_margin: boolean
+          is_working: boolean
           order_id: string
+          order_type: string
+          order_uuid: string
           price: string
           quantity: string
           side: string
           status: string
+          stop_price: string
           symbol: string
-          synced_at: string
-          type: string
+          time_in_force: string
+          updated_at: string
           user_id: string
         }
         Insert: {
-          bot_id?: string | null
+          actual_order_id?: number
+          client_order_id?: string
           created_at?: string
-          creation_time?: string | null
+          exchange?: string
           executed_quantity?: string | null
           id?: string
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_margin?: boolean
+          is_working?: boolean
           order_id: string
+          order_type: string
+          order_uuid?: string
           price: string
           quantity: string
           side: string
           status: string
+          stop_price?: string
           symbol: string
-          synced_at?: string
-          type: string
+          time_in_force?: string
+          updated_at?: string
           user_id: string
         }
         Update: {
-          bot_id?: string | null
+          actual_order_id?: number
+          client_order_id?: string
           created_at?: string
-          creation_time?: string | null
+          exchange?: string
           executed_quantity?: string | null
           id?: string
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_margin?: boolean
+          is_working?: boolean
           order_id?: string
+          order_type?: string
+          order_uuid?: string
           price?: string
           quantity?: string
           side?: string
           status?: string
+          stop_price?: string
           symbol?: string
-          synced_at?: string
-          type?: string
+          time_in_force?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "sync_orders_bot_id_fkey"
-            columns: ["bot_id"]
-            isOneToOne: false
-            referencedRelation: "bots"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "sync_orders_user_id_fkey"
             columns: ["user_id"]
@@ -289,69 +215,246 @@ export type Database = {
           },
         ]
       }
-      sync_trades: {
+      positions: {
         Row: {
-          bot_id: string | null
+          average_cost: string
+          base: string
+          base_currency: string
           created_at: string
+          exchange: string
+          id: string
+          net_profit: string | null
+          profit: string | null
+          quote: string
+          quote_currency: string
+          side: string
+          strategy: string
+          strategy_instance_id: string
+          symbol: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Insert: {
+          average_cost?: string
+          base?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          id?: string
+          net_profit?: string | null
+          profit?: string | null
+          quote?: string
+          quote_currency?: string
+          side?: string
+          strategy: string
+          strategy_instance_id?: string
+          symbol: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Update: {
+          average_cost?: string
+          base?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          id?: string
+          net_profit?: string | null
+          profit?: string | null
+          quote?: string
+          quote_currency?: string
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id?: number
+          traded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profits: {
+        Row: {
+          average_cost: string
+          base_currency: string
+          created_at: string
+          exchange: string
+          fee: string
+          fee_currency: string
+          fee_in_usd: string | null
+          id: string
+          is_buyer: boolean
+          is_futures: boolean
+          is_isolated: boolean
+          is_maker: boolean
+          is_margin: boolean
+          net_profit: string
+          net_profit_margin: string
+          price: string
+          profit: string
+          profit_margin: string
+          quantity: string
+          quote_currency: string
+          quote_quantity: string
+          side: string
+          strategy: string
+          strategy_instance_id: string
+          symbol: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Insert: {
+          average_cost?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          fee?: string
+          fee_currency?: string
+          fee_in_usd?: string | null
+          id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
+          net_profit?: string
+          net_profit_margin?: string
+          price?: string
+          profit?: string
+          profit_margin?: string
+          quantity?: string
+          quote_currency?: string
+          quote_quantity?: string
+          side?: string
+          strategy: string
+          strategy_instance_id?: string
+          symbol: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Update: {
+          average_cost?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          fee?: string
+          fee_currency?: string
+          fee_in_usd?: string | null
+          id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
+          net_profit?: string
+          net_profit_margin?: string
+          price?: string
+          profit?: string
+          profit_margin?: string
+          quantity?: string
+          quote_currency?: string
+          quote_quantity?: string
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id?: number
+          traded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trades: {
+        Row: {
+          exchange: string
           fee: string
           fee_currency: string
           id: string
+          is_buyer: boolean
+          is_futures: boolean
+          is_isolated: boolean
+          is_maker: boolean
+          is_margin: boolean
           order_id: string
+          order_uuid: string
           pnl: string | null
           price: string
           quantity: string
           quote_quantity: string | null
           side: string
+          strategy: string
           symbol: string
-          synced_at: string
           trade_id: string
           traded_at: string | null
           user_id: string
         }
         Insert: {
-          bot_id?: string | null
-          created_at?: string
+          exchange?: string
           fee: string
           fee_currency: string
           id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
           order_id: string
+          order_uuid?: string
           pnl?: string | null
           price: string
           quantity: string
           quote_quantity?: string | null
           side: string
+          strategy?: string
           symbol: string
-          synced_at?: string
           trade_id: string
           traded_at?: string | null
           user_id: string
         }
         Update: {
-          bot_id?: string | null
-          created_at?: string
+          exchange?: string
           fee?: string
           fee_currency?: string
           id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
           order_id?: string
+          order_uuid?: string
           pnl?: string | null
           price?: string
           quantity?: string
           quote_quantity?: string | null
           side?: string
+          strategy?: string
           symbol?: string
-          synced_at?: string
           trade_id?: string
           traded_at?: string | null
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "sync_trades_bot_id_fkey"
-            columns: ["bot_id"]
-            isOneToOne: false
-            referencedRelation: "bots"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "sync_trades_user_id_fkey"
             columns: ["user_id"]

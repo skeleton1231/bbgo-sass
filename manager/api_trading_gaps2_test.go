@@ -80,6 +80,13 @@ func TestAPI_CreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tnKey, _ := api.encryptor.Encrypt("tn-key")
+	tnSec, _ := api.encryptor.Encrypt("tn-secret")
+	api.creds.Upsert(ExchangeCredential{
+		ID: "tn1", UserID: userID, Exchange: "binance",
+		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+	})
+
 	api.users.AddStrategy(userID, ModePaper, StrategyEntry{ID: "s0", Exchange: "binance", Strategy: "grid", Mode: "paper"})
 	api.users.UpdateStatus(userID, ModePaper, StatusStarting)
 
@@ -113,6 +120,13 @@ func TestAPI_CreateStrategy_ModeInheritsFromExisting(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tnKey, _ := api.encryptor.Encrypt("tn-key")
+	tnSec, _ := api.encryptor.Encrypt("tn-secret")
+	api.creds.Upsert(ExchangeCredential{
+		ID: "tn1", UserID: userID, Exchange: "binance",
+		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+	})
+
 	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
 		{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
 	}
@@ -198,7 +212,7 @@ func TestEnvArgs_LiveStrategy_NoPaperTrade(t *testing.T) {
 		if strings.HasPrefix(a, "MARKET_DATA_SERVICE_URL=") {
 			hasMarketData = true
 		}
-		if a == "DB_DRIVER=sqlite3" {
+		if a == "DB_DRIVER=supabase" {
 			hasDBDriver = true
 		}
 	}
@@ -206,7 +220,7 @@ func TestEnvArgs_LiveStrategy_NoPaperTrade(t *testing.T) {
 		t.Error("expected MARKET_DATA_SERVICE_URL in env args")
 	}
 	if !hasDBDriver {
-		t.Error("expected DB_DRIVER=sqlite3 in env args")
+		t.Error("expected DB_DRIVER=supabase in env args")
 	}
 }
 

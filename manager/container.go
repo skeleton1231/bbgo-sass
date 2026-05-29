@@ -112,16 +112,6 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	dbPath := hDir + "/bbgo.db"
-	if _, err := os.Stat(dbPath); err == nil {
-		backup := dbPath + ".backup." + time.Now().Format("20060102-150405")
-		if err := copyFile(dbPath, backup); err != nil {
-			return fmt.Errorf("backup %s: %w", dbPath, err)
-		}
-		log.Printf("backed up %s -> %s", dbPath, backup)
-		cleanupBackups(hDir, "bbgo.db.backup", 3)
-	}
-
 	yamlContent, err := buildUserYAML(uc, func(exchange string) bool {
 		if cm.creds == nil {
 			return false
@@ -310,10 +300,11 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 		args = append(args, "-e", "PAPER_TRADE=1")
 	}
 
-	dir := cm.userDir(uc.UserID, uc.Mode)
 	args = append(args,
-		"-e", "DB_DRIVER=sqlite3",
-		"-e", fmt.Sprintf("DB_DSN=%s/bbgo.db", dir),
+		"-e", "DB_DRIVER=supabase",
+		"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
+		"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
+		"-e", "BBGO_USER_ID="+uc.UserID,
 		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
 	)
 

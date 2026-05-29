@@ -47,22 +47,6 @@ func TestCreateAndStart_PreservesDB(t *testing.T) {
 	if string(data) != "existing-db-state" {
 		t.Errorf("DB content corrupted: got %q", string(data))
 	}
-
-	entries, _ := os.ReadDir(userDir)
-	found := false
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "bbgo.db.backup.") {
-			found = true
-			backupData, _ := os.ReadFile(filepath.Join(userDir, e.Name()))
-			if string(backupData) != "existing-db-state" {
-				t.Errorf("backup content mismatch: got %q", string(backupData))
-			}
-			break
-		}
-	}
-	if !found {
-		t.Error("expected safety backup to exist")
-	}
 }
 
 func TestCreateAndStart_SecondRestart_KeepsDB(t *testing.T) {
