@@ -61,12 +61,18 @@ export function useUserStrategies(userId: string) {
   })
 }
 
+function invalidateUserQueries(qc: ReturnType<typeof useQueryClient>, userId: string) {
+  qc.invalidateQueries({ queryKey: ['user-strategies', userId] })
+  qc.invalidateQueries({ queryKey: ['bot-list', userId] })
+  qc.invalidateQueries({ queryKey: ['bot-detail', userId] })
+}
+
 export function useCreateStrategy() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ userId, ...data }: { userId: string } & Parameters<typeof apiCreateStrategy>[1]) =>
       apiCreateStrategy(userId, data),
-    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: ['user-strategies', variables.userId] }),
+    onSuccess: (_data, variables) => invalidateUserQueries(qc, variables.userId),
   })
 }
 
@@ -75,7 +81,7 @@ export function useDeleteStrategy() {
   return useMutation({
     mutationFn: ({ userId, strategyId }: { userId: string; strategyId: string }) =>
       apiDeleteStrategy(userId, strategyId),
-    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: ['user-strategies', variables.userId] }),
+    onSuccess: (_data, variables) => invalidateUserQueries(qc, variables.userId),
   })
 }
 
@@ -84,7 +90,7 @@ export function useStartUser() {
   return useMutation({
     mutationFn: ({ userId, mode }: { userId: string; mode?: 'live' | 'paper' }) =>
       apiStartUser(userId, mode),
-    onSuccess: (_data, { userId }) => qc.invalidateQueries({ queryKey: ['user-strategies', userId] }),
+    onSuccess: (_data, { userId }) => invalidateUserQueries(qc, userId),
   })
 }
 
@@ -93,7 +99,7 @@ export function useStopUser() {
   return useMutation({
     mutationFn: ({ userId, mode }: { userId: string; mode?: 'live' | 'paper' }) =>
       apiStopUser(userId, mode),
-    onSuccess: (_data, { userId }) => qc.invalidateQueries({ queryKey: ['user-strategies', userId] }),
+    onSuccess: (_data, { userId }) => invalidateUserQueries(qc, userId),
   })
 }
 
