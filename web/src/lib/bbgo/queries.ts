@@ -309,7 +309,33 @@ export function useContainerLogs(userId: string, tail?: string, mode?: 'live' | 
 export function useBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
   return useQuery<PnLReport>({
     queryKey: ['bot-pnl', userId, exchange, symbol, mode],
-    queryFn: () => fetchBotPnL(userId, exchange, symbol, mode),
+    queryFn: async (): Promise<PnLReport> => {
+      const raw = await fetchBotPnL(userId, exchange, symbol, mode)
+      return {
+        totalRealizedPnl: raw.totalRealizedPnl ?? 0,
+        totalFees: raw.totalFees ?? 0,
+        totalTrades: raw.totalTrades ?? 0,
+        winningTrades: raw.winningTrades ?? 0,
+        losingTrades: raw.losingTrades ?? 0,
+        winRate: raw.winRate ?? 0,
+        symbols: (raw.symbols ?? []).map((sym) => ({
+          symbol: sym.symbol ?? '',
+          realizedPnl: sym.realizedPnl ?? 0,
+          totalBuys: sym.totalBuys ?? 0,
+          totalSells: sym.totalSells ?? 0,
+          buyVolume: sym.buyVolume ?? 0,
+          sellVolume: sym.sellVolume ?? 0,
+          totalFees: sym.totalFees ?? 0,
+          tradeCount: sym.tradeCount ?? 0,
+          winningTrades: sym.winningTrades ?? 0,
+          losingTrades: sym.losingTrades ?? 0,
+          avgBuyPrice: sym.avgBuyPrice ?? 0,
+          avgSellPrice: sym.avgSellPrice ?? 0,
+          openPosition: sym.openPosition ?? 0,
+          openPositionCost: sym.openPositionCost ?? 0,
+        })),
+      }
+    },
     enabled: !!userId,
     staleTime: 30_000,
     refetchInterval: 30_000,
