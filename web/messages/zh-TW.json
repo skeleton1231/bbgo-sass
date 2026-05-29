@@ -158,8 +158,10 @@
     "crossExchange": "跨交易所",
     "live": {
       "connected": "已連接",
-      "disconnected": "離線"
-    }
+      "disconnected": "離線",
+      "connecting": "連線中..."
+    },
+    "liveOnlyHint": "此策略需要實盤模式。"
   },
   "Backtest": {
     "title": "回測",
@@ -189,7 +191,8 @@
     "statusCompleted": "已完成",
     "statusFailed": "失敗",
     "symbol": "交易對",
-    "loading": "載入中..."
+    "loading": "載入中...",
+    "quickRange": "快速範圍："
   },
   "Settings": {
     "title": "設定",

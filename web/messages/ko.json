@@ -158,8 +158,10 @@
     "crossExchange": "크로스 거래소",
     "live": {
       "connected": "연결됨",
-      "disconnected": "오프라인"
-    }
+      "disconnected": "오프라인",
+      "connecting": "연결 중..."
+    },
+    "liveOnlyHint": "이 전략은 라이브 모드가 필요합니다."
   },
   "Backtest": {
     "title": "백테스트",
@@ -189,7 +191,8 @@
     "statusCompleted": "완료",
     "statusFailed": "실패",
     "symbol": "심볼",
-    "loading": "로딩..."
+    "loading": "로딩...",
+    "quickRange": "빠른 범위："
   },
   "Settings": {
     "title": "설정",

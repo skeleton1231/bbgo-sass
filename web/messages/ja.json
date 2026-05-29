@@ -158,8 +158,10 @@
     "crossExchange": "クロス取引所",
     "live": {
       "connected": "接続済み",
-      "disconnected": "オフライン"
-    }
+      "disconnected": "オフライン",
+      "connecting": "接続中..."
+    },
+    "liveOnlyHint": "このストラテジーはライブモードが必要です。"
   },
   "Backtest": {
     "title": "バックテスト",
@@ -189,7 +191,8 @@
     "statusCompleted": "完了",
     "statusFailed": "失敗",
     "symbol": "シンボル",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "quickRange": "クイックレンジ："
   },
   "Settings": {
     "title": "設定",
