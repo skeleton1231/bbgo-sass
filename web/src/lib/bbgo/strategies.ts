@@ -93,6 +93,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Bollinger Maker',
     description: 'Market making with Bollinger Band neutral zone and trend-following exposure control',
     category: 'maker',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -193,6 +194,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Supertrend',
     description: 'Trend following with Supertrend indicator and optional DEMA confirmation',
     category: 'trend',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -473,6 +475,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Drift',
     description: 'Drift MA strategy with linear regression prediction, ATR stop-loss and trailing exits',
     category: 'trend',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -493,6 +496,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Elliott Wave',
     description: 'Elliott Wave oscillator with ATR stop-loss, Heikin-Ashi and trailing exits',
     category: 'trend',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -511,6 +515,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Factor Zoo',
     description: 'Multi-factor linear strategy with momentum and exit management',
     category: 'trend',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -728,9 +733,9 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Cross-Exchange Premium',
     description: 'Trade premium/discount between spot and futures across exchanges',
     category: 'cross-exchange',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     crossExchange: true,
-    liveOnly: true,
     sessionRoles: [
       { name: 'spot', label: 'Spot Session', futures: false },
       { name: 'futures', label: 'Futures Session', futures: true },
@@ -763,9 +768,9 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Cross-Exchange NAV',
     description: 'Net asset value tracking and rebalancing across sessions',
     category: 'cross-exchange',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     crossExchange: true,
-    liveOnly: true,
     sessionRoles: [
       { name: 'spot', label: 'Spot Session', futures: false },
       { name: 'futures', label: 'Futures Session', futures: true },
