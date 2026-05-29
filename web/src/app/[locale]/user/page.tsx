@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const otherContainer = containers[globalMode === 'live' ? 'paper' : 'live']
   const isActive = activeContainer?.status === 'running'
   const anyActive = isActive || otherContainer?.status === 'running'
-  const strategyCount = (activeContainer?.strategies?.length ?? 0) + (otherContainer?.strategies?.length ?? 0)
+  const strategyCount = activeContainer?.strategies?.length ?? 0
 
   const { data: tradesData } = useBotTrades(userId, undefined, undefined, globalMode)
   const { data: assetsData } = useBotAssets(userId, globalMode)
@@ -75,7 +75,7 @@ export default function DashboardPage() {
           </span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {anyActive
+          {strategyCount > 0
             ? t('strategyCount', { count: strategyCount })
             : t('noStrategies')}
         </p>
@@ -91,7 +91,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold">{isActive ? 1 : 0}</span>
+              <span className="text-2xl font-semibold">{isActive ? strategyCount : 0}</span>
               <span className="text-sm text-muted-foreground">/ {strategyCount}</span>
             </div>
           </CardContent>
@@ -199,7 +199,7 @@ export default function DashboardPage() {
         </ErrorBoundary>
       )}
 
-      {anyActive && strategyCount > 0 && (
+      {strategyCount > 0 && (
         <Card className="rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-sm font-medium">{t('strategies')}</CardTitle>
@@ -210,7 +210,7 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <div className="divide-y">
-            {[activeContainer, otherContainer].filter(Boolean).flatMap(uc => uc!.strategies.map(s => ({ ...s, containerStatus: uc!.status }))).map((s) => (
+            {activeContainer?.strategies.map((s) => (
               <div key={s.id} className="flex items-center justify-between px-6 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
@@ -219,18 +219,18 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium">{s.name || s.strategy}</p>
                     <p className="text-xs text-muted-foreground">
-                      {s.exchange} · {s.strategy} · {bt(`mode.${s.mode}`)}
+                      {s.exchange} · {s.strategy}
                     </p>
                   </div>
                 </div>
                 <Badge
-                  variant={s.containerStatus === 'running' ? 'default' : 'secondary'}
+                  variant={isActive ? 'default' : 'secondary'}
                   className={cn(
                     'rounded-full text-[11px] font-medium',
-                    s.containerStatus === 'running' && 'bg-trade-up text-white hover:bg-trade-up'
+                    isActive && 'bg-trade-up text-white hover:bg-trade-up'
                   )}
                 >
-                  {s.containerStatus === 'running' ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
+                  {isActive ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
                 </Badge>
               </div>
             ))}
