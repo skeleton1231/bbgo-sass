@@ -103,7 +103,7 @@ export default function BotDetailPage() {
   }, [firstSession, activeSession])
 
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode)
-  const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, undefined, mode)
+  const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode)
   const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode)
   const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode)
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode)

@@ -332,10 +332,14 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		exchangeStrategies = append(exchangeStrategies, entry)
 	}
 
+	dataDir := uc.UserID
+	if uc.Mode == ModePaper {
+		dataDir = uc.UserID + "-paper"
+	}
 	cfg := bbgoConfig{
 		Database: &databaseConfig{
 			Driver: "sqlite3",
-			DSN:    fmt.Sprintf("file:/data/%s/bbgo.db?cache=shared&_journal_mode=WAL", uc.UserID),
+			DSN:    fmt.Sprintf("file:/data/%s/bbgo.db?cache=shared&_journal_mode=WAL", dataDir),
 		},
 		Sessions:                sessions,
 		Exchange:                exchanges,

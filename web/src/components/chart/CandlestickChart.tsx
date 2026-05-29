@@ -235,25 +235,32 @@ export function CandlestickChart({
 
   // Candle data + trade markers
   useEffect(() => {
-    if (!candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return
+    if (!candleSeriesRef.current || !volumeSeriesRef.current) return
+
+    if (candles.length === 0) {
+      prevCandleCountRef.current = 0
+      return
+    }
 
     const prevCount = prevCandleCountRef.current
-    const isInitialLoad = prevCount === 0
-    const hasMoreHistory = candles.length > prevCount && prevCount > 0 &&
-      candles[0] !== undefined
     prevCandleCountRef.current = candles.length
 
-    if (isInitialLoad || candles.length < prevCount) {
-      candleSeriesRef.current.setData(candles.map((c) => ({
-        time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
-      })))
-      volumeSeriesRef.current.setData(candles
-        .filter((c) => c.volume != null && c.volume > 0)
-        .map((c) => ({
-          time: c.time,
-          value: c.volume!,
-          color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-        })))
+    const candleData = candles.map((c) => ({
+      time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
+    }))
+    const volumeData = candles
+      .filter((c) => c.volume != null && c.volume > 0)
+      .map((c) => ({
+        time: c.time,
+        value: c.volume!,
+        color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+      }))
+
+    const useSetData = prevCount === 0 || candles.length !== prevCount
+
+    if (useSetData) {
+      candleSeriesRef.current.setData(candleData)
+      volumeSeriesRef.current.setData(volumeData)
       const ts = chartRef.current?.timeScale()
       if (ts && candles.length > 80) {
         const visibleStart = candles[candles.length - 80]
@@ -264,29 +271,23 @@ export function CandlestickChart({
       } else {
         ts?.fitContent()
       }
-    } else if (hasMoreHistory) {
-      candleSeriesRef.current.setData(candles.map((c) => ({
-        time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
-      })))
-      volumeSeriesRef.current.setData(candles
-        .filter((c) => c.volume != null && c.volume > 0)
-        .map((c) => ({
-          time: c.time,
-          value: c.volume!,
-          color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-        })))
     } else {
       const lastCandle = candles[candles.length - 1]
       if (!lastCandle) return
-      candleSeriesRef.current.update({
-        time: lastCandle.time, open: lastCandle.open, high: lastCandle.high, low: lastCandle.low, close: lastCandle.close,
-      })
-      if (lastCandle.volume != null && lastCandle.volume > 0) {
-        volumeSeriesRef.current.update({
-          time: lastCandle.time,
-          value: lastCandle.volume,
-          color: lastCandle.close >= lastCandle.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+      try {
+        candleSeriesRef.current.update({
+          time: lastCandle.time, open: lastCandle.open, high: lastCandle.high, low: lastCandle.low, close: lastCandle.close,
         })
+        if (lastCandle.volume != null && lastCandle.volume > 0) {
+          volumeSeriesRef.current.update({
+            time: lastCandle.time,
+            value: lastCandle.volume,
+            color: lastCandle.close >= lastCandle.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+          })
+        }
+      } catch {
+        candleSeriesRef.current.setData(candleData)
+        volumeSeriesRef.current.setData(volumeData)
       }
     }
 

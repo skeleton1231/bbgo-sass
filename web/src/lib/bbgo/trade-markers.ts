@@ -4,11 +4,13 @@ import { computePositionTags } from './position-tags'
 
 export function buildTradeMarkers(
   trades: BBGoTrade[] | null | undefined,
-  closedOrders: BBGoOrder[] | null | undefined,
+  _closedOrders: BBGoOrder[] | null | undefined,
   symbol: string
 ): TradeMarker[] {
   const markers: TradeMarker[] = []
 
+  // Only use trades for chart markers — closed orders use creationTime (order
+  // placement) not fill time, which places markers at wrong chart positions.
   if (trades) {
     markers.push(
       ...trades
@@ -19,20 +21,6 @@ export function buildTradeMarkers(
           side: tr.side as 'BUY' | 'SELL',
           price: parseFloat(tr.price),
           quantity: parseFloat(tr.quantity),
-        }))
-    )
-  }
-
-  if (closedOrders) {
-    markers.push(
-      ...closedOrders
-        .filter((o) => (!symbol || o.symbol === symbol) && parseFloat(o.executedQuantity) > 0)
-        .map((o) => ({
-          time: Math.floor(new Date(o.creationTime ?? Date.now()).getTime() / 1000) as TradeMarker['time'],
-          side: o.side as 'BUY' | 'SELL',
-          price: parseFloat(o.price),
-          quantity: parseFloat(o.executedQuantity || o.quantity),
-          orderId: o.orderID,
         }))
     )
   }

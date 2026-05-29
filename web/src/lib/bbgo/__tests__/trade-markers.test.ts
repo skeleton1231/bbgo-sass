@@ -55,46 +55,27 @@ describe('buildTradeMarkers', () => {
     expect(buildTradeMarkers([trade], null, '')).toHaveLength(1)
   })
 
-  it('converts closed orders with executed quantity > 0 to markers', () => {
+  it('ignores closed orders (uses only trades for accurate fill times)', () => {
     const result = buildTradeMarkers(null, [baseOrder], 'BTCUSDT')
-    expect(result).toHaveLength(1)
-    expect(result[0]!.side).toBe('SELL')
-    expect(result[0]!.price).toBe(73000)
+    expect(result).toHaveLength(0)
   })
 
-  it('skips orders with zero executed quantity', () => {
-    const order: BBGoOrder = { ...baseOrder, executedQuantity: '0' }
-    expect(buildTradeMarkers(null, [order], 'BTCUSDT')).toHaveLength(0)
-  })
-
-  it('merges trades and orders, sorted by time', () => {
+  it('uses only trades even when closed orders are provided', () => {
     const result = buildTradeMarkers([baseTrade], [baseOrder], 'BTCUSDT')
-    expect(result).toHaveLength(2)
+    expect(result).toHaveLength(1)
+    expect(result[0]!.side).toBe('BUY')
     expect(result[0]!.price).toBe(72000)
-    expect(result[1]!.price).toBe(73000)
   })
 
-  it('deduplicates markers with same time+side+price', () => {
-    const order: BBGoOrder = {
-      ...baseOrder,
-      side: 'BUY',
-      price: '72000',
-      executedQuantity: '0.001',
-      creationTime: '2026-05-28T10:00:00Z',
-    }
-    const result = buildTradeMarkers([baseTrade], [order], 'BTCUSDT')
+  it('deduplicates trades with same time+side+price', () => {
+    const dup: BBGoTrade = { ...baseTrade }
+    const result = buildTradeMarkers([baseTrade, dup], null, 'BTCUSDT')
     expect(result).toHaveLength(1)
   })
 
-  it('keeps markers with same price but different side', () => {
-    const order: BBGoOrder = {
-      ...baseOrder,
-      side: 'SELL',
-      price: '72000',
-      executedQuantity: '0.001',
-      creationTime: '2026-05-28T10:00:00Z',
-    }
-    const result = buildTradeMarkers([baseTrade], [order], 'BTCUSDT')
+  it('keeps trades with same price but different side', () => {
+    const sell: BBGoTrade = { ...baseTrade, side: 'SELL', tradedAt: '2026-05-28T10:30:00Z' }
+    const result = buildTradeMarkers([baseTrade, sell], null, 'BTCUSDT')
     expect(result).toHaveLength(2)
   })
 
@@ -107,13 +88,6 @@ describe('buildTradeMarkers', () => {
     }))
     const result = buildTradeMarkers(trades, null, 'BTCUSDT')
     expect(result).toHaveLength(200)
-  })
-
-  it('handles orders with missing creationTime', () => {
-    const order: BBGoOrder = { ...baseOrder, creationTime: undefined }
-    const result = buildTradeMarkers(null, [order], 'BTCUSDT')
-    expect(result).toHaveLength(1)
-    expect(result[0]!.time).toBeGreaterThan(0)
   })
 
   it('tags first BUY as open, last SELL as close', () => {
