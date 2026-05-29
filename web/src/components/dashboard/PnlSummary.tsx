@@ -27,7 +27,7 @@ export function PnlSummary({ report }: PnlSummaryProps) {
         <p className="text-xs text-muted-foreground">{t('winRate')}</p>
         <p className="text-sm font-medium">
           {report.totalTrades > 0
-            ? `${((report.winningTrades / report.totalTrades) * 100).toFixed(1)}%`
+            ? `${report.winRate.toFixed(1)}%`
             : '--'}
         </p>
         <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -35,7 +35,7 @@ export function PnlSummary({ report }: PnlSummaryProps) {
             className="h-full bg-green-500 rounded-full transition-all"
             style={{
               width: report.totalTrades > 0
-                ? `${(report.winningTrades / report.totalTrades) * 100}%`
+                ? `${report.winRate}%`
                 : '0%',
             }}
           />
