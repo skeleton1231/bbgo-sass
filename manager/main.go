@@ -50,6 +50,7 @@ func main() {
 	syncer := NewSyncerWithCreds(users, cfg, containerMgr, credStore, syncPool)
 
 	notifier := NewNotifier(cfg.DataDir, enc)
+	syncer.SetNotifier(notifier)
 
 	recoveredUsers, err := syncer.LoadUsersFromSupabase()
 	if err != nil {

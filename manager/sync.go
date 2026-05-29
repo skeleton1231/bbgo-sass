@@ -18,6 +18,7 @@ type Syncer struct {
 	cfg             *Config
 	container       *ContainerManager
 	creds           *CredentialStore
+	notifier        *Notifier
 	client          *http.Client
 	pool            *pool.Pool
 	newBBGoClientFn func(baseURL string) *BBGoClient
@@ -39,9 +40,13 @@ func NewSyncerWithCreds(users *UserContainerManager, cfg *Config, cm *ContainerM
 	return s
 }
 
+func (s *Syncer) SetNotifier(n *Notifier) {
+	s.notifier = n
+}
+
 func (s *Syncer) bbgoClient(userID, mode string) *BBGoClient {
 	if s.newBBGoClientFn != nil {
-		return s.newBBGoClientFn(s.container.APIURL(userID, mode))
+		return s.newBBGoClientFn("")
 	}
 	return NewBBGoClient(s.container.APIURL(userID, mode))
 }
@@ -254,6 +259,7 @@ func (s *Syncer) syncOrdersViaAPI(userID string, client *BBGoClient) {
 	}
 	s.updateCursor(userID, "sync_orders", maxGID)
 	log.Printf("synced %d orders for user %s via api (cursor %d -> %d)", len(newOrders), userID, cursor, maxGID)
+	s.dispatchOrderNotifications(userID, newOrders)
 }
 
 // fullSyncOrders paginates backward through all orders for initial sync (cursor=0).
@@ -405,6 +411,7 @@ func (s *Syncer) syncTradesViaAPI(userID string, client *BBGoClient) {
 
 	if totalSynced > 0 {
 		log.Printf("synced %d trades for user %s via api (cursor %d -> %d)", totalSynced, userID, startCursor, cursor)
+		s.dispatchTradeNotifications(userID, totalSynced)
 	}
 }
 
@@ -539,4 +546,33 @@ func (s *Syncer) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
 		offset += len(rows)
 	}
 	return allTrades, nil
+}
+
+func (s *Syncer) dispatchTradeNotifications(userID string, count int) {
+	if s.notifier == nil {
+		return
+	}
+	s.notifier.Dispatch(userID, NotificationEvent{
+		Type:    "trade",
+		Title:   fmt.Sprintf("%d New Trade%s", count, pluralS(count)),
+		Message: fmt.Sprintf("Synced %d new trade(s) from your trading bot.", count),
+	})
+}
+
+func (s *Syncer) dispatchOrderNotifications(userID string, orders []BBGoOrder) {
+	if s.notifier == nil || len(orders) == 0 {
+		return
+	}
+	s.notifier.Dispatch(userID, NotificationEvent{
+		Type:    "order",
+		Title:   fmt.Sprintf("%d New Order%s", len(orders), pluralS(len(orders))),
+		Message: fmt.Sprintf("Synced %d new closed order(s) from your trading bot.", len(orders)),
+	})
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
