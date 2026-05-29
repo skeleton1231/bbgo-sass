@@ -20,11 +20,12 @@ export interface MarketDataMessage {
 
 interface UseWebSocketOptions {
   userId: string
+  mode?: 'live' | 'paper'
   enabled?: boolean
   onMessage?: (msg: MarketDataMessage) => void
 }
 
-export function useMarketData({ userId, enabled = true, onMessage }: UseWebSocketOptions) {
+export function useMarketData({ userId, mode, enabled = true, onMessage }: UseWebSocketOptions) {
   const [lastMessage, setLastMessage] = useState<MarketDataMessage | null>(null)
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
@@ -37,7 +38,9 @@ export function useMarketData({ userId, enabled = true, onMessage }: UseWebSocke
     if (!enabled || !userId) return
 
     try {
-      const res = await fetch('/api/ws-url')
+      const params = new URLSearchParams()
+      if (mode) params.set('mode', mode)
+      const res = await fetch(`/api/ws-url?${params}`)
       if (!res.ok) return
       const { wsUrl } = await res.json()
       if (!wsUrl) return
@@ -62,7 +65,7 @@ export function useMarketData({ userId, enabled = true, onMessage }: UseWebSocke
     } catch {
       reconnectRef.current = setTimeout(() => connectRef.current(), 5_000)
     }
-  }, [userId, enabled])
+  }, [userId, mode, enabled])
   connectRef.current = connect
 
   useEffect(() => {

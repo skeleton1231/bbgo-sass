@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
     wsBase = httpBase.replace(/^http/, 'ws')
   }
 
-  const wsUrl = `${wsBase}/api/ws?ticket=${encodeURIComponent(ticket)}`
+  const mode = request.nextUrl.searchParams.get('mode')
+  const modeParam = mode ? `&mode=${encodeURIComponent(mode)}` : ''
+  const wsUrl = `${wsBase}/api/ws?ticket=${encodeURIComponent(ticket)}${modeParam}`
   return NextResponse.json({ wsUrl })
 }

@@ -143,9 +143,13 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Subscribe to user data if container is running
 	var userCh chan json.RawMessage
+	wsMode := r.URL.Query().Get("mode")
 	containers := api.users.GetByUser(userID)
 	for _, uc := range containers {
 		if uc.Status != StatusRunning {
+			continue
+		}
+		if wsMode != "" && uc.Mode != wsMode {
 			continue
 		}
 		containerAddr := api.container.ContainerGRPCAddr(userID, uc.Mode)
