@@ -149,12 +149,19 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
 	snapshot := make([]NotificationConfig, len(configs))
 	copy(snapshot, configs)
 
+	if n.lastSent == nil {
+		n.lastSent = make(map[string]map[string]time.Time)
+	}
 	if timings, ok := n.lastSent[userID]; ok {
 		if last, ok := timings[event.Type]; ok && time.Since(last) < n.rateLimit {
 			n.mu.Unlock()
 			return false
 		}
 	}
+	if n.lastSent[userID] == nil {
+		n.lastSent[userID] = make(map[string]time.Time)
+	}
+	n.lastSent[userID][event.Type] = time.Now()
 	n.mu.Unlock()
 
 	sent := false
@@ -176,27 +183,18 @@ func (n *Notifier) Dispatch(userID string, event NotificationEvent) bool {
 			}
 			err = sendTelegram(n.client, token, cfg.Channel.ChatID, event.Title, event.Message)
 		case "slack":
-			url, decodeErr := n.decryptToken(cfg.Channel.WebhookURL)
+			webhookURL, decodeErr := n.decryptToken(cfg.Channel.WebhookURL)
 			if decodeErr != nil {
 				log.Printf("notif: decrypt slack webhook for %s: %v", userID, decodeErr)
 				continue
 			}
-			err = sendSlack(n.client, url, event.Title, event.Message)
+			err = sendSlack(n.client, webhookURL, event.Title, event.Message)
 		}
 		if err != nil {
 			log.Printf("notif: send to %s/%s failed: %v", userID, cfg.Channel.Type, err)
 		} else {
 			sent = true
 		}
-	}
-
-	if sent {
-		n.mu.Lock()
-		if n.lastSent[userID] == nil {
-			n.lastSent[userID] = make(map[string]time.Time)
-		}
-		n.lastSent[userID][event.Type] = time.Now()
-		n.mu.Unlock()
 	}
 
 	return sent
