@@ -154,7 +154,7 @@
     },
     "crossExchange": "cross-exchange",
     "live": {
-      "connected": "Live",
+      "connected": "Connected",
       "connecting": "Connecting...",
       "disconnected": "Offline"
     },
@@ -207,7 +207,8 @@
       "empty": "No API keys configured.",
       "delete": "Delete",
       "verified": "Verified",
-      "verificationFailed": "Verification failed"
+      "verificationFailed": "Verification failed",
+      "required": "This field is required"
     },
     "notifications": {
       "title": "Notifications",

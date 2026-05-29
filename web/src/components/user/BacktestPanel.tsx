@@ -290,12 +290,12 @@ export function BacktestPanel({ userId }: { userId: string }) {
       {lastResult && lastResult.status === 'completed' && lastResult.output && (
         <div className="rounded-lg border bg-card p-4 space-y-4">
           <BacktestEquityChart output={lastResult.output} />
-          <div>
-            <h3 className="text-sm font-semibold mb-2">{t('backtestOutput')}</h3>
-            <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">{t('backtestOutput')}</summary>
+            <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
               {lastResult.output.replace(/\x1b\[[0-9;]*m/g, '')}
             </pre>
-          </div>
+          </details>
         </div>
       )}
 

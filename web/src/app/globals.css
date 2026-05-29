@@ -140,6 +140,8 @@
   }
 }
 
+.recharts-wrapper { overflow: hidden !important; }
+
 @layer utilities {
   .text-trade-up { color: var(--trade-up); }
   .text-trade-down { color: var(--trade-down); }

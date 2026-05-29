@@ -56,7 +56,8 @@ export function useUserStrategies(userId: string) {
     queryKey: ['user-strategies', userId],
     queryFn: () => fetchUserStrategies(userId),
     enabled: !!userId,
-    refetchInterval: 10_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   })
 }
 
@@ -142,7 +143,8 @@ export function useBotList(userId: string, mode?: 'live' | 'paper') {
     queryKey: ['bot-list', userId, mode],
     queryFn: () => fetchBotList(userId, mode),
     enabled: !!userId,
-    refetchInterval: 10_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   })
 }
 
@@ -151,6 +153,7 @@ export function useBotDetail(userId: string, botId: string | null) {
     queryKey: ['bot-detail', userId, botId],
     queryFn: () => fetchBotDetail(userId, botId!),
     enabled: !!userId && !!botId,
+    staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
@@ -162,6 +165,7 @@ export function useBotPing(userId: string, mode?: 'live' | 'paper') {
     queryKey: ['bot-ping', userId, mode],
     queryFn: () => fetchBotPing(userId, mode),
     enabled: !!userId,
+    staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
@@ -171,6 +175,7 @@ export function useBotSessions(userId: string, mode?: 'live' | 'paper') {
     queryKey: ['bot-sessions', userId, mode],
     queryFn: () => fetchBotSessions(userId, mode),
     enabled: !!userId,
+    staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
@@ -180,7 +185,8 @@ export function useBotSessionTrades(userId: string, session: string, mode?: 'liv
     queryKey: ['bot-session-trades', userId, session, mode],
     queryFn: () => fetchBotSessionTrades(userId, session, mode),
     enabled: !!userId && !!session,
-    refetchInterval: 10_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   })
 }
 
@@ -189,7 +195,8 @@ export function useBotOpenOrders(userId: string, session: string, mode?: 'live' 
     queryKey: ['bot-orders', userId, session, mode],
     queryFn: () => fetchBotOpenOrders(userId, session, mode),
     enabled: !!userId && !!session,
-    refetchInterval: 10_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   })
 }
 
@@ -198,7 +205,8 @@ export function useBotSessionBalances(userId: string, session: string, mode?: 'l
     queryKey: ['bot-balances', userId, session, mode],
     queryFn: () => fetchBotSessionBalances(userId, session, mode),
     enabled: !!userId && !!session,
-    refetchInterval: 15_000,
+    staleTime: 20_000,
+    refetchInterval: 20_000,
   })
 }
 
@@ -243,7 +251,8 @@ export function useBotTrades(userId: string, exchange?: string, symbol?: string,
     queryKey: ['bot-trades', userId, exchange, symbol, mode],
     queryFn: () => fetchBotTrades(userId, exchange, symbol, undefined, mode),
     enabled: !!userId,
-    refetchInterval: 15_000,
+    staleTime: 20_000,
+    refetchInterval: 20_000,
   })
 }
 
@@ -252,7 +261,8 @@ export function useBotClosedOrders(userId: string, exchange?: string, symbol?: s
     queryKey: ['bot-closed-orders', userId, exchange, symbol, mode],
     queryFn: () => fetchBotClosedOrders(userId, exchange, symbol, undefined, mode),
     enabled: !!userId,
-    refetchInterval: 15_000,
+    staleTime: 20_000,
+    refetchInterval: 20_000,
   })
 }
 
@@ -261,6 +271,7 @@ export function useBotTradingVolume(userId: string, period?: string, mode?: 'liv
     queryKey: ['bot-trading-volume', userId, period, mode],
     queryFn: () => fetchBotTradingVolume(userId, period, undefined, mode),
     enabled: !!userId,
+    staleTime: 60_000,
     refetchInterval: 60_000,
   })
 }
@@ -270,6 +281,7 @@ export function useBotAssets(userId: string, mode?: 'live' | 'paper') {
     queryKey: ['bot-assets', userId, mode],
     queryFn: () => fetchBotAssets(userId, mode),
     enabled: !!userId,
+    staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
@@ -279,6 +291,7 @@ export function useBotStrategiesState(userId: string, mode?: 'live' | 'paper') {
     queryKey: ['bot-strategies-state', userId, mode],
     queryFn: () => fetchBotStrategies(userId, mode),
     enabled: !!userId,
+    staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
@@ -288,6 +301,7 @@ export function useContainerLogs(userId: string, tail?: string, mode?: 'live' | 
     queryKey: ['container-logs', userId, tail, mode],
     queryFn: () => fetchContainerLogs(userId, tail, mode),
     enabled: !!userId,
+    staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
@@ -297,6 +311,7 @@ export function useBotPnL(userId: string, exchange?: string, symbol?: string, mo
     queryKey: ['bot-pnl', userId, exchange, symbol, mode],
     queryFn: () => fetchBotPnL(userId, exchange, symbol, mode),
     enabled: !!userId,
+    staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }

@@ -682,11 +682,11 @@ export default function BotDetailPage() {
                     {Object.keys(ls).length > 1 && (
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-11">
                         {Object.entries(ls)
-                          .filter(([k]) => k !== 'strategy')
-                          .slice(0, 6)
+                          .filter(([k, v]) => k !== 'strategy' && v != null && typeof v !== 'object' && typeof v !== 'function')
+                          .slice(0, 10)
                           .map(([key, val]) => (
                             <span key={key} className="text-xs text-muted-foreground">
-                              {key}: <span className="text-foreground font-mono">{typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val)}</span>
+                              {key}: <span className="text-foreground font-mono">{String(val)}</span>
                             </span>
                           ))}
                       </div>

@@ -13,6 +13,8 @@ export function SessionExpiredBanner() {
     if (msg === 'session_expired') {
       setShow(true)
       sessionStorage.removeItem('bbgo-auth-message')
+    } else {
+      sessionStorage.removeItem('bbgo-auth-message')
     }
   }, [])
 

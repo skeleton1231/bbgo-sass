@@ -157,7 +157,7 @@
     },
     "crossExchange": "クロス取引所",
     "live": {
-      "connected": "リアルタイム",
+      "connected": "接続済み",
       "disconnected": "オフライン"
     }
   },
@@ -204,7 +204,8 @@
       "empty": "API キーが設定されていません。",
       "delete": "削除",
       "verified": "検証済み",
-      "verificationFailed": "検証失敗"
+      "verificationFailed": "検証失敗",
+      "required": "この項目は必須です"
     },
     "notifications": {
       "title": "通知",

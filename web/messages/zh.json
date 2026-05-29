@@ -158,7 +158,7 @@
     },
     "crossExchange": "跨交易所",
     "live": {
-      "connected": "实时",
+      "connected": "已连接",
       "connecting": "连接中...",
       "disconnected": "离线"
     }
@@ -207,7 +207,8 @@
       "empty": "尚未配置 API 密钥。",
       "delete": "删除",
       "verified": "已验证",
-      "verificationFailed": "验证失败"
+      "verificationFailed": "验证失败",
+      "required": "此字段为必填项"
     },
     "notifications": {
       "title": "通知",

@@ -28,6 +28,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter()
 
   async function handleSignOut() {
+    sessionStorage.setItem('bbgo-auth-message', 'signed_out')
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push(LOGIN_PATH)

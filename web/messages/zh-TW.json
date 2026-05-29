@@ -157,7 +157,7 @@
     },
     "crossExchange": "跨交易所",
     "live": {
-      "connected": "即時",
+      "connected": "已連接",
       "disconnected": "離線"
     }
   },
@@ -204,7 +204,8 @@
       "empty": "尚未設定 API 金鑰。",
       "delete": "刪除",
       "verified": "已驗證",
-      "verificationFailed": "驗證失敗"
+      "verificationFailed": "驗證失敗",
+      "required": "此欄位為必填"
     },
     "notifications": {
       "title": "通知",

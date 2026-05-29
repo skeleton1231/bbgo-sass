@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCredentials, useCreateCredential, useDeleteCredential } from '@/lib/bbgo/queries'
 import { EXCHANGES, EXCHANGES_REQUIRING_PASSPHRASE } from '@/lib/bbgo/constants'
+import { cn } from '@/lib/utils'
 
 
 export function ApiKeyList() {
@@ -16,6 +17,7 @@ export function ApiKeyList() {
   const [apiSecret, setApiSecret] = useState('')
   const [passphrase, setPassphrase] = useState('')
   const [isTestnet, setIsTestnet] = useState(false)
+  const [errors, setErrors] = useState<{ apiKey?: string; apiSecret?: string }>({})
 
   useEffect(() => {
     const loadUser = async () => {
@@ -33,7 +35,15 @@ export function ApiKeyList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!userId || !apiKey || !apiSecret) return
+    const newErrors: { apiKey?: string; apiSecret?: string } = {}
+    if (!apiKey) newErrors.apiKey = t('required')
+    if (!apiSecret) newErrors.apiSecret = t('required')
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+    setErrors({})
+    if (!userId) return
 
     createMut.mutate(
       { exchange, api_key: apiKey, api_secret: apiSecret, passphrase: passphrase || undefined, is_testnet: isTestnet },
@@ -105,7 +115,7 @@ export function ApiKeyList() {
       )}
 
       {showAdd && (
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border bg-card p-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 rounded-lg border bg-card p-6">
           <div>
             <label className="block text-sm font-medium mb-1">{t('exchange')}</label>
             <select
@@ -125,9 +135,10 @@ export function ApiKeyList() {
               type="text"
               required
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              onChange={(e) => { setApiKey(e.target.value); setErrors((p) => ({ ...p, apiKey: undefined })) }}
+              className={cn('w-full rounded-md border border-input bg-background px-3 py-2 text-sm', errors.apiKey && 'border-destructive')}
             />
+            {errors.apiKey && <p className="mt-1 text-xs text-destructive">{errors.apiKey}</p>}
           </div>
 
           <div>
@@ -136,9 +147,10 @@ export function ApiKeyList() {
               type="password"
               required
               value={apiSecret}
-              onChange={(e) => setApiSecret(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              onChange={(e) => { setApiSecret(e.target.value); setErrors((p) => ({ ...p, apiSecret: undefined })) }}
+              className={cn('w-full rounded-md border border-input bg-background px-3 py-2 text-sm', errors.apiSecret && 'border-destructive')}
             />
+            {errors.apiSecret && <p className="mt-1 text-xs text-destructive">{errors.apiSecret}</p>}
           </div>
 
           {EXCHANGES_REQUIRING_PASSPHRASE.includes(exchange) && (
