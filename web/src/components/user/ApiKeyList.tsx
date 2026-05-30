@@ -14,6 +14,7 @@ export function ApiKeyList() {
   const bt = useTranslations('Bots')
   const userId = useUserId()
   const [showAdd, setShowAdd] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [exchange, setExchange] = useState('binance')
   const [apiKey, setApiKey] = useState('')
   const [apiSecret, setApiSecret] = useState('')
@@ -94,8 +95,9 @@ export function ApiKeyList() {
                 )}
               </div>
               <button
-                onClick={() => handleDelete(cred.id)}
+                onClick={() => setPendingDeleteId(cred.id)}
                 disabled={deleteMut.isPending}
+                aria-label={t('delete')}
                 className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
               >
                 {t('delete')}
@@ -177,6 +179,7 @@ export function ApiKeyList() {
               id="testnet"
               checked={isTestnet}
               onChange={(e) => setIsTestnet(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
             />
             <label htmlFor="testnet" className="text-sm">{t('testnet')}</label>
           </div>
@@ -198,6 +201,25 @@ export function ApiKeyList() {
             </button>
           </div>
         </form>
+      )}
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingDeleteId(null)}>
+          <div className="rounded-lg bg-card p-6 shadow-lg max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm">{t('delete')}?</p>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setPendingDeleteId(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">
+                {bt('cancel')}
+              </button>
+              <button
+                onClick={() => { handleDelete(pendingDeleteId); setPendingDeleteId(null) }}
+                disabled={deleteMut.isPending}
+                className="rounded-md bg-destructive px-4 py-2 text-sm text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {t('delete')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
