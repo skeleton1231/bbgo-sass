@@ -15,6 +15,10 @@ var configEnvKeys = []string{
 	"WS_ALLOWED_ORIGINS", "MARKET_SUBSCRIPTIONS",
 	"BACKTEST_SYMBOLS", "BACKTEST_EXCHANGES",
 	"BACKTEST_START_TIME", "BACKTEST_END_TIME", "BACKTEST_SHARED_DIR",
+	"CONTAINER_MEMORY", "CONTAINER_MEMORY_SWAP", "CONTAINER_CPUS",
+	"CONTAINER_PIDS_LIMIT", "CONTAINER_LOG_MAX_SIZE", "CONTAINER_LOG_MAX_FILE",
+	"CONTAINER_PAPER_MEMORY", "CONTAINER_PAPER_MEMORY_SWAP", "CONTAINER_PAPER_CPUS",
+	"CONTAINER_PAPER_PIDS_LIMIT", "CONTAINER_PAPER_LOG_MAX_SIZE", "CONTAINER_PAPER_LOG_MAX_FILE",
 }
 
 // setConfigEnv clears only config env vars then sets the given ones.
@@ -176,5 +180,112 @@ func TestSafeShortID(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("safeShortID(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestLoadConfig_ResourceDefaults(t *testing.T) {
+	setConfigEnv(t,
+		"SUPABASE_URL", "https://x.supabase.co",
+		"SUPABASE_SERVICE_KEY", "k",
+		"MANAGER_TOKEN", "t",
+		"ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef",
+	)
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Live defaults
+	if cfg.LiveResources.Memory != "256m" {
+		t.Errorf("live memory: got %q, want 256m", cfg.LiveResources.Memory)
+	}
+	if cfg.LiveResources.MemorySwap != "512m" {
+		t.Errorf("live swap: got %q, want 512m", cfg.LiveResources.MemorySwap)
+	}
+	if cfg.LiveResources.CPUs != "0.5" {
+		t.Errorf("live cpus: got %q, want 0.5", cfg.LiveResources.CPUs)
+	}
+	if cfg.LiveResources.PidsLimit != 128 {
+		t.Errorf("live pids: got %d, want 128", cfg.LiveResources.PidsLimit)
+	}
+	if cfg.LiveResources.LogMaxSize != "10m" {
+		t.Errorf("live log size: got %q, want 10m", cfg.LiveResources.LogMaxSize)
+	}
+	if cfg.LiveResources.LogMaxFile != 3 {
+		t.Errorf("live log files: got %d, want 3", cfg.LiveResources.LogMaxFile)
+	}
+
+	// Paper defaults (lower than live)
+	if cfg.PaperResources.Memory != "128m" {
+		t.Errorf("paper memory: got %q, want 128m", cfg.PaperResources.Memory)
+	}
+	if cfg.PaperResources.CPUs != "0.25" {
+		t.Errorf("paper cpus: got %q, want 0.25", cfg.PaperResources.CPUs)
+	}
+	if cfg.PaperResources.PidsLimit != 64 {
+		t.Errorf("paper pids: got %d, want 64", cfg.PaperResources.PidsLimit)
+	}
+}
+
+func TestLoadConfig_ResourceOverrides(t *testing.T) {
+	setConfigEnv(t,
+		"SUPABASE_URL", "https://x.supabase.co",
+		"SUPABASE_SERVICE_KEY", "k",
+		"MANAGER_TOKEN", "t",
+		"ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef",
+		"CONTAINER_MEMORY", "512m",
+		"CONTAINER_CPUS", "1.0",
+		"CONTAINER_PIDS_LIMIT", "256",
+		"CONTAINER_PAPER_MEMORY", "64m",
+	)
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Live uses the override
+	if cfg.LiveResources.Memory != "512m" {
+		t.Errorf("live memory: got %q, want 512m", cfg.LiveResources.Memory)
+	}
+	if cfg.LiveResources.CPUs != "1.0" {
+		t.Errorf("live cpus: got %q, want 1.0", cfg.LiveResources.CPUs)
+	}
+	if cfg.LiveResources.PidsLimit != 256 {
+		t.Errorf("live pids: got %d, want 256", cfg.LiveResources.PidsLimit)
+	}
+
+	// Paper uses its own override for memory, cascades from live for others
+	if cfg.PaperResources.Memory != "64m" {
+		t.Errorf("paper memory: got %q, want 64m", cfg.PaperResources.Memory)
+	}
+
+	// Paper CPUs not set separately, should cascade from CONTAINER_CPUS
+	if cfg.PaperResources.CPUs != "1.0" {
+		t.Errorf("paper cpus cascade: got %q, want 1.0", cfg.PaperResources.CPUs)
+	}
+}
+
+func TestResourcesForMode(t *testing.T) {
+	cfg := &Config{
+		LiveResources:  ContainerResources{Memory: "256m", CPUs: "0.5", PidsLimit: 128},
+		PaperResources: ContainerResources{Memory: "128m", CPUs: "0.25", PidsLimit: 64},
+	}
+
+	live := cfg.ResourcesForMode(ModeLive)
+	if live.Memory != "256m" {
+		t.Errorf("live: got %q, want 256m", live.Memory)
+	}
+
+	paper := cfg.ResourcesForMode(ModePaper)
+	if paper.Memory != "128m" {
+		t.Errorf("paper: got %q, want 128m", paper.Memory)
+	}
+
+	// Unknown mode falls back to live
+	unknown := cfg.ResourcesForMode("unknown")
+	if unknown.Memory != "256m" {
+		t.Errorf("unknown: got %q, want 256m", unknown.Memory)
 	}
 }
