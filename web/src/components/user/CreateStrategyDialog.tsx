@@ -187,6 +187,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
                   checked={mode === m}
                   onChange={() => setMode(m)}
                   disabled={isLiveOnly && m === 'paper'}
+                  className="h-4 w-4 border-input accent-primary"
                 />
                 {t(`mode.${m}`)}
               </label>

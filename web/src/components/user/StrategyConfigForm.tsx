@@ -39,7 +39,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
                 type="checkbox"
                 checked={Boolean(values[field.key] ?? field.default)}
                 onChange={(e) => handleChange(field.key, e.target.checked)}
-                className="rounded"
+                className="h-4 w-4 rounded border-input accent-primary"
               />
               <span className="text-sm font-medium">
                 {ft(field.key as Parameters<typeof ft>[0])}
