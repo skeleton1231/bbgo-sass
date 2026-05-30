@@ -15,6 +15,15 @@ type MarketSub struct {
 	Depth    string
 }
 
+type ContainerResources struct {
+	Memory     string // --memory, e.g. "256m"
+	MemorySwap string // --memory-swap, e.g. "512m"
+	CPUs       string // --cpus, e.g. "0.5"
+	PidsLimit  int    // --pids-limit
+	LogMaxSize string // --log-opt max-size
+	LogMaxFile int    // --log-opt max-file
+}
+
 type Config struct {
 	Port                int
 	DataDir             string
@@ -36,6 +45,15 @@ type Config struct {
 	BacktestStartTime   string
 	BacktestEndTime     string
 	BacktestSharedDir   string
+	LiveResources       ContainerResources
+	PaperResources      ContainerResources
+}
+
+func (cfg *Config) ResourcesForMode(mode string) ContainerResources {
+	if mode == ModePaper {
+		return cfg.PaperResources
+	}
+	return cfg.LiveResources
 }
 
 func LoadConfig() (*Config, error) {
@@ -60,6 +78,22 @@ func LoadConfig() (*Config, error) {
 		BacktestStartTime:   getEnv("BACKTEST_START_TIME", "2023-12-01"),
 		BacktestEndTime:     getEnv("BACKTEST_END_TIME", "2025-12-31"),
 		BacktestSharedDir:   getEnv("BACKTEST_SHARED_DIR", ""),
+		LiveResources: ContainerResources{
+			Memory:     getEnv("CONTAINER_MEMORY", "256m"),
+			MemorySwap: getEnv("CONTAINER_MEMORY_SWAP", "512m"),
+			CPUs:       getEnv("CONTAINER_CPUS", "0.5"),
+			PidsLimit:  getEnvInt("CONTAINER_PIDS_LIMIT", 128),
+			LogMaxSize: getEnv("CONTAINER_LOG_MAX_SIZE", "10m"),
+			LogMaxFile: getEnvInt("CONTAINER_LOG_MAX_FILE", 3),
+		},
+		PaperResources: ContainerResources{
+			Memory:     getEnv("CONTAINER_PAPER_MEMORY", getEnv("CONTAINER_MEMORY", "128m")),
+			MemorySwap: getEnv("CONTAINER_PAPER_MEMORY_SWAP", getEnv("CONTAINER_MEMORY_SWAP", "256m")),
+			CPUs:       getEnv("CONTAINER_PAPER_CPUS", getEnv("CONTAINER_CPUS", "0.25")),
+			PidsLimit:  getEnvInt("CONTAINER_PAPER_PIDS_LIMIT", getEnvInt("CONTAINER_PIDS_LIMIT", 64)),
+			LogMaxSize: getEnv("CONTAINER_PAPER_LOG_MAX_SIZE", getEnv("CONTAINER_LOG_MAX_SIZE", "10m")),
+			LogMaxFile: getEnvInt("CONTAINER_PAPER_LOG_MAX_FILE", getEnvInt("CONTAINER_LOG_MAX_FILE", 3)),
+		},
 	}
 
 	if cfg.SupabaseURL == "" || cfg.SupabaseKey == "" {

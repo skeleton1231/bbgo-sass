@@ -136,6 +136,7 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		"--workdir", containerDir,
 		"--restart", "unless-stopped",
 	}
+	args = append(args, cm.resourceArgs(uc.Mode)...)
 	args = append(args, cm.envArgs(uc)...)
 	args = append(args,
 		cm.cfg.BBGOImage,
@@ -290,6 +291,30 @@ func buildSyncConfig(exchange, symbol, startTime, endTime string) ([]byte, error
 	cfg.Backtest.EndTime = endTime
 
 	return yaml.Marshal(&cfg)
+}
+
+func (cm *ContainerManager) resourceArgs(mode string) []string {
+	r := cm.cfg.ResourcesForMode(mode)
+	var args []string
+	if r.Memory != "" {
+		args = append(args, "--memory", r.Memory)
+	}
+	if r.MemorySwap != "" {
+		args = append(args, "--memory-swap", r.MemorySwap)
+	}
+	if r.CPUs != "" {
+		args = append(args, "--cpus", r.CPUs)
+	}
+	if r.PidsLimit > 0 {
+		args = append(args, "--pids-limit", fmt.Sprintf("%d", r.PidsLimit))
+	}
+	if r.LogMaxSize != "" {
+		args = append(args, "--log-opt", "max-size="+r.LogMaxSize)
+	}
+	if r.LogMaxFile > 0 {
+		args = append(args, "--log-opt", fmt.Sprintf("max-file=%d", r.LogMaxFile))
+	}
+	return args
 }
 
 func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
