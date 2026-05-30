@@ -91,8 +91,8 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold">{isActive ? strategyCount : 0}</span>
-              <span className="text-sm text-muted-foreground">/ {strategyCount}</span>
+              <span className="text-2xl font-semibold">{strategyCount}</span>
+              <span className="text-sm text-muted-foreground">{t('strategyCount', { count: strategyCount })}</span>
             </div>
           </CardContent>
         </Card>
