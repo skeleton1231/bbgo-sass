@@ -79,6 +79,7 @@ func main() {
 			log.Printf("discovered orphaned container: %s (%s), registering", uid, m)
 			users.AddStrategy(uid, m, StrategyEntry{})
 			users.UpdateStatus(uid, m, StatusRunning)
+			syncer.SyncUser(uid, m)
 		}
 	}
 
@@ -107,7 +108,7 @@ func main() {
 		btSyncPool.Wait()
 	}()
 
-	// Periodic sync and health check
+	// Periodic health check
 	done := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
@@ -118,13 +119,14 @@ func main() {
 				return
 			case <-ticker.C:
 			}
-			syncer.SyncAll()
 			allUsers := users.ListUsers()
 			for _, r := range containerMgr.CheckAndRecover(allUsers) {
 				if r.Error != "" {
 					users.UpdateStatus(r.UserID, r.Mode, StatusError)
+					syncer.SyncUser(r.UserID, r.Mode)
 				}
 				if r.Restarted {
+					syncer.SyncUser(r.UserID, r.Mode)
 					notifier.Dispatch(r.UserID, NotificationEvent{
 						Type:    "container",
 						Title:   "Container Restarted",
