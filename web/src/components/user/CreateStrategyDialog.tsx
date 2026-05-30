@@ -103,7 +103,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}

@@ -98,7 +98,7 @@ export default function NotificationSettingsPage() {
         ))}
       </div>
       {pendingDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingDeleteId(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingDeleteId(null)} onKeyDown={(e) => { if (e.key === 'Escape') setPendingDeleteId(null) }}>
           <div className="rounded-lg bg-card p-6 shadow-lg max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm">{t('remove')}?</p>
             <div className="flex justify-end gap-2 mt-4">
