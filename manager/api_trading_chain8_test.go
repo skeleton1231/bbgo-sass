@@ -30,6 +30,7 @@ func setupCredsAPI(t *testing.T) (*API, func()) {
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(*UserContainer) error { return nil }
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`ok`))

@@ -211,6 +211,7 @@
       "delete": "删除",
       "verified": "已验证",
       "unverified": "未验证",
+      "verifyFailed": "验证失败",
       "required": "此字段为必填项",
       "authRequired": "请重新登录后再添加 API 密钥。",
       "testnetAdded": "测试网 API 密钥已添加。",

@@ -38,6 +38,7 @@ type API struct {
 	containerStart   func(uc *UserContainer) error
 	containerStop    func(userID, mode string)
 	containerRunning func(userID, mode string) bool
+	verifyCredFn     func(exchange, apiKey, apiSecret, passphrase string, isTestnet bool) VerifyResult
 }
 
 func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore) *API {
@@ -251,10 +252,11 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 
 	uc, created := api.users.AddStrategy(userID, req.Mode, entry)
 
-	if uc.Status == StatusRunning {
-		api.users.UpdateStatus(userID, req.Mode, StatusStarting)
-		go api.startUserContainer(userID, req.Mode)
-	} else if created {
+	if uc.Status == StatusRunning || created {
+		if !api.checkCredentialsVerified(userID, req.Mode, uc.Strategies) {
+			writeJSON(w, http.StatusCreated, uc)
+			return
+		}
 		api.users.UpdateStatus(userID, req.Mode, StatusStarting)
 		go api.startUserContainer(userID, req.Mode)
 	}
@@ -366,8 +368,13 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	if api.creds != nil {
 		wantTestnet := mode == ModePaper
 		for _, ex := range collectExchanges(uc.Strategies) {
-			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, wantTestnet); err != nil {
+			cred, err := api.creds.GetByMode(userID, ex, wantTestnet)
+			if err != nil {
 				writeError(w, http.StatusBadRequest, credModeError(mode, ex))
+				return
+			}
+			if !cred.IsVerified && exchangeHasVerifier(ex) {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("API key for %s (%s) is not verified — verification failed or has not been attempted", ex, modeLabel(wantTestnet)))
 				return
 			}
 		}
@@ -393,6 +400,26 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, uc)
 
 	go api.startUserContainer(userID, mode)
+}
+
+// checkCredentialsVerified returns true if all credentials for the given
+// strategies are verified (or the exchange has no verifier). Returns false
+// if any verifiable exchange credential is unverified.
+func (api *API) checkCredentialsVerified(userID, mode string, strategies []StrategyEntry) bool {
+	if api.creds == nil {
+		return true
+	}
+	wantTestnet := mode == ModePaper
+	for _, ex := range collectExchanges(strategies) {
+		cred, err := api.creds.GetByMode(userID, ex, wantTestnet)
+		if err != nil {
+			return false
+		}
+		if !cred.IsVerified && exchangeHasVerifier(ex) {
+			return false
+		}
+	}
+	return true
 }
 
 func (api *API) updateAndPersistStatus(userID, mode, status string) {
@@ -724,6 +751,13 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		IsTestnet:           req.IsTestnet,
 	}
 
+	verifyFn := api.verifyCredFn
+	if verifyFn == nil {
+		verifyFn = verifyCredential
+	}
+	result := verifyFn(req.Exchange, req.APIKey, req.APISecret, req.Passphrase, req.IsTestnet)
+	cred.IsVerified = result.Verified
+
 	if err := api.creds.Upsert(cred); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -733,22 +767,28 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		go api.syncer.SyncCredential(cred)
 	}
 
-	mode := ModeLive
-	if req.IsTestnet {
-		mode = ModePaper
-	}
-	if uc, ok := api.users.Get(userID, mode); ok && uc.Status == StatusRunning {
-		api.users.UpdateStatus(userID, mode, StatusStarting)
-		go api.startUserContainer(userID, mode)
+	if cred.IsVerified {
+		mode := ModeLive
+		if req.IsTestnet {
+			mode = ModePaper
+		}
+		if uc, ok := api.users.Get(userID, mode); ok && uc.Status == StatusRunning {
+			api.users.UpdateStatus(userID, mode, StatusStarting)
+			go api.startUserContainer(userID, mode)
+		}
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
+	resp := map[string]interface{}{
 		"id":          cred.ID,
 		"user_id":     cred.UserID,
 		"exchange":    cred.Exchange,
 		"is_testnet":  cred.IsTestnet,
 		"is_verified": cred.IsVerified,
-	})
+	}
+	if !result.Verified {
+		resp["verify_error"] = result.Error
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (api *API) ListCredentials(w http.ResponseWriter, r *http.Request) {

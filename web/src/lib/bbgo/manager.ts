@@ -426,6 +426,7 @@ export interface CredentialInfo {
   exchange: string
   is_testnet: boolean
   is_verified: boolean
+  verify_error?: string
 }
 
 export function fetchCredentials(_userId: string) {

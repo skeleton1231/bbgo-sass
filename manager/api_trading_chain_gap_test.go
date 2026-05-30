@@ -255,7 +255,7 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 	tnSec, _ := enc.Encrypt("tn-secret")
 	creds.Upsert(ExchangeCredential{
 		ID: "tn1", UserID: userID, Exchange: "binance",
-		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true, IsVerified: true,
 	})
 
 	cfg := &Config{
@@ -272,6 +272,7 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	var capturedArgs []string
 	api.containerStart = func(uc *UserContainer) error {
@@ -378,6 +379,7 @@ func TestTradingChain_LiveMode_FullFlow(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	var capturedArgs []string
 	api.containerStart = func(uc *UserContainer) error {

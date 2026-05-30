@@ -211,6 +211,7 @@
       "delete": "Delete",
       "verified": "Verified",
       "unverified": "Unverified",
+      "verifyFailed": "Verification failed",
       "required": "This field is required",
       "authRequired": "Please sign in again to add API keys.",
       "testnetAdded": "Testnet API key added.",

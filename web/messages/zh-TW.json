@@ -211,6 +211,7 @@
       "delete": "刪除",
       "verified": "已驗證",
       "unverified": "未驗證",
+      "verifyFailed": "驗證失敗",
       "required": "此欄位為必填",
       "authRequired": "請重新登入後再新增 API 金鑰。",
       "testnetAdded": "測試網 API 金鑰已新增。",

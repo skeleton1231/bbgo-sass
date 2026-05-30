@@ -211,6 +211,7 @@
       "delete": "削除",
       "verified": "検証済み",
       "unverified": "未検証",
+      "verifyFailed": "検証に失敗しました",
       "required": "この項目は必須です",
       "authRequired": "APIキーを追加するには再度ログインしてください。",
       "testnetAdded": "テストネットAPIキーを追加しました。",

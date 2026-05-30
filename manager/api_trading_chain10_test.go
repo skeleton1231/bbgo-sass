@@ -75,6 +75,7 @@ func chain10Setup(t *testing.T) (*API, *chi.Mux, *httptest.Server) {
 	api.containerStart = func(_ *UserContainer) error { return nil }
 	api.containerStop = func(_, _ string) {}
 	api.containerRunning = func(_, _ string) bool { return true }
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -1076,7 +1077,7 @@ func TestTradingChain_StartUser_AlreadyRunning(t *testing.T) {
 	secretEnc, _ := api.encryptor.Encrypt("secret")
 	api.creds.Upsert(ExchangeCredential{
 		ID: "cred-live", UserID: chain10UID, Exchange: "binance",
-		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
+		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc, IsVerified: true,
 	})
 
 	api.users.AddStrategy(chain10UID, ModeLive, StrategyEntry{
@@ -1112,7 +1113,7 @@ func TestTradingChain_StartUser_StartsAsync(t *testing.T) {
 	secretEnc, _ := api.encryptor.Encrypt("secret")
 	api.creds.Upsert(ExchangeCredential{
 		ID: "cred-live", UserID: chain10UID, Exchange: "binance",
-		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
+		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc, IsVerified: true,
 	})
 
 	// Mock bbgo container that responds to ping

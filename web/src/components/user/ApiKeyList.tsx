@@ -52,8 +52,12 @@ export function ApiKeyList() {
     createMut.mutate(
       { exchange, api_key: apiKey, api_secret: apiSecret, passphrase: passphrase || undefined, is_testnet: isTestnet },
       {
-        onSuccess: () => {
-          toast.success(isTestnet ? t('testnetAdded') : t('added'))
+        onSuccess: (data) => {
+          if (data.is_verified) {
+            toast.success(isTestnet ? t('testnetAdded') : t('added'))
+          } else {
+            toast.error(t('verifyFailed'))
+          }
           setShowAdd(false)
           setApiKey('')
           setApiSecret('')
@@ -92,7 +96,7 @@ export function ApiKeyList() {
                 {cred.is_verified ? (
                   <span className="rounded-md bg-green-100 text-green-700 px-2 py-1 text-xs">{t('verified')}</span>
                 ) : (
-                  <span className="rounded-md bg-yellow-100 text-yellow-700 px-2 py-1 text-xs">{t('unverified')}</span>
+                  <span className="rounded-md bg-red-100 text-red-700 px-2 py-1 text-xs" title={cred.verify_error}>{t('verifyFailed')}</span>
                 )}
               </div>
               <button

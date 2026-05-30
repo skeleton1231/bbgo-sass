@@ -185,6 +185,21 @@ func (cs *CredentialStore) GetDecryptedByMode(userID, exchange string, wantTestn
 	return "", "", "", fmt.Errorf("no %s credentials for exchange %s", modeLabel(wantTestnet), exchange)
 }
 
+func (cs *CredentialStore) GetByMode(userID, exchange string, wantTestnet bool) (*ExchangeCredential, error) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	creds, err := cs.loadAll(userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range creds {
+		if c.Exchange == exchange && c.IsTestnet == wantTestnet {
+			return &c, nil
+		}
+	}
+	return nil, fmt.Errorf("no %s credentials for exchange %s", modeLabel(wantTestnet), exchange)
+}
+
 func modeLabel(isTestnet bool) string {
 	if isTestnet {
 		return "testnet"

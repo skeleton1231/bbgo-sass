@@ -208,6 +208,7 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 		return nil
 	}
 	api.containerRunning = func(_, _ string) bool { return true }
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
