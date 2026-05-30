@@ -32,13 +32,14 @@ export function useMarketData({ userId, mode, enabled = true, onMessage }: UseWe
   const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const onMessageRef = useRef(onMessage)
   const connectRef = useRef<() => void>(() => {})
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     onMessageRef.current = onMessage
   }, [onMessage])
 
   const connect = useCallback(async () => {
-    if (!enabled || !userId) return
+    if (!enabled || !userId || !mountedRef.current) return
 
     try {
       const params = new URLSearchParams()
@@ -77,6 +78,7 @@ export function useMarketData({ userId, mode, enabled = true, onMessage }: UseWe
   useEffect(() => {
     connect()
     return () => {
+      mountedRef.current = false
       clearTimeout(reconnectRef.current)
       wsRef.current?.close()
     }
