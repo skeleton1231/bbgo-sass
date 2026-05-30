@@ -16,6 +16,7 @@ export default function NotificationSettingsPage() {
   const t = useTranslations('Settings.notifications')
   const [configs, setConfigs] = useState<NotificationConfigInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchNotificationConfigs()
@@ -46,7 +47,7 @@ export default function NotificationSettingsPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold">{t('title')}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t('description')}</p>
       </div>
 
@@ -90,12 +91,23 @@ export default function NotificationSettingsPage() {
                 </span>
               </div>
             </div>
-            <button onClick={() => handleDelete(cfg.id)} className="text-sm text-destructive hover:underline">
+            <button onClick={() => setPendingDeleteId(cfg.id)} className="text-sm text-destructive hover:underline">
               {t('remove')}
             </button>
           </div>
         ))}
       </div>
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingDeleteId(null)}>
+          <div className="rounded-lg bg-card p-6 shadow-lg max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm">{t('remove')}?</p>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setPendingDeleteId(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">{t('cancel')}</button>
+              <button onClick={() => { handleDelete(pendingDeleteId); setPendingDeleteId(null) }} className="rounded-md bg-destructive px-4 py-2 text-sm text-destructive-foreground hover:bg-destructive/90">{t('remove')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -161,15 +173,15 @@ function AddChannelForm({
       )}
       <div className="flex gap-4 text-sm">
         <label className="flex items-center gap-1">
-          <input type="checkbox" checked={rules.trade_events} onChange={(e) => setRules({ ...rules, trade_events: e.target.checked })} />
+          <input type="checkbox" checked={rules.trade_events} onChange={(e) => setRules({ ...rules, trade_events: e.target.checked })} className="h-4 w-4 rounded border-input accent-primary" />
           {t('trades')}
         </label>
         <label className="flex items-center gap-1">
-          <input type="checkbox" checked={rules.order_events} onChange={(e) => setRules({ ...rules, order_events: e.target.checked })} />
+          <input type="checkbox" checked={rules.order_events} onChange={(e) => setRules({ ...rules, order_events: e.target.checked })} className="h-4 w-4 rounded border-input accent-primary" />
           {t('orders')}
         </label>
         <label className="flex items-center gap-1">
-          <input type="checkbox" checked={rules.container_health} onChange={(e) => setRules({ ...rules, container_health: e.target.checked })} />
+          <input type="checkbox" checked={rules.container_health} onChange={(e) => setRules({ ...rules, container_health: e.target.checked })} className="h-4 w-4 rounded border-input accent-primary" />
           {t('health')}
         </label>
       </div>
