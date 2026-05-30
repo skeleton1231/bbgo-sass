@@ -27,6 +27,7 @@
     "loginSubtitle": "Sign in to your account to continue",
     "signupSuccess": "Account created! Please check your email to confirm, then sign in.",
     "sessionExpired": "Your session has expired. Please sign in again.",
+    "dismiss": "Dismiss",
     "required": "Email and password are required",
     "allFieldsRequired": "All fields are required",
     "connectionError": "Unable to connect to authentication service. Please try again.",

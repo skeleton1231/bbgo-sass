@@ -27,6 +27,7 @@
     "loginSubtitle": "アカウントにログインして続行",
     "signupSuccess": "アカウントが作成されました！メールを確認してからログインしてください。",
     "sessionExpired": "セッションが期限切れです。再度ログインしてください。",
+    "dismiss": "閉じる",
     "required": "メールアドレスとパスワードは必須です",
     "allFieldsRequired": "すべての項目は必須です",
     "connectionError": "認証サービスに接続できません。もう一度お試しください。",

@@ -27,7 +27,7 @@ export function SessionExpiredBanner() {
         type="button"
         onClick={() => setShow(false)}
         className="ml-auto text-destructive/60 hover:text-destructive"
-        aria-label="Dismiss"
+        aria-label={t('dismiss')}
       >
         &times;
       </button>

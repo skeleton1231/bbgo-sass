@@ -27,6 +27,7 @@
     "loginSubtitle": "계속하려면 계정에 로그인하세요",
     "signupSuccess": "계정이 생성되었습니다! 이메일을 확인한 후 로그인하세요.",
     "sessionExpired": "세션이 만료되었습니다. 다시 로그인해 주세요.",
+    "dismiss": "닫기",
     "required": "이메일과 비밀번호는 필수입니다",
     "allFieldsRequired": "모든 필드는 필수입니다",
     "connectionError": "인증 서비스에 연결할 수 없습니다. 다시 시도해 주세요.",
