@@ -86,9 +86,17 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
   deleteDisabled: boolean
 }) {
   const t = useTranslations('Bots')
-  const { data: botsResp, isLoading } = useBotList(userId, mode)
+  const { data: botsResp, isLoading, isError } = useBotList(userId, mode)
   const startUser = useStartUser()
   const stopUser = useStopUser()
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border bg-destructive/10 p-6 text-center text-destructive">
+        {t('errorLoading')}
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
