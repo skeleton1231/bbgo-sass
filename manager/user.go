@@ -346,9 +346,11 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		ExchangeStrategies:      exchangeStrategies,
 		CrossExchangeStrategies: crossStrategies,
 	}
-	cfg.Environment = &environmentConfig{DisableStartupBalanceQuery: true}
+	cfg.Environment = &environmentConfig{}
 	if uc.Mode == ModePaper {
 		cfg.Environment.PaperTrade = "1"
+	} else {
+		cfg.Environment.DisableStartupBalanceQuery = true
 	}
 
 	out, err := yaml.Marshal(cfg)

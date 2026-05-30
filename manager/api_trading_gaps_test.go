@@ -237,7 +237,7 @@ func TestAPI_PnL_SupabaseFallback_WhenStopped(t *testing.T) {
 
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		if r.URL.Path == "/rest/v1/sync_trades" {
+		if r.URL.Path == "/rest/v1/trades" {
 			json.NewEncoder(w).Encode([]map[string]interface{}{
 				{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1", "fee": "10", "traded_at": "2024-01-01"},
 				{"symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1", "fee": "10", "traded_at": "2024-01-02"},

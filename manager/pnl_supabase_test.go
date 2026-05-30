@@ -74,7 +74,7 @@ func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http
 func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 	setup := setupPnLTest(t, StatusRunning,
 		func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/rest/v1/sync_trades" {
+			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode([]map[string]interface{}{
 					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1.0", "fee": "25", "traded_at": "2024-01-01T00:00:00Z"},
@@ -119,7 +119,7 @@ func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
 	setup := setupPnLTest(t, StatusRunning,
 		func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/rest/v1/sync_trades" {
+			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode([]interface{}{})
 				return
@@ -159,7 +159,7 @@ func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
 func TestBBGoPnL_WorksWhenContainerStopped(t *testing.T) {
 	setup := setupPnLTest(t, StatusStopped,
 		func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/rest/v1/sync_trades" {
+			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode([]map[string]interface{}{
 					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.5", "fee": "12.5", "traded_at": "2024-01-01T00:00:00Z"},
@@ -183,8 +183,8 @@ func TestBBGoPnL_WorksWhenContainerStopped(t *testing.T) {
 
 func TestSyncer_GetTradesForPnL(t *testing.T) {
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/rest/v1/sync_trades" {
-			t.Errorf("expected /rest/v1/sync_trades, got %s", r.URL.Path)
+		if r.URL.Path != "/rest/v1/trades" {
+			t.Errorf("expected /rest/v1/trades, got %s", r.URL.Path)
 		}
 		if r.Header.Get("apikey") != "test-key" {
 			t.Errorf("expected apikey test-key, got %s", r.Header.Get("apikey"))
@@ -275,8 +275,8 @@ func TestSyncer_GetTradesForPnL_Pagination(t *testing.T) {
 	callCount := 0
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
-		if r.URL.Path != "/rest/v1/sync_trades" {
-			t.Errorf("expected /rest/v1/sync_trades, got %s", r.URL.Path)
+		if r.URL.Path != "/rest/v1/trades" {
+			t.Errorf("expected /rest/v1/trades, got %s", r.URL.Path)
 		}
 
 		offset := r.URL.Query().Get("offset")
