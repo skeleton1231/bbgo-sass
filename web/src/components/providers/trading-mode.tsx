@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useCallback, useEffect, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 export type TradingMode = 'live' | 'paper'
@@ -12,6 +12,15 @@ function readStoredMode(): TradingMode {
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored === 'live' || stored === 'paper') return stored
   return DEFAULT_MODE
+}
+
+function getServerSnapshot(): TradingMode {
+  return DEFAULT_MODE
+}
+
+function subscribe(callback: () => void) {
+  window.addEventListener('storage', callback)
+  return () => window.removeEventListener('storage', callback)
 }
 
 const TradingModeContext = createContext<{
@@ -26,44 +35,26 @@ export function TradingModeProvider({ children }: { children: React.ReactNode })
   const searchParams = useSearchParams()
   const urlMode = searchParams.get('mode')
 
-  // Always initialize with DEFAULT_MODE so SSR and first client render match.
-  // Sync from localStorage in useEffect (after hydration).
-  const [mode, setModeState] = useState<TradingMode>(DEFAULT_MODE)
+  const storedMode = useSyncExternalStore(subscribe, readStoredMode, getServerSnapshot)
 
-  useEffect(() => {
-    const stored = readStoredMode()
-    if (stored !== mode) {
-      setModeState(stored)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only sync from localStorage
-
-  // React to URL ?mode= changes on SPA navigation
+  // Persist URL ?mode= to localStorage — useSyncExternalStore picks up the change
   useEffect(() => {
     if (urlMode === 'live' || urlMode === 'paper') {
-      if (urlMode !== mode) {
+      const current = localStorage.getItem(STORAGE_KEY)
+      if (current !== urlMode) {
         localStorage.setItem(STORAGE_KEY, urlMode)
-        setModeState(urlMode)
+        window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: urlMode }))
       }
     }
-  }, [urlMode]) // eslint-disable-line react-hooks/exhaustive-deps -- only react to URL changes
+  }, [urlMode])
 
   const setMode = useCallback((m: TradingMode) => {
-    setModeState(m)
     localStorage.setItem(STORAGE_KEY, m)
-  }, [])
-
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && (e.newValue === 'live' || e.newValue === 'paper')) {
-        setModeState(e.newValue)
-      }
-    }
-    window.addEventListener('storage', handler)
-    return () => window.removeEventListener('storage', handler)
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: m }))
   }, [])
 
   return (
-    <TradingModeContext.Provider value={{ mode, setMode }}>
+    <TradingModeContext.Provider value={{ mode: storedMode, setMode }}>
       {children}
     </TradingModeContext.Provider>
   )

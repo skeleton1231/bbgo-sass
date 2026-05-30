@@ -167,7 +167,9 @@ export default function BotDetailPage() {
       }
     }
     return lines
-  }, [strategyStatesData, currentPrice, findMatchingStrategy, t]) = useMemo(() => {
+  }, [strategyStatesData, currentPrice, findMatchingStrategy, t])
+
+  const indicatorLines = useMemo(() => {
     if (candles.length === 0) return []
     const closes = candles.map((c) => ({ time: c.time, close: c.close }))
     const lines: Array<{
