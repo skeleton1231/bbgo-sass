@@ -93,7 +93,7 @@ export function Sidebar() {
   )
 }
 
-export function MobileSidebar() {
+export function MobileSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-2.5 px-5">
@@ -105,7 +105,7 @@ export function MobileSidebar() {
 
       <Separator className="bg-sidebar-border" />
 
-      <SidebarNav />
+      <SidebarNav onNavigate={onNavigate} />
     </div>
   )
 }

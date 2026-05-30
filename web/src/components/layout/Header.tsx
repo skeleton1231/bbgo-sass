@@ -100,7 +100,7 @@ export function Header({ email }: { email?: string }) {
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-[240px] p-0" showCloseButton={false}>
           <SheetTitle className="sr-only">{t('navigation')}</SheetTitle>
-          <MobileSidebar />
+          <MobileSidebar onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
     </>
