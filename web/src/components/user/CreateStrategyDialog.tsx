@@ -103,8 +103,11 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="presentation" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
       <form
+        role="dialog"
+        aria-modal="true"
+
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4 rounded-lg bg-card p-6 shadow-lg"
