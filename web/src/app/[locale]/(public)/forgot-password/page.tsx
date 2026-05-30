@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Link } from '@/i18n/navigation'
-import { Activity } from 'lucide-react'
+import { Activity, AlertCircle } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('Auth')
@@ -43,7 +43,8 @@ export default function ForgotPasswordPage() {
           </div>
 
           {state?.error && (
-            <div className="rounded-lg bg-destructive/10 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
               <p className="text-sm text-destructive">{state.error}</p>
             </div>
           )}
