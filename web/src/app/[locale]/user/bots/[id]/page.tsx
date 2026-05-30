@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -82,10 +82,9 @@ export default function BotDetailPage() {
   const exchange = bot?.exchange ?? ''
   const symbol = (bot?.config?.symbol as string) ?? ''
 
-  const [activeSession, setactiveSession] = useState('')
+  const [selectedSession, setSelectedSession] = useState('')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [indicators, setIndicators] = useState<IndicatorConfig[]>(DEFAULT_INDICATORS)
-  const [showPnlCurve, setShowPnlCurve] = useState(true)
 
   const toggleIndicator = useCallback((id: string) => {
     setIndicators((prev) =>
@@ -97,10 +96,7 @@ export default function BotDetailPage() {
   const { data: sessionsData } = useBotSessions(userId, mode)
   const sessions = sessionsData?.sessions ?? []
   const firstSession = sessions[0]?.name ?? ''
-
-  useEffect(() => {
-    if (!activeSession && firstSession) setactiveSession(firstSession)
-  }, [firstSession, activeSession])
+  const activeSession = selectedSession || firstSession
 
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode)
   const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode)
@@ -171,7 +167,7 @@ export default function BotDetailPage() {
       }
     }
     return lines
-  }, [strategyStatesData?.strategies, currentPrice, findMatchingStrategy])
+  }, [strategyStatesData, currentPrice, findMatchingStrategy])
 
   const indicatorLines = useMemo(() => {
     if (candles.length === 0) return []
@@ -206,7 +202,7 @@ export default function BotDetailPage() {
   }, [candles, indicators])
 
   const pnlLine = useMemo(() => {
-    if (!showPnlCurve || !tradesData?.trades || tradesData.trades.length === 0) return null
+    if (!tradesData?.trades || tradesData.trades.length === 0) return null
     const curve = computePnlCurve(
       tradesData.trades.map((t) => ({
         time: t.tradedAt,
@@ -223,14 +219,14 @@ export default function BotDetailPage() {
       priceScaleId: 'pnl', scaleMargins: { top: 0.75, bottom: 0 },
       data: curve,
     }
-  }, [tradesData?.trades])
+  }, [tradesData])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
     const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
     if (!matching) return null
     return extractStrategyStats(matching as Record<string, unknown>)
-  }, [strategyStatesData?.strategies, findMatchingStrategy])
+  }, [strategyStatesData, findMatchingStrategy])
 
   interface DepthMessage {
     type: string
@@ -257,7 +253,7 @@ export default function BotDetailPage() {
   const startUser = useStartUser()
   const stopUser = useStopUser()
 
-  const trades = tradesData?.trades ?? []
+  const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
   const tradePositionTags = useMemo(
     () => computePositionTags(trades),
     [trades]
@@ -390,7 +386,7 @@ export default function BotDetailPage() {
               key={s.name}
               variant={activeSession === s.name ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setactiveSession(s.name)}
+              onClick={() => setSelectedSession(s.name)}
               className="rounded-full text-xs"
             >
               {s.exchange || s.name}

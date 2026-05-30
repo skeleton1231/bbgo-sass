@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
 import type { BacktestJob } from '@/lib/bbgo/queries'
@@ -26,7 +26,7 @@ function toLocalDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-export function BacktestPanel({ userId }: { userId: string }) {
+export function BacktestPanel() {
   const t = useTranslations('Backtest')
   const ct = useTranslations('Categories')
   const submitBacktest = useSubmitBacktest()
@@ -34,56 +34,55 @@ export function BacktestPanel({ userId }: { userId: string }) {
 
   const [strategy, setStrategy] = useState('grid2')
   const [exchange, setExchange] = useState('binance')
-  const [symbol, setSymbol] = useState('BTCUSDT')
+  const [rawSymbol, setRawSymbol] = useState('BTCUSDT')
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
   const [startTime, setStartTime] = useState('2024-01-01')
   const [endTime, setEndTime] = useState('2024-03-01')
   const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true, excludeCrossExchange: true })
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
-  const [lastResult, setLastResult] = useState<BacktestJob | null>(null)
-  const prevSymbolRef = useRef(symbol)
+  const [manualResult, setManualResult] = useState<BacktestJob | null>(null)
+  const [priceSymbol, setPriceSymbol] = useState('')
 
   const { data: symbolsData } = useMarketSymbols(exchange)
-  const { data: tickerData } = useMarketTicker(exchange, symbol)
 
   const schema = getStrategySchema(strategy)
   const formFields = schema ? schema.fields.filter((f) => f.key !== 'symbol') : []
 
   const filteredSymbols = filterSymbols(symbolsData?.symbols ?? [])
-  const displaySymbol = filteredSymbols.includes(symbol) ? symbol : (filteredSymbols[0] ?? '')
+  const symbol = filteredSymbols.includes(rawSymbol) ? rawSymbol : (filteredSymbols[0] ?? '')
+  const displaySymbol = symbol
 
-  useEffect(() => {
-    if (displaySymbol && displaySymbol !== symbol) {
-      setSymbol(displaySymbol)
-      setConfig((prev) => ({ ...prev, symbol: displaySymbol }))
-    }
-  }, [displaySymbol, symbol])
+  const { data: tickerData } = useMarketTicker(exchange, symbol)
 
   const { data: activeJob } = useBacktestJob(activeJobId)
 
-  // Auto-set upperPrice/lowerPrice from ticker only when symbol changes
-  useEffect(() => {
-    if (prevSymbolRef.current === symbol) return
-    prevSymbolRef.current = symbol
+  const recentJobs = (jobsData?.jobs ?? [])
+    .filter((j) => j.status === 'completed' || j.status === 'failed')
+    .slice(0, 5)
+
+  const completedJob = activeJob && (activeJob.status === 'completed' || activeJob.status === 'failed') ? activeJob : null
+  const lastResult = completedJob ?? manualResult ?? recentJobs[0] ?? null
+
+  const configWithTickerPrices = useMemo(() => {
+    if (priceSymbol !== rawSymbol) return config
     const ticker = tickerData?.ticker
-    if (!ticker || !ticker.close) return
+    if (!ticker?.close) return config
     const hasPriceFields = schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')
-    if (!hasPriceFields) return
+    if (!hasPriceFields) return config
     const price = ticker.close
     const range = price * 0.2
-    setConfig((prev) => ({
-      ...prev,
-      symbol,
+    return {
+      ...config,
       upperPrice: Math.round((price + range) * 100) / 100,
       lowerPrice: Math.round((price - range) * 100) / 100,
-    }))
-  }, [tickerData, schema?.fields, symbol])
-
-  useEffect(() => {
-    if (activeJob && (activeJob.status === 'completed' || activeJob.status === 'failed')) {
-      setLastResult(activeJob)
     }
-  }, [activeJob])
+  }, [config, tickerData?.ticker, schema?.fields, priceSymbol, rawSymbol])
+
+  const handleSymbolChange = useCallback((newSymbol: string) => {
+    setRawSymbol(newSymbol)
+    setPriceSymbol(newSymbol)
+    setConfig((prev) => ({ ...prev, symbol: newSymbol }))
+  }, [])
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
@@ -92,11 +91,10 @@ export function BacktestPanel({ userId }: { userId: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLastResult(null)
     try {
       const result = await submitBacktest.mutateAsync({
         strategy,
-        config: { ...config, exchange, symbol: displaySymbol },
+        config: { ...configWithTickerPrices, exchange, symbol: displaySymbol },
         exchange,
         symbol: displaySymbol,
         start_time: startTime,
@@ -109,10 +107,6 @@ export function BacktestPanel({ userId }: { userId: string }) {
   }
 
   const isRunning = !!activeJobId && (activeJob?.status === 'pending' || activeJob?.status === 'downloading' || activeJob?.status === 'running')
-
-  const recentJobs = (jobsData?.jobs ?? [])
-    .filter((j) => j.status === 'completed' || j.status === 'failed')
-    .slice(0, 5)
 
   return (
     <div className="space-y-6">
@@ -145,7 +139,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
               value={exchange}
               onChange={(e) => {
                 setExchange(e.target.value)
-                setSymbol('')
+                setRawSymbol('')
                 setConfig(getStrategyDefaults(strategy))
               }}
               disabled={isRunning}
@@ -161,14 +155,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
             <label className="block text-sm font-medium mb-1">{t('symbol')}</label>
             <select
               value={displaySymbol}
-              onChange={(e) => {
-                const newSymbol = e.target.value
-                setSymbol(newSymbol)
-                setConfig((prev) => ({
-                  ...prev,
-                  symbol: newSymbol,
-                }))
-              }}
+              onChange={(e) => handleSymbolChange(e.target.value)}
               disabled={isRunning || !filteredSymbols.length}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             >
@@ -312,7 +299,7 @@ export function BacktestPanel({ userId }: { userId: string }) {
             {recentJobs.map((job) => (
               <button
                 key={job.id}
-                onClick={() => setLastResult(job)}
+                onClick={() => setManualResult(job)}
                 className="w-full text-left flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
               >
                 <span className="truncate">

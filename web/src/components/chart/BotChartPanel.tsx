@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/error-boundary'

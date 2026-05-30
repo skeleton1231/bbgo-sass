@@ -38,7 +38,6 @@ export function OhlcvLegend({ data, symbol, previousClose }: OhlcvLegendProps) {
   }
 
   const change = data.close - data.open
-  const changePct = data.open > 0 ? (change / data.open) * 100 : 0
   const isUp = change >= 0
 
   const refClose = previousClose ?? data.open

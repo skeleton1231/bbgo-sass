@@ -31,9 +31,12 @@ export function useMarketData({ userId, mode, enabled = true, onMessage }: UseWe
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const onMessageRef = useRef(onMessage)
-  onMessageRef.current = onMessage
-
   const connectRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    onMessageRef.current = onMessage
+  }, [onMessage])
+
   const connect = useCallback(async () => {
     if (!enabled || !userId) return
 
@@ -66,7 +69,10 @@ export function useMarketData({ userId, mode, enabled = true, onMessage }: UseWe
       reconnectRef.current = setTimeout(() => connectRef.current(), 5_000)
     }
   }, [userId, mode, enabled])
-  connectRef.current = connect
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   useEffect(() => {
     connect()

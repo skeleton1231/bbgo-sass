@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Time } from 'lightweight-charts'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
 import type { KlineCandle } from '@/components/chart/CandlestickChart'
@@ -23,44 +24,40 @@ interface UseKlineDataOptions {
   enabled?: boolean
 }
 
+function parseKlineRaw(k: { time: string | number; open: string; high: string; low: string; close: string; volume: string }): KlineCandle {
+  return {
+    time: (typeof k.time === 'string' ? Math.floor(new Date(k.time).getTime() / 1000) : Math.floor(Number(k.time) / 1000)) as Time,
+    open: parseFloat(k.open),
+    high: parseFloat(k.high),
+    low: parseFloat(k.low),
+    close: parseFloat(k.close),
+    volume: parseFloat(k.volume || '0'),
+  }
+}
+
 export function useKlineData({ userId, exchange, symbol, interval, enabled = true }: UseKlineDataOptions) {
-  const [candles, setCandles] = useState<KlineCandle[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const queryClient = useQueryClient()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const loadingMoreRef = useRef(false)
   const wsCandlesRef = useRef<Map<string, KlineCandle>>(new Map())
   const earliestTimeRef = useRef<number | null>(null)
-  const loadingMoreRef = useRef(false)
 
-  const fetchHistoricalKlines = useCallback(async () => {
-    if (!exchange || !symbol || !enabled) return
+  const queryKey = useMemo(() => ['klines', exchange, symbol, interval] as const, [exchange, symbol, interval])
 
-    setCandles([])
-    setIsLoading(true)
-    setError(null)
-    earliestTimeRef.current = null
-
-    try {
+  const { data: candles = [], isLoading, error, refetch } = useQuery<KlineCandle[]>({
+    queryKey,
+    queryFn: async () => {
+      if (!exchange || !symbol) return []
       const params = new URLSearchParams({
         symbol,
         interval: interval || '1h',
         limit: '200',
       })
       const res = await fetch(`/api/manager/markets/${encodeURIComponent(exchange)}/klines?${params}`)
-      if (!res.ok) {
-        throw new Error(`Failed to fetch klines: ${res.status}`)
-      }
+      if (!res.ok) throw new Error(`Failed to fetch klines: ${res.status}`)
       const data = await res.json()
-      const klines: KlineCandle[] = (data.klines || []).map((k: { time: string | number; open: string; high: string; low: string; close: string; volume: string }) => ({
-        time: (typeof k.time === 'string' ? Math.floor(new Date(k.time).getTime() / 1000) : Math.floor(Number(k.time) / 1000)) as Time,
-        open: parseFloat(k.open),
-        high: parseFloat(k.high),
-        low: parseFloat(k.low),
-        close: parseFloat(k.close),
-        volume: parseFloat(k.volume || '0'),
-      }))
+      const klines: KlineCandle[] = (data.klines || []).map(parseKlineRaw)
 
-      setCandles(klines)
       wsCandlesRef.current.clear()
       for (const k of klines) {
         wsCandlesRef.current.set(String(k.time), k)
@@ -68,12 +65,11 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
       if (klines.length > 0 && klines[0]) {
         earliestTimeRef.current = klines[0].time as number
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load kline data')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [exchange, symbol, interval, enabled])
+      return klines
+    },
+    enabled: enabled && !!exchange && !!symbol,
+    staleTime: 60_000,
+  })
 
   const loadEarlierKlines = useCallback(async () => {
     if (!exchange || !symbol || !enabled || loadingMoreRef.current || !earliestTimeRef.current) return
@@ -93,15 +89,7 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
       if (!res.ok) return
 
       const data = await res.json()
-      const olderKlines: KlineCandle[] = (data.klines || []).map((k: { time: string | number; open: string; high: string; low: string; close: string; volume: string }) => ({
-        time: (typeof k.time === 'string' ? Math.floor(new Date(k.time).getTime() / 1000) : Math.floor(Number(k.time) / 1000)) as Time,
-        open: parseFloat(k.open),
-        high: parseFloat(k.high),
-        low: parseFloat(k.low),
-        close: parseFloat(k.close),
-        volume: parseFloat(k.volume || '0'),
-      }))
-
+      const olderKlines: KlineCandle[] = (data.klines || []).map(parseKlineRaw)
       if (olderKlines.length === 0) return
 
       for (const k of olderKlines) {
@@ -113,16 +101,12 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
 
       const sorted = Array.from(wsCandlesRef.current.values())
         .sort((a, b) => (a.time as number) - (b.time as number))
-      setCandles(sorted)
+      queryClient.setQueryData(queryKey, sorted)
     } finally {
       loadingMoreRef.current = false
       setIsLoadingMore(false)
     }
-  }, [exchange, symbol, interval, enabled])
-
-  useEffect(() => {
-    fetchHistoricalKlines()
-  }, [fetchHistoricalKlines])
+  }, [exchange, symbol, interval, enabled, queryClient, queryKey])
 
   const handleWSMessage = useCallback((msg: { type: string; data: { exchange?: string; symbol?: string; channel?: string; kline?: KlineUpdate } }) => {
     if (msg.type !== 'market') return
@@ -146,9 +130,10 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
     if (isNew) {
       const sorted = Array.from(wsCandlesRef.current.values())
         .sort((a, b) => (a.time as number) - (b.time as number))
-      setCandles(sorted)
+      queryClient.setQueryData(queryKey, sorted)
     } else {
-      setCandles(prev => {
+      queryClient.setQueryData(queryKey, (prev: KlineCandle[] | undefined) => {
+        if (!prev) return prev
         const idx = prev.findIndex(c => c.time === time)
         if (idx === -1) return prev
         const next = [...prev]
@@ -156,7 +141,7 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
         return next
       })
     }
-  }, [exchange, symbol])
+  }, [exchange, symbol, queryClient, queryKey])
 
   useMarketData({
     userId,
@@ -164,5 +149,12 @@ export function useKlineData({ userId, exchange, symbol, interval, enabled = tru
     onMessage: handleWSMessage,
   })
 
-  return { candles, isLoading, isLoadingMore, error, refetch: fetchHistoricalKlines, loadEarlierKlines }
+  return {
+    candles,
+    isLoading,
+    isLoadingMore,
+    error: error?.message ?? null,
+    refetch,
+    loadEarlierKlines,
+  }
 }

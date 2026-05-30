@@ -1,22 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { AlertCircle } from 'lucide-react'
 
 export function SessionExpiredBanner() {
   const t = useTranslations('Auth')
-  const [show, setShow] = useState(false)
-
-  useEffect(() => {
+  const [show, setShow] = useState(() => {
+    if (typeof window === 'undefined') return false
     const msg = sessionStorage.getItem('bbgo-auth-message')
     if (msg === 'session_expired') {
-      setShow(true)
       sessionStorage.removeItem('bbgo-auth-message')
-    } else {
-      sessionStorage.removeItem('bbgo-auth-message')
+      return true
     }
-  }, [])
+    sessionStorage.removeItem('bbgo-auth-message')
+    return false
+  })
 
   if (!show) return null
 

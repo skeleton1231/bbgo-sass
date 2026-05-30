@@ -126,16 +126,21 @@ export function CandlestickChart({
   const onVisibleRangeChangeRef = useRef(onVisibleTimeRangeChange)
   const onCrosshairMoveRef = useRef(onCrosshairMove)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: TradeMarker } | null>(null)
-  onVisibleRangeChangeRef.current = onVisibleTimeRangeChange
-  onCrosshairMoveRef.current = onCrosshairMove
   const onCandleHoverRef = useRef(onCandleHover)
-  onCandleHoverRef.current = onCandleHover
   const prevMarkersKeyRef = useRef('')
 
-  if (prevDataKeyRef.current !== dataKey) {
-    prevDataKeyRef.current = dataKey
-    prevCandleCountRef.current = 0
-  }
+  useEffect(() => {
+    onVisibleRangeChangeRef.current = onVisibleTimeRangeChange
+    onCrosshairMoveRef.current = onCrosshairMove
+    onCandleHoverRef.current = onCandleHover
+  }, [onVisibleTimeRangeChange, onCrosshairMove, onCandleHover])
+
+  useEffect(() => {
+    if (prevDataKeyRef.current !== dataKey) {
+      prevDataKeyRef.current = dataKey
+      prevCandleCountRef.current = 0
+    }
+  }, [dataKey])
 
   const initChart = useCallback(() => {
     if (!containerRef.current) return
