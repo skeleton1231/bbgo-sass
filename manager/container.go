@@ -337,7 +337,7 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 						"-e", prefix+"_API_SECRET="+apiSecret,
 					)
 					if passphrase != "" {
-						args = append(args, "-e", prefix+"_PASSPHRASE="+passphrase)
+						args = append(args, "-e", prefix+"_API_PASSPHRASE="+passphrase)
 					}
 					if uc.Mode == ModePaper {
 						args = append(args, "-e", prefix+"_TESTNET=1")

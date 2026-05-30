@@ -60,14 +60,14 @@ func (s *Syncer) SyncCredential(cred ExchangeCredential) {
 	}
 }
 
-func (s *Syncer) DeleteCredential(userID, exchange string) {
+func (s *Syncer) DeleteCredential(userID, exchange string, isTestnet bool) {
 	if s.creds == nil {
 		return
 	}
-	if err := s.supa.DeleteCredential(userID, exchange); err != nil {
+	if err := s.supa.DeleteCredential(userID, exchange, isTestnet); err != nil {
 		log.Printf("delete credential for user %s %s: %v", userID, exchange, err)
 	} else {
-		log.Printf("deleted credential %s for user %s from supabase", exchange, userID)
+		log.Printf("deleted credential %s (testnet=%v) for user %s from supabase", exchange, isTestnet, userID)
 	}
 }
 

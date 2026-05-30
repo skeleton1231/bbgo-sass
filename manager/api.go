@@ -797,7 +797,7 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 
 	if exchange != "" {
 		if api.syncer != nil {
-			go api.syncer.DeleteCredential(userID, exchange)
+			go api.syncer.DeleteCredential(userID, exchange, isTestnet)
 		}
 	}
 	mode := ModeLive

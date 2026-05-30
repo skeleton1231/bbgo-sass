@@ -504,8 +504,8 @@ func TestEnvArgs_LiveMode(t *testing.T) {
 	if !strings.Contains(argsStr, "OKEX_API_SECRET=my-api-secret") {
 		t.Error("must inject OKEX_API_SECRET from decrypted credential")
 	}
-	if !strings.Contains(argsStr, "OKEX_PASSPHRASE=my-passphrase") {
-		t.Error("must inject OKEX_PASSPHRASE for exchanges that need it")
+	if !strings.Contains(argsStr, "OKEX_API_PASSPHRASE=my-passphrase") {
+		t.Error("must inject OKEX_API_PASSPHRASE for exchanges that need it")
 	}
 }
 

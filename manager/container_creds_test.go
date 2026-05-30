@@ -249,8 +249,8 @@ func TestEnvArgs_Passphrase_Injected(t *testing.T) {
 	if !findEnv("OKEX_API_SECRET=secret") {
 		t.Error("expected OKEX_API_SECRET")
 	}
-	if !findEnv("OKEX_PASSPHRASE=mypass") {
-		t.Error("expected OKEX_PASSPHRASE")
+	if !findEnv("OKEX_API_PASSPHRASE=mypass") {
+		t.Error("expected OKEX_API_PASSPHRASE")
 	}
 }
 

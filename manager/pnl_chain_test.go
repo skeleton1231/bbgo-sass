@@ -296,12 +296,12 @@ func TestEnvArgs_PassphraseInjection(t *testing.T) {
 
 	hasPassphrase := false
 	for _, a := range args {
-		if a == "OKEX_PASSPHRASE=okex_pass" {
+		if a == "OKEX_API_PASSPHRASE=okex_pass" {
 			hasPassphrase = true
 		}
 	}
 	if !hasPassphrase {
-		t.Errorf("expected OKEX_PASSPHRASE in env args, got %v", args)
+		t.Errorf("expected OKEX_API_PASSPHRASE in env args, got %v", args)
 	}
 }
 

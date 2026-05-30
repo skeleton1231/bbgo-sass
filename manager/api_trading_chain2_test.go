@@ -191,7 +191,7 @@ func TestSyncer_DeleteCredential(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	syncer := NewSyncerWithCreds(NewUserContainerManager(), supaClient, NewCredentialStore(dir, enc))
 
-	syncer.DeleteCredential("user-1", "binance")
+	syncer.DeleteCredential("user-1", "binance", false)
 
 	mu.Lock()
 	defer mu.Unlock()

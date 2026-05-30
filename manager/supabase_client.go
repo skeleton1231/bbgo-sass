@@ -83,11 +83,12 @@ func (sc *SupabaseClient) UpsertCredential(cred ExchangeCredential) error {
 	return nil
 }
 
-func (sc *SupabaseClient) DeleteCredential(userID, exchange string) error {
+func (sc *SupabaseClient) DeleteCredential(userID, exchange string, isTestnet bool) error {
 	_, _, err := sc.client.From("exchange_credentials").
 		Delete("", "").
 		Eq("user_id", userID).
 		Eq("exchange", exchange).
+		Eq("is_testnet", fmt.Sprintf("%t", isTestnet)).
 		Execute()
 	if err != nil {
 		return fmt.Errorf("delete credential %s for user %s: %w", exchange, userID, err)
