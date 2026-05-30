@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCredentials, useCreateCredential, useDeleteCredential } from '@/lib/bbgo/queries'
 import { EXCHANGES, EXCHANGES_REQUIRING_PASSPHRASE } from '@/lib/bbgo/constants'
+import { useUserId } from '@/components/providers/user-id'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -11,7 +12,7 @@ import { toast } from 'sonner'
 export function ApiKeyList() {
   const t = useTranslations('Settings.apiKeys')
   const bt = useTranslations('Bots')
-  const [userId, setUserId] = useState('')
+  const userId = useUserId()
   const [showAdd, setShowAdd] = useState(false)
   const [exchange, setExchange] = useState('binance')
   const [apiKey, setApiKey] = useState('')
@@ -19,16 +20,6 @@ export function ApiKeyList() {
   const [passphrase, setPassphrase] = useState('')
   const [isTestnet, setIsTestnet] = useState(false)
   const [errors, setErrors] = useState<{ apiKey?: string; apiSecret?: string }>({})
-
-  useEffect(() => {
-    const loadUser = async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase.auth.getUser()
-      if (data.user) setUserId(data.user.id)
-    }
-    loadUser()
-  }, [])
 
   const { data: credentials = [], isLoading } = useCredentials(userId)
   const createMut = useCreateCredential()
@@ -73,7 +64,10 @@ export function ApiKeyList() {
 
   const handleDelete = (id: string) => {
     if (!userId) return
-    deleteMut.mutate({ id, userId })
+    deleteMut.mutate(
+      { id, userId },
+      { onError: (err) => toast.error(err.message) },
+    )
   }
 
   return (

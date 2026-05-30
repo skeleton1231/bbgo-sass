@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts'
+import { useTranslations } from 'next-intl'
 
 interface DepthChartProps {
   bids: Array<{ price: number; volume: number }>
@@ -50,13 +51,14 @@ interface DepthTooltipProps {
 }
 
 function DepthTooltip({ active, payload, label }: DepthTooltipProps) {
+  const t = useTranslations('Bots')
   if (!active || !payload?.length || label == null) return null
   return (
     <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
       <p className="text-xs text-muted-foreground mb-1">{label.toFixed(2)}</p>
       {payload.map((p) => (
         <p key={p.dataKey} className="text-xs" style={{ color: p.dataKey === 'bids' ? '#22c55e' : '#ef4444' }}>
-          {p.dataKey}: {p.value.toFixed(4)}
+          {p.dataKey === 'bids' ? t('bids') : t('asks')}: {p.value.toFixed(4)}
         </p>
       ))}
     </div>
@@ -64,10 +66,11 @@ function DepthTooltip({ active, payload, label }: DepthTooltipProps) {
 }
 
 export function DepthChart({ bids, asks, height = 300 }: DepthChartProps) {
+  const t = useTranslations('Bots')
   if (bids.length === 0 && asks.length === 0) {
     return (
       <div className="flex items-center justify-center rounded-lg border bg-card" style={{ height }}>
-        <span className="text-sm text-muted-foreground">No order book data</span>
+        <span className="text-sm text-muted-foreground">{t('noDepthData')}</span>
       </div>
     )
   }

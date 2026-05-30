@@ -2,15 +2,17 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { LOGIN_PATH, USER_PATH } from '@/lib/routes'
 
 export async function signInAction(prevState: unknown, formData: FormData) {
+  const t = await getTranslations('Auth')
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
   if (!email || !password) {
-    return { error: 'Email and password are required' }
+    return { error: t('required') }
   }
 
   try {
@@ -21,7 +23,7 @@ export async function signInAction(prevState: unknown, formData: FormData) {
       return { error: error.message }
     }
   } catch {
-    return { error: 'Unable to connect to authentication service. Please try again.' }
+    return { error: t('connectionError') }
   }
 
   revalidatePath('/')
@@ -36,16 +38,17 @@ export async function signOutAction() {
 }
 
 export async function signUpAction(prevState: unknown, formData: FormData) {
+  const t = await getTranslations('Auth')
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const confirmPassword = formData.get('confirmPassword') as string
 
   if (!email || !password || !confirmPassword) {
-    return { error: 'All fields are required' }
+    return { error: t('allFieldsRequired') }
   }
 
   if (password !== confirmPassword) {
-    return { error: 'Passwords do not match' }
+    return { error: t('passwordsDontMatch') }
   }
 
   try {
@@ -56,7 +59,7 @@ export async function signUpAction(prevState: unknown, formData: FormData) {
       return { error: error.message }
     }
   } catch {
-    return { error: 'Unable to connect to authentication service. Please try again.' }
+    return { error: t('connectionError') }
   }
 
   revalidatePath('/')
@@ -64,10 +67,11 @@ export async function signUpAction(prevState: unknown, formData: FormData) {
 }
 
 export async function resetPasswordAction(prevState: unknown, formData: FormData) {
+  const t = await getTranslations('Auth')
   const email = formData.get('email') as string
 
   if (!email) {
-    return { error: 'Email is required' }
+    return { error: t('emailRequired') }
   }
 
   try {
@@ -80,8 +84,8 @@ export async function resetPasswordAction(prevState: unknown, formData: FormData
       return { error: error.message }
     }
   } catch {
-    return { error: 'Unable to connect to authentication service. Please try again.' }
+    return { error: t('connectionError') }
   }
 
-  return { success: 'Password reset link sent to your email.' }
+  return { success: t('resetLinkSent') }
 }

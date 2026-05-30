@@ -26,7 +26,12 @@
     "welcomeBack": "歡迎回來",
     "loginSubtitle": "登入您的帳戶以繼續",
     "signupSuccess": "帳戶已建立！請查收電子郵件確認後登入。",
-    "sessionExpired": "工作階段已過期，請重新登入。"
+    "sessionExpired": "工作階段已過期，請重新登入。",
+    "required": "郵箱和密碼為必填",
+    "allFieldsRequired": "所有欄位為必填",
+    "connectionError": "無法連線認證服務，請重試。",
+    "emailRequired": "郵箱為必填",
+    "resetLinkSent": "密碼重設連結已發送到您的信箱。"
   },
   "Nav": {
     "dashboard": "儀表板",
@@ -101,6 +106,7 @@
     "noClosedOrders": "暫無歷史訂單",
     "noTrades": "暫無成交",
     "status": {
+      "starting": "啟動中",
       "running": "運行中",
       "stopped": "已停止",
       "error": "錯誤"
@@ -108,6 +114,13 @@
     "strategyStatus": {
       "running": "運行中",
       "idle": "閒置"
+    },
+    "orderStatus": {
+      "New": "新建",
+      "Filled": "已成交",
+      "PartiallyFilled": "部分成交",
+      "Canceled": "已撤銷",
+      "Rejected": "已拒絕"
     },
     "strategyParams": "策略參數",
     "mode": {
@@ -144,9 +157,45 @@
     "loadingLogs": "載入日誌...",
     "noStrategiesTab": "暫無策略",
     "chart": "圖表",
+    "priceChart": "價格圖表",
+    "filled": "{pct}% 已成交",
+    "chartSidePanel": {
+      "range": "區間",
+      "grids": "網格數",
+      "qtyPerGrid": "每格數量",
+      "stopLoss": "止損",
+      "takeProfit": "止盈",
+      "position": "持倉",
+      "base": "基礎幣",
+      "quote": "計價幣",
+      "avgCost": "均價",
+      "unrealized": "未實現盈虧",
+      "value": "價值",
+      "gridLevels": "網格線",
+      "entry": "入場價",
+      "pos": "持倉"
+    },
     "depth": "深度",
     "orderBook": "訂單簿",
+    "noDepthData": "暫無訂單簿資料",
+    "bids": "買盤",
+    "asks": "賣盤",
     "noSymbolForChart": "未設定圖表顯示的交易對",
+    "noCandleData": "暫無K線資料",
+    "hoverOhlcv": "懸停圖表查看 OHLCV",
+    "tooltipPrice": "價格",
+    "tooltipQty": "數量",
+    "tooltipFee": "手續費",
+    "modeBots": "{mode} 機器人",
+    "tradeTags": {
+      "open": "開倉",
+      "close": "平倉",
+      "add": "加倉",
+      "reduce": "減倉",
+      "maker": "Maker",
+      "net": "淨 {position}"
+    },
+    "avgCost": "均價 {price}",
     "pnl": {
       "realized": "已實現盈虧",
       "totalFees": "總手續費",
@@ -155,7 +204,9 @@
       "bySymbol": "按幣種盈虧",
       "tradeCount": "{count} 筆交易",
       "openPosition": "持倉: {amount} @ ~{price}",
-      "avgBuy": "均價 {price}"
+      "openPositionNoPrice": "持倉: {amount}",
+      "avgBuy": "均價 {price}",
+      "winLossFormat": "{wins}勝 / {losses}負"
     },
     "crossExchange": "跨交易所",
     "live": {
@@ -195,7 +246,12 @@
     "statusFailed": "失敗",
     "symbol": "交易對",
     "loading": "載入中...",
-    "quickRange": "快速範圍："
+    "quickRange": "快速範圍：",
+    "realizedPnl": "已實現盈虧",
+    "unrealizedPnl": "未實現盈虧",
+    "assetIncrease": "資產增長",
+    "sortinoRatio": "索提諾比率",
+    "tradeNumber": "交易 #"
   },
   "Settings": {
     "title": "設定",
@@ -245,7 +301,9 @@
   },
   "Errors": {
     "serverError": "伺服器錯誤，請重試。",
-    "fetchFailed": "取得資料失敗，請重試。"
+    "fetchFailed": "取得資料失敗，請重試。",
+    "componentError": "發生錯誤，請重新整理頁面再試。",
+    "retry": "重試"
   },
   "Common": {
     "pageNotFound": "找不到此頁面。",

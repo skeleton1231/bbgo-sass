@@ -166,61 +166,61 @@ export function useBotDetail(userId: string, botId: string | null) {
 
 // --- Bot data queries (real-time from bbgo container) ---
 
-export function useBotPing(userId: string, mode?: 'live' | 'paper') {
+export function useBotPing(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ status: string }>({
     queryKey: ['bot-ping', userId, mode],
     queryFn: () => fetchBotPing(userId, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
 
-export function useBotSessions(userId: string, mode?: 'live' | 'paper') {
+export function useBotSessions(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ sessions: BBGoSession[] }>({
     queryKey: ['bot-sessions', userId, mode],
     queryFn: () => fetchBotSessions(userId, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper') {
+export function useBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ trades: BBGoTrade[] }>({
     queryKey: ['bot-session-trades', userId, session, mode],
     queryFn: () => fetchBotSessionTrades(userId, session, mode),
-    enabled: !!userId && !!session,
+    enabled: !!userId && !!session && (containerRunning ?? false),
     staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper') {
+export function useBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ orders: BBGoOrder[] }>({
     queryKey: ['bot-orders', userId, session, mode],
     queryFn: () => fetchBotOpenOrders(userId, session, mode),
-    enabled: !!userId && !!session,
+    enabled: !!userId && !!session && (containerRunning ?? false),
     staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper') {
+export function useBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ balances: Record<string, BBGoBalance> }>({
     queryKey: ['bot-balances', userId, session, mode],
     queryFn: () => fetchBotSessionBalances(userId, session, mode),
-    enabled: !!userId && !!session,
+    enabled: !!userId && !!session && (containerRunning ?? false),
     staleTime: 20_000,
     refetchInterval: 20_000,
   })
 }
 
-export function useBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper') {
+export function useBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ symbols: string[] }>({
     queryKey: ['bot-symbols', userId, session, mode],
     queryFn: () => fetchBotSessionSymbols(userId, session, mode),
-    enabled: !!userId && !!session,
+    enabled: !!userId && !!session && (containerRunning ?? false),
     refetchInterval: 30_000,
   })
 }
@@ -252,67 +252,67 @@ export function useMarketKlines(exchange: string, symbol: string, interval?: str
   })
 }
 
-export function useBotTrades(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
+export function useBotTrades(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ trades: BBGoTrade[] }>({
     queryKey: ['bot-trades', userId, exchange, symbol, mode],
     queryFn: () => fetchBotTrades(userId, exchange, symbol, undefined, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 20_000,
     refetchInterval: 20_000,
   })
 }
 
-export function useBotClosedOrders(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
+export function useBotClosedOrders(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ orders: BBGoOrder[] }>({
     queryKey: ['bot-closed-orders', userId, exchange, symbol, mode],
     queryFn: () => fetchBotClosedOrders(userId, exchange, symbol, undefined, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 20_000,
     refetchInterval: 20_000,
   })
 }
 
-export function useBotTradingVolume(userId: string, period?: string, mode?: 'live' | 'paper') {
+export function useBotTradingVolume(userId: string, period?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ tradingVolumes: TradingVolumeEntry[] }>({
     queryKey: ['bot-trading-volume', userId, period, mode],
     queryFn: () => fetchBotTradingVolume(userId, period, undefined, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 60_000,
     refetchInterval: 60_000,
   })
 }
 
-export function useBotAssets(userId: string, mode?: 'live' | 'paper') {
+export function useBotAssets(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ assets: Record<string, BBGoAsset> }>({
     queryKey: ['bot-assets', userId, mode],
     queryFn: () => fetchBotAssets(userId, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
 
-export function useBotStrategiesState(userId: string, mode?: 'live' | 'paper') {
+export function useBotStrategiesState(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ strategies: BBGoStrategyState[] }>({
     queryKey: ['bot-strategies-state', userId, mode],
     queryFn: () => fetchBotStrategies(userId, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
 
-export function useContainerLogs(userId: string, tail?: string, mode?: 'live' | 'paper') {
+export function useContainerLogs(userId: string, tail?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ logs: string }>({
     queryKey: ['container-logs', userId, tail, mode],
     queryFn: () => fetchContainerLogs(userId, tail, mode),
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
+export function useBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<PnLReport>({
     queryKey: ['bot-pnl', userId, exchange, symbol, mode],
     queryFn: async (): Promise<PnLReport> => {
@@ -342,7 +342,7 @@ export function useBotPnL(userId: string, exchange?: string, symbol?: string, mo
         })),
       }
     },
-    enabled: !!userId,
+    enabled: !!userId && (containerRunning ?? false),
     staleTime: 30_000,
     refetchInterval: 30_000,
   })

@@ -26,7 +26,12 @@
     "welcomeBack": "おかえりなさい",
     "loginSubtitle": "アカウントにログインして続行",
     "signupSuccess": "アカウントが作成されました！メールを確認してからログインしてください。",
-    "sessionExpired": "セッションが期限切れです。再度ログインしてください。"
+    "sessionExpired": "セッションが期限切れです。再度ログインしてください。",
+    "required": "メールアドレスとパスワードは必須です",
+    "allFieldsRequired": "すべての項目は必須です",
+    "connectionError": "認証サービスに接続できません。もう一度お試しください。",
+    "emailRequired": "メールアドレスは必須です",
+    "resetLinkSent": "パスワードリセットリンクをメールに送信しました。"
   },
   "Nav": {
     "dashboard": "ダッシュボード",
@@ -101,6 +106,7 @@
     "noClosedOrders": "約定済み注文なし",
     "noTrades": "取引履歴なし",
     "status": {
+      "starting": "起動中",
       "running": "稼働中",
       "stopped": "停止",
       "error": "エラー"
@@ -108,6 +114,13 @@
     "strategyStatus": {
       "running": "稼働中",
       "idle": "待機"
+    },
+    "orderStatus": {
+      "New": "新規",
+      "Filled": "約定済み",
+      "PartiallyFilled": "部分約定",
+      "Canceled": "取消済み",
+      "Rejected": "拒否"
     },
     "strategyParams": "ストラテジーパラメータ",
     "mode": {
@@ -144,9 +157,45 @@
     "loadingLogs": "ログを読み込み中...",
     "noStrategiesTab": "ストラテジーなし",
     "chart": "チャート",
+    "priceChart": "プライスチャート",
+    "filled": "{pct}% 約定済み",
+    "chartSidePanel": {
+      "range": "レンジ",
+      "grids": "グリッド数",
+      "qtyPerGrid": "数量/グリッド",
+      "stopLoss": "ストップロス",
+      "takeProfit": "テイクプロフィット",
+      "position": "ポジション",
+      "base": "ベース",
+      "quote": "クオート",
+      "avgCost": "平均原価",
+      "unrealized": "未実現損益",
+      "value": "価値",
+      "gridLevels": "グリッドレベル",
+      "entry": "エントリー",
+      "pos": "ポジ"
+    },
     "depth": "板",
     "orderBook": "オーダーブック",
+    "noDepthData": "オーダーブックデータがありません",
+    "bids": "買い",
+    "asks": "売り",
     "noSymbolForChart": "チャート表示のシンボルが設定されていません",
+    "noCandleData": "ローソク足データがありません",
+    "hoverOhlcv": "チャートにホバーしてOHLCVを表示",
+    "tooltipPrice": "価格",
+    "tooltipQty": "数量",
+    "tooltipFee": "手数料",
+    "modeBots": "{mode} ボット",
+    "tradeTags": {
+      "open": "オープン",
+      "close": "クローズ",
+      "add": "追加",
+      "reduce": "削減",
+      "maker": "Maker",
+      "net": "ネット {position}"
+    },
+    "avgCost": "平均原価 {price}",
     "pnl": {
       "realized": "実現損益",
       "totalFees": "合計手数料",
@@ -155,7 +204,9 @@
       "bySymbol": "シンボル別損益",
       "tradeCount": "{count} 件",
       "openPosition": "ポジ: {amount} @ ~{price}",
-      "avgBuy": "平均買い {price}"
+      "openPositionNoPrice": "ポジ: {amount}",
+      "avgBuy": "平均買い {price}",
+      "winLossFormat": "{wins}勝 / {losses}負"
     },
     "crossExchange": "クロス取引所",
     "live": {
@@ -195,7 +246,12 @@
     "statusFailed": "失敗",
     "symbol": "シンボル",
     "loading": "読み込み中...",
-    "quickRange": "クイックレンジ："
+    "quickRange": "クイックレンジ：",
+    "realizedPnl": "実現損益",
+    "unrealizedPnl": "未実現損益",
+    "assetIncrease": "資産増加",
+    "sortinoRatio": "ソルティノレシオ",
+    "tradeNumber": "トレード #"
   },
   "Settings": {
     "title": "設定",
@@ -245,7 +301,9 @@
   },
   "Errors": {
     "serverError": "サーバーエラー。もう一度お試しください。",
-    "fetchFailed": "データの取得に失敗しました。"
+    "fetchFailed": "データの取得に失敗しました。",
+    "componentError": "エラーが発生しました。ページを更新してお試しください。",
+    "retry": "再試行"
   },
   "Common": {
     "pageNotFound": "このページは見つかりませんでした。",

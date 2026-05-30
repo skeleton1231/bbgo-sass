@@ -26,7 +26,12 @@
     "welcomeBack": "欢迎回来",
     "loginSubtitle": "登录您的账户以继续",
     "signupSuccess": "账户已创建！请查收邮件确认后登录。",
-    "sessionExpired": "会话已过期，请重新登录。"
+    "sessionExpired": "会话已过期，请重新登录。",
+    "required": "邮箱和密码为必填项",
+    "allFieldsRequired": "所有字段为必填项",
+    "connectionError": "无法连接认证服务，请重试。",
+    "emailRequired": "邮箱为必填项",
+    "resetLinkSent": "密码重置链接已发送到您的邮箱。"
   },
   "Nav": {
     "dashboard": "仪表盘",
@@ -101,6 +106,7 @@
     "noClosedOrders": "暂无历史订单",
     "noTrades": "暂无成交",
     "status": {
+      "starting": "启动中",
       "running": "运行中",
       "stopped": "已停止",
       "error": "错误"
@@ -108,6 +114,13 @@
     "strategyStatus": {
       "running": "运行中",
       "idle": "空闲"
+    },
+    "orderStatus": {
+      "New": "新建",
+      "Filled": "已成交",
+      "PartiallyFilled": "部分成交",
+      "Canceled": "已撤销",
+      "Rejected": "已拒绝"
     },
     "loading": "加载中...",
     "noStrategies": "暂无策略，创建一个开始。",
@@ -146,9 +159,45 @@
     "loadingLogs": "加载日志...",
     "noStrategiesTab": "暂无策略",
     "chart": "图表",
+    "priceChart": "价格图表",
+    "filled": "{pct}% 已成交",
+    "chartSidePanel": {
+      "range": "区间",
+      "grids": "网格数",
+      "qtyPerGrid": "每格数量",
+      "stopLoss": "止损",
+      "takeProfit": "止盈",
+      "position": "持仓",
+      "base": "基础币",
+      "quote": "计价币",
+      "avgCost": "均价",
+      "unrealized": "未实现盈亏",
+      "value": "价值",
+      "gridLevels": "网格线",
+      "entry": "入场价",
+      "pos": "持仓"
+    },
     "depth": "深度",
     "orderBook": "订单簿",
+    "noDepthData": "暂无订单簿数据",
+    "bids": "买盘",
+    "asks": "卖盘",
     "noSymbolForChart": "未配置图表显示的交易对",
+    "noCandleData": "暂无K线数据",
+    "hoverOhlcv": "悬停图表查看 OHLCV",
+    "tooltipPrice": "价格",
+    "tooltipQty": "数量",
+    "tooltipFee": "手续费",
+    "modeBots": "{mode} 机器人",
+    "tradeTags": {
+      "open": "开仓",
+      "close": "平仓",
+      "add": "加仓",
+      "reduce": "减仓",
+      "maker": "Maker",
+      "net": "净 {position}"
+    },
+    "avgCost": "均价 {price}",
     "pnl": {
       "realized": "已实现盈亏",
       "totalFees": "总手续费",
@@ -157,7 +206,9 @@
       "bySymbol": "按币种盈亏",
       "tradeCount": "{count} 笔交易",
       "openPosition": "持仓: {amount} @ ~{price}",
-      "avgBuy": "均价 {price}"
+      "openPositionNoPrice": "持仓: {amount}",
+      "avgBuy": "均价 {price}",
+      "winLossFormat": "{wins}胜 / {losses}负"
     },
     "crossExchange": "跨交易所",
     "live": {
@@ -195,7 +246,12 @@
     "statusFailed": "失败",
     "symbol": "交易对",
     "loading": "加载中...",
-    "quickRange": "快捷选择："
+    "quickRange": "快捷选择：",
+    "realizedPnl": "已实现盈亏",
+    "unrealizedPnl": "未实现盈亏",
+    "assetIncrease": "资产增长",
+    "sortinoRatio": "索提诺比率",
+    "tradeNumber": "交易 #"
   },
   "Settings": {
     "title": "设置",
@@ -245,7 +301,9 @@
   },
   "Errors": {
     "serverError": "服务器错误，请重试。",
-    "fetchFailed": "获取数据失败，请重试。"
+    "fetchFailed": "获取数据失败，请重试。",
+    "componentError": "出现错误，请刷新页面重试。",
+    "retry": "重试"
   },
   "Common": {
     "pageNotFound": "找不到此页面。",

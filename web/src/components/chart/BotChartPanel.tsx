@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,6 +68,8 @@ export function BotChartPanel({
   indicatorConfigs = [],
   onToggleIndicator,
 }: BotChartPanelProps) {
+  const t = useTranslations('Bots')
+  const sp = useTranslations('Bots.chartSidePanel')
   const [showPnlCurve, setShowPnlCurve] = useState(true)
   const [ohlcvData, setOhlcvData] = useState<{
     time: number; open: number; high: number; low: number; close: number; volume?: number
@@ -83,7 +86,7 @@ export function BotChartPanel({
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="text-sm font-medium">
-              {symbol || 'Price Chart'} · {exchange}
+              {symbol || t('priceChart')} · {exchange}
             </CardTitle>
             <div className="flex items-center gap-1 flex-wrap">
               {KLINE_INTERVALS.map((iv) => (
@@ -131,11 +134,11 @@ export function BotChartPanel({
           {strategyStats && strategyStats.base > 0 && currentPrice && (
             <div className="flex items-center gap-4 mt-1.5 pt-2 border-t text-xs font-mono">
               <span className="text-muted-foreground">
-                Pos: <span className="text-trade-up font-medium">{strategyStats.base.toFixed(6)}</span>
+                {sp('pos')}: <span className="text-trade-up font-medium">{strategyStats.base.toFixed(6)}</span>
               </span>
               {strategyStats.averageCost > 0 && (
                 <span className="text-muted-foreground">
-                  Entry: <span className="text-foreground font-medium">{strategyStats.averageCost.toLocaleString()}</span>
+                  {sp('entry')}: <span className="text-foreground font-medium">{strategyStats.averageCost.toLocaleString()}</span>
                 </span>
               )}
               <span className={cn(
@@ -200,32 +203,34 @@ function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
   currentPrice?: number
   gridLines: GridLine[]
 }) {
+  const sp = useTranslations('Bots.chartSidePanel')
+
   return (
     <div className="hidden lg:flex flex-col gap-2 w-48 shrink-0 text-xs">
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
         <p className="font-medium text-sm">{strategyStats.strategy}</p>
         <div className="space-y-1.5 font-mono text-muted-foreground">
           <div className="flex justify-between">
-            <span>Range</span>
+            <span>{sp('range')}</span>
             <span className="text-foreground">{strategyStats.lowerPrice.toLocaleString()}–{strategyStats.upperPrice.toLocaleString()}</span>
           </div>
           <div className="flex justify-between">
-            <span>Grids</span>
+            <span>{sp('grids')}</span>
             <span className="text-foreground">{strategyStats.gridNumber}</span>
           </div>
           <div className="flex justify-between">
-            <span>Qty/Grid</span>
+            <span>{sp('qtyPerGrid')}</span>
             <span className="text-foreground">{strategyStats.quantity}</span>
           </div>
           {strategyStats.stopLossPrice > 0 && (
             <div className="flex justify-between">
-              <span>Stop Loss</span>
+              <span>{sp('stopLoss')}</span>
               <span className="text-trade-down">{strategyStats.stopLossPrice.toLocaleString()}</span>
             </div>
           )}
           {strategyStats.takeProfitPrice > 0 && (
             <div className="flex justify-between">
-              <span>Take Profit</span>
+              <span>{sp('takeProfit')}</span>
               <span className="text-trade-up">{strategyStats.takeProfitPrice.toLocaleString()}</span>
             </div>
           )}
@@ -233,29 +238,29 @@ function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
         </div>
       </div>
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-        <p className="font-medium text-sm">Position</p>
+        <p className="font-medium text-sm">{sp('position')}</p>
         <div className="space-y-1.5 font-mono text-muted-foreground">
           <div className="flex justify-between">
-            <span>Base</span>
+            <span>{sp('base')}</span>
             <span className={cn('text-foreground', strategyStats.base > 0 && 'text-trade-up')}>
               {strategyStats.base.toFixed(6)}
             </span>
           </div>
           <div className="flex justify-between">
-            <span>Quote</span>
+            <span>{sp('quote')}</span>
             <span className={cn('text-foreground', strategyStats.quote > 0 && 'text-trade-up')}>
               {strategyStats.quote.toFixed(2)}
             </span>
           </div>
           {strategyStats.averageCost > 0 && (
             <div className="flex justify-between">
-              <span>Avg Cost</span>
+              <span>{sp('avgCost')}</span>
               <span className="text-foreground">{strategyStats.averageCost.toLocaleString()}</span>
             </div>
           )}
           {currentPrice && strategyStats.base > 0 && strategyStats.averageCost > 0 && (
             <div className="flex justify-between">
-              <span>Unrealized</span>
+              <span>{sp('unrealized')}</span>
               <span className={cn(
                 'font-medium',
                 currentPrice > strategyStats.averageCost ? 'text-trade-up' : 'text-trade-down'
@@ -267,7 +272,7 @@ function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
           )}
           {currentPrice && strategyStats.base > 0 && (
             <div className="flex justify-between">
-              <span>Value</span>
+              <span>{sp('value')}</span>
               <span className="text-foreground">{(currentPrice * strategyStats.base).toFixed(2)}</span>
             </div>
           )}
@@ -275,7 +280,7 @@ function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
       </div>
       {gridLines.length > 0 && (
         <div className="rounded-lg border bg-muted/30 p-3">
-          <p className="font-medium mb-1.5">Grid Levels</p>
+          <p className="font-medium mb-1.5">{sp('gridLevels')}</p>
           <div className="max-h-40 overflow-y-auto space-y-0.5 font-mono text-muted-foreground">
             {gridLines.slice(0, 12).map((g, i) => (
               <div key={i} className="flex justify-between">

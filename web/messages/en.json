@@ -26,7 +26,12 @@
     "welcomeBack": "Welcome back",
     "loginSubtitle": "Sign in to your account to continue",
     "signupSuccess": "Account created! Please check your email to confirm, then sign in.",
-    "sessionExpired": "Your session has expired. Please sign in again."
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "required": "Email and password are required",
+    "allFieldsRequired": "All fields are required",
+    "connectionError": "Unable to connect to authentication service. Please try again.",
+    "emailRequired": "Email is required",
+    "resetLinkSent": "Password reset link sent to your email."
   },
   "Nav": {
     "dashboard": "Dashboard",
@@ -101,6 +106,7 @@
     "noClosedOrders": "No closed orders",
     "noTrades": "No trades yet",
     "status": {
+      "starting": "Starting",
       "running": "Running",
       "stopped": "Stopped",
       "error": "Error"
@@ -108,6 +114,13 @@
     "strategyStatus": {
       "running": "running",
       "idle": "idle"
+    },
+    "orderStatus": {
+      "New": "New",
+      "Filled": "Filled",
+      "PartiallyFilled": "Partially Filled",
+      "Canceled": "Canceled",
+      "Rejected": "Rejected"
     },
     "loading": "Loading...",
     "noStrategies": "No strategies yet. Create one to get started.",
@@ -153,7 +166,9 @@
       "bySymbol": "P&L by Symbol",
       "tradeCount": "{count} trades",
       "openPosition": "pos: {amount} @ ~{price}",
-      "avgBuy": "avg buy {price}"
+      "openPositionNoPrice": "pos: {amount}",
+      "avgBuy": "avg buy {price}",
+      "winLossFormat": "{wins}W / {losses}L"
     },
     "crossExchange": "cross-exchange",
     "live": {
@@ -162,9 +177,45 @@
       "disconnected": "Offline"
     },
     "chart": "Chart",
+    "priceChart": "Price Chart",
+    "filled": "{pct}% filled",
+    "chartSidePanel": {
+      "range": "Range",
+      "grids": "Grids",
+      "qtyPerGrid": "Qty/Grid",
+      "stopLoss": "Stop Loss",
+      "takeProfit": "Take Profit",
+      "position": "Position",
+      "base": "Base",
+      "quote": "Quote",
+      "avgCost": "Avg Cost",
+      "unrealized": "Unrealized",
+      "value": "Value",
+      "gridLevels": "Grid Levels",
+      "entry": "Entry",
+      "pos": "Pos"
+    },
     "depth": "Depth",
     "orderBook": "Order Book",
-    "noSymbolForChart": "No symbol configured for chart display"
+    "noDepthData": "No order book data",
+    "bids": "Bids",
+    "asks": "Asks",
+    "noSymbolForChart": "No symbol configured for chart display",
+    "noCandleData": "No candlestick data available",
+    "hoverOhlcv": "Hover chart to see OHLCV",
+    "tooltipPrice": "Price",
+    "tooltipQty": "Qty",
+    "tooltipFee": "Fee",
+    "modeBots": "{mode} bots",
+    "tradeTags": {
+      "open": "Open",
+      "close": "Close",
+      "add": "Add",
+      "reduce": "Reduce",
+      "maker": "Maker",
+      "net": "net {position}"
+    },
+    "avgCost": "Avg Cost {price}"
   },
   "Backtest": {
     "title": "Backtest",
@@ -195,7 +246,12 @@
     "statusFailed": "Failed",
     "symbol": "Symbol",
     "loading": "Loading...",
-    "quickRange": "Quick Range:"
+    "quickRange": "Quick Range:",
+    "realizedPnl": "Realized P&L",
+    "unrealizedPnl": "Unrealized P&L",
+    "assetIncrease": "Asset Increase",
+    "sortinoRatio": "Sortino Ratio",
+    "tradeNumber": "Trade #"
   },
   "Settings": {
     "title": "Settings",
@@ -245,7 +301,9 @@
   },
   "Errors": {
     "serverError": "Server error. Please try again.",
-    "fetchFailed": "Failed to fetch data. Please try again."
+    "fetchFailed": "Failed to fetch data. Please try again.",
+    "componentError": "Something went wrong. Refresh the page to try again.",
+    "retry": "Retry"
   },
   "Common": {
     "pageNotFound": "This page could not be found.",
@@ -264,7 +322,7 @@
     "other": "Other"
   },
   "StrategyFields": {
-    "MinInterval": " Min Interval",
+    "MinInterval": "Min Interval",
     "amount": "Amount",
     "askLiquidityAmount": "Ask Liquidity Amount",
     "askQuantity": "Ask Quantity",
@@ -353,7 +411,7 @@
     "volumeInterval": "Volume Interval",
     "volumeThreshold": "Volume Threshold",
     "window": "Window",
-    "windowATR": "Window A T R",
+    "windowATR": "Window ATR",
     "windowQuick": "Window Quick",
     "windowSlow": "Window Slow"
   }

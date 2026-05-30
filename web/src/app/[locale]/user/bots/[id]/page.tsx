@@ -93,19 +93,19 @@ export default function BotDetailPage() {
   }, [])
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
 
-  const { data: sessionsData } = useBotSessions(userId, mode)
+  const { data: sessionsData } = useBotSessions(userId, mode, isRunning)
   const sessions = sessionsData?.sessions ?? []
   const firstSession = sessions[0]?.name ?? ''
   const activeSession = selectedSession || firstSession
 
-  const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode)
-  const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode)
-  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode)
-  const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode)
-  const { data: strategyStatesData } = useBotStrategiesState(userId, mode)
-  const { data: pingData } = useBotPing(userId, mode)
-  const { data: logsData } = useContainerLogs(userId, '100', mode)
-  const { data: pnlData } = useBotPnL(userId, undefined, symbol || undefined, mode)
+  const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode, isRunning)
+  const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode, isRunning)
+  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning)
+  const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode, isRunning)
+  const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
+  const { data: pingData } = useBotPing(userId, mode, isRunning)
+  const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
+  const { data: pnlData } = useBotPnL(userId, undefined, symbol || undefined, mode, isRunning)
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
 
@@ -163,7 +163,7 @@ export default function BotDetailPage() {
       const ac = typeof posState.averageCost === 'number' ? posState.averageCost : parseFloat(String(posState.averageCost))
       const base = typeof posState.base === 'number' ? posState.base : parseFloat(String(posState.base ?? '0'))
       if (ac > 0 && base > 0) {
-        lines.push({ price: ac, label: `Avg Cost ${ac.toLocaleString()}`, color: 'rgba(251, 146, 60, 0.7)' })
+        lines.push({ price: ac, label: t('avgCost', { price: ac.toLocaleString() }), color: 'rgba(251, 146, 60, 0.7)' })
       }
     }
     return lines
@@ -215,7 +215,7 @@ export default function BotDetailPage() {
     )
     if (curve.length < 2) return null
     return {
-      id: 'pnl-curve', name: 'P&L', color: '#a855f7', lineWidth: 2,
+      id: 'pnl-curve', name: t('pnl.realized'), color: '#a855f7', lineWidth: 2,
       priceScaleId: 'pnl', scaleMargins: { top: 0.75, bottom: 0 },
       data: curve,
     }
@@ -294,8 +294,8 @@ export default function BotDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1 min-w-0">
           <button
             onClick={() => router.back()}
             className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
@@ -303,13 +303,13 @@ export default function BotDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             {t('backToBots')}
           </button>
-          <h1 className="text-2xl font-semibold tracking-tight">{bot.name || bot.strategy}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight truncate">{bot.name || bot.strategy}</h1>
           <p className="text-sm text-muted-foreground">
             {exchange}{symbol ? ` · ${symbol}` : ''} · {bot.strategy} · {t(`mode.${mode}`)}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {isRunning && (
             <Badge
               variant="outline"
@@ -438,7 +438,7 @@ export default function BotDetailPage() {
               <p className="mt-2 text-xl font-semibold font-mono">
                 {pnlData.winRate.toFixed(1)}%
                 <span className="ml-2 text-xs text-muted-foreground font-normal">
-                  ({pnlData.winningTrades}W / {pnlData.losingTrades}L)
+                  ({t('pnl.winLossFormat', { wins: pnlData.winningTrades, losses: pnlData.losingTrades })})
                 </span>
               </p>
             </CardContent>
@@ -470,7 +470,7 @@ export default function BotDetailPage() {
                 <div className="flex items-center gap-6">
                   {s.openPosition > 0 && (
                     <span className="text-xs text-muted-foreground">
-                      Pos: {s.openPosition.toFixed(6)}
+                      {t('pnl.openPositionNoPrice', { amount: s.openPosition.toFixed(6) })}
                     </span>
                   )}
                   <span className={cn(
@@ -487,7 +487,7 @@ export default function BotDetailPage() {
       )}
 
       <Tabs defaultValue="chart" className="space-y-4">
-        <TabsList className="bg-muted/50 p-1 rounded-lg">
+        <TabsList className="bg-muted/50 p-1 rounded-lg w-full overflow-x-auto">
           <TabsTrigger value="chart" className="rounded-md text-xs">{t('chart')}</TabsTrigger>
           <TabsTrigger value="depth" className="rounded-md text-xs">{t('depth')}</TabsTrigger>
           <TabsTrigger value="balances" className="rounded-md text-xs">{t('balances')}</TabsTrigger>
@@ -619,12 +619,12 @@ export default function BotDetailPage() {
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium truncate">{trade.symbol}</span>
-                              {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">Open</Badge>}
-                              {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">Close</Badge>}
-                              {tag === 'add' && <Badge variant="outline" className="rounded-md text-[10px] border-emerald-400 text-emerald-400">Add</Badge>}
-                              {tag === 'reduce' && <Badge variant="outline" className="rounded-md text-[10px] border-amber-400 text-amber-400">Reduce</Badge>}
-                              {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">Maker</Badge>}
-                              <span className="text-[10px] text-muted-foreground tabular-nums">net {netPos.toFixed(6)}</span>
+                              {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">{t('tradeTags.open')}</Badge>}
+                              {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">{t('tradeTags.close')}</Badge>}
+                              {tag === 'add' && <Badge variant="outline" className="rounded-md text-[10px] border-emerald-400 text-emerald-400">{t('tradeTags.add')}</Badge>}
+                              {tag === 'reduce' && <Badge variant="outline" className="rounded-md text-[10px] border-amber-400 text-amber-400">{t('tradeTags.reduce')}</Badge>}
+                              {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">{t('tradeTags.maker')}</Badge>}
+                              <span className="text-[10px] text-muted-foreground tabular-nums">{t('tradeTags.net', { position: netPos.toFixed(6) })}</span>
                             </div>
                             <span className="text-xs text-muted-foreground">{trade.exchange}</span>
                           </div>
@@ -665,12 +665,12 @@ export default function BotDetailPage() {
                         </div>
                         <div>
                           <p className="text-sm font-medium">{ls.strategy}</p>
-                          <p className="text-xs text-muted-foreground">{exchange} · {mode}</p>
+                          <p className="text-xs text-muted-foreground">{exchange} · {t(`mode.${mode}`)}</p>
                         </div>
                       </div>
                       <Badge
                         variant="default"
-                        className="rounded-full text-[11px] bg-trade-up text-white hover:bg-trade-up"
+                        className="rounded-full text-[11px] bg-trade-up text-white hover:bg-trade-up/90"
                       >
                         {t('strategyStatus.running')}
                       </Badge>

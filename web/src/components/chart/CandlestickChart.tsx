@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   createChart,
   createSeriesMarkers,
@@ -114,6 +115,7 @@ export function CandlestickChart({
   onCrosshairMove,
   onCandleHover,
 }: CandlestickChartProps) {
+  const t = useTranslations('Bots')
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
@@ -455,12 +457,12 @@ export function CandlestickChart({
       )}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/80">
-          <span className="text-sm text-muted-foreground">Loading chart...</span>
+          <span className="text-sm text-muted-foreground">{t('loading')}</span>
         </div>
       )}
       {!isLoading && candles.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm text-muted-foreground">No candlestick data available</span>
+          <span className="text-sm text-muted-foreground">{t('noCandleData')}</span>
         </div>
       )}
     </div>
@@ -473,6 +475,7 @@ function TradeTooltip({ x, y, data, onClose }: {
   data: TradeMarker
   onClose: () => void
 }) {
+  const t = useTranslations('Bots')
   return (
     <div
       className="absolute z-50 w-52 rounded-lg border bg-card p-2.5 shadow-lg text-xs"
@@ -491,21 +494,21 @@ function TradeTooltip({ x, y, data, onClose }: {
           {data.side}
         </span>
         {data.isMaker && (
-          <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">Maker</span>
+          <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{t('tradeTags.maker')}</span>
         )}
       </div>
       <div className="space-y-0.5 font-mono text-muted-foreground">
         <div className="flex justify-between">
-          <span>Price</span>
+          <span>{t('tooltipPrice')}</span>
           <span className="text-foreground">{data.price}</span>
         </div>
         <div className="flex justify-between">
-          <span>Qty</span>
+          <span>{t('tooltipQty')}</span>
           <span className="text-foreground">{data.quantity}</span>
         </div>
         {data.fee && (
           <div className="flex justify-between">
-            <span>Fee</span>
+            <span>{t('tooltipFee')}</span>
             <span className="text-foreground">{data.fee} {data.feeCurrency}</span>
           </div>
         )}

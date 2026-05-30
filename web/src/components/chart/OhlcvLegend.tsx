@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 interface OhlcvData {
   time: number
@@ -28,11 +29,12 @@ function fmtVol(v: number): string {
 }
 
 export function OhlcvLegend({ data, symbol, previousClose }: OhlcvLegendProps) {
+  const t = useTranslations('Bots')
   if (!data) {
     return (
       <div className="flex items-center gap-4 px-1 pb-2 font-mono text-xs text-muted-foreground">
         {symbol && <span className="font-semibold text-foreground">{symbol}</span>}
-        <span>Hover chart to see OHLCV</span>
+        <span>{t('hoverOhlcv')}</span>
       </div>
     )
   }

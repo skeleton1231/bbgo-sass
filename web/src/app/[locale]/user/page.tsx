@@ -48,11 +48,11 @@ export default function DashboardPage() {
   const anyActive = isActive || otherContainer?.status === 'running'
   const strategyCount = activeContainer?.strategies?.length ?? 0
 
-  const { data: tradesData } = useBotTrades(userId, undefined, undefined, globalMode)
-  const { data: assetsData } = useBotAssets(userId, globalMode)
-  const { data: sessionsData } = useBotSessions(userId, globalMode)
-  const { data: volumeData } = useBotTradingVolume(userId, undefined, globalMode)
-  const { data: pnlData } = useBotPnL(userId, undefined, undefined, globalMode)
+  const { data: tradesData } = useBotTrades(userId, undefined, undefined, globalMode, isActive)
+  const { data: assetsData } = useBotAssets(userId, globalMode, isActive)
+  const { data: sessionsData } = useBotSessions(userId, globalMode, isActive)
+  const { data: volumeData } = useBotTradingVolume(userId, undefined, globalMode, isActive)
+  const { data: pnlData } = useBotPnL(userId, undefined, undefined, globalMode, isActive)
 
   const trades = isActive ? (tradesData?.trades ?? []) : []
   const assets = isActive ? (assetsData?.assets ?? {}) : {}
@@ -81,7 +81,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <Card className="rounded-xl">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">

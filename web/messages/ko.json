@@ -26,7 +26,12 @@
     "welcomeBack": "돌아오신 것을 환영합니다",
     "loginSubtitle": "계속하려면 계정에 로그인하세요",
     "signupSuccess": "계정이 생성되었습니다! 이메일을 확인한 후 로그인하세요.",
-    "sessionExpired": "세션이 만료되었습니다. 다시 로그인해 주세요."
+    "sessionExpired": "세션이 만료되었습니다. 다시 로그인해 주세요.",
+    "required": "이메일과 비밀번호는 필수입니다",
+    "allFieldsRequired": "모든 필드는 필수입니다",
+    "connectionError": "인증 서비스에 연결할 수 없습니다. 다시 시도해 주세요.",
+    "emailRequired": "이메일은 필수입니다",
+    "resetLinkSent": "비밀번호 재설정 링크를 이메일로 보냈습니다."
   },
   "Nav": {
     "dashboard": "대시보드",
@@ -101,6 +106,7 @@
     "noClosedOrders": "체결된 주문 없음",
     "noTrades": "거래 내역 없음",
     "status": {
+      "starting": "시작 중",
       "running": "실행 중",
       "stopped": "중지됨",
       "error": "오류"
@@ -108,6 +114,13 @@
     "strategyStatus": {
       "running": "실행 중",
       "idle": "대기"
+    },
+    "orderStatus": {
+      "New": "신규",
+      "Filled": "체결됨",
+      "PartiallyFilled": "부분 체결",
+      "Canceled": "취소됨",
+      "Rejected": "거부됨"
     },
     "strategyParams": "전략 매개변수",
     "mode": {
@@ -144,9 +157,45 @@
     "loadingLogs": "로그 로딩 중...",
     "noStrategiesTab": "전략 없음",
     "chart": "차트",
+    "priceChart": "가격 차트",
+    "filled": "{pct}% 체결됨",
+    "chartSidePanel": {
+      "range": "범위",
+      "grids": "그리드 수",
+      "qtyPerGrid": "수량/그리드",
+      "stopLoss": "손절",
+      "takeProfit": "익절",
+      "position": "포지션",
+      "base": "베이스",
+      "quote": "견적",
+      "avgCost": "평균 단가",
+      "unrealized": "미실현 손익",
+      "value": "가치",
+      "gridLevels": "그리드 레벨",
+      "entry": "진입가",
+      "pos": "포지"
+    },
     "depth": "호가",
     "orderBook": "오더북",
+    "noDepthData": "오더북 데이터가 없습니다",
+    "bids": "매수",
+    "asks": "매도",
     "noSymbolForChart": "차트 표시를 위한 심볼이 설정되지 않았습니다",
+    "noCandleData": "캔들스틱 데이터가 없습니다",
+    "hoverOhlcv": "차트에 호버하여 OHLCV 확인",
+    "tooltipPrice": "가격",
+    "tooltipQty": "수량",
+    "tooltipFee": "수수료",
+    "modeBots": "{mode} 봇",
+    "tradeTags": {
+      "open": "오픈",
+      "close": "청산",
+      "add": "추가",
+      "reduce": "감소",
+      "maker": "Maker",
+      "net": "순 {position}"
+    },
+    "avgCost": "평균 단가 {price}",
     "pnl": {
       "realized": "실현 손익",
       "totalFees": "총 수수료",
@@ -155,7 +204,9 @@
       "bySymbol": "심볼별 손익",
       "tradeCount": "{count}건",
       "openPosition": "포지션: {amount} @ ~{price}",
-      "avgBuy": "평균 매수 {price}"
+      "openPositionNoPrice": "포지션: {amount}",
+      "avgBuy": "평균 매수 {price}",
+      "winLossFormat": "{wins}승 / {losses}패"
     },
     "crossExchange": "크로스 거래소",
     "live": {
@@ -195,7 +246,12 @@
     "statusFailed": "실패",
     "symbol": "심볼",
     "loading": "로딩...",
-    "quickRange": "빠른 범위："
+    "quickRange": "빠른 범위：",
+    "realizedPnl": "실현 손익",
+    "unrealizedPnl": "미실현 손익",
+    "assetIncrease": "자산 증가",
+    "sortinoRatio": "소르티노 비율",
+    "tradeNumber": "거래 #"
   },
   "Settings": {
     "title": "설정",
@@ -245,7 +301,9 @@
   },
   "Errors": {
     "serverError": "서버 오류. 다시 시도해 주세요.",
-    "fetchFailed": "데이터를 가져오지 못했습니다."
+    "fetchFailed": "데이터를 가져오지 못했습니다.",
+    "componentError": "오류가 발생했습니다. 페이지를 새로고침하여 다시 시도해 주세요.",
+    "retry": "재시도"
   },
   "Common": {
     "pageNotFound": "페이지를 찾을 수 없습니다.",

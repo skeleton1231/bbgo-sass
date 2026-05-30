@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import type { BBGoOrder } from '@/lib/bbgo/queries'
@@ -8,7 +11,13 @@ interface OrderRowProps {
   showTime?: boolean
 }
 
+const TRANSLATED_STATUSES = ['New', 'Filled', 'PartiallyFilled', 'Canceled', 'Rejected'] as const
+
 export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
+  const t = useTranslations('Bots')
+  const statusLabel = (TRANSLATED_STATUSES as readonly string[]).includes(order.status)
+    ? t(`orderStatus.${order.status}` as typeof TRANSLATED_STATUSES[number])
+    : order.status
   const executed = parseFloat(order.executedQuantity || '0')
   const total = parseFloat(order.quantity)
   const fillPct = total > 0 ? Math.round((executed / total) * 100) : 0
@@ -36,7 +45,7 @@ export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
             <span className="font-mono">{executed > 0 ? order.executedQuantity : order.quantity}</span>
             {executed > 0 && executed < total && (
               <span className={cn('text-[10px] px-1 rounded', sideBg, sideColor)}>
-                {fillPct}% filled
+                {t('filled', { pct: fillPct })}
               </span>
             )}
           </div>
@@ -51,7 +60,7 @@ export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
             order.status === 'New' && 'border-blue-500/30 text-blue-500',
             order.status === 'PartiallyFilled' && 'border-yellow-500/30 text-yellow-600',
           )}>
-            {order.status}
+            {statusLabel}
           </Badge>
         )}
         {showTime && order.creationTime && (

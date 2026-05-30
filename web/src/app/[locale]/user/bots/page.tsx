@@ -18,14 +18,16 @@ export default function BotsPage() {
   const t = useTranslations('Bots')
   const userId = useUserId()
   const { mode: globalMode } = useTradingMode()
+  const deleteStrategy = useDeleteStrategy()
   const [showCreate, setShowCreate] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-          <p className="text-sm text-muted-foreground">{t(`mode.${globalMode}`)} bots</p>
+          <p className="text-sm text-muted-foreground">{t('modeBots', { mode: t(`mode.${globalMode}`) })}</p>
         </div>
         <Button onClick={() => setShowCreate(true)} className="rounded-full">
           <Plus className="mr-1.5 h-4 w-4" />
@@ -33,21 +35,60 @@ export default function BotsPage() {
         </Button>
       </div>
 
-      {userId && <BotListView userId={userId} mode={globalMode} />}
+      {userId && (
+        <BotListView
+          userId={userId}
+          mode={globalMode}
+          onDelete={(id) => setPendingDeleteId(id)}
+          deleteDisabled={deleteStrategy.isPending}
+        />
+      )}
 
       {showCreate && userId && (
         <CreateStrategyDialog userId={userId} onClose={() => setShowCreate(false)} />
+      )}
+
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingDeleteId(null)}>
+          <div className="rounded-lg bg-card p-6 shadow-lg max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm">{t('removeConfirm')}</p>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setPendingDeleteId(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">
+                {t('cancel')}
+              </button>
+              <button
+                onClick={() => {
+                  deleteStrategy.mutate(
+                    { userId, strategyId: pendingDeleteId },
+                    {
+                      onSuccess: () => setPendingDeleteId(null),
+                      onError: (err) => { toast.error(err.message); setPendingDeleteId(null) },
+                    },
+                  )
+                }}
+                disabled={deleteStrategy.isPending}
+                className="rounded-md bg-destructive px-4 py-2 text-sm text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {t('remove')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-function BotListView({ userId, mode }: { userId: string; mode: 'live' | 'paper' }) {
+function BotListView({ userId, mode, onDelete, deleteDisabled }: {
+  userId: string
+  mode: 'live' | 'paper'
+  onDelete: (id: string) => void
+  deleteDisabled: boolean
+}) {
   const t = useTranslations('Bots')
   const { data: botsResp, isLoading } = useBotList(userId, mode)
   const startUser = useStartUser()
   const stopUser = useStopUser()
-  const deleteStrategy = useDeleteStrategy()
 
   if (isLoading) {
     return (
@@ -130,6 +171,7 @@ function BotListView({ userId, mode }: { userId: string; mode: 'live' | 'paper' 
                     { onError: (err) => toast.error(err.message) },
                   )}
                   disabled={stopUser.isPending}
+                  aria-label={t('stop')}
                   className="rounded-md border px-3 py-1 text-sm hover:bg-muted disabled:opacity-50"
                 >
                   <Square className="h-3 w-3" />
@@ -141,21 +183,16 @@ function BotListView({ userId, mode }: { userId: string; mode: 'live' | 'paper' 
                     { onError: (err) => toast.error(err.message) },
                   )}
                   disabled={startUser.isPending || status === 'starting'}
+                  aria-label={t('start')}
                   className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   <Play className="h-3 w-3" />
                 </button>
               )}
               <button
-                onClick={() => {
-                  if (confirm(t('removeConfirm'))) {
-                    deleteStrategy.mutate(
-                      { userId, strategyId: bot.id },
-                      { onError: (err) => toast.error(err.message) },
-                    )
-                  }
-                }}
-                disabled={deleteStrategy.isPending}
+                onClick={() => onDelete(bot.id)}
+                disabled={deleteDisabled}
+                aria-label={t('remove')}
                 className="rounded-md border border-destructive px-2 py-1 text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
               >
                 <Trash2 className="h-3 w-3" />

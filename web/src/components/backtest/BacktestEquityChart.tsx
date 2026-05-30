@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   AreaChart,
   Area,
@@ -99,14 +100,15 @@ interface EquityTooltipProps {
   active?: boolean
   payload?: Array<{ value: number }>
   label?: number
+  tradeLabel: string
 }
 
-function EquityTooltip({ active, payload, label }: EquityTooltipProps) {
+function EquityTooltip({ active, payload, label, tradeLabel }: EquityTooltipProps) {
   if (!active || !payload?.length || label == null) return null
   const val = payload[0]!.value
   return (
     <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
-      <p className="text-xs text-muted-foreground">Trade #{label}</p>
+      <p className="text-xs text-muted-foreground">{tradeLabel}{label}</p>
       <p className={`text-sm font-medium ${val >= 0 ? 'text-trade-up' : 'text-trade-down'}`}>
         {val >= 0 ? '+' : ''}{val.toFixed(2)}
       </p>
@@ -115,6 +117,7 @@ function EquityTooltip({ active, payload, label }: EquityTooltipProps) {
 }
 
 export function BacktestEquityChart({ output }: BacktestEquityChartProps) {
+  const t = useTranslations('Backtest')
   const parsed = useMemo(() => parseBacktestOutput(output), [output])
 
   if (parsed.equityCurve.length === 0) {
@@ -130,14 +133,14 @@ export function BacktestEquityChart({ output }: BacktestEquityChartProps) {
             dataKey="trade"
             tick={{ fontSize: 11 }}
             className="fill-muted-foreground"
-            label={{ value: 'Trade #', position: 'insideBottomRight', offset: -5, fontSize: 10 }}
+            label={{ value: t('tradeNumber'), position: 'insideBottomRight', offset: -5, fontSize: 10 }}
           />
           <YAxis
             tick={{ fontSize: 11 }}
             className="fill-muted-foreground"
             tickFormatter={(v: number) => v.toFixed(2)}
           />
-          <Tooltip content={<EquityTooltip />} />
+          <Tooltip content={<EquityTooltip tradeLabel={t('tradeNumber')} />} />
           <ReferenceLine y={0} stroke="hsl(var(--border))" />
           <Area
             type="monotone"
@@ -152,12 +155,12 @@ export function BacktestEquityChart({ output }: BacktestEquityChartProps) {
 
       {parsed.metrics && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <MetricCard label="Realized P&L" value={String(parsed.metrics.totalReturn)} isCurrency />
-          <MetricCard label="Unrealized P&L" value={String(parsed.metrics.unrealizedReturn)} isCurrency />
-          <MetricCard label="Asset Increase" value={`${parsed.metrics.assetIncreasePercent >= 0 ? '+' : ''}${parsed.metrics.assetIncreasePercent.toFixed(2)}%`} highlight={parsed.metrics.assetIncreasePercent >= 0} />
-          <MetricCard label="Trades" value={String(parsed.metrics.tradeCount)} />
-          <MetricCard label="Sharpe Ratio" value={parsed.metrics.sharpeRatio.toFixed(4)} />
-          <MetricCard label="Sortino Ratio" value={parsed.metrics.sortinoRatio.toFixed(4)} />
+          <MetricCard label={t('realizedPnl')} value={String(parsed.metrics.totalReturn)} isCurrency />
+          <MetricCard label={t('unrealizedPnl')} value={String(parsed.metrics.unrealizedReturn)} isCurrency />
+          <MetricCard label={t('assetIncrease')} value={`${parsed.metrics.assetIncreasePercent >= 0 ? '+' : ''}${parsed.metrics.assetIncreasePercent.toFixed(2)}%`} highlight={parsed.metrics.assetIncreasePercent >= 0} />
+          <MetricCard label={t('trades')} value={String(parsed.metrics.tradeCount)} />
+          <MetricCard label={t('sharpeRatio')} value={parsed.metrics.sharpeRatio.toFixed(4)} />
+          <MetricCard label={t('sortinoRatio')} value={parsed.metrics.sortinoRatio.toFixed(4)} />
         </div>
       )}
     </div>

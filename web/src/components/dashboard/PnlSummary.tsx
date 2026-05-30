@@ -46,7 +46,7 @@ export function PnlSummary({ report }: PnlSummaryProps) {
         <p className="text-sm font-medium">
           {report.totalTrades}
           <span className="text-xs text-muted-foreground ml-1">
-            ({report.winningTrades}W / {report.losingTrades}L)
+            ({t('winLossFormat', { wins: report.winningTrades, losses: report.losingTrades })})
           </span>
         </p>
       </div>

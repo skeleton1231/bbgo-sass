@@ -33,26 +33,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
       </h3>
       {fields.map((field) => (
         <div key={field.key}>
-          <label className="block text-sm font-medium mb-1">
-            {ft(field.key as Parameters<typeof ft>[0])}
-            {field.required && <span className="text-destructive ml-0.5">*</span>}
-          </label>
-
-          {field.description && (
-            <p className="text-xs text-muted-foreground mb-1">{field.description}</p>
-          )}
-
-          {field.type === 'select' ? (
-            <select
-              value={String(values[field.key] ?? field.default)}
-              onChange={(e) => handleChange(field.key, e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              {field.options?.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          ) : field.type === 'boolean' ? (
+          {field.type === 'boolean' ? (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -60,9 +41,33 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
                 onChange={(e) => handleChange(field.key, e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm">{ft(field.key as Parameters<typeof ft>[0])}</span>
+              <span className="text-sm font-medium">
+                {ft(field.key as Parameters<typeof ft>[0])}
+                {field.required && <span className="text-destructive ml-0.5">*</span>}
+              </span>
             </label>
           ) : (
+            <>
+              <label className="block text-sm font-medium mb-1">
+                {ft(field.key as Parameters<typeof ft>[0])}
+                {field.required && <span className="text-destructive ml-0.5">*</span>}
+              </label>
+
+              {field.description && (
+                <p className="text-xs text-muted-foreground mb-1">{field.description}</p>
+              )}
+
+              {field.type === 'select' ? (
+                <select
+                  value={String(values[field.key] ?? field.default)}
+                  onChange={(e) => handleChange(field.key, e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {field.options?.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              ) : (
             <input
               type="text"
               inputMode="decimal"
@@ -77,6 +82,8 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
               step={field.step}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
+              )}
+            </>
           )}
         </div>
       ))}
