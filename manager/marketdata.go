@@ -379,9 +379,9 @@ func userDataToJSON(ud *pb.UserData) map[string]interface{} {
 		"event":    ud.Event.String(),
 	}
 	if len(ud.Balances) > 0 {
-		balances := make([]map[string]string, len(ud.Balances))
+		balances := make([]map[string]interface{}, len(ud.Balances))
 		for i, b := range ud.Balances {
-			balances[i] = map[string]string{
+			balances[i] = map[string]interface{}{
 				"currency":  b.Currency,
 				"available": b.Available,
 				"locked":    b.Locked,
@@ -420,10 +420,10 @@ func userDataToJSON(ud *pb.UserData) map[string]interface{} {
 	return result
 }
 
-func priceVolumeSlice(pv []*pb.PriceVolume) []map[string]string {
-	result := make([]map[string]string, len(pv))
+func priceVolumeSlice(pv []*pb.PriceVolume) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(pv))
 	for i, p := range pv {
-		result[i] = map[string]string{"price": p.Price, "volume": p.Volume}
+		result[i] = map[string]interface{}{"price": p.Price, "volume": p.Volume}
 	}
 	return result
 }

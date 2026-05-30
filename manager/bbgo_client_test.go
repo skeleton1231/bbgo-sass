@@ -153,8 +153,8 @@ func TestBBGoClient_GetSessions(t *testing.T) {
 
 func TestBBGoClient_GetSessionBalances(t *testing.T) {
 	balances := map[string]BBGoBalance{
-		"BTC":  {Currency: "BTC", Available: "1.5", Locked: "0.5"},
-		"USDT": {Currency: "USDT", Available: "10000", Locked: "0"},
+		"BTC":  {Currency: "BTC", Available: json.Number("1.5"), Locked: json.Number("0.5")},
+		"USDT": {Currency: "USDT", Available: json.Number("10000"), Locked: json.Number("0")},
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,6 +172,23 @@ func TestBBGoClient_GetSessionBalances(t *testing.T) {
 	}
 	if result["BTC"].Available != "1.5" {
 		t.Errorf("expected BTC available=1.5, got %s", result["BTC"].Available)
+	}
+}
+
+func TestBBGoClient_GetSessionBalances_NumericFields(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// bbgo returns numeric values, not strings
+		w.Write([]byte(`{"balances":{"BTC":{"currency":"BTC","available":1.5,"locked":0}}}`))
+	}))
+	defer srv.Close()
+
+	client := NewBBGoClient(srv.URL)
+	result, err := client.GetSessionBalances("binance")
+	if err != nil {
+		t.Fatalf("GetSessionBalances with numeric fields returned error: %v", err)
+	}
+	if result["BTC"].Available != "1.5" {
+		t.Errorf("BTC available = %s, want 1.5", result["BTC"].Available)
 	}
 }
 

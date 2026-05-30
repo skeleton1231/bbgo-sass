@@ -231,9 +231,9 @@ func (c *BBGoClient) GetSessionOpenOrders(session string) ([]BBGoOrder, error) {
 }
 
 type BBGoBalance struct {
-	Currency  string `json:"currency"`
-	Available string `json:"available"`
-	Locked    string `json:"locked"`
+	Currency  string      `json:"currency"`
+	Available json.Number `json:"available"`
+	Locked    json.Number `json:"locked"`
 }
 
 type BBGoAccountResponse struct {

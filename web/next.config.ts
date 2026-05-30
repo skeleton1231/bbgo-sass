@@ -9,8 +9,6 @@ const withNextIntl = createNextIntlPlugin({
 })
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  allowedDevOrigins: ['127.0.0.1'],
   turbopack: {},
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
