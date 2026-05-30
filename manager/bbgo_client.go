@@ -273,15 +273,15 @@ func (c *BBGoClient) GetSessionSymbols(session string) ([]string, error) {
 }
 
 type BBGoAsset struct {
-	Currency      string `json:"currency"`
-	Total         string `json:"total"`
-	Available     string `json:"available"`
-	Locked        string `json:"lock"`
-	Borrowed      string `json:"borrowed"`
-	NetAsset      string `json:"netAsset"`
-	NetAssetInUSD string `json:"netAssetInUSD"`
-	NetAssetInBTC string `json:"netAssetInBTC"`
-	PriceInUSD    string `json:"priceInUSD"`
+	Currency      string      `json:"currency"`
+	Total         json.Number `json:"total"`
+	Available     json.Number `json:"available"`
+	Locked        json.Number `json:"lock"`
+	Borrowed      json.Number `json:"borrowed"`
+	NetAsset      json.Number `json:"netAsset"`
+	NetAssetInUSD json.Number `json:"netAssetInUSD"`
+	NetAssetInBTC json.Number `json:"netAssetInBTC"`
+	PriceInUSD    json.Number `json:"priceInUSD"`
 }
 
 type BBGoAssetsResponse struct {

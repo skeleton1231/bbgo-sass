@@ -180,7 +180,7 @@ func TestBBGoClient_GetAssets(t *testing.T) {
 		if r.URL.Path != "/api/assets" {
 			t.Errorf("expected /api/assets, got %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(BBGoAssetsResponse{Assets: map[string]BBGoAsset{"BTC": {Currency: "BTC", Total: "1.0", Available: "1.0", Locked: "0"}}})
+		json.NewEncoder(w).Encode(BBGoAssetsResponse{Assets: map[string]BBGoAsset{"BTC": {Currency: "BTC", Total: json.Number("1.0"), Available: json.Number("1.0"), Locked: json.Number("0")}}})
 	}))
 	defer srv.Close()
 
@@ -188,6 +188,50 @@ func TestBBGoClient_GetAssets(t *testing.T) {
 	_, err := client.GetAssets()
 	if err != nil {
 		t.Fatalf("GetAssets() returned error: %v", err)
+	}
+}
+
+func TestBBGoClient_GetAssets_NumericFields(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// bbgo returns numeric values, not strings
+		w.Write([]byte(`{"assets":{"BTC":{"currency":"BTC","total":905.00000000,"available":905.00000000,"lock":0.00000000,"borrowed":0.00000000,"netAsset":905.00000000,"netAssetInUSD":390.05500000,"netAssetInBTC":0.00530291,"priceInUSD":0.43100000}}}`))
+	}))
+	defer srv.Close()
+
+	client := NewBBGoClient(srv.URL)
+	assets, err := client.GetAssets()
+	if err != nil {
+		t.Fatalf("GetAssets() with numeric fields returned error: %v", err)
+	}
+	btc, ok := assets["BTC"]
+	if !ok {
+		t.Fatal("BTC asset not found")
+	}
+	if btc.Total.String() != "905.00000000" {
+		t.Errorf("BTC total = %s, want 905.00000000", btc.Total.String())
+	}
+	if btc.Currency != "BTC" {
+		t.Errorf("BTC currency = %s, want BTC", btc.Currency)
+	}
+}
+
+func TestBBGoClient_GetAssets_MixedFormats(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Some bbgo versions may return string or number formats
+		w.Write([]byte(`{"assets":{"BTC":{"currency":"BTC","total":"1.5","available":"1.0","lock":"0"},"ETH":{"currency":"ETH","total":2.0,"available":2.0,"lock":0}}}`))
+	}))
+	defer srv.Close()
+
+	client := NewBBGoClient(srv.URL)
+	assets, err := client.GetAssets()
+	if err != nil {
+		t.Fatalf("GetAssets() with mixed formats returned error: %v", err)
+	}
+	if assets["BTC"].Total.String() != "1.5" {
+		t.Errorf("BTC total = %s, want 1.5", assets["BTC"].Total.String())
+	}
+	if assets["ETH"].Total.String() != "2.0" {
+		t.Errorf("ETH total = %s, want 2.0", assets["ETH"].Total.String())
 	}
 }
 

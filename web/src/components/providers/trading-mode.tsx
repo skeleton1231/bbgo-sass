@@ -9,7 +9,6 @@ const STORAGE_KEY = 'bbgo-trading-mode'
 const DEFAULT_MODE: TradingMode = 'live'
 
 function readStoredMode(): TradingMode {
-  if (typeof window === 'undefined') return DEFAULT_MODE
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored === 'live' || stored === 'paper') return stored
   return DEFAULT_MODE
@@ -26,20 +25,27 @@ const TradingModeContext = createContext<{
 export function TradingModeProvider({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams()
   const urlMode = searchParams.get('mode')
-  const [mode, setModeState] = useState<TradingMode>(() => {
-    if (typeof window === 'undefined') return DEFAULT_MODE
-    if (urlMode === 'live' || urlMode === 'paper') {
-      localStorage.setItem(STORAGE_KEY, urlMode)
-      return urlMode
-    }
-    return readStoredMode()
-  })
 
-  // React to URL ?mode= changes on SPA navigation (not just initial mount)
-  if ((urlMode === 'live' || urlMode === 'paper') && urlMode !== mode) {
-    localStorage.setItem(STORAGE_KEY, urlMode)
-    setModeState(urlMode)
-  }
+  // Always initialize with DEFAULT_MODE so SSR and first client render match.
+  // Sync from localStorage in useEffect (after hydration).
+  const [mode, setModeState] = useState<TradingMode>(DEFAULT_MODE)
+
+  useEffect(() => {
+    const stored = readStoredMode()
+    if (stored !== mode) {
+      setModeState(stored)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only sync from localStorage
+
+  // React to URL ?mode= changes on SPA navigation
+  useEffect(() => {
+    if (urlMode === 'live' || urlMode === 'paper') {
+      if (urlMode !== mode) {
+        localStorage.setItem(STORAGE_KEY, urlMode)
+        setModeState(urlMode)
+      }
+    }
+  }, [urlMode]) // eslint-disable-line react-hooks/exhaustive-deps -- only react to URL changes
 
   const setMode = useCallback((m: TradingMode) => {
     setModeState(m)
