@@ -167,9 +167,7 @@ export default function BotDetailPage() {
       }
     }
     return lines
-  }, [strategyStatesData, currentPrice, findMatchingStrategy])
-
-  const indicatorLines = useMemo(() => {
+  }, [strategyStatesData, currentPrice, findMatchingStrategy, t]) = useMemo(() => {
     if (candles.length === 0) return []
     const closes = candles.map((c) => ({ time: c.time, close: c.close }))
     const lines: Array<{
@@ -219,7 +217,7 @@ export default function BotDetailPage() {
       priceScaleId: 'pnl', scaleMargins: { top: 0.75, bottom: 0 },
       data: curve,
     }
-  }, [tradesData])
+  }, [tradesData, t])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
