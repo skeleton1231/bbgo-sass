@@ -31,7 +31,7 @@ func TestSyncer_MarkCredentialsVerified(t *testing.T) {
 
 	syncer := NewSyncerWithCreds(users, nil, creds)
 
-	syncer.markCredentialsVerified(users.users["user-1"])
+	syncer.MarkCredentialsVerified(users.users["user-1"])
 
 	stored, err := creds.List("user-1")
 	if err != nil {
@@ -74,7 +74,7 @@ func TestSyncer_MarkCredentialsVerified_CrossExchange(t *testing.T) {
 
 	syncer := NewSyncerWithCreds(users, nil, creds)
 
-	syncer.markCredentialsVerified(users.users["user-1"])
+	syncer.MarkCredentialsVerified(users.users["user-1"])
 
 	stored, _ := creds.List("user-1")
 	for _, c := range stored {
@@ -106,7 +106,7 @@ func TestSyncer_MarkCredentialsVerified_UnusedExchange(t *testing.T) {
 
 	syncer := NewSyncerWithCreds(users, nil, creds)
 
-	syncer.markCredentialsVerified(users.users["user-1"])
+	syncer.MarkCredentialsVerified(users.users["user-1"])
 
 	stored, _ := creds.List("user-1")
 	for _, c := range stored {

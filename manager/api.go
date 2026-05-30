@@ -457,6 +457,10 @@ func (api *API) startUserContainer(userID, mode string) {
 	api.updateAndPersistStatus(userID, mode, StatusRunning)
 	log.Printf("user %s %s container started and healthy", userID, mode)
 
+	if api.syncer != nil {
+		go api.syncer.MarkCredentialsVerified(uc)
+	}
+
 	go func() {
 		grpcAddr := api.container.ContainerGRPCAddr(userID, mode)
 		for i := 0; i < 10; i++ {

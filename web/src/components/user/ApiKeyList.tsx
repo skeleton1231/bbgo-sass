@@ -92,7 +92,7 @@ export function ApiKeyList() {
                 {cred.is_verified ? (
                   <span className="rounded-md bg-green-100 text-green-700 px-2 py-1 text-xs">{t('verified')}</span>
                 ) : (
-                  <span className="rounded-md bg-gray-100 text-gray-500 px-2 py-1 text-xs">{t('verificationFailed')}</span>
+                  <span className="rounded-md bg-yellow-100 text-yellow-700 px-2 py-1 text-xs">{t('unverified')}</span>
                 )}
               </div>
               <button

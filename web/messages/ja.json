@@ -210,7 +210,7 @@
       "empty": "API キーが設定されていません。",
       "delete": "削除",
       "verified": "検証済み",
-      "verificationFailed": "検証失敗",
+      "unverified": "未検証",
       "required": "この項目は必須です",
       "authRequired": "APIキーを追加するには再度ログインしてください。",
       "testnetAdded": "テストネットAPIキーを追加しました。",

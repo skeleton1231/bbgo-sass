@@ -210,7 +210,7 @@
       "empty": "尚未設定 API 金鑰。",
       "delete": "刪除",
       "verified": "已驗證",
-      "verificationFailed": "驗證失敗",
+      "unverified": "未驗證",
       "required": "此欄位為必填",
       "authRequired": "請重新登入後再新增 API 金鑰。",
       "testnetAdded": "測試網 API 金鑰已新增。",

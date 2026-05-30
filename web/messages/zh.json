@@ -210,7 +210,7 @@
       "empty": "尚未配置 API 密钥。",
       "delete": "删除",
       "verified": "已验证",
-      "verificationFailed": "验证失败",
+      "unverified": "未验证",
       "required": "此字段为必填项",
       "authRequired": "请重新登录后再添加 API 密钥。",
       "testnetAdded": "测试网 API 密钥已添加。",

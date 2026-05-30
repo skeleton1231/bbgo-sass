@@ -210,7 +210,7 @@
       "empty": "API 키가 설정되지 않았습니다.",
       "delete": "삭제",
       "verified": "인증 완료",
-      "verificationFailed": "인증 실패",
+      "unverified": "미인증",
       "required": "필수 항목입니다",
       "authRequired": "API 키를 추가하려면 다시 로그인해 주세요.",
       "testnetAdded": "테스트넷 API 키가 추가되었습니다.",

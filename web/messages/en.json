@@ -210,7 +210,7 @@
       "empty": "No API keys configured.",
       "delete": "Delete",
       "verified": "Verified",
-      "verificationFailed": "Verification failed",
+      "unverified": "Unverified",
       "required": "This field is required",
       "authRequired": "Please sign in again to add API keys.",
       "testnetAdded": "Testnet API key added.",

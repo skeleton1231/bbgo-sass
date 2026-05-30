@@ -50,7 +50,7 @@ func (s *Syncer) SyncAll() {
 }
 
 func (s *Syncer) SyncCredential(cred ExchangeCredential) {
-	if s.creds == nil {
+	if s.supa == nil {
 		return
 	}
 	if err := s.supa.UpsertCredential(cred); err != nil {
@@ -71,7 +71,7 @@ func (s *Syncer) DeleteCredential(userID, exchange string, isTestnet bool) {
 	}
 }
 
-func (s *Syncer) markCredentialsVerified(uc *UserContainer) {
+func (s *Syncer) MarkCredentialsVerified(uc *UserContainer) {
 	if s.creds == nil {
 		return
 	}
@@ -79,25 +79,32 @@ func (s *Syncer) markCredentialsVerified(uc *UserContainer) {
 	if err != nil {
 		return
 	}
+	wantTestnet := uc.Mode == ModePaper
+
+	exchanges := []string{}
+	for _, strat := range uc.Strategies {
+		if strat.CrossExchange {
+			for _, sr := range strat.Sessions {
+				exchanges = append(exchanges, sr.Exchange)
+			}
+		} else if strat.Exchange != "" {
+			exchanges = append(exchanges, strat.Exchange)
+		}
+	}
+
 	for _, c := range creds {
 		if c.IsVerified {
 			continue
 		}
-		exchanges := []string{}
-		for _, strat := range uc.Strategies {
-			if strat.CrossExchange {
-				for _, sr := range strat.Sessions {
-					exchanges = append(exchanges, sr.Exchange)
-				}
-			} else if strat.Exchange != "" {
-				exchanges = append(exchanges, strat.Exchange)
-			}
+		if c.IsTestnet != wantTestnet {
+			continue
 		}
 		for _, ex := range exchanges {
 			if ex == c.Exchange {
 				c.IsVerified = true
 				s.creds.Update(uc.UserID, c)
-				log.Printf("credential %s for user %s marked as verified", c.Exchange, uc.UserID)
+				log.Printf("credential %s (%s) for user %s marked as verified", c.Exchange, modeLabel(c.IsTestnet), uc.UserID)
+				s.SyncCredential(c)
 				break
 			}
 		}
