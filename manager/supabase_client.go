@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/supabase-community/postgrest-go"
 	supabase "github.com/supabase-community/supabase-go"
 )
@@ -66,8 +68,10 @@ func (sc *SupabaseClient) UpsertUser(uc *UserContainer) error {
 }
 
 func (sc *SupabaseClient) UpsertCredential(cred ExchangeCredential) error {
+	id := uuid.New().String()
+	now := time.Now().UTC().Format(time.RFC3339)
 	row := PublicExchangeCredentialsInsert{
-		Id:                  &cred.ID,
+		Id:                  &id,
 		UserId:              cred.UserID,
 		Exchange:            cred.Exchange,
 		ApiKeyEncrypted:     cred.APIKeyEncrypted,
@@ -75,6 +79,7 @@ func (sc *SupabaseClient) UpsertCredential(cred ExchangeCredential) error {
 		PassphraseEncrypted: &cred.PassphraseEncrypted,
 		IsTestnet:           &cred.IsTestnet,
 		IsVerified:          &cred.IsVerified,
+		CreatedAt:           &now,
 	}
 	_, _, err := sc.client.From("exchange_credentials").Upsert(row, "user_id,exchange,is_testnet", "", "").Execute()
 	if err != nil {
