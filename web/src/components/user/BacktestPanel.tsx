@@ -41,6 +41,7 @@ export function BacktestPanel() {
   const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true, excludeCrossExchange: true })
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [manualResult, setManualResult] = useState<BacktestJob | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [priceSymbol, setPriceSymbol] = useState('')
 
   const { data: symbolsData } = useMarketSymbols(exchange)
@@ -91,6 +92,7 @@ export function BacktestPanel() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
     try {
       const result = await submitBacktest.mutateAsync({
         strategy,
@@ -101,8 +103,9 @@ export function BacktestPanel() {
         end_time: endTime,
       })
       setActiveJobId(result.job_id)
-    } catch {
-      // Error is displayed via submitBacktest.isError below
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setSubmitError(message)
     }
   }
 
@@ -268,7 +271,13 @@ export function BacktestPanel() {
         </div>
       )}
 
-      {submitBacktest.isError && (
+      {submitError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{submitError}</p>
+        </div>
+      )}
+
+      {submitBacktest.isError && !submitError && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{submitBacktest.error instanceof Error ? submitBacktest.error.message : t('error')}</p>
         </div>
