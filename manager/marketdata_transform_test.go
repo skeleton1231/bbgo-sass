@@ -54,7 +54,7 @@ func TestMarketDataToJSON_AllFields(t *testing.T) {
 	if !ok {
 		t.Fatal("expected depth map")
 	}
-	bids, ok := depth["bids"].([]map[string]string)
+	bids, ok := depth["bids"].([]map[string]interface{})
 	if !ok || len(bids) != 1 {
 		t.Fatalf("expected 1 bid, got %v", depth["bids"])
 	}
@@ -134,7 +134,7 @@ func TestUserDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected binance, got %v", result["session"])
 	}
 
-	balances, ok := result["balances"].([]map[string]string)
+	balances, ok := result["balances"].([]map[string]interface{})
 	if !ok || len(balances) != 2 {
 		t.Fatalf("expected 2 balances, got %v", result["balances"])
 	}

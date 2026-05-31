@@ -71,7 +71,7 @@ func TestMarketDataToJSON_Depth(t *testing.T) {
 	if !ok {
 		t.Fatal("depth not a map")
 	}
-	bids, _ := depth["bids"].([]map[string]string)
+	bids, _ := depth["bids"].([]map[string]interface{})
 	if len(bids) != 1 || bids[0]["price"] != "50000" {
 		t.Errorf("bids = %v", bids)
 	}
@@ -102,7 +102,7 @@ func TestUserDataToJSON_Balances(t *testing.T) {
 		},
 	}
 	result := userDataToJSON(ud)
-	balances, ok := result["balances"].([]map[string]string)
+	balances, ok := result["balances"].([]map[string]interface{})
 	if !ok || len(balances) != 1 {
 		t.Fatalf("balances wrong type or len")
 	}
