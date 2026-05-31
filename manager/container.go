@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/saas/manager/pool"
@@ -426,99 +425,6 @@ func (cm *ContainerManager) ContainerGRPCAddr(userID, mode string) string {
 	return fmt.Sprintf("%s:%d", cm.containerName(userID, mode), cm.cfg.BBGOGRPCPort)
 }
 
-// HealthCheckResult reports the outcome of checking a single container.
-type HealthCheckResult struct {
-	UserID    string
-	Mode      string
-	Alive     bool
-	Restarted bool
-	Error     string
-}
-
-// CheckAndRecover checks all running containers in parallel and restarts
-// any that have died. Uses a goroutine pool (max 5) for parallel docker inspect.
-func (cm *ContainerManager) CheckAndRecover(users []*UserContainer) []HealthCheckResult {
-	results := make([]HealthCheckResult, len(users))
-	var mu sync.Mutex
-
-	for i, uc := range users {
-		if uc.Status != StatusRunning {
-			results[i] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: false}
-			continue
-		}
-		idx, uc := i, uc
-		if err := cm.pool.Submit(func() {
-			running, _ := cm.CheckRunning(uc.UserID, uc.Mode)
-			if running {
-				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: true}
-				mu.Unlock()
-				return
-			}
-			log.Printf("health check: container %s died, restarting", cm.containerName(uc.UserID, uc.Mode))
-			if err := cm.CreateAndStart(uc); err != nil {
-				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: false, Error: err.Error()}
-				mu.Unlock()
-				return
-			}
-			mu.Lock()
-			results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: true, Restarted: true}
-			mu.Unlock()
-		}); err != nil {
-			results[idx] = HealthCheckResult{UserID: uc.UserID, Mode: uc.Mode, Alive: false, Error: err.Error()}
-		}
-	}
-	cm.pool.Wait()
-	return results
-}
-
-type RecoveryResult struct {
-	UserID string
-	Mode   string
-	Status string
-}
-
-func (cm *ContainerManager) RecoverUsers(users []*UserContainer) []RecoveryResult {
-	results := make([]RecoveryResult, len(users))
-	var mu sync.Mutex
-
-	for i, uc := range users {
-		idx, uc := i, uc
-		if err := cm.pool.Submit(func() {
-			name := cm.containerName(uc.UserID, uc.Mode)
-			out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
-			if out == "true" {
-				log.Printf("recovered container %s (running)", name)
-				mu.Lock()
-				results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusRunning}
-				mu.Unlock()
-				return
-			}
-			if uc.Status == StatusRunning {
-				log.Printf("recovering container %s for user %s", name, uc.UserID)
-				if err := cm.CreateAndStart(uc); err != nil {
-					log.Printf("recover user %s failed: %v", uc.UserID, err)
-					mu.Lock()
-					results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusError}
-					mu.Unlock()
-					return
-				}
-				mu.Lock()
-				results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusRunning}
-				mu.Unlock()
-				return
-			}
-			mu.Lock()
-			results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: uc.Status}
-			mu.Unlock()
-		}); err != nil {
-			results[idx] = RecoveryResult{UserID: uc.UserID, Mode: uc.Mode, Status: StatusError}
-		}
-	}
-	cm.pool.Wait()
-	return results
-}
 
 // DiscoverContainers scans Docker for running bbgo-* containers and returns
 // the userIDs and modes found. Used during startup to detect orphaned containers

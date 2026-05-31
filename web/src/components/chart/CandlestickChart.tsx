@@ -125,6 +125,7 @@ export function CandlestickChart({
   const priceLinesRef = useRef<ReturnType<ISeriesApi<SeriesType>['createPriceLine']>[]>([])
   const prevCandleCountRef = useRef(0)
   const prevDataKeyRef = useRef(dataKey)
+  const hadDataRef = useRef(false)
   const onVisibleRangeChangeRef = useRef(onVisibleTimeRangeChange)
   const onCrosshairMoveRef = useRef(onCrosshairMove)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: TradeMarker } | null>(null)
@@ -141,6 +142,7 @@ export function CandlestickChart({
     if (prevDataKeyRef.current !== dataKey) {
       prevDataKeyRef.current = dataKey
       prevCandleCountRef.current = 0
+      hadDataRef.current = false
     }
   }, [dataKey])
 
@@ -246,6 +248,7 @@ export function CandlestickChart({
 
     if (candles.length === 0) {
       prevCandleCountRef.current = 0
+      hadDataRef.current = false
       return
     }
 
@@ -263,7 +266,8 @@ export function CandlestickChart({
         color: c.close >= c.open ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
       }))
 
-    const useSetData = prevCount === 0 || candles.length !== prevCount
+    const useSetData = !hadDataRef.current || prevCount === 0 || candles.length !== prevCount
+    hadDataRef.current = true
 
     if (useSetData) {
       candleSeriesRef.current.setData(candleData)

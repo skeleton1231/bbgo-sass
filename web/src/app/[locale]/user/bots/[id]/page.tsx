@@ -76,7 +76,7 @@ export default function BotDetailPage() {
 
   const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper'
     : rawMode === 'live' ? 'live'
-    : bot?.mode ?? globalMode
+    : globalMode
 
   const isRunning = bot?.container_status === 'running'
   const exchange = bot?.exchange ?? ''
@@ -111,10 +111,10 @@ export default function BotDetailPage() {
 
   const { candles, isLoading: klinesLoading, loadEarlierKlines } = useKlineData({
     userId,
-    exchange: activeExchange,
+    exchange: activeExchange || exchange,
     symbol,
     interval: klineInterval,
-    enabled: isRunning && !!activeExchange && !!symbol,
+    enabled: !!exchange && !!symbol,
   })
 
   const tradeMarkers: TradeMarker[] = useMemo(

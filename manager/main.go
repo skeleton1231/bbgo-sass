@@ -77,8 +77,7 @@ func main() {
 				continue
 			}
 			log.Printf("discovered orphaned container: %s (%s), registering", uid, m)
-			users.AddStrategy(uid, m, StrategyEntry{})
-			users.UpdateStatus(uid, m, StatusRunning)
+			users.RegisterContainer(uid, m, StatusRunning)
 			syncer.SyncUser(uid, m)
 		}
 	}
@@ -134,6 +133,7 @@ func main() {
 					})
 				}
 			}
+			containerMgr.CleanupStopped(allUsers)
 		}
 	}()
 

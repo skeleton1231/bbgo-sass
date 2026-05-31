@@ -235,6 +235,23 @@ func (m *UserContainerManager) ListUsers() []*UserContainer {
 	return list
 }
 
+// RegisterContainer creates a UserContainer entry without strategies.
+// Used for orphaned containers discovered in Docker but not tracked in Supabase.
+func (m *UserContainerManager) RegisterContainer(userID, mode, status string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := userContainerKey(userID, mode)
+	if _, ok := m.users[key]; ok {
+		return
+	}
+	m.users[key] = &UserContainer{
+		UserID:     userID,
+		Mode:       mode,
+		Status:     status,
+		Strategies: []StrategyEntry{},
+	}
+}
+
 func (m *UserContainerManager) Restore(users []*UserContainer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -252,11 +269,21 @@ type databaseConfig struct {
 	DSN    string `yaml:"dsn"`
 }
 
+type syncUserDataStreamConfig struct {
+	Trades       bool `yaml:"trades"`
+	FilledOrders bool `yaml:"filledOrders"`
+}
+
+type syncConfig struct {
+	UserDataStream *syncUserDataStreamConfig `yaml:"userDataStream"`
+}
+
 type bbgoConfig struct {
 	Database                *databaseConfig           `yaml:"database,omitempty"`
 	Sessions                map[string]sessionConfig  `yaml:"sessions,omitempty"`
 	Exchange                map[string]exchangeConfig `yaml:"exchange"`
 	Environment             *environmentConfig        `yaml:"environment,omitempty"`
+	Sync                    *syncConfig               `yaml:"sync,omitempty"`
 	ExchangeStrategies      []map[string]interface{}  `yaml:"exchangeStrategies,omitempty"`
 	CrossExchangeStrategies []map[string]interface{}  `yaml:"crossExchangeStrategies,omitempty"`
 }
@@ -343,6 +370,12 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		},
 		Sessions:                sessions,
 		Exchange:                exchanges,
+		Sync: &syncConfig{
+			UserDataStream: &syncUserDataStreamConfig{
+				Trades:       true,
+				FilledOrders: true,
+			},
+		},
 		ExchangeStrategies:      exchangeStrategies,
 		CrossExchangeStrategies: crossStrategies,
 	}
