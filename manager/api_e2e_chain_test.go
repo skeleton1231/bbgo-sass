@@ -456,8 +456,11 @@ func TestEnvArgs_PaperMode(t *testing.T) {
 	if !strings.Contains(argsStr, "PAPER_TRADE=1") {
 		t.Error("paper mode must inject PAPER_TRADE=1")
 	}
-	if !strings.Contains(argsStr, "DB_DRIVER=supabase") {
-		t.Error("must inject DB_DRIVER")
+	if !strings.Contains(argsStr, "DB_DRIVER=sqlite3") {
+		t.Error("paper mode must inject DB_DRIVER=sqlite3")
+	}
+	if strings.Contains(argsStr, "SUPABASE_URL") {
+		t.Error("paper mode must NOT inject Supabase env vars")
 	}
 	if !strings.Contains(argsStr, "MARKET_DATA_SERVICE_URL") {
 		t.Error("must inject MARKET_DATA_SERVICE_URL")

@@ -328,13 +328,20 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 		args = append(args, "-e", "PAPER_TRADE=1")
 	}
 
-	args = append(args,
-		"-e", "DB_DRIVER=supabase",
-		"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
-		"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
-		"-e", "BBGO_USER_ID="+uc.UserID,
-		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
-	)
+	if uc.Mode == ModePaper {
+		args = append(args,
+			"-e", "DB_DRIVER=sqlite3",
+			"-e", "DB_DSN="+filepath.Join(cm.userDir(uc.UserID, ModePaper), "bbgo.db"),
+		)
+	} else {
+		args = append(args,
+			"-e", "DB_DRIVER=supabase",
+			"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
+			"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
+			"-e", "BBGO_USER_ID="+uc.UserID,
+		)
+	}
+	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
 
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
