@@ -216,7 +216,8 @@
       "maker": "Maker",
       "net": "net {position}"
     },
-    "avgCost": "Avg Cost {price}"
+    "avgCost": "Avg Cost {price}",
+    "noBinanceTestnetCreds": "No Binance testnet API credentials configured. Add them in Settings first."
   },
   "Backtest": {
     "title": "Backtest",

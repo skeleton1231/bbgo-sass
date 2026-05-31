@@ -216,7 +216,8 @@
       "connecting": "연결 중..."
     },
     "liveOnlyHint": "이 전략은 라이브 모드가 필요합니다.",
-    "liveOnlyOverrideHint": "이 전략은 라이브 모드만 지원합니다. 페이퍼 모드에서 라이브 모드로 자동 전환되었습니다."
+    "liveOnlyOverrideHint": "이 전략은 라이브 모드만 지원합니다. 페이퍼 모드에서 라이브 모드로 자동 전환되었습니다.",
+    "noBinanceTestnetCreds": "Binance 테스트넷 API 자격 증명이 없습니다. 설정에서 먼저 추가하세요."
   },
   "Backtest": {
     "title": "백테스트",

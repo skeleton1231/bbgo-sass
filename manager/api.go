@@ -226,6 +226,21 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("strategy %s only supports live mode", req.Strategy))
 		return
 	}
+	// Paper mode: only Binance exchange is supported
+	if req.Mode == ModePaper {
+		if !req.CrossExchange && req.Exchange != "binance" {
+			writeError(w, http.StatusBadRequest, "paper mode only supports Binance exchange")
+			return
+		}
+		if req.CrossExchange {
+			for _, sr := range req.Sessions {
+				if sr.Exchange != paperExchange {
+					writeError(w, http.StatusBadRequest, "paper mode only supports Binance exchange for all sessions")
+					return
+				}
+			}
+		}
+	}
 
 	if api.creds != nil {
 		wantTestnet := req.Mode == ModePaper
@@ -368,6 +383,10 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	if api.creds != nil {
 		wantTestnet := mode == ModePaper
 		for _, ex := range collectExchanges(uc.Strategies) {
+			// Paper mode: skip credential validation for non-Binance (runs PublicOnly)
+			if mode == ModePaper && ex != paperExchange {
+				continue
+			}
 			cred, err := api.creds.GetByMode(userID, ex, wantTestnet)
 			if err != nil {
 				writeError(w, http.StatusBadRequest, credModeError(mode, ex))
@@ -1567,7 +1586,7 @@ func credModeError(mode, ex string) string {
 	if mode == ModeLive {
 		return fmt.Sprintf("live mode requires API credentials for %s — add them in Settings first", ex)
 	}
-	return fmt.Sprintf("paper mode requires testnet API credentials for %s — add them in Settings first", ex)
+	return "paper mode requires Binance testnet API credentials — add them in Settings first"
 }
 
 func collectExchanges(strategies []StrategyEntry) []string {

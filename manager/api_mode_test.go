@@ -262,3 +262,132 @@ func TestAPI_CreateStrategy_NoModeWithExistingMode(t *testing.T) {
 		t.Fatalf("expected 201 when empty mode (defaults to paper) alongside live (separate containers), got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestAPI_CreateStrategy_PaperMode_RejectsNonBinance(t *testing.T) {
+	api := setupModeTestAPI(t, "")
+	r := testRouter(api)
+
+	for _, exchange := range []string{"okex", "bybit", "kucoin", "bitget", "max", "coinbase", "bitfinex"} {
+		t.Run(exchange, func(t *testing.T) {
+			body := map[string]interface{}{
+				"name":     "test",
+				"exchange": exchange,
+				"strategy": "grid2",
+				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"mode":     "paper",
+			}
+			b, _ := json.Marshal(body)
+			req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("expected 400 for paper mode with exchange %s, got %d: %s", exchange, w.Code, w.Body.String())
+			}
+			if !bytes.Contains(w.Body.Bytes(), []byte("paper mode only supports Binance")) {
+				t.Errorf("error message should mention Binance-only restriction, got: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+func TestAPI_CreateStrategy_PaperMode_AcceptsBinance(t *testing.T) {
+	api := setupModeTestAPI(t, "")
+	r := testRouter(api)
+
+	body := map[string]interface{}{
+		"name":     "Paper Grid",
+		"exchange": "binance",
+		"strategy": "grid2",
+		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"mode":     "paper",
+	}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for paper mode with binance, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAPI_CreateStrategy_LiveMode_AcceptsAllExchanges(t *testing.T) {
+	api := setupModeTestAPI(t, "")
+	r := testRouter(api)
+
+	for _, exchange := range []string{"binance", "okex", "bybit", "kucoin"} {
+		t.Run(exchange, func(t *testing.T) {
+			body := map[string]interface{}{
+				"name":     "test",
+				"exchange": exchange,
+				"strategy": "grid2",
+				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"mode":     "live",
+			}
+			b, _ := json.Marshal(body)
+			req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusCreated {
+				t.Errorf("expected 201 for live mode with exchange %s, got %d: %s", exchange, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestAPI_CreateStrategy_PaperMode_CrossExchange_RejectsNonBinance(t *testing.T) {
+	api := setupModeTestAPI(t, "")
+	r := testRouter(api)
+
+	body := map[string]interface{}{
+		"name":     "xmaker paper",
+		"exchange": "",
+		"strategy": "xmaker",
+		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"mode":     "paper",
+		"crossExchange": true,
+		"sessions": []map[string]interface{}{
+			{"name": "maker", "exchange": "binance", "envVarPrefix": "BINANCE"},
+			{"name": "hedge", "exchange": "bybit", "envVarPrefix": "BYBIT", "futures": true},
+		},
+	}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for paper mode cross-exchange with non-binance session, got %d: %s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte("paper mode only supports Binance")) {
+		t.Errorf("error message should mention Binance-only restriction, got: %s", w.Body.String())
+	}
+}
+
+func TestAPI_CreateStrategy_PaperMode_CrossExchange_AcceptsAllBinance(t *testing.T) {
+	api := setupModeTestAPI(t, "")
+	r := testRouter(api)
+
+	body := map[string]interface{}{
+		"name":     "xmaker paper all binance",
+		"exchange": "",
+		"strategy": "xmaker",
+		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"mode":     "paper",
+		"crossExchange": true,
+		"sessions": []map[string]interface{}{
+			{"name": "maker", "exchange": "binance", "envVarPrefix": "BINANCE"},
+			{"name": "hedge", "exchange": "binance", "envVarPrefix": "BINANCE", "futures": true},
+		},
+	}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for paper mode cross-exchange with all binance sessions, got %d: %s", w.Code, w.Body.String())
+	}
+}

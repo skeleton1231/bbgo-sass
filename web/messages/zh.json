@@ -215,7 +215,8 @@
       "connected": "已连接",
       "connecting": "连接中...",
       "disconnected": "离线"
-    }
+    },
+    "noBinanceTestnetCreds": "未配置 Binance 测试网 API 凭证，请先在设置中添加。"
   },
   "Backtest": {
     "title": "回测",

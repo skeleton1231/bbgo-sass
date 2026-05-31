@@ -115,6 +115,10 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		if cm.creds == nil {
 			return false
 		}
+		// Paper mode: only Binance gets credentials, other exchanges run PublicOnly
+		if mode == ModePaper && exchange != paperExchange {
+			return false
+		}
 		wantTestnet := mode == ModePaper
 		_, _, _, err := cm.creds.GetDecryptedByMode(uc.UserID, exchange, wantTestnet)
 		return err == nil
@@ -336,7 +340,7 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
 
-	// Inject credentials: paper containers use testnet creds, live containers use live creds
+	// Inject credentials: paper mode only injects Binance testnet creds
 	if cm.creds != nil {
 		injected := map[string]bool{}
 		wantTestnet := uc.Mode == ModePaper
@@ -351,6 +355,11 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 			}
 			for _, ex := range exchanges {
 				if injected[ex] {
+					continue
+				}
+				// Paper mode: only inject Binance testnet credentials
+				if uc.Mode == ModePaper && ex != paperExchange {
+					injected[ex] = true
 					continue
 				}
 				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(uc.UserID, ex, wantTestnet)

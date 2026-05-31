@@ -21,6 +21,9 @@ const (
 	ModePaper = "paper"
 )
 
+// paperExchange is the only exchange supported in paper mode.
+const paperExchange = "binance"
+
 // legacyStrategyAliases maps frontend strategy IDs to the correct bbgo registered IDs.
 var legacyStrategyAliases = map[string]string{
 	"ewoDgtrd":            "ewo_dgtrd",

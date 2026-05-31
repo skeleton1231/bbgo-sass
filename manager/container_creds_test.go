@@ -54,6 +54,30 @@ func insertTestCredential(t *testing.T, cs *CredentialStore, userID, exchange, a
 	}
 }
 
+func insertTestnetCredential(t *testing.T, cs *CredentialStore, userID, exchange, apiKey, apiSecret string) {
+	t.Helper()
+	enc := cs.crypto
+	keyEnc, err := enc.Encrypt(apiKey)
+	if err != nil {
+		t.Fatalf("encrypt api key: %v", err)
+	}
+	secretEnc, err := enc.Encrypt(apiSecret)
+	if err != nil {
+		t.Fatalf("encrypt api secret: %v", err)
+	}
+	cred := ExchangeCredential{
+		ID:                 generateID("cred"),
+		UserID:             userID,
+		Exchange:           exchange,
+		APIKeyEncrypted:    keyEnc,
+		APISecretEncrypted: secretEnc,
+		IsTestnet:          true,
+	}
+	if err := cs.Upsert(cred); err != nil {
+		t.Fatalf("upsert credential: %v", err)
+	}
+}
+
 func TestEnvArgs_PaperMode_SetsEnv(t *testing.T) {
 	cm, _ := setupContainerManager(t)
 	uc := &UserContainer{
@@ -173,6 +197,90 @@ func TestEnvArgs_MultipleExchanges_InjectsBoth(t *testing.T) {
 	}
 	if !findEnv("OKEX_API_KEY=okex-key") {
 		t.Error("expected OKEX_API_KEY")
+	}
+}
+
+func TestEnvArgs_PaperMode_NonBinanceCredentials_NotInjected(t *testing.T) {
+	cm, creds := setupContainerManager(t)
+	insertTestCredential(t, creds, "test-user", "binance", "binance-key", "binance-secret")
+	insertTestCredential(t, creds, "test-user", "okex", "okex-key", "okex-secret")
+
+	uc := &UserContainer{
+		Mode:   ModePaper,
+		UserID: "test-user",
+		Strategies: []StrategyEntry{
+			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+			{Exchange: "okex", Strategy: "dca", Mode: "paper"},
+		},
+	}
+	args := cm.envArgs(uc)
+
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, "OKEX_API_KEY") {
+		t.Error("paper mode should NOT inject OKEX credentials")
+	}
+	if strings.Contains(joined, "OKEX_API_SECRET") {
+		t.Error("paper mode should NOT inject OKEX credentials")
+	}
+}
+
+func TestEnvArgs_PaperMode_OnlyInjectsBinanceTestnet(t *testing.T) {
+	cm, creds := setupContainerManager(t)
+	insertTestnetCredential(t, creds, "test-user", "binance", "testnet-key", "testnet-secret")
+
+	uc := &UserContainer{
+		Mode:   ModePaper,
+		UserID: "test-user",
+		Strategies: []StrategyEntry{
+			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+		},
+	}
+	args := cm.envArgs(uc)
+
+	findEnv := func(key string) bool {
+		for i := 0; i < len(args)-1; i++ {
+			if args[i] == "-e" && args[i+1] == key {
+				return true
+			}
+		}
+		return false
+	}
+	if !findEnv("BINANCE_API_KEY=testnet-key") {
+		t.Error("paper mode should inject Binance testnet credentials")
+	}
+	if !findEnv("BINANCE_TESTNET=1") {
+		t.Error("paper mode should set BINANCE_TESTNET=1")
+	}
+}
+
+func TestEnvArgs_PaperMode_CrossExchange_NonBinanceNotInjected(t *testing.T) {
+	cm, creds := setupContainerManager(t)
+	insertTestnetCredential(t, creds, "test-user", "binance", "binance-testnet-key", "binance-testnet-secret")
+	insertTestCredential(t, creds, "test-user", "bybit", "bybit-key", "bybit-secret")
+
+	uc := &UserContainer{
+		Mode:   ModePaper,
+		UserID: "test-user",
+		Strategies: []StrategyEntry{
+			{
+				Strategy:      "xmaker",
+				CrossExchange: true,
+				Mode:          "paper",
+				Sessions: []SessionRoleConfig{
+					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
+				},
+			},
+		},
+	}
+	args := cm.envArgs(uc)
+
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "BINANCE_API_KEY=binance-testnet-key") {
+		t.Error("paper mode should inject Binance testnet credentials for cross-exchange")
+	}
+	if strings.Contains(joined, "BYBIT_API_KEY") {
+		t.Error("paper mode should NOT inject non-Binance credentials even in cross-exchange")
 	}
 }
 
@@ -341,6 +449,61 @@ func TestBuildUserYAML_PublicOnlyFalse_WithCredentials(t *testing.T) {
 	s := string(yaml)
 	if strings.Contains(s, "publicOnly: true") {
 		t.Error("should NOT have publicOnly: true when credentials exist")
+	}
+}
+
+func TestBuildUserYAML_PaperMode_NonBinance_AlwaysPublicOnly(t *testing.T) {
+	uc := &UserContainer{
+		Mode:   ModePaper,
+		UserID: "test-user",
+		Strategies: []StrategyEntry{
+			{Exchange: "okex", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+		},
+	}
+	// Simulates the actual CreateAndStart callback which returns false for non-binance in paper mode
+	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(yaml)
+	if !strings.Contains(s, "publicOnly: true") {
+		t.Error("paper mode should set publicOnly: true for non-Binance exchanges when callback returns false")
+	}
+}
+
+func TestBuildUserYAML_PaperMode_Binance_PublicOnlyWhenNoCreds(t *testing.T) {
+	uc := &UserContainer{
+		Mode:   ModePaper,
+		UserID: "test-user",
+		Strategies: []StrategyEntry{
+			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+		},
+	}
+	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(yaml)
+	if !strings.Contains(s, "publicOnly: true") {
+		t.Error("paper mode binance without testnet creds should be PublicOnly")
+	}
+}
+
+func TestBuildUserYAML_PaperMode_Binance_NotPublicOnlyWithCreds(t *testing.T) {
+	uc := &UserContainer{
+		Mode:   ModePaper,
+		UserID: "test-user",
+		Strategies: []StrategyEntry{
+			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+		},
+	}
+	yaml, err := buildUserYAML(uc, func(exchange string) bool { return exchange == "binance" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(yaml)
+	if strings.Contains(s, "publicOnly: true") {
+		t.Error("paper mode binance with testnet creds should NOT be PublicOnly")
 	}
 }
 

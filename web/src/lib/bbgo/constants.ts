@@ -11,6 +11,8 @@ export const EXCHANGES = [
 
 export type Exchange = (typeof EXCHANGES)[number]
 
+export const PAPER_EXCHANGES = ['binance'] as const
+
 export const EXCHANGES_REQUIRING_PASSPHRASE: string[] = ['okex', 'kucoin', 'bitget']
 
 export const CATEGORY_KEYS = [

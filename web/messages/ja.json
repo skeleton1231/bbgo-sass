@@ -216,7 +216,8 @@
       "connecting": "接続中..."
     },
     "liveOnlyHint": "このストラテジーはライブモードが必要です。",
-    "liveOnlyOverrideHint": "このストラテジーはライブモードのみ対応しています。ペーパーモードからライブモードに自動切替しました。"
+    "liveOnlyOverrideHint": "このストラテジーはライブモードのみ対応しています。ペーパーモードからライブモードに自動切替しました。",
+    "noBinanceTestnetCreds": "BinanceテストネットAPI認証情報が設定されていません。先に設定で追加してください。"
   },
   "Backtest": {
     "title": "バックテスト",

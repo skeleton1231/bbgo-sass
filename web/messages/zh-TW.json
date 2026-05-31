@@ -215,7 +215,8 @@
       "connecting": "連線中..."
     },
     "liveOnlyHint": "此策略需要實盤模式。",
-    "liveOnlyOverrideHint": "此策略僅支援實盤模式，已自動從模擬切換為實盤。"
+    "liveOnlyOverrideHint": "此策略僅支援實盤模式，已自動從模擬切換為實盤。",
+    "noBinanceTestnetCreds": "未配置 Binance 測試網 API 憑證，請先在設定中新增。"
   },
   "Backtest": {
     "title": "回測",
