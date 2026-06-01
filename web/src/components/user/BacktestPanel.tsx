@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
 import type { BacktestJob } from '@/lib/bbgo/queries'
-import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory } from '@/lib/bbgo/strategies'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureNumbers } from '@/lib/bbgo/strategies'
 import { EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
 import { BacktestEquityChart } from '@/components/backtest/BacktestEquityChart'
@@ -64,26 +64,27 @@ export function BacktestPanel() {
   const completedJob = activeJob && (activeJob.status === 'completed' || activeJob.status === 'failed') ? activeJob : null
   const lastResult = completedJob ?? manualResult ?? recentJobs[0] ?? null
 
-  const configWithTickerPrices = useMemo(() => {
-    if (priceSymbol !== rawSymbol) return config
-    const ticker = tickerData?.ticker
-    if (!ticker?.close) return config
-    const hasPriceFields = schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')
-    if (!hasPriceFields) return config
-    const price = ticker.close
-    const range = price * 0.2
-    return {
-      ...config,
-      upperPrice: Math.round((price + range) * 100) / 100,
-      lowerPrice: Math.round((price - range) * 100) / 100,
-    }
-  }, [config, tickerData?.ticker, schema?.fields, priceSymbol, rawSymbol])
-
   const handleSymbolChange = useCallback((newSymbol: string) => {
     setRawSymbol(newSymbol)
     setPriceSymbol(newSymbol)
     setConfig((prev) => ({ ...prev, symbol: newSymbol }))
   }, [])
+
+  // Auto-fill upperPrice/lowerPrice once when ticker data arrives for a new symbol
+  const prevPriceSymbol = useRef('')
+  if (priceSymbol && priceSymbol !== prevPriceSymbol.current) {
+    prevPriceSymbol.current = priceSymbol
+    const ticker = tickerData?.ticker
+    if (ticker?.close && schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')) {
+      const price = ticker.close
+      const range = price * 0.2
+      setConfig((prev) => ({
+        ...prev,
+        upperPrice: Math.round((price + range) * 100) / 100,
+        lowerPrice: Math.round((price - range) * 100) / 100,
+      }))
+    }
+  }
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
@@ -93,10 +94,11 @@ export function BacktestPanel() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError(null)
+    const numericConfig = ensureNumbers(schema, config)
     try {
       const result = await submitBacktest.mutateAsync({
         strategy,
-        config: { ...configWithTickerPrices, exchange, symbol: displaySymbol },
+        config: { ...numericConfig, exchange, symbol: displaySymbol },
         exchange,
         symbol: displaySymbol,
         start_time: startTime,

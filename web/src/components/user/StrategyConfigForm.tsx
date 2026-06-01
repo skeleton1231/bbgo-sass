@@ -20,6 +20,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
   function formatNumberValue(val: unknown, fallback: unknown): string {
     const raw = val ?? fallback
     if (raw === '' || raw === undefined) return ''
+    if (typeof raw === 'string') return raw
     const num = Number(raw)
     if (!Number.isFinite(num)) return String(raw)
     const s = num.toPrecision(10)
@@ -73,8 +74,17 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
               inputMode="decimal"
               value={field.type === 'number' ? formatNumberValue(values[field.key], field.default) : String(values[field.key] ?? field.default ?? '')}
               onChange={(e) => {
-                const val = field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value
-                handleChange(field.key, val)
+                handleChange(field.key, e.target.value)
+              }}
+              onBlur={() => {
+                if (field.type === 'number') {
+                  const raw = values[field.key]
+                  if (raw === '' || raw === undefined) return
+                  const num = Number(raw)
+                  if (Number.isFinite(num)) {
+                    handleChange(field.key, num)
+                  }
+                }
               }}
               required={field.required}
               min={field.min}

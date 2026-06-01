@@ -861,6 +861,18 @@ export function getStrategyDefaults(id: string): Record<string, unknown> {
   return defaults
 }
 
+export function ensureNumbers(schema: StrategySchema | undefined, config: Record<string, unknown>): Record<string, unknown> {
+  if (!schema) return config
+  const result = { ...config }
+  for (const field of schema.fields) {
+    if (field.type === 'number' && result[field.key] !== undefined && result[field.key] !== '') {
+      const num = Number(result[field.key])
+      if (Number.isFinite(num)) result[field.key] = num
+    }
+  }
+  return result
+}
+
 export function getAllStrategies(): { id: string; label: string; description: string; category: string }[] {
   return STRATEGY_SCHEMAS.map((s) => ({ id: s.id, label: s.label, description: s.description, category: s.category }))
 }
