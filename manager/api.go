@@ -862,8 +862,9 @@ func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
 		return
 	}
-	mode := r.URL.Query().Get("mode")
-	hub := api.hubForMode(mode)
+	// Klines are public market data — always use the live hub regardless of mode.
+	// Testnet exchanges have very limited historical data.
+	hub := api.hub
 	if hub == nil || hub.conn == nil {
 		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
 		return

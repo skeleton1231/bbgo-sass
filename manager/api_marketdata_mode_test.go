@@ -177,15 +177,17 @@ func TestMarketTicker_PaperMode_NoTestnetHub_FallsBackToLive(t *testing.T) {
 	}
 }
 
-func TestMarketKlines_PaperMode_NoTestnetHub_FallsBackToLive(t *testing.T) {
-	_, router := setupMarketDataAPIWithTestnet(nil, nil)
+func TestMarketKlines_PaperMode_AlwaysUsesLiveHub(t *testing.T) {
+	// Klines are public data — paper mode must use live hub (testnet has limited history).
+	testnetHub := &MarketDataHub{}
+	_, router := setupMarketDataAPIWithTestnet(nil, testnetHub)
 
 	req := httptest.NewRequest("GET", "/api/markets/binance/klines?symbol=BTCUSDT&mode=paper", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503 when both hubs nil with paper mode, got %d: %s", w.Code, w.Body.String())
+		t.Errorf("expected 503 for paper klines when live hub nil (ignores testnet hub), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
