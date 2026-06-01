@@ -181,8 +181,8 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
-					{"strategyInstanceID": "strat-2", "strategy": "supertrend", "symbol": "ETHUSDT", "session": "binance"},
+					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance", "on": []any{"binance"}},
+					{"strategyInstanceID": "strat-2", "strategy": "supertrend", "symbol": "ETHUSDT", "session": "binance", "on": []any{"binance"}},
 				},
 			})
 			return

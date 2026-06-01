@@ -101,7 +101,7 @@ func TestAPI_CreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	}
 
 	r := testRouter(api)
-	stratBody := `{"name":"Test Grid","exchange":"binance","strategy":"grid2","config":{},"mode":"paper"}`
+	stratBody := `{"name":"Test Grid","exchange":"binance","strategy":"grid2","config":{"symbol":"ETHUSDT"},"mode":"paper"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", strings.NewReader(stratBody))
 	req.Header.Set("X-User-Id", userID)
 	w := httptest.NewRecorder()

@@ -11,7 +11,7 @@ import (
 func setupModeTestAPI(t *testing.T, existingMode string) *API {
 	t.Helper()
 	store, dir := newTestStore(t)
-	strats := []StrategyEntry{{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)}}
+	strats := []StrategyEntry{{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"ETHUSDT"}`)}}
 	if existingMode != "" {
 		strats[0].Mode = existingMode
 	}

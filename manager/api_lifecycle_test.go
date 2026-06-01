@@ -193,7 +193,7 @@ func TestAPI_DeleteStrategy(t *testing.T) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance"},
+					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance", "on": []any{"binance"}},
 				},
 			})
 			return
@@ -223,7 +223,7 @@ func TestAPI_DeleteStrategy_NotFound(t *testing.T) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance"},
+					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance", "on": []any{"binance"}},
 				},
 			})
 			return

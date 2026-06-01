@@ -145,7 +145,7 @@ func TestAPI_DeleteLastStrategy_StopsContainer(t *testing.T) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT"},
+					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT", "on": []any{"binance"}},
 				},
 			})
 			return
@@ -182,8 +182,8 @@ func TestAPI_DeleteStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT"},
-					{"strategyInstanceID": "s2", "strategy": "supertrend", "symbol": "ETHUSDT"},
+					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT", "on": []any{"binance"}},
+					{"strategyInstanceID": "s2", "strategy": "supertrend", "symbol": "ETHUSDT", "on": []any{"binance"}},
 				},
 			})
 			return

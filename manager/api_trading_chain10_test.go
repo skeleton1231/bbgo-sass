@@ -45,7 +45,7 @@ func chain10Setup(t *testing.T) (*API, *chi.Mux, *httptest.Server) {
 			json.NewEncoder(w).Encode(map[string]any{"assets": map[string]any{}})
 		case "/api/strategies/single":
 			json.NewEncoder(w).Encode(map[string]any{"strategies": []map[string]any{
-				{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
+				{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance", "on": []any{"binance"}},
 			}})
 		case "/api/trades":
 			json.NewEncoder(w).Encode(map[string]any{"trades": []map[string]any{}})

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -79,10 +80,12 @@ func normalizeStrategyConfig(strategy string, params map[string]any) (string, ma
 	if fields, ok := legacyFieldAliases[strategy]; ok {
 		for oldKey, newKey := range fields {
 			if v, exists := params[oldKey]; exists {
-				if _, hasNew := params[newKey]; !hasNew {
-					params[newKey] = v
+				if newKey != "" {
+					if _, hasNew := params[newKey]; !hasNew {
+						params[newKey] = v
+					}
+					delete(params, oldKey)
 				}
-				delete(params, oldKey)
 			}
 		}
 	}
@@ -115,6 +118,7 @@ type UserMode struct {
 // StrategyStore manages bbgo.yaml files on disk as the source of truth
 // for user strategy configurations. No in-memory state, no database sync.
 type StrategyStore struct {
+	mu      sync.Mutex
 	dataDir string
 }
 
@@ -153,6 +157,8 @@ func (s *StrategyStore) YAMLExists(userID, mode string) bool {
 
 // ListStrategies parses bbgo.yaml and returns the configured strategy entries.
 func (s *StrategyStore) ListStrategies(userID, mode string) ([]StrategyEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	data, err := s.ReadYAML(userID, mode)
 	if err != nil {
 		return nil, err
@@ -177,7 +183,7 @@ func parseStrategiesFromYAML(data []byte) ([]StrategyEntry, error) {
 	}
 
 	for _, cs := range cfg.CrossExchangeStrategies {
-		entry, ok := parseCrossStrategyEntry(cs)
+		entry, ok := parseCrossStrategyEntry(cs, cfg.Sessions)
 		if ok {
 			entries = append(entries, entry)
 		}
@@ -212,37 +218,65 @@ func parseExchangeStrategyEntry(m map[string]any) (StrategyEntry, bool) {
 }
 
 // parseCrossStrategyEntry extracts a StrategyEntry from a crossExchangeStrategy YAML map.
-// Format: {"xmaker": {symbol: "BTCUSDT", ...}}
-func parseCrossStrategyEntry(m map[string]any) (StrategyEntry, bool) {
+// It reconstructs Sessions from the YAML sessions section for YAML roundtrip fidelity.
+func parseCrossStrategyEntry(m map[string]any, yamlSessions map[string]sessionConfig) (StrategyEntry, bool) {
 	for key, val := range m {
 		config, err := json.Marshal(val)
 		if err != nil {
 			continue
 		}
+		var sessions []SessionRoleConfig
+		for name, sc := range yamlSessions {
+			sessions = append(sessions, SessionRoleConfig{
+				Name:         name,
+				Exchange:     sc.Exchange,
+				EnvVarPrefix: sc.EnvVarPrefix,
+				Futures:      sc.Futures,
+			})
+		}
 		return StrategyEntry{
 			Strategy:      key,
 			Config:        config,
 			CrossExchange: true,
+			Sessions:      sessions,
 		}, true
 	}
 	return StrategyEntry{}, false
 }
 
 // AddStrategy adds a new strategy, regenerates bbgo.yaml, and writes to disk.
+// Rejects duplicates: same strategy type + symbol is not allowed.
 func (s *StrategyStore) AddStrategy(userID, mode string, entry StrategyEntry, hasCredentials func(exchange string) bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	var existing []StrategyEntry
 	if data, err := s.ReadYAML(userID, mode); err == nil {
 		existing, _ = parseStrategiesFromYAML(data)
 	}
-	existing = append(existing, entry)
 
+	newSymbol := extractSymbolFromConfig(entry.Config)
+	for _, e := range existing {
+		if e.Strategy == entry.Strategy && e.Exchange == entry.Exchange && extractSymbolFromConfig(e.Config) == newSymbol {
+			return fmt.Errorf("strategy %s with symbol %s on %s already exists", entry.Strategy, newSymbol, entry.Exchange)
+		}
+	}
+
+	existing = append(existing, entry)
 	return s.writeYAML(userID, mode, existing, hasCredentials)
 }
 
-// RemoveStrategy removes a strategy by type+symbol match, regenerates bbgo.yaml.
+// RemoveStrategy removes a strategy by type+symbol+exchange match, regenerates bbgo.yaml.
 // Returns (found bool, err error).
-func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol string) (bool, error) {
-	entries, err := s.ListStrategies(userID, mode)
+func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol, exchange string, hasCredentials func(exchange string) bool) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	data, err := s.ReadYAML(userID, mode)
+	if err != nil {
+		return false, err
+	}
+	entries, err := parseStrategiesFromYAML(data)
 	if err != nil {
 		return false, err
 	}
@@ -251,7 +285,7 @@ func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol string) (b
 	found := false
 	for _, e := range entries {
 		eSymbol := extractSymbolFromConfig(e.Config)
-		if e.Strategy == strategy && eSymbol == symbol && !found {
+		if e.Strategy == strategy && eSymbol == symbol && e.Exchange == exchange && !found {
 			found = true
 			continue
 		}
@@ -266,8 +300,7 @@ func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol string) (b
 		return true, nil
 	}
 
-	hasCred := func(string) bool { return false }
-	return true, s.writeYAML(userID, mode, filtered, hasCred)
+	return true, s.writeYAML(userID, mode, filtered, hasCredentials)
 }
 
 // writeYAML regenerates bbgo.yaml from the given strategy entries.
@@ -283,6 +316,21 @@ func (s *StrategyStore) writeYAML(userID, mode string, entries []StrategyEntry, 
 	}
 
 	return os.WriteFile(s.yamlPath(userID, mode), yamlContent, 0o644)
+}
+
+// RefreshYAML re-parses and rewrites bbgo.yaml with updated credential state.
+func (s *StrategyStore) RefreshYAML(userID, mode string, hasCredentials func(exchange string) bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := s.ReadYAML(userID, mode)
+	if err != nil {
+		return err
+	}
+	entries, err := parseStrategiesFromYAML(data)
+	if err != nil {
+		return err
+	}
+	return s.writeYAML(userID, mode, entries, hasCredentials)
 }
 
 // extractSymbolFromConfig returns the symbol from a strategy config JSON.
@@ -307,17 +355,17 @@ func (s *StrategyStore) ScanUsers() []UserMode {
 			continue
 		}
 		name := e.Name()
-		yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
-		if _, err := os.Stat(yamlPath); err == nil {
-			userID := name
-			result = append(result, UserMode{UserID: userID, Mode: ModeLive})
-		}
 		if strings.HasSuffix(name, "-paper") {
 			yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
 			if _, err := os.Stat(yamlPath); err == nil {
 				userID := strings.TrimSuffix(name, "-paper")
 				result = append(result, UserMode{UserID: userID, Mode: ModePaper})
 			}
+			continue
+		}
+		yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
+		if _, err := os.Stat(yamlPath); err == nil {
+			result = append(result, UserMode{UserID: name, Mode: ModeLive})
 		}
 	}
 	return result
@@ -362,7 +410,7 @@ type exchangeConfig struct {
 
 type environmentConfig struct {
 	PaperTrade                 string `yaml:"PAPER_TRADE,omitempty"`
-	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery"`
+	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery,omitempty"`
 }
 
 // buildUserYAML generates the bbgo YAML config from strategy entries.
@@ -485,9 +533,13 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions
 
 func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string) ([]byte, error) {
 	var allParams map[string]any
-	if err := json.Unmarshal(rawConfig, &allParams); err != nil {
+	if len(rawConfig) == 0 || string(rawConfig) == "null" {
+		allParams = map[string]any{}
+	} else if err := json.Unmarshal(rawConfig, &allParams); err != nil {
 		return nil, err
 	}
+
+	strategy, allParams = normalizeStrategyConfig(strategy, allParams)
 
 	exchange := overrideExchange
 	if exchange == "" {

@@ -316,7 +316,7 @@ func TestMixedModePrevention(t *testing.T) {
 		APIKeyEncrypted: tnKeyEnc, APISecretEncrypted: tnSecretEnc, IsTestnet: true,
 	})
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore(dir)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -347,7 +347,7 @@ func TestLiveModeRequiresCredentials(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore(dir)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -371,7 +371,7 @@ func TestPaperModeWithLiveOnlyStrategy(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore(dir)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -397,7 +397,7 @@ func TestLegacyAliasPaperRejection(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore(dir)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -666,7 +666,7 @@ func TestPaperModeFullLifecycle(t *testing.T) {
 		case "/api/strategies/single":
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
+					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance", "on": []any{"binance"}},
 				},
 			})
 		case "/api/assets":

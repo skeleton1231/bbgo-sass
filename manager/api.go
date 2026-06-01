@@ -343,10 +343,14 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	normalizedID := req.Strategy
+	if alias, ok := legacyStrategyAliases[req.Strategy]; ok {
+		normalizedID = alias
+	}
 	entry := StrategyEntry{
 		Name:          req.Name,
 		Exchange:      req.Exchange,
-		Strategy:      req.Strategy,
+		Strategy:      normalizedID,
 		Config:        req.Config,
 		Mode:          req.Mode,
 		CrossExchange: req.CrossExchange,
@@ -362,7 +366,11 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := api.strategies.AddStrategy(userID, req.Mode, entry, hasCredFn); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		if strings.Contains(err.Error(), "already exists") {
+			writeError(w, http.StatusConflict, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 
@@ -433,8 +441,25 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 
 	strategy, _ := target["strategy"].(string)
 	symbol, _ := target["symbol"].(string)
+	var exchange string
+	if on, ok := target["on"].([]any); ok && len(on) > 0 {
+		exchange, _ = on[0].(string)
+	}
 
-	found, err := api.strategies.RemoveStrategy(userID, mode, strategy, symbol)
+	hasCredFn := func(exchange string) bool {
+		if api.creds == nil {
+			return false
+		}
+		_, err := api.creds.GetByMode(userID, exchange, mode == ModePaper)
+		return err == nil
+	}
+
+	found, err := api.strategies.RemoveStrategy(userID, mode, strategy, symbol, exchange, hasCredFn)
+	// Cross-exchange strategies have Exchange="" in the store but bbgo returns
+	// session names in "on". Retry with empty exchange if the first attempt failed.
+	if !found && err == nil && exchange != "" {
+		found, err = api.strategies.RemoveStrategy(userID, mode, strategy, symbol, "", hasCredFn)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -598,6 +623,7 @@ func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
 	}
 	mode := modeFromQuery(r)
 	api.stopContainer(userID, mode)
+	api.starting.Delete(containerKey(userID, mode))
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID, "mode": mode})
 }
 
@@ -1286,6 +1312,14 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		if req.IsTestnet {
 			mode = ModePaper
 		}
+		hasCredFn := func(exchange string) bool {
+			if api.creds == nil {
+				return false
+			}
+			_, err := api.creds.GetByMode(userID, exchange, mode == ModePaper)
+			return err == nil
+		}
+		api.strategies.RefreshYAML(userID, mode, hasCredFn)
 		if api.isContainerRunning(userID, mode) {
 			if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
 				go api.startUserContainer(userID, mode)
@@ -1364,11 +1398,18 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 	if isTestnet {
 		mode = ModePaper
 	}
+	hasCredFn := func(exchange string) bool {
+		if api.creds == nil {
+			return false
+		}
+		_, err := api.creds.GetByMode(userID, exchange, mode == ModePaper)
+		return err == nil
+	}
+	api.strategies.RefreshYAML(userID, mode, hasCredFn)
 	if api.isContainerRunning(userID, mode) {
 		if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
 			go api.startUserContainer(userID, mode)
 		}
-
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }

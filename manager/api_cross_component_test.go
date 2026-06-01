@@ -370,7 +370,7 @@ func TestDeleteStrategy_NotFound(t *testing.T) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]any{
 				"strategies": []map[string]any{
-					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT"},
+					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "on": []any{"binance"}},
 				},
 			})
 			return

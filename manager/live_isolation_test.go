@@ -34,7 +34,7 @@ func TestLiveContainer_NoTestnetEnv(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
-	store := NewStrategyStore("")
+	store := NewStrategyStore(tmpDir)
 	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 

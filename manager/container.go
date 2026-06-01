@@ -295,10 +295,11 @@ func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEn
 		args = append(args, "-e", "PAPER_TRADE=1")
 	}
 
+	// Use "/" not filepath.Join — this path runs inside the Linux container.
 	if mode == ModePaper {
 		args = append(args,
 			"-e", "DB_DRIVER=sqlite3",
-			"-e", "DB_DSN="+filepath.Join(cm.userDir(userID, ModePaper), "bbgo.db"),
+			"-e", "DB_DSN="+cm.userDir(userID, ModePaper)+"/bbgo.db",
 		)
 	} else {
 		args = append(args,
