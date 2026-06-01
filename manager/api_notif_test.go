@@ -14,19 +14,14 @@ func setupTestAPIWithNotifier(t *testing.T) (*API, func()) {
 	tmpDir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(tmpDir, enc)
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status: StatusStopped,
-	}
+	store := NewStrategyStore(tmpDir)
 	cfg := &Config{DataDir: tmpDir, ManagerToken: "test-token", SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
 	notifier := NewNotifier(tmpDir, enc)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, notifier, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, notifier, nil, NewBacktestJobStore(tmpDir))
 	api.containerRunning = func(string, _ string) bool { return false }
-	api.containerStart = func(*UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 	return api, func() { api.Close() }
 }
 

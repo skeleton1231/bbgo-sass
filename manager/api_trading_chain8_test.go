@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // setupCredsAPI creates an API with credential store and encryption ready.
@@ -17,19 +18,14 @@ func setupCredsAPI(t *testing.T) (*API, func()) {
 		t.Fatal(err)
 	}
 	creds := NewCredentialStore(tmpDir, enc)
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeee000070:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeee000070",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store, _ := newTestStore(t)
+
 	cfg := &Config{ManagerToken: "test-token", DataDir: tmpDir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.containerRunning = func(string, _ string) bool { return false }
-	api.containerStart = func(*UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +195,17 @@ func TestAPI_CreateCredential_TriggersRestart(t *testing.T) {
 	api, cleanup := setupCredsAPI(t)
 	defer cleanup()
 
-	api.users.users[credsUID+":"+ModeLive].Status = StatusRunning
+	// Write strategies and mark as running
+	writeTestStrategies(t, api.strategies, credsUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+	api.containerRunning = func(string, _ string) bool { return true }
+
+	var restartCalled bool
+	api.containerStart = func(userID, mode string) error {
+		restartCalled = true
+		return nil
+	}
 
 	body := `{"exchange":"binance","api_key":"k","api_secret":"s"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/credentials", strings.NewReader(body))
@@ -211,9 +217,9 @@ func TestAPI_CreateCredential_TriggersRestart(t *testing.T) {
 		t.Fatalf("status = %d, want 201: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get(credsUID, ModeLive)
-	if uc.Status != StatusStarting {
-		t.Errorf("expected status starting after credential create, got %s", uc.Status)
+	time.Sleep(100 * time.Millisecond)
+	if !restartCalled {
+		t.Error("expected container restart after credential create while running")
 	}
 }
 
@@ -249,20 +255,18 @@ func TestAPI_PnL_ContainerFallback_Running(t *testing.T) {
 	}))
 	defer bbgoSrv.Close()
 
-	users := NewUserContainerManager()
-	users.users[credsUID+":"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     credsUID,
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, credsUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080}}
 	creds := NewCredentialStore(tmpDir, enc)
 	proxy := NewBotProxy(cm)
 
-	api := NewAPI(&Config{DataDir: tmpDir, ManagerToken: "t"}, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(&Config{DataDir: tmpDir, ManagerToken: "t"}, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.containerRunning = func(string, _ string) bool { return true }
-	api.containerStart = func(*UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
 	}

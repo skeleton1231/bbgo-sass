@@ -210,8 +210,12 @@ func (c *BBGoClient) GetSession(name string) (*BBGoSession, error) {
 	return &resp.Session, nil
 }
 
+type bbgoSessionTradeSlice struct {
+	Trades []BBGoTrade `json:"Trades"`
+}
+
 type BBGoSessionTradesResponse struct {
-	Trades []BBGoTrade `json:"trades"`
+	Trades map[string]bbgoSessionTradeSlice `json:"trades"`
 }
 
 func (c *BBGoClient) GetSessionTrades(session string) ([]BBGoTrade, error) {
@@ -219,7 +223,11 @@ func (c *BBGoClient) GetSessionTrades(session string) ([]BBGoTrade, error) {
 	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/trades", &resp); err != nil {
 		return nil, err
 	}
-	return resp.Trades, nil
+	var all []BBGoTrade
+	for _, slice := range resp.Trades {
+		all = append(all, slice.Trades...)
+	}
+	return all, nil
 }
 
 func (c *BBGoClient) GetSessionOpenOrders(session string) ([]BBGoOrder, error) {

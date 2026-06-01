@@ -10,7 +10,7 @@ import (
 )
 
 func TestAPI_StartUser_AlreadyRunning(t *testing.T) {
-	api, _ := setupTestAPIWithMockCM(nil, true)
+	api, _ := setupTestAPIWithMockCM(t, nil, true)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -21,7 +21,7 @@ func TestAPI_StartUser_AlreadyRunning(t *testing.T) {
 		t.Fatalf("expected 200 for already running, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp UserContainer
+	var resp containerInfo
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Status != StatusRunning {
 		t.Errorf("expected running status, got %s", resp.Status)
@@ -29,7 +29,7 @@ func TestAPI_StartUser_AlreadyRunning(t *testing.T) {
 }
 
 func TestAPI_StartUser_AcceptedAsync(t *testing.T) {
-	api, _ := setupTestAPIWithMockCM(nil, false)
+	api, _ := setupTestAPIWithMockCM(t, nil, false)
 	r := testRouter(api)
 
 	start := time.Now()
@@ -46,7 +46,7 @@ func TestAPI_StartUser_AcceptedAsync(t *testing.T) {
 		t.Fatalf("StartUser should return immediately, took %v", elapsed)
 	}
 
-	var resp UserContainer
+	var resp containerInfo
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Status != StatusStarting {
 		t.Errorf("expected starting status, got %s", resp.Status)
@@ -54,16 +54,11 @@ func TestAPI_StartUser_AcceptedAsync(t *testing.T) {
 }
 
 func TestAPI_StartUserAsync_NoStrategies(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status: StatusStopped,
-	}
+	store, _ := newTestStore(t)
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -76,13 +71,9 @@ func TestAPI_StartUserAsync_NoStrategies(t *testing.T) {
 }
 
 func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+	})
 
 	var mu sync.Mutex
 	var pingCalls int
@@ -101,11 +92,12 @@ func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
+	t.Cleanup(func() { api.Close() })
 
 	r := testRouter(api)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -123,16 +115,12 @@ func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 	for {
 		select {
 		case <-deadline:
-			t.Fatal("timed out waiting for status to become running")
+			t.Fatal("timed out waiting for health check to complete")
 		case <-ticker.C:
-			uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
-			if uc.Status == StatusRunning {
-				mu.Lock()
-				calls := pingCalls
-				mu.Unlock()
-				if calls == 0 {
-					t.Error("expected at least one ping call during health check")
-				}
+			mu.Lock()
+			calls := pingCalls
+			mu.Unlock()
+			if calls > 0 {
 				return
 			}
 		}
@@ -140,7 +128,7 @@ func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 }
 
 func TestAPI_StartUser_UserNotFound(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/00000000-0000-0000-0000-000000000000/start", nil)
@@ -154,20 +142,14 @@ func TestAPI_StartUser_UserNotFound(t *testing.T) {
 
 // setupTestAPIWithMockCM creates a test API with a mocked container manager.
 // If isRunning is true, the mock reports the container as already running.
-func setupTestAPIWithMockCM(bbgoHandler http.HandlerFunc, isRunning bool) (*API, *httptest.Server) {
-	users := NewUserContainerManager()
-	status := StatusStopped
-	if isRunning {
-		status = StatusRunning
-	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     status,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+func setupTestAPIWithMockCM(t *testing.T, bbgoHandler http.HandlerFunc, isRunning bool) (*API, *httptest.Server) {
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
 
 	bbgoSrv := httptest.NewServer(bbgoHandler)
+	t.Cleanup(bbgoSrv.Close)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -176,13 +158,15 @@ func setupTestAPIWithMockCM(bbgoHandler http.HandlerFunc, isRunning bool) (*API,
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return isRunning }
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 	if bbgoHandler != nil {
 		api.newBBGoClient = func(_ string) *BBGoClient {
 			return NewBBGoClient(bbgoSrv.URL)
 		}
+		api.container.apiURLFn = func(_, _ string) string { return bbgoSrv.URL }
 	}
+	t.Cleanup(func() { api.Close() })
 	return api, bbgoSrv
 }

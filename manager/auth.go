@@ -71,13 +71,6 @@ func UserRateLimit(rate time.Duration, maxBurst int) func(http.Handler) http.Han
 		maxBurst: maxBurst,
 	}
 
-	go func() {
-		for {
-			time.Sleep(10 * time.Minute)
-			rl.cleanup()
-		}
-	}()
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := userIDFromRequest(r)
@@ -85,6 +78,8 @@ func UserRateLimit(rate time.Duration, maxBurst int) func(http.Handler) http.Han
 				next.ServeHTTP(w, r)
 				return
 			}
+
+			rl.purgeExpired()
 
 			if !rl.allow(userID) {
 				writeError(w, http.StatusTooManyRequests, "rate limited — try again later")
@@ -122,7 +117,7 @@ func (rl *userRateLimiter) allow(userID string) bool {
 	return true
 }
 
-func (rl *userRateLimiter) cleanup() {
+func (rl *userRateLimiter) purgeExpired() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	threshold := time.Now().Add(-1 * time.Hour)

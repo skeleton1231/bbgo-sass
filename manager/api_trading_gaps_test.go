@@ -75,7 +75,6 @@ func TestCalculatePnL_MultipleSymbols(t *testing.T) {
 		{Symbol: "ETHUSDT", Side: "SELL", Price: "2800", Quantity: "2", Fee: "5", TradedAt: "2024-01-02"},
 	}
 	report := calculatePnL(trades)
-	// BTC: +5000, ETH: -400 → total +4600
 	if report.TotalRealizedPnL != 4600 {
 		t.Errorf("expected realized PnL 4600, got %f", report.TotalRealizedPnL)
 	}
@@ -94,7 +93,7 @@ func TestBacktestExecutor_NotificationOnComplete(t *testing.T) {
 	enc, _ := NewEncryptor("0123456789abcdef0123456789abcdef")
 	notifier := NewNotifier(tmpDir, enc)
 	notifier.configs["u1"] = []NotificationConfig{{
-		Channel: NotificationChannel{ID: "n1", Type: "test", Enabled: true},
+		Channel: NotificationChannel{Type: "test", Enabled: true},
 		Rules:   NotificationRule{TradeEvents: true, OrderEvents: true, ContainerHealth: true},
 	}}
 
@@ -108,7 +107,7 @@ func TestBacktestExecutor_NotificationOnComplete(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID: "bt-notif", UserID: "u1", Strategy: "grid2",
+		UserID: "u1", Strategy: "grid2",
 		Exchange: "binance", Symbol: "BTCUSDT",
 		StartTime: "2024-01-01", EndTime: "2024-06-01", NeedSync: true,
 		Config: json.RawMessage(`{"symbol":"BTCUSDT"}`),
@@ -133,7 +132,7 @@ func TestBacktestExecutor_NotificationOnFailure(t *testing.T) {
 	enc, _ := NewEncryptor("0123456789abcdef0123456789abcdef")
 	notifier := NewNotifier(tmpDir, enc)
 	notifier.configs["u1"] = []NotificationConfig{{
-		Channel: NotificationChannel{ID: "n1", Type: "test", Enabled: true},
+		Channel: NotificationChannel{Type: "test", Enabled: true},
 		Rules:   NotificationRule{TradeEvents: true, OrderEvents: true, ContainerHealth: true},
 	}}
 
@@ -144,7 +143,7 @@ func TestBacktestExecutor_NotificationOnFailure(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID: "bt-notif-fail", UserID: "u1", Strategy: "grid2",
+		UserID: "u1", Strategy: "grid2",
 		Exchange: "binance", Symbol: "BTCUSDT",
 		StartTime: "2024-01-01", EndTime: "2024-06-01", NeedSync: true,
 		Config: json.RawMessage(`{}`),
@@ -158,7 +157,7 @@ func TestBacktestExecutor_NotificationOnFailure(t *testing.T) {
 	}
 }
 
-// --- Credential → Live strategy full chain ---
+// --- Credential -> Live strategy full chain ---
 
 func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 	t.Helper()
@@ -168,27 +167,38 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 		t.Fatal(err)
 	}
 	creds := NewCredentialStore(tmpDir, enc)
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store, _ := newTestStore(t)
 	cfg := &Config{DataDir: tmpDir, ManagerToken: "test-token", SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
-	cm := &ContainerManager{cfg: cfg}
+	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	supaClient, _ := NewSupabaseClient("http://localhost:1", "test")
+	syncer := NewSyncer(supaClient)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.containerRunning = func(string, _ string) bool { return false }
-	api.containerStart = func(*UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
+	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
+					{"strategyInstanceID": "strat-2", "strategy": "supertrend", "symbol": "ETHUSDT", "session": "binance"},
+				},
+			})
+			return
+		}
+		if r.URL.Path == "/api/ping" {
+			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
+			return
+		}
+		w.Write([]byte(`ok`))
+	}))
+	t.Cleanup(bbgoSrv.Close)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(`ok`))
-		}))
-		t.Cleanup(srv.Close)
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
+		return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
 	}
-	return api, func() { api.Close() }
+	api.container.apiURLFn = func(_, _ string) string { return bbgoSrv.URL }
+	return api, func() {}
 }
 
 func TestAPI_CredentialThenLiveStrategy_Chain(t *testing.T) {
@@ -217,13 +227,6 @@ func TestAPI_CredentialThenLiveStrategy_Chain(t *testing.T) {
 	if w2.Code != http.StatusCreated {
 		t.Fatalf("create live strategy: expected 201, got %d: %s", w2.Code, w2.Body.String())
 	}
-
-	var uc map[string]interface{}
-	json.NewDecoder(w2.Body).Decode(&uc)
-	strategies, ok := uc["strategies"].([]interface{})
-	if !ok || len(strategies) != 2 {
-		t.Fatalf("expected 2 strategies (existing + new), got %v", uc["strategies"])
-	}
 }
 
 // --- PnL Supabase fallback when container stopped ---
@@ -233,7 +236,6 @@ func TestAPI_PnL_SupabaseFallback_WhenStopped(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID+":"+ModeLive].Status = StatusStopped
 
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -252,7 +254,7 @@ func TestAPI_PnL_SupabaseFallback_WhenStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api.syncer = NewSyncer(api.users, supaClient)
+	api.syncer = NewSyncer(supaClient)
 
 	r := testRouter(api)
 	req := httptest.NewRequest(http.MethodGet, "/api/users/"+userID+"/bbgo/pnl", nil)

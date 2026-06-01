@@ -5,134 +5,76 @@ import (
 	"testing"
 )
 
-func TestGetReturnsSnapshot(t *testing.T) {
-	m := NewUserContainerManager()
-	m.AddStrategy("user-1", ModeLive, StrategyEntry{
-		ID:       "s1",
-		Strategy: "grid2",
-		Exchange: "binance",
-		Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
-	})
-
-	uc1, ok := m.Get("user-1", ModeLive)
-	if !ok {
-		t.Fatal("expected to find user-1")
-	}
-
-	// Mutate the returned value — should NOT affect the stored entry
-	uc1.Status = StatusRunning
-
-	uc2, _ := m.Get("user-1", ModeLive)
-	if uc2.Status == StatusRunning {
-		t.Error("Get() should return a snapshot, but mutating it affected the stored entry")
-	}
-}
-
-func TestListUsersReturnsSnapshots(t *testing.T) {
-	m := NewUserContainerManager()
-	m.AddStrategy("user-1", ModeLive, StrategyEntry{ID: "s1", Strategy: "grid2", Exchange: "binance", Config: rawJSON(`{}`)})
-
-	users := m.ListUsers()
-	if len(users) != 1 {
-		t.Fatalf("expected 1 user, got %d", len(users))
-	}
-
-	// Mutate the returned value
-	users[0].Status = StatusRunning
-
-	// Verify internal state is unaffected
-	users2 := m.ListUsers()
-	if users2[0].Status == StatusRunning {
-		t.Error("ListUsers() should return snapshots, but mutating it affected stored entries")
-	}
-}
-
-func TestConcurrentAccessNoRace(t *testing.T) {
-	m := NewUserContainerManager()
-	m.AddStrategy("user-1", ModeLive, StrategyEntry{ID: "s1", Strategy: "grid2", Exchange: "binance", Config: rawJSON(`{}`)})
+// TestStrategyStore_ConcurrentWrites verifies that concurrent writes to
+// StrategyStore don't cause data races.
+func TestStrategyStore_ConcurrentWrites(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStrategyStore(dir)
 
 	var wg sync.WaitGroup
 	const goroutines = 20
 
+	// Concurrent writers adding strategies for different users
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			userID := "user-" + string(rune('0'+idx%10))
+			entry := StrategyEntry{
+				Name:     "test",
+				Exchange: "binance",
+				Strategy: "grid2",
+				Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
+			}
+			store.AddStrategy(userID, ModeLive, entry, func(string) bool { return false })
+		}(i)
+	}
+
 	// Concurrent readers
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
-		go func() {
+		go func(idx int) {
 			defer wg.Done()
-			uc, ok := m.Get("user-1", ModeLive)
-			if ok {
-				_ = uc.Status
-			}
-			users := m.ListUsers()
-			for _, u := range users {
-				_ = u.Status
-			}
-		}()
-	}
-
-	// Concurrent writers
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			m.UpdateStatus("user-1", ModeLive, StatusRunning)
-			m.UpdateStatus("user-1", ModeLive, StatusStopped)
-		}()
+			userID := "user-" + string(rune('0'+idx%10))
+			store.ListStrategies(userID, ModeLive)
+		}(i)
 	}
 
 	wg.Wait()
 }
 
-func TestAddStrategyReturnsSnapshot(t *testing.T) {
-	m := NewUserContainerManager()
+// TestStrategyStore_ConcurrentReadWrite verifies concurrent reads and writes
+// to the same user's strategies don't cause data races.
+func TestStrategyStore_ConcurrentReadWrite(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStrategyStore(dir)
+	userID := "shared-user"
 
-	uc, created := m.AddStrategy("user-1", ModeLive, StrategyEntry{
-		ID:       "s1",
-		Strategy: "grid2",
-		Exchange: "binance",
-		Config:   rawJSON(`{}`),
-	})
+	// Seed with initial strategy
+	store.AddStrategy(userID, ModeLive, StrategyEntry{
+		Name: "seed", Exchange: "binance", Strategy: "grid2",
+		Config: rawJSON(`{"symbol":"BTCUSDT"}`),
+	}, func(string) bool { return false })
 
-	if !created {
-		t.Fatal("expected user to be created")
+	var wg sync.WaitGroup
+	const goroutines = 10
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			store.ListStrategies(userID, ModeLive)
+		}()
+		go func(idx int) {
+			defer wg.Done()
+			store.AddStrategy(userID, ModeLive, StrategyEntry{
+				Name:     "concurrent",
+				Exchange: "binance",
+				Strategy: "grid",
+				Config:   rawJSON(`{}`),
+			}, func(string) bool { return false })
+		}(i)
 	}
 
-	uc.Status = StatusRunning
-
-	uc2, _ := m.Get("user-1", ModeLive)
-	if uc2.Status == StatusRunning {
-		t.Error("AddStrategy() should return a snapshot, not a pointer to internal state")
-	}
-}
-
-func TestGet_StrategiesSliceIsDeepCopy(t *testing.T) {
-	m := NewUserContainerManager()
-	m.AddStrategy("user-1", ModeLive, StrategyEntry{
-		ID:       "s1",
-		Strategy: "grid2",
-		Exchange: "binance",
-		Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
-	})
-
-	uc1, _ := m.Get("user-1", ModeLive)
-	// Modify element through returned copy — should NOT affect stored data
-	uc1.Strategies[0].Exchange = "okex"
-
-	uc2, _ := m.Get("user-1", ModeLive)
-	if uc2.Strategies[0].Exchange == "okex" {
-		t.Fatal("Get() must deep-copy Strategies slice — modifying returned copy affected internal state")
-	}
-}
-
-func TestListUsers_StrategiesSliceIsDeepCopy(t *testing.T) {
-	m := NewUserContainerManager()
-	m.AddStrategy("user-1", ModeLive, StrategyEntry{ID: "s1", Exchange: "binance", Config: rawJSON(`{}`)})
-
-	users := m.ListUsers()
-	users[0].Strategies[0].Exchange = "okex"
-
-	users2 := m.ListUsers()
-	if users2[0].Strategies[0].Exchange == "okex" {
-		t.Fatal("ListUsers() must deep-copy Strategies — modifying returned copy affected internal state")
-	}
+	wg.Wait()
 }

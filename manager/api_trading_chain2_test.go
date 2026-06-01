@@ -19,19 +19,13 @@ func TestSyncer_MarkCredentialsVerified(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 	insertTestCredential(t, creds, "user-1", "binance", "key", "secret")
 
-	users := NewUserContainerManager()
-	users.users["user-1"] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"},
-		},
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
 	}
 
-	syncer := NewSyncerWithCreds(users, nil, creds)
+	syncer := NewSyncerWithCreds(nil, creds)
 
-	syncer.MarkCredentialsVerified(users.users["user-1"])
+	syncer.MarkCredentialsVerified("user-1", ModeLive, strategies)
 
 	stored, err := creds.List("user-1")
 	if err != nil {
@@ -55,26 +49,20 @@ func TestSyncer_MarkCredentialsVerified_CrossExchange(t *testing.T) {
 	insertTestCredential(t, creds, "user-1", "binance", "bin-key", "bin-secret")
 	insertTestCredential(t, creds, "user-1", "bybit", "byb-key", "byb-secret")
 
-	users := NewUserContainerManager()
-	users.users["user-1"] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT"},
-				},
+	strategies := []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT"},
 			},
 		},
 	}
 
-	syncer := NewSyncerWithCreds(users, nil, creds)
+	syncer := NewSyncerWithCreds(nil, creds)
 
-	syncer.MarkCredentialsVerified(users.users["user-1"])
+	syncer.MarkCredentialsVerified("user-1", ModeLive, strategies)
 
 	stored, _ := creds.List("user-1")
 	for _, c := range stored {
@@ -94,19 +82,13 @@ func TestSyncer_MarkCredentialsVerified_UnusedExchange(t *testing.T) {
 	insertTestCredential(t, creds, "user-1", "binance", "key", "secret")
 	insertTestCredential(t, creds, "user-1", "okex", "unused-key", "unused-secret")
 
-	users := NewUserContainerManager()
-	users.users["user-1"] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"},
-		},
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
 	}
 
-	syncer := NewSyncerWithCreds(users, nil, creds)
+	syncer := NewSyncerWithCreds(nil, creds)
 
-	syncer.MarkCredentialsVerified(users.users["user-1"])
+	syncer.MarkCredentialsVerified("user-1", ModeLive, strategies)
 
 	stored, _ := creds.List("user-1")
 	for _, c := range stored {
@@ -145,7 +127,7 @@ func TestSyncer_SyncCredential(t *testing.T) {
 
 	dir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
-	syncer := NewSyncerWithCreds(NewUserContainerManager(), supaClient, NewCredentialStore(dir, enc))
+	syncer := NewSyncerWithCreds(supaClient, NewCredentialStore(dir, enc))
 
 	keyEnc, _ := enc.Encrypt("my-key")
 	secretEnc, _ := enc.Encrypt("my-secret")
@@ -189,7 +171,7 @@ func TestSyncer_DeleteCredential(t *testing.T) {
 
 	dir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
-	syncer := NewSyncerWithCreds(NewUserContainerManager(), supaClient, NewCredentialStore(dir, enc))
+	syncer := NewSyncerWithCreds(supaClient, NewCredentialStore(dir, enc))
 
 	syncer.DeleteCredential("user-1", "binance", false)
 
@@ -206,23 +188,18 @@ func TestSyncer_DeleteCredential(t *testing.T) {
 // --- Session names: mixed single + cross-exchange strategies ---
 
 func TestExtractSessionNames_MixedSingleAndCrossExchange(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2"},
-			{
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance"},
-					{Name: "hedge", Exchange: "bybit"},
-				},
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+		{
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance"},
+				{Name: "hedge", Exchange: "bybit"},
 			},
 		},
 	}
-	sessions := extractSessionNames(uc)
+	sessions := extractSessionNames(strategies)
 
-	// Single-exchange uses exchange name, cross-exchange uses session Name field
 	seen := map[string]bool{}
 	for _, s := range sessions {
 		seen[s] = true
@@ -236,21 +213,17 @@ func TestExtractSessionNames_MixedSingleAndCrossExchange(t *testing.T) {
 }
 
 func TestExtractSessionNames_CrossExchangeDeduplicates(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
-			{
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance"},
-					{Name: "hedge", Exchange: "bybit"},
-				},
+	strategies := []StrategyEntry{
+		{
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance"},
+				{Name: "hedge", Exchange: "bybit"},
 			},
-			{Exchange: "binance", Strategy: "dca"},
 		},
+		{Exchange: "binance", Strategy: "dca"},
 	}
-	sessions := extractSessionNames(uc)
+	sessions := extractSessionNames(strategies)
 
 	binanceCount := 0
 	for _, s := range sessions {

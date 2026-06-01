@@ -18,13 +18,7 @@ func TestAPI_CreateStrategy_LiveRequiresCredentials(t *testing.T) {
 	}
 	creds := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{},
-	}
+	store, _ := newTestStore(t)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -34,7 +28,7 @@ func TestAPI_CreateStrategy_LiveRequiresCredentials(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 
@@ -67,13 +61,7 @@ func TestAPI_CreateStrategy_LiveWithCredentials_Accepted(t *testing.T) {
 	creds := NewCredentialStore(dir, enc)
 	insertTestCredential(t, creds, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "binance", "key", "secret")
 
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{},
-	}
+	store, _ := newTestStore(t)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -83,7 +71,7 @@ func TestAPI_CreateStrategy_LiveWithCredentials_Accepted(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 
@@ -113,13 +101,7 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 	creds := NewCredentialStore(dir, enc)
 	insertTestCredential(t, creds, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "binance", "key", "secret")
 
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{},
-	}
+	store, _ := newTestStore(t)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -129,7 +111,7 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 
@@ -159,7 +141,18 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 
 func TestAPI_DeleteLastStrategy_StopsContainer(t *testing.T) {
 	var stopCalled bool
-	api, _ := setupTestAPIWithMockCM(nil, true)
+	bbgoHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT"},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	api, _ := setupTestAPIWithMockCM(t, bbgoHandler, true)
 	api.containerStop = func(userID string, _ string) {
 		stopCalled = true
 	}
@@ -177,27 +170,36 @@ func TestAPI_DeleteLastStrategy_StopsContainer(t *testing.T) {
 		t.Error("deleting last strategy should stop the container")
 	}
 
-	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
-	if uc != nil {
-		t.Errorf("expected container deleted after last strategy removed, got status %s", uc.Status)
+	strategies, _ := api.strategies.ListStrategies("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
+	if len(strategies) != 0 {
+		t.Errorf("expected no strategies after last strategy removed, got %d", len(strategies))
 	}
 }
 
 func TestAPI_DeleteStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 	var restartCalled bool
-	api, _ := setupTestAPIWithMockCM(nil, true)
-
-	api.users.mu.Lock()
-	uc := api.users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive]
-	uc.Strategies = append(uc.Strategies, StrategyEntry{
-		ID:       "s2",
-		Exchange: "binance",
-		Strategy: "grid2",
-		Mode:     "paper",
+	bbgoHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT"},
+					{"strategyInstanceID": "s2", "strategy": "supertrend", "symbol": "ETHUSDT"},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	})
-	api.users.mu.Unlock()
+	api, _ := setupTestAPIWithMockCM(t, bbgoHandler, true)
 
-	api.containerStart = func(_ *UserContainer) error {
+		// Write both strategies so deleting one leaves another
+		writeTestStrategies(t, api.strategies, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+			{Exchange: "binance", Strategy: "supertrend", Config: rawJSON(`{"symbol":"ETHUSDT"}`)},
+		})
+
+
+	api.containerStart = func(userID, mode string) error {
 		restartCalled = true
 		return nil
 	}
@@ -228,25 +230,21 @@ func TestAPI_DeleteStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 }
 
 func TestBuildUserYAML_MultiStrategy_SameExchange_DedupSession(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy: "grid2",
-				Exchange: "binance",
-				Mode:     "live",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-			},
-			{
-				Strategy: "dca",
-				Exchange: "binance",
-				Mode:     "live",
-				Config:   rawJSON(`{"symbol":"ETHUSDT"}`),
-			},
+	strategies := []StrategyEntry{
+		{
+			Strategy: "grid2",
+			Exchange: "binance",
+			Mode:     "live",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		},
+		{
+			Strategy: "dca",
+			Exchange: "binance",
+			Mode:     "live",
+			Config:   rawJSON(`{"symbol":"ETHUSDT"}`),
 		},
 	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return true })
+	yaml, err := buildUserYAML("test-user", ModeLive, strategies, func(exchange string) bool { return true })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,25 +268,21 @@ func TestBuildUserYAML_MultiStrategy_SameExchange_DedupSession(t *testing.T) {
 }
 
 func TestBuildUserYAML_DifferentExchanges_SeparateSessions(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy: "grid2",
-				Exchange: "binance",
-				Mode:     "paper",
-				Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
-			},
-			{
-				Strategy: "grid2",
-				Exchange: "okex",
-				Mode:     "paper",
-				Config:   rawJSON(`{"symbol":"ETHUSDT"}`),
-			},
+	strategies := []StrategyEntry{
+		{
+			Strategy: "grid2",
+			Exchange: "binance",
+			Mode:     "paper",
+			Config:   rawJSON(`{"symbol":"BTCUSDT"}`),
+		},
+		{
+			Strategy: "grid2",
+			Exchange: "okex",
+			Mode:     "paper",
+			Config:   rawJSON(`{"symbol":"ETHUSDT"}`),
 		},
 	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModePaper, strategies, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

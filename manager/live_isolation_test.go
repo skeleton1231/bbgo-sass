@@ -22,7 +22,7 @@ func TestLiveContainer_NoTestnetEnv(t *testing.T) {
 	liveKey, _ := enc.Encrypt("live-key")
 	liveSec, _ := enc.Encrypt("live-secret")
 	creds.Upsert(ExchangeCredential{
-		ID: "live1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false, IsVerified: true,
 	})
 
@@ -34,12 +34,14 @@ func TestLiveContainer_NoTestnetEnv(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, creds, enc, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	store := NewStrategyStore("")
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	var capturedArgs []string
-	api.containerStart = func(uc *UserContainer) error {
-		capturedArgs = cm.envArgs(uc)
+	api.containerStart = func(startUserID, startMode string) error {
+		strategies, _ := api.strategies.ListStrategies(startUserID, startMode)
+		capturedArgs = cm.envArgs(startUserID, startMode, strategies)
 		return nil
 	}
 	api.containerRunning = func(string, string) bool { return false }
@@ -102,18 +104,13 @@ func TestLiveContainer_YAML_DisableStartupBalanceQuery(t *testing.T) {
 	liveKey, _ := enc.Encrypt("live-key")
 	liveSec, _ := enc.Encrypt("live-secret")
 	creds.Upsert(ExchangeCredential{
-		ID: "live1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false, IsVerified: true,
 	})
 
-	uc := &UserContainer{
-		UserID: userID, Mode: ModeLive, Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	strategies := []StrategyEntry{}
 
-	yamlContent, err := buildUserYAML(uc, func(exchange string) bool {
+	yamlContent, err := buildUserYAML(userID, ModeLive, strategies, func(exchange string) bool {
 		if creds == nil {
 			return false
 		}
@@ -148,14 +145,14 @@ func TestDualContainer_CredentialIsolation(t *testing.T) {
 	liveKey, _ := enc.Encrypt("live-key")
 	liveSec, _ := enc.Encrypt("live-secret")
 	creds.Upsert(ExchangeCredential{
-		ID: "live1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false, IsVerified: true,
 	})
 
 	tnKey, _ := enc.Encrypt("tn-key")
 	tnSec, _ := enc.Encrypt("tn-secret")
 	creds.Upsert(ExchangeCredential{
-		ID: "tn1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true, IsVerified: true,
 	})
 
@@ -167,21 +164,12 @@ func TestDualContainer_CredentialIsolation(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
-	liveUC := &UserContainer{
-		UserID: userID, Mode: ModeLive, Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	paperUC := &UserContainer{
-		UserID: userID, Mode: ModePaper, Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s2", Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	strategies := []StrategyEntry{
+			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+		}
 
-	liveArgs := cm.envArgs(liveUC)
-	paperArgs := cm.envArgs(paperUC)
+	liveArgs := cm.envArgs(userID, ModeLive, strategies)
+	paperArgs := cm.envArgs(userID, ModePaper, strategies)
 
 	assertEnv(t, liveArgs, "BINANCE_API_KEY=live-key", "live container should have live API key")
 	assertNoEnv(t, liveArgs, "BINANCE_TESTNET=1", "live container should NOT have TESTNET")
@@ -213,15 +201,23 @@ func TestCreateCredential_RestartIsolation(t *testing.T) {
 
 	userID := credsUID
 
-	api.users.users[userID+":"+ModeLive].Status = StatusRunning
-	api.users.users[userID+":paper"] = &UserContainer{Mode: ModePaper, UserID: userID, Status: StatusStopped, Strategies: []StrategyEntry{{ID: "sp", Exchange: "binance", Strategy: "grid"}}}
-	api.users.users[userID+":"+ModePaper].Status = StatusRunning
+	// Write strategies for both modes so both containers are considered "running"
+	writeTestStrategies(t, api.strategies, userID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+	writeTestStrategies(t, api.strategies, userID, ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+	api.containerRunning = containerRunningFor(map[string]bool{
+		userID + ":" + ModeLive:  true,
+		userID + ":" + ModePaper: true,
+	})
 
 	var liveStarts, paperStarts int
-	api.containerStart = func(uc *UserContainer) error {
-		if uc.Mode == ModeLive {
+	api.containerStart = func(startUserID, startMode string) error {
+		if startMode == ModeLive {
 			liveStarts++
-		} else if uc.Mode == ModePaper {
+		} else if startMode == ModePaper {
 			paperStarts++
 		}
 		return nil

@@ -203,31 +203,31 @@ done:
 // --- extractSessionNames additional coverage ---
 
 func TestExtractSessionNames_MultiExchange(t *testing.T) {
-	uc := &UserContainer{Strategies: []StrategyEntry{
+	strategies := []StrategyEntry{
 		{Exchange: "binance", Strategy: "grid2"},
 		{Exchange: "okex", Strategy: "bollmaker"},
-	}}
-	names := extractSessionNames(uc)
+	}
+	names := extractSessionNames(strategies)
 	if len(names) != 2 || names[0] != "binance" || names[1] != "okex" {
 		t.Errorf("sessions = %v, want [binance okex]", names)
 	}
 }
 
 func TestExtractSessionNames_Mixed(t *testing.T) {
-	uc := &UserContainer{Strategies: []StrategyEntry{
+	strategies := []StrategyEntry{
 		{Exchange: "binance", Strategy: "grid2"},
 		{CrossExchange: true, Strategy: "xmaker", Sessions: []SessionRoleConfig{
 			{Name: "okex_spot", Exchange: "okex"},
 		}},
-	}}
-	names := extractSessionNames(uc)
+	}
+	names := extractSessionNames(strategies)
 	if len(names) != 2 {
 		t.Errorf("sessions = %v, want 2 entries", names)
 	}
 }
 
 func TestExtractSessionNames_Empty(t *testing.T) {
-	names := extractSessionNames(&UserContainer{})
+	names := extractSessionNames(nil)
 	if len(names) != 0 {
 		t.Errorf("sessions = %v, want empty", names)
 	}
@@ -311,11 +311,7 @@ func TestNotifier_Dispatch_TelegramWithMock(t *testing.T) {
 		Rules: NotificationRule{TradeEvents: true},
 	}}
 
-	// sendTelegram builds URL as https://api.telegram.org/bot{token}/sendMessage
-	// so the mock won't match. This test validates the decrypt+dispatch path
-	// reaches the HTTP call (will fail with 404 but proves the flow works).
 	_ = n.Dispatch("u1", NotificationEvent{Type: "trade", Title: "Trade", Message: "BUY"})
-	// If we got here without panic, the decrypt + rule matching path works.
 	_ = receivedBody
 }
 
@@ -352,59 +348,6 @@ func TestNotifier_Dispatch_SlackWithMock(t *testing.T) {
 	}
 	if receivedPath != "/webhook/test" {
 		t.Errorf("slack path = %q, want /webhook/test", receivedPath)
-	}
-}
-
-// --- SyncUser (sync.go) ---
-
-func TestSyncUser_UpsertsAndSyncs(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy("sync-u1", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "paper"})
-	users.UpdateStatus("sync-u1", ModeLive, StatusRunning)
-
-	upserted := false
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/rest/v1/user_containers" {
-			upserted = true
-		}
-		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
-	}))
-	defer supabaseSrv.Close()
-
-	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	s := NewSyncer(users, supaClient)
-	s.SyncUser("sync-u1", ModeLive)
-	if !upserted {
-		t.Error("SyncUser did not upsert to Supabase")
-	}
-}
-
-func TestSyncUser_StoppedContainer(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy("sync-u2", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-
-	upserted := false
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upserted = true
-		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
-	}))
-	defer supabaseSrv.Close()
-
-	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	s := NewSyncer(users, supaClient)
-	s.SyncUser("sync-u2", ModeLive)
-	if !upserted {
-		t.Error("should still upsert even when stopped")
 	}
 }
 

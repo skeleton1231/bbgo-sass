@@ -18,18 +18,13 @@ func TestBBGoDataEndpoints_UserIDMismatch_Rejected(t *testing.T) {
 	victimID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	attackerID := "11111111-2222-3333-4444-555555555555"
 
-	users := NewUserContainerManager()
-	users.users[victimID] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     victimID,
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -89,18 +84,13 @@ func TestBBGoDataEndpoints_UserIDMismatch_Rejected(t *testing.T) {
 func TestBBGoDataEndpoints_MatchingUserID_Accepted(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
-	users := NewUserContainerManager()
-	users.users[userID+":"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     userID,
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
@@ -135,18 +125,13 @@ func TestPnLEndpoint_UserIDMismatch_Rejected(t *testing.T) {
 	victimID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	attackerID := "11111111-2222-3333-4444-555555555555"
 
-	users := NewUserContainerManager()
-	users.users[victimID] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     victimID,
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -184,13 +169,7 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"}},
-	}
+	store := NewStrategyStore(dir)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -202,8 +181,8 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var restartCalled bool
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
-	api.containerStart = func(_ *UserContainer) error {
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api.containerStart = func(userID, mode string) error {
 		restartCalled = true
 		return nil
 	}
@@ -248,13 +227,7 @@ func TestCredentialDelete_TriggersContainerRestart(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"}},
-	}
+	store := NewStrategyStore(dir)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -270,8 +243,8 @@ func TestCredentialDelete_TriggersContainerRestart(t *testing.T) {
 	credID := stored[0].ID
 
 	var restartCalled bool
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
-	api.containerStart = func(_ *UserContainer) error {
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api.containerStart = func(userID, mode string) error {
 		restartCalled = true
 		return nil
 	}

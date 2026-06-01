@@ -76,6 +76,7 @@ export function useMarketData({ userId, mode, enabled = true, onMessage }: UseWe
   }, [connect])
 
   useEffect(() => {
+    mountedRef.current = true
     connect()
     return () => {
       mountedRef.current = false

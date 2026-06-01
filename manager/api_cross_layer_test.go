@@ -91,7 +91,6 @@ func storeCred(t *testing.T, creds *CredentialStore, enc *Encryptor, userID, exc
 		require.NoError(t, err)
 	}
 	require.NoError(t, creds.Upsert(ExchangeCredential{
-		ID:                  "cred-" + exchange,
 		UserID:              userID,
 		Exchange:            exchange,
 		APIKeyEncrypted:     keyEnc,
@@ -107,7 +106,6 @@ func storeTestnetCred(t *testing.T, creds *CredentialStore, enc *Encryptor, user
 	secEnc, err := enc.Encrypt(secret)
 	require.NoError(t, err)
 	require.NoError(t, creds.Upsert(ExchangeCredential{
-		ID:                 "cred-" + exchange + "-testnet",
 		UserID:             userID,
 		Exchange:           exchange,
 		APIKeyEncrypted:    keyEnc,
@@ -127,12 +125,8 @@ func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 		creds: creds,
 	}
 
-	args := cm.envArgs(&UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{ID: "grid", Exchange: "binance", Mode: "live"},
-		},
+	args := cm.envArgs(testUUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Mode: "live"},
 	})
 	s := strings.Join(args, " ")
 
@@ -154,12 +148,8 @@ func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
 		creds: creds,
 	}
 
-	args := cm.envArgs(&UserContainer{
-		Mode:   ModePaper,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{ID: "grid", Exchange: "binance", Mode: "paper"},
-		},
+	args := cm.envArgs(testUUID, ModePaper, []StrategyEntry{
+		{Exchange: "binance", Mode: "paper"},
 	})
 	s := strings.Join(args, " ")
 
@@ -180,16 +170,12 @@ func TestCrossLayerDockerEnvArgsCrossExchange(t *testing.T) {
 		creds: creds,
 	}
 
-	args := cm.envArgs(&UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{
-				ID: "xmaker", CrossExchange: true, Mode: "live",
-				Sessions: []SessionRoleConfig{
-					{Exchange: "binance", Name: "maker"},
-					{Exchange: "bybit", Name: "taker"},
-				},
+	args := cm.envArgs(testUUID, ModeLive, []StrategyEntry{
+		{
+			CrossExchange: true, Mode: "live",
+			Sessions: []SessionRoleConfig{
+				{Exchange: "binance", Name: "maker"},
+				{Exchange: "bybit", Name: "taker"},
 			},
 		},
 	})
@@ -204,13 +190,9 @@ func TestCrossLayerDockerEnvArgsCrossExchange(t *testing.T) {
 func TestCrossLayerPaperModeIsGlobal(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataVolume: "bbgo-data"}}
 
-	args := cm.envArgs(&UserContainer{
-		Mode:   ModePaper,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{ID: "grid", Exchange: "binance", Mode: "paper"},
-			{ID: "twap", Exchange: "okex", Mode: "paper"},
-		},
+	args := cm.envArgs(testUUID, ModePaper, []StrategyEntry{
+		{Exchange: "binance", Mode: "paper"},
+		{Exchange: "okex", Mode: "paper"},
 	})
 	count := strings.Count(strings.Join(args, " "), "PAPER_TRADE=1")
 	assert.Equal(t, 1, count)
@@ -223,26 +205,18 @@ func TestCrossLayerMarketDataEnv(t *testing.T) {
 		MarketDataAddr: "market-data:9090",
 	}}
 
-	args := cm.envArgs(&UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{ID: "grid", Exchange: "binance", Mode: "live"},
-		},
+	args := cm.envArgs(testUUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Mode: "live"},
 	})
 	assert.Contains(t, strings.Join(args, " "), "MARKET_DATA_SERVICE_URL=market-data:9090")
 }
 
 // TestCrossLayerBuildYAMLLive verifies YAML generation for a live strategy.
 func TestCrossLayerBuildYAMLLive(t *testing.T) {
-	yamlBytes, err := buildUserYAML(&UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{
-				Strategy: "grid", Exchange: "binance", Mode: "live",
-				Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10}`),
-			},
+	yamlBytes, err := buildUserYAML(testUUID, ModeLive, []StrategyEntry{
+		{
+			Strategy: "grid", Exchange: "binance", Mode: "live",
+			Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10}`),
 		},
 	}, func(string) bool { return true })
 	require.NoError(t, err)
@@ -254,14 +228,10 @@ func TestCrossLayerBuildYAMLLive(t *testing.T) {
 
 // TestCrossLayerBuildYAMLPaper verifies YAML generation for a paper strategy.
 func TestCrossLayerBuildYAMLPaper(t *testing.T) {
-	yamlBytes, err := buildUserYAML(&UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{
-				Strategy: "grid", Exchange: "binance", Mode: "paper",
-				Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
-			},
+	yamlBytes, err := buildUserYAML(testUUID, ModeLive, []StrategyEntry{
+		{
+			Strategy: "grid", Exchange: "binance", Mode: "paper",
+			Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
 		},
 	}, func(string) bool { return false })
 	require.NoError(t, err)

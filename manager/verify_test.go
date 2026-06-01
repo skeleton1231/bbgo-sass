@@ -252,10 +252,15 @@ func TestCreateCredential_Unverified_DoesNotRestart(t *testing.T) {
 	api.verifyCredFn = nil // use real verifyCredential with mock server
 	defer cleanup()
 
-	api.users.users[credsUID+":"+ModeLive].Status = StatusRunning
+	writeTestStrategies(t, api.strategies, credsUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+	api.containerRunning = containerRunningFor(map[string]bool{
+		credsUID + ":" + ModeLive: true,
+	})
 
 	var startCalled bool
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		startCalled = true
 		return nil
 	}
@@ -281,7 +286,6 @@ func TestStartUserContainer_UnverifiedCredential_Rejected(t *testing.T) {
 	keyEnc, _ := enc.Encrypt("test-key")
 	secretEnc, _ := enc.Encrypt("test-secret")
 	creds.Upsert(ExchangeCredential{
-		ID:                 "cred-1",
 		UserID:             testUUID,
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
@@ -290,22 +294,17 @@ func TestStartUserContainer_UnverifiedCredential_Rejected(t *testing.T) {
 		IsVerified:         false,
 	})
 
-	users := NewUserContainerManager()
-	users.users[testUUID+":"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	store := NewStrategyStore(dir)
+	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return false }
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 
 	r := testRouter(api)
 	req := httptest.NewRequest("POST", "/api/users/"+testUUID+"/start?mode=live", nil)
@@ -328,7 +327,6 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 	keyEnc, _ := enc.Encrypt("test-key")
 	secretEnc, _ := enc.Encrypt("test-secret")
 	creds.Upsert(ExchangeCredential{
-		ID:                 "cred-1",
 		UserID:             testUUID,
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
@@ -337,22 +335,17 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 		IsVerified:         true,
 	})
 
-	users := NewUserContainerManager()
-	users.users[testUUID+":"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	store := NewStrategyStore(dir)
+	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return true }
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
@@ -373,22 +366,18 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 }
 
 func TestStartUserContainer_NoCredsStore_NoVerificationCheck(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users[testUUID+":"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	dir := t.TempDir()
+	store := NewStrategyStore(dir)
+	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 
-	cfg := &Config{ManagerToken: "test-token"}
+	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return true }
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
@@ -418,7 +407,6 @@ func TestCredentialStore_GetByMode(t *testing.T) {
 	keyEnc, _ := enc.Encrypt("live-key")
 	secretEnc, _ := enc.Encrypt("live-secret")
 	cs.Upsert(ExchangeCredential{
-		ID:                 "cred-live",
 		UserID:             "user1",
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
@@ -430,7 +418,6 @@ func TestCredentialStore_GetByMode(t *testing.T) {
 	keyEnc2, _ := enc.Encrypt("test-key")
 	secretEnc2, _ := enc.Encrypt("test-secret")
 	cs.Upsert(ExchangeCredential{
-		ID:                 "cred-test",
 		UserID:             "user1",
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc2,
@@ -515,7 +502,6 @@ func TestStartUserContainer_UnsupportedExchange_SkipsVerification(t *testing.T) 
 	keyEnc, _ := enc.Encrypt("test-key")
 	secretEnc, _ := enc.Encrypt("test-secret")
 	creds.Upsert(ExchangeCredential{
-		ID:                 "cred-okex",
 		UserID:             testUUID,
 		Exchange:           "okex",
 		APIKeyEncrypted:    keyEnc,
@@ -524,22 +510,17 @@ func TestStartUserContainer_UnsupportedExchange_SkipsVerification(t *testing.T) 
 		IsVerified:         false,
 	})
 
-	users := NewUserContainerManager()
-	users.users[testUUID+":"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "okex", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	store := NewStrategyStore(dir)
+	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
+		{Exchange: "okex", Strategy: "grid2"},
+	})
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return true }
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})

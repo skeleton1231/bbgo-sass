@@ -44,10 +44,13 @@ func TestProxyToBot_UserIDMismatch(t *testing.T) {
 }
 
 func TestProxyToBot_UserNotFound(t *testing.T) {
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
+	cm := &ContainerManager{cfg: &Config{}, pool: nil}
+	proxy := NewBotProxy(cm)
 	api := &API{
-		users:     users,
-		wsTickets: NewWSTicketStore(),
+		strategies: store,
+		proxy:      proxy,
+		wsTickets:  NewWSTicketStore(),
 	}
 	defer api.Close()
 
@@ -170,7 +173,7 @@ func TestNotifier_CRUD(t *testing.T) {
 	n := NewNotifier(tmpDir, enc)
 
 	cfg := NotificationConfig{
-		Channel: NotificationChannel{ID: "n1", Type: "test", Enabled: true},
+		Channel: NotificationChannel{Type: "test", Enabled: true},
 		Rules:   NotificationRule{TradeEvents: true},
 	}
 	if err := n.Create("u1", cfg); err != nil {
@@ -181,11 +184,12 @@ func TestNotifier_CRUD(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("expected 1 config, got %d", len(list))
 	}
-	if list[0].Channel.ID != "n1" {
-		t.Errorf("expected ID n1, got %s", list[0].Channel.ID)
+	generatedID := list[0].Channel.ID
+	if generatedID == "" {
+		t.Error("expected auto-generated ID")
 	}
 
-	if err := n.Delete("u1", "n1"); err != nil {
+	if err := n.Delete("u1", generatedID); err != nil {
 		t.Fatal(err)
 	}
 	if len(n.List("u1")) != 0 {
@@ -209,7 +213,7 @@ func TestNotifier_DispatchDisabled(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	n := NewNotifier(tmpDir, enc)
 	n.configs["u1"] = []NotificationConfig{{
-		Channel: NotificationChannel{ID: "n1", Type: "telegram", Enabled: false},
+		Channel: NotificationChannel{Type: "telegram", Enabled: false},
 		Rules:   NotificationRule{TradeEvents: true},
 	}}
 
@@ -236,7 +240,7 @@ func TestNotifier_DispatchRateLimit(t *testing.T) {
 	n := NewNotifier(tmpDir, enc)
 	n.rateLimit = 999 * time.Hour
 	n.configs["u1"] = []NotificationConfig{{
-		Channel: NotificationChannel{ID: "n1", Type: "test", Enabled: true},
+		Channel: NotificationChannel{Type: "test", Enabled: true},
 		Rules:   NotificationRule{TradeEvents: true},
 	}}
 
@@ -286,9 +290,7 @@ func TestNotificationAPI_CRUD(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	notifier := NewNotifier(tmpDir, enc)
 
-	users := NewUserContainerManager()
 	api := &API{
-		users:     users,
 		notifier:  notifier,
 		wsTickets: NewWSTicketStore(),
 	}
@@ -352,7 +354,6 @@ func TestNotificationAPI_CreateInvalidType(t *testing.T) {
 	notifier := NewNotifier(tmpDir, enc)
 
 	api := &API{
-		users:     NewUserContainerManager(),
 		notifier:  notifier,
 		wsTickets: NewWSTicketStore(),
 	}
@@ -375,7 +376,6 @@ func TestNotificationAPI_TestNotification_NoConfigs(t *testing.T) {
 	notifier := NewNotifier(tmpDir, enc)
 
 	api := &API{
-		users:     NewUserContainerManager(),
 		notifier:  notifier,
 		wsTickets: NewWSTicketStore(),
 	}

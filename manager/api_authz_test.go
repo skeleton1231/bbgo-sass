@@ -30,13 +30,7 @@ func testRouterWithUser(api *API, userID string) *chi.Mux {
 }
 
 func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -44,7 +38,8 @@ func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouterWithUser(api, "11111111-2222-3333-4444-555555555555")
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status", nil)
@@ -60,13 +55,7 @@ func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
 }
 
 func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -74,7 +63,8 @@ func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status", nil)
@@ -87,13 +77,7 @@ func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
 }
 
 func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -101,7 +85,8 @@ func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status", nil)
@@ -114,7 +99,7 @@ func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
 }
 
 func TestResolveUserID_InvalidUUID_Rejected(t *testing.T) {
-	users := NewUserContainerManager()
+	store := NewStrategyStore("")
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -122,7 +107,7 @@ func TestResolveUserID_InvalidUUID_Rejected(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/not-a-uuid/status", nil)
@@ -135,21 +120,16 @@ func TestResolveUserID_InvalidUUID_Rejected(t *testing.T) {
 }
 
 func TestResolveUserID_CreateStrategy_MismatchBlocked(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{},
-	}
+	store, dir := newTestStore(t)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
+		DataDir:      dir,
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, "11111111-2222-3333-4444-555555555555")
 
@@ -169,8 +149,8 @@ func TestResolveUserID_CreateStrategy_MismatchBlocked(t *testing.T) {
 		t.Fatalf("expected 403 for strategy creation with mismatched user, got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
-	if uc != nil && len(uc.Strategies) != 0 {
+	strategies, _ := store.ListStrategies("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
+	if len(strategies) != 0 {
 		t.Error("strategy should NOT have been created for mismatched user")
 	}
 }
@@ -183,7 +163,7 @@ func TestCredentialEndpoint_UsesHeaderUserID(t *testing.T) {
 	}
 	creds := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
+	store := NewStrategyStore(dir)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -192,7 +172,7 @@ func TestCredentialEndpoint_UsesHeaderUserID(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
@@ -230,7 +210,7 @@ func TestCredentialEndpoint_MissingUserID_Rejected(t *testing.T) {
 	}
 	creds := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
+	store := NewStrategyStore(dir)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -239,7 +219,7 @@ func TestCredentialEndpoint_MissingUserID_Rejected(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, enc, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 
@@ -275,21 +255,17 @@ func TestCreateAndStart_WritesYAMLToDisk(t *testing.T) {
 	}
 	_ = NewContainerManager(cfg, creds, nil)
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Name:     "Paper Grid",
-				Exchange: "binance",
-				Strategy: "grid2",
-				Mode:     "paper",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
-			},
+	strategies := []StrategyEntry{
+		{
+			Name:     "Paper Grid",
+			Exchange: "binance",
+			Strategy: "grid2",
+			Mode:     "paper",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
 		},
 	}
 
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModePaper, strategies, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("build yaml: %v", err)
 	}
@@ -344,21 +320,17 @@ func TestDockerArgs_LiveMode_EnvAssembly(t *testing.T) {
 	}
 	cm := NewContainerManager(cfg, creds, nil)
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Name:     "Live Grid",
-				Exchange: "binance",
-				Strategy: "grid2",
-				Mode:     "live",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
-			},
+	liveStrategies := []StrategyEntry{
+		{
+			Name:     "Live Grid",
+			Exchange: "binance",
+			Strategy: "grid2",
+			Mode:     "live",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
 		},
 	}
 
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, liveStrategies)
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {

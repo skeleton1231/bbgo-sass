@@ -5,48 +5,23 @@ import (
 )
 
 type Syncer struct {
-	users    *UserContainerManager
 	supa     *SupabaseClient
 	creds    *CredentialStore
 	notifier *Notifier
 }
 
-func NewSyncer(users *UserContainerManager, supa *SupabaseClient) *Syncer {
-	return &Syncer{users: users, supa: supa}
+func NewSyncer(supa *SupabaseClient) *Syncer {
+	return &Syncer{supa: supa}
 }
 
-func NewSyncerWithCreds(users *UserContainerManager, supa *SupabaseClient, creds *CredentialStore) *Syncer {
-	s := NewSyncer(users, supa)
+func NewSyncerWithCreds(supa *SupabaseClient, creds *CredentialStore) *Syncer {
+	s := NewSyncer(supa)
 	s.creds = creds
 	return s
 }
 
 func (s *Syncer) SetNotifier(n *Notifier) {
 	s.notifier = n
-}
-
-func (s *Syncer) LoadUsersFromSupabase() ([]*UserContainer, error) {
-	return s.supa.LoadUserContainers()
-}
-
-func (s *Syncer) UpsertUser(uc *UserContainer) {
-	if err := s.supa.UpsertUser(uc); err != nil {
-		log.Printf("upsert user %s: %v", uc.UserID, err)
-	}
-}
-
-func (s *Syncer) SyncUser(userID, mode string) {
-	uc, ok := s.users.Get(userID, mode)
-	if !ok {
-		return
-	}
-	s.UpsertUser(uc)
-}
-
-func (s *Syncer) SyncAll() {
-	for _, uc := range s.users.ListUsers() {
-		s.UpsertUser(uc)
-	}
 }
 
 func (s *Syncer) SyncCredential(cred ExchangeCredential) {
@@ -71,18 +46,18 @@ func (s *Syncer) DeleteCredential(userID, exchange string, isTestnet bool) {
 	}
 }
 
-func (s *Syncer) MarkCredentialsVerified(uc *UserContainer) {
+func (s *Syncer) MarkCredentialsVerified(userID, mode string, strategies []StrategyEntry) {
 	if s.creds == nil {
 		return
 	}
-	creds, err := s.creds.List(uc.UserID)
+	creds, err := s.creds.List(userID)
 	if err != nil {
 		return
 	}
-	wantTestnet := uc.Mode == ModePaper
+	wantTestnet := mode == ModePaper
 
 	exchanges := []string{}
-	for _, strat := range uc.Strategies {
+	for _, strat := range strategies {
 		if strat.CrossExchange {
 			for _, sr := range strat.Sessions {
 				exchanges = append(exchanges, sr.Exchange)
@@ -102,8 +77,8 @@ func (s *Syncer) MarkCredentialsVerified(uc *UserContainer) {
 		for _, ex := range exchanges {
 			if ex == c.Exchange {
 				c.IsVerified = true
-				s.creds.Update(uc.UserID, c)
-				log.Printf("credential %s (%s) for user %s marked as verified", c.Exchange, modeLabel(c.IsTestnet), uc.UserID)
+				s.creds.Update(userID, c)
+				log.Printf("credential %s (%s) for user %s marked as verified", c.Exchange, modeLabel(c.IsTestnet), userID)
 				s.SyncCredential(c)
 				break
 			}

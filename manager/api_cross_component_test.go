@@ -17,7 +17,7 @@ func TestIssueWSTicket_RequiresAuth(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 
 	r := chi.NewRouter()
@@ -43,7 +43,7 @@ func TestIssueWSTicket_ReturnsTicket(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 
 	r := chi.NewRouter()
@@ -77,10 +77,9 @@ func TestStartUser_NoStrategies_Returns400(t *testing.T) {
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	users := NewUserContainerManager()
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -100,21 +99,17 @@ func TestStopUser_SetsStatusStopped(t *testing.T) {
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	var stopCalled bool
 	api.containerStop = func(_, _ string) {
 		stopCalled = true
 	}
+	api.containerRunning = containerRunningFor(map[string]bool{
+		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + ModeLive: true,
+	})
 
 	r := testRouter(api)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/stop", nil)
@@ -127,33 +122,29 @@ func TestStopUser_SetsStatusStopped(t *testing.T) {
 	if !stopCalled {
 		t.Error("expected containerStop to be called")
 	}
-	uc, _ := users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
-	if uc.Status != StatusStopped {
-		t.Errorf("expected status stopped, got %s", uc.Status)
-	}
 }
 
 // TestStartUser_AlreadyRunning_Returns200 verifies that starting an already-running
 // container returns 200 without spawning a new start goroutine.
 func TestStartUser_AlreadyRunning_Returns200(t *testing.T) {
+	store, dir := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
+		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StrategyEntry{
-		ID: "s1", Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`),
-	})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StatusRunning)
-
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	var startCalls int
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		startCalls++
 		return nil
 	}
@@ -177,26 +168,29 @@ func TestStartUser_AlreadyRunning_Returns200(t *testing.T) {
 // does NOT launch an additional start goroutine.
 func TestCreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	users := NewUserContainerManager()
-	users.AddStrategy(userID, ModePaper, StrategyEntry{
-		ID: "s1", Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`), Mode: "paper",
+	store, dir := newTestStore(t)
+	writeTestStrategies(t, store, userID, ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
 	})
-	users.UpdateStatus(userID, ModePaper, StatusStarting)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
+		DataDir:      dir,
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
+	// Simulate "starting" state — not running, but already in the starting map
+	api.starting.Store(containerKey(userID, ModePaper), true)
 	var startCalls int
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		startCalls++
 		return nil
 	}
+	api.containerRunning = containerRunningFor(map[string]bool{})
 
 	r := testRouter(api)
 	body := `{"name":"Grid2","exchange":"binance","strategy":"grid2","config":{"symbol":"ETHUSDT"},"mode":"paper"}`
@@ -214,12 +208,9 @@ func TestCreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 		t.Errorf("expected no containerStart when status is starting, got %d calls", startCalls)
 	}
 
-	uc, _ := users.Get(userID, ModePaper)
-	if len(uc.Strategies) != 2 {
-		t.Fatalf("expected 2 strategies, got %d", len(uc.Strategies))
-	}
-	if uc.Status != StatusStarting {
-		t.Errorf("expected status starting, got %s", uc.Status)
+	strategies, _ := store.ListStrategies(userID, ModePaper)
+	if len(strategies) != 2 {
+		t.Fatalf("expected 2 strategies, got %d", len(strategies))
 	}
 }
 
@@ -233,7 +224,7 @@ func TestUserStatus_UnknownUser_ReturnsStopped(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status", nil)
@@ -261,7 +252,7 @@ func TestListStrategies_UnknownUser_ReturnsEmpty(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", nil)
@@ -294,7 +285,7 @@ func TestCreateCredential_UnsupportedExchange(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	body := `{"exchange":"unknown_ex","api_key":"k","api_secret":"s"}`
@@ -322,7 +313,7 @@ func TestCreateCredential_MissingFields(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name string
@@ -357,10 +348,9 @@ func TestCreateStrategy_CrossExchange_RequiresSessions(t *testing.T) {
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	users := NewUserContainerManager()
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	body := `{"name":"XMaker","strategy":"xmaker","crossExchange":true,"config":{},"mode":"paper"}`
@@ -376,21 +366,34 @@ func TestCreateStrategy_CrossExchange_RequiresSessions(t *testing.T) {
 
 // TestDeleteStrategy_NotFound verifies deleting a non-existent strategy returns 404.
 func TestDeleteStrategy_NotFound(t *testing.T) {
+	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT"},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer bbgoSrv.Close()
+
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
 	}
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = containerRunningFor(map[string]bool{
+		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + ModeLive: true,
+	})
+	api.newBBGoClient = func(_ string) *BBGoClient {
+		return NewBBGoClient(bbgoSrv.URL)
+	}
+	api.container.apiURLFn = func(_, _ string) string { return bbgoSrv.URL }
 
 	r := testRouter(api)
 	req := httptest.NewRequest("DELETE", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies/nonexistent", nil)
@@ -405,22 +408,19 @@ func TestDeleteStrategy_NotFound(t *testing.T) {
 // TestHealthEndpoint_ReturnsCounts verifies the health endpoint returns user counts.
 func TestHealthEndpoint_ReturnsCounts(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1"}},
-	}
-	users.users["11111111-2222-3333-4444-555555555555:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "11111111-2222-3333-4444-555555555555",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s2"}},
-	}
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+	writeTestStrategies(t, store, "11111111-2222-3333-4444-555555555555", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = containerRunningFor(map[string]bool{
+		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + ModeLive: true,
+	})
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/health", nil)
@@ -449,7 +449,7 @@ func TestBacktestSync_TooManySymbols(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewUserContainerManager(), cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {

@@ -19,52 +19,84 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+// containerInfo is the API response for a user's container state per mode.
+type containerInfo struct {
+	UserID string          `json:"user_id"`
+	Mode   string          `json:"mode"`
+	Status string          `json:"status"`
+	// Strategies is populated from bbgo API when container is running.
+	// nil when container is stopped (Approach B: no strategy data when stopped).
+	Strategies interface{} `json:"strategies"`
+}
+
 type API struct {
-	cfg       *Config
-	users     *UserContainerManager
-	container *ContainerManager
-	proxy     *BotProxy
-	creds     *CredentialStore
-	encryptor *Encryptor
-	syncer    *Syncer
-	hub       *MarketDataHub
-	notifier  *Notifier
-	wsTickets *WSTicketStore
-	btExec    *BacktestExecutor
-	btJobs    *BacktestJobStore
-	btSyncSem chan struct{}
+	cfg        *Config
+	strategies *StrategyStore
+	container  *ContainerManager
+	proxy      *BotProxy
+	creds      *CredentialStore
+	encryptor  *Encryptor
+	syncer     *Syncer
+	hub        *MarketDataHub
+	testnetHub *MarketDataHub
+	notifier   *Notifier
+	wsTickets  *WSTicketStore
+	btExec     *BacktestExecutor
+	btJobs     *BacktestJobStore
+	btSyncSem  chan struct{}
+
+	stopCtx    context.Context
+	stopCancel context.CancelFunc
+	starting   sync.Map
 
 	newBBGoClient    func(baseURL string) *BBGoClient
-	containerStart   func(uc *UserContainer) error
+	containerStart   func(userID, mode string) error
 	containerStop    func(userID, mode string)
 	containerRunning func(userID, mode string) bool
 	verifyCredFn     func(exchange, apiKey, apiSecret, passphrase string, isTestnet bool) VerifyResult
 }
 
-func NewAPI(cfg *Config, users *UserContainerManager, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore) *API {
+func NewAPI(cfg *Config, strategies *StrategyStore, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, testnetHub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore) *API {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &API{
 		cfg:           cfg,
-		users:         users,
+		strategies:    strategies,
 		container:     cm,
 		proxy:         proxy,
 		creds:         creds,
 		encryptor:     enc,
 		syncer:        syncer,
 		hub:           hub,
+		testnetHub:    testnetHub,
 		notifier:      notifier,
 		wsTickets:     NewWSTicketStore(),
 		btExec:        btExec,
 		btJobs:        btJobs,
 		btSyncSem:     make(chan struct{}, 2),
 		newBBGoClient: NewBBGoClient,
+		stopCtx:       ctx,
+		stopCancel:    cancel,
 	}
 }
 
 func (api *API) Close() {
-	api.wsTickets.Close()
+	if api.stopCancel != nil {
+		api.stopCancel()
+	}
+	if api.wsTickets != nil {
+		api.wsTickets.Close()
+	}
+}
+
+func (api *API) hubForMode(mode string) *MarketDataHub {
+	if mode == ModePaper && api.testnetHub != nil {
+		return api.testnetHub
+	}
+	return api.hub
 }
 
 func (api *API) RegisterRoutes(r chi.Router) {
+
 	// WS routes — no request timeout (long-lived connections)
 	r.Get("/api/ws/ticket", api.IssueWSTicket)
 	r.Get("/api/ws", api.HandleWebSocket)
@@ -82,7 +114,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 		r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
 		r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
 
-		r.Route("/", func(r chi.Router) {
+	r.Route("/", func(r chi.Router) {
 			r.Use(UserRateLimit(3*time.Second, 20))
 			r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
 			r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
@@ -131,10 +163,10 @@ func (api *API) RegisterRoutes(r chi.Router) {
 }
 
 func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
-	users := api.users.ListUsers()
+	users := api.strategies.ScanUsers()
 	running := 0
-	for _, u := range users {
-		if u.Status == StatusRunning {
+	for _, um := range users {
+		if api.isContainerRunning(um.UserID, um.Mode) {
 			running++
 		}
 	}
@@ -166,13 +198,81 @@ func (api *API) resolveUserID(w http.ResponseWriter, r *http.Request) (string, b
 	return id, true
 }
 
-// modeFromQuery reads the ?mode=paper query parameter, defaulting to ModeLive.
 func modeFromQuery(r *http.Request) string {
 	m := r.URL.Query().Get("mode")
 	if m == ModePaper {
 		return ModePaper
 	}
 	return ModeLive
+}
+
+func containerKey(userID, mode string) string {
+	return userID + ":" + mode
+}
+
+func (api *API) isContainerStarting(userID, mode string) bool {
+	_, ok := api.starting.Load(containerKey(userID, mode))
+	return ok
+}
+
+func (api *API) isContainerRunning(userID, mode string) bool {
+	if api.containerRunning != nil {
+		return api.containerRunning(userID, mode)
+	}
+	return api.container.IsRunning(userID, mode)
+}
+
+func (api *API) startContainer(userID, mode string) error {
+	if api.containerStart != nil {
+		return api.containerStart(userID, mode)
+	}
+	if api.container == nil {
+		return fmt.Errorf("container manager not configured")
+	}
+	return api.container.CreateAndStart(userID, mode)
+}
+
+func (api *API) stopContainer(userID, mode string) {
+	if api.containerStop != nil {
+		api.containerStop(userID, mode)
+		return
+	}
+	api.container.Stop(userID, mode)
+}
+
+// containerStatusForMode returns the status info for a single mode.
+// When running, queries bbgo API for strategy details.
+// When stopped, returns status only (no strategy data).
+func (api *API) containerStatusForMode(userID, mode string) *containerInfo {
+	if !api.strategies.YAMLExists(userID, mode) {
+		return nil
+	}
+
+	info := &containerInfo{
+		UserID: userID,
+		Mode:   mode,
+		Status: StatusStopped,
+	}
+
+	if api.isContainerStarting(userID, mode) {
+		info.Status = StatusStarting
+		return info
+	}
+
+	if !api.isContainerRunning(userID, mode) {
+		return info
+	}
+
+	info.Status = StatusRunning
+	client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(context.Background())
+	strategies, err := client.GetStrategies()
+	if err != nil {
+		log.Printf("list strategies from bbgo for %s (%s): %v", userID, mode, err)
+		info.Strategies = []interface{}{}
+	} else {
+		info.Strategies = strategies
+	}
+	return info
 }
 
 func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
@@ -226,7 +326,6 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("strategy %s only supports live mode", req.Strategy))
 		return
 	}
-	// Paper mode: only Binance exchange is supported
 	if req.Mode == ModePaper {
 		if !req.CrossExchange && req.Exchange != "binance" {
 			writeError(w, http.StatusBadRequest, "paper mode only supports Binance exchange")
@@ -255,7 +354,6 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entry := StrategyEntry{
-		ID:            generateID("strat"),
 		Name:          req.Name,
 		Exchange:      req.Exchange,
 		Strategy:      req.Strategy,
@@ -265,21 +363,30 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		Sessions:      req.Sessions,
 	}
 
-	uc, created := api.users.AddStrategy(userID, req.Mode, entry)
-
-	if uc.Status == StatusRunning || created {
-		if !api.checkCredentialsVerified(userID, req.Mode, uc.Strategies) {
-			writeJSON(w, http.StatusCreated, uc)
-			return
+	hasCredFn := func(exchange string) bool {
+		if api.creds == nil {
+			return false
 		}
-		api.users.UpdateStatus(userID, req.Mode, StatusStarting)
-		go api.startUserContainer(userID, req.Mode)
+		_, err := api.creds.GetByMode(userID, exchange, req.Mode == ModePaper)
+		return err == nil
 	}
 
-	if api.syncer != nil {
-		go api.syncer.SyncUser(userID, req.Mode)
+	if err := api.strategies.AddStrategy(userID, req.Mode, entry, hasCredFn); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	writeJSON(w, http.StatusCreated, uc)
+
+	if api.isContainerRunning(userID, req.Mode) {
+		if _, loaded := api.starting.LoadOrStore(containerKey(userID, req.Mode), true); !loaded {
+			go api.startUserContainer(userID, req.Mode)
+		}
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"status":  "created",
+		"user_id": userID,
+		"mode":    req.Mode,
+	})
 }
 
 func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
@@ -287,20 +394,11 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	containers := api.users.GetByUser(userID)
-	if len(containers) == 0 {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"user_id":    userID,
-			"containers": map[string]interface{}{},
-		})
-		return
-	}
-	for _, uc := range containers {
-		api.refreshContainerStatus(uc)
-	}
 	byMode := make(map[string]interface{})
-	for _, uc := range containers {
-		byMode[uc.Mode] = uc
+	for _, mode := range []string{ModeLive, ModePaper} {
+		if info := api.containerStatusForMode(userID, mode); info != nil {
+			byMode[mode] = info
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"user_id":    userID,
@@ -308,61 +406,71 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeleteStrategy removes a strategy by bbgo strategyInstanceID.
+// Only works when the container is running (we query bbgo API to resolve the ID).
 func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
 		return
 	}
 	strategyID := chi.URLParam(r, "strategyID")
+	mode := modeFromQuery(r)
 
-	found, mode := api.users.RemoveStrategy(userID, strategyID)
-	if !found {
+	if !api.isContainerRunning(userID, mode) {
+		writeError(w, http.StatusBadRequest, "container is not running — start it first to delete strategies")
+		return
+	}
+
+	// Query bbgo API to find the strategy by instanceID and get its type+symbol
+	client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
+	bbgoStrategies, err := client.GetStrategies()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to query strategies: %v", err))
+		return
+	}
+
+	var target map[string]interface{}
+	for _, s := range bbgoStrategies {
+		if id, _ := s["strategyInstanceID"].(string); id == strategyID {
+			target = s
+			break
+		}
+	}
+	if target == nil {
 		writeError(w, http.StatusNotFound, "strategy not found")
 		return
 	}
 
-	uc, exists := api.users.Get(userID, mode)
-	if !exists || len(uc.Strategies) == 0 {
+	strategy, _ := target["strategy"].(string)
+	symbol, _ := target["symbol"].(string)
+
+	found, err := api.strategies.RemoveStrategy(userID, mode, strategy, symbol)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "strategy not found in bbgo.yaml")
+		return
+	}
+
+	// If no strategies left, stop the container
+	strategies, _ := api.strategies.ListStrategies(userID, mode)
+	if len(strategies) == 0 {
 		api.stopContainer(userID, mode)
-		api.users.UpdateStatus(userID, mode, StatusStopped)
-		if api.syncer != nil {
-			go api.syncer.SyncUser(userID, mode)
-		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "reason": "no strategies left"})
 		return
 	}
 
-	if uc.Status == StatusRunning {
-		api.users.UpdateStatus(userID, mode, StatusStarting)
+	if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
 		go api.startUserContainer(userID, mode)
 	}
 
-	writeJSON(w, http.StatusOK, uc)
-}
-
-func (api *API) isContainerRunning(userID, mode string) bool {
-	if api.containerRunning != nil {
-		return api.containerRunning(userID, mode)
-	}
-	return api.container.IsRunning(userID, mode)
-}
-
-func (api *API) startContainer(uc *UserContainer) error {
-	if api.containerStart != nil {
-		return api.containerStart(uc)
-	}
-	if api.container == nil {
-		return fmt.Errorf("container manager not configured")
-	}
-	return api.container.CreateAndStart(uc)
-}
-
-func (api *API) stopContainer(userID, mode string) {
-	if api.containerStop != nil {
-		api.containerStop(userID, mode)
-		return
-	}
-	api.container.Stop(userID, mode)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "restarting",
+		"user_id": userID,
+		"mode":    mode,
+	})
 }
 
 func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
@@ -373,17 +481,16 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 
 	mode := modeFromQuery(r)
 
-	uc, found := api.users.Get(userID, mode)
-	if !found || len(uc.Strategies) == 0 {
+	if !api.strategies.YAMLExists(userID, mode) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("no strategies configured for %s mode", mode))
 		return
 	}
 
-	// Validate credentials before starting the container.
+	// Validate credentials
+	strategies, _ := api.strategies.ListStrategies(userID, mode)
 	if api.creds != nil {
 		wantTestnet := mode == ModePaper
-		for _, ex := range collectExchanges(uc.Strategies) {
-			// Paper mode: skip credential validation for non-Binance (runs PublicOnly)
+		for _, ex := range collectExchanges(strategies) {
 			if mode == ModePaper && ex != paperExchange {
 				continue
 			}
@@ -400,89 +507,58 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if api.isContainerRunning(userID, mode) {
-		api.users.UpdateStatus(userID, mode, StatusRunning)
-		uc.Status = StatusRunning
-		writeJSON(w, http.StatusOK, uc)
+		writeJSON(w, http.StatusOK, api.containerStatusForMode(userID, mode))
 		return
 	}
 
-	if uc.Status == StatusStarting {
-		writeJSON(w, http.StatusAccepted, uc)
+	if api.isContainerStarting(userID, mode) {
+		writeJSON(w, http.StatusAccepted, api.containerStatusForMode(userID, mode))
 		return
 	}
 
-	if !api.users.CompareAndSetStatus(userID, mode, uc.Status, StatusStarting) {
-		writeJSON(w, http.StatusAccepted, uc)
-		return
+	// Return starting status immediately, start async
+	info := api.containerStatusForMode(userID, mode)
+	if info != nil {
+		info.Status = StatusStarting
+	} else {
+		info = &containerInfo{UserID: userID, Mode: mode, Status: StatusStarting}
 	}
-	uc.Status = StatusStarting
-	writeJSON(w, http.StatusAccepted, uc)
+	writeJSON(w, http.StatusAccepted, info)
 
-	go api.startUserContainer(userID, mode)
-}
-
-// checkCredentialsVerified returns true if all credentials for the given
-// strategies are verified (or the exchange has no verifier). Returns false
-// if any verifiable exchange credential is unverified.
-func (api *API) checkCredentialsVerified(userID, mode string, strategies []StrategyEntry) bool {
-	if api.creds == nil {
-		return true
-	}
-	wantTestnet := mode == ModePaper
-	for _, ex := range collectExchanges(strategies) {
-		cred, err := api.creds.GetByMode(userID, ex, wantTestnet)
-		if err != nil {
-			return false
-		}
-		if !cred.IsVerified && exchangeHasVerifier(ex) {
-			return false
-		}
-	}
-	return true
-}
-
-func (api *API) updateAndPersistStatus(userID, mode, status string) {
-	api.users.UpdateStatus(userID, mode, status)
-	if api.syncer != nil {
-		go api.syncer.SyncUser(userID, mode)
+	if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
+		go api.startUserContainer(userID, mode)
 	}
 }
 
 func (api *API) startUserContainer(userID, mode string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	key := containerKey(userID, mode)
+	defer api.starting.Delete(key)
+
+	if err := api.startContainer(userID, mode); err != nil {
+		log.Printf("start %s container for user %s failed: %v", mode, userID, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(api.stopCtx, 30*time.Second)
 	defer cancel()
 
-	uc, found := api.users.Get(userID, mode)
-	if !found || uc.Status != StatusStarting {
-		return
-	}
-
-	if err := api.startContainer(uc); err != nil {
-		log.Printf("start %s container for user %s failed: %v", mode, userID, err)
-		api.updateAndPersistStatus(userID, mode, StatusError)
-		return
-	}
-
-	var reachable bool
 	baseURL := ""
 	if api.container != nil {
 		baseURL = api.container.APIURL(userID, mode)
 	}
 	if baseURL == "" {
-		api.updateAndPersistStatus(userID, mode, StatusError)
 		log.Printf("user %s %s: cannot determine container URL", userID, mode)
 		return
 	}
 	if api.newBBGoClient == nil {
-		api.updateAndPersistStatus(userID, mode, StatusError)
 		log.Printf("user %s %s: bbgo client factory not configured", userID, mode)
 		return
 	}
 	client := api.newBBGoClient(baseURL)
+	var reachable bool
 	for i := 0; i < 30; i++ {
 		select {
 		case <-ctx.Done():
-			api.updateAndPersistStatus(userID, mode, StatusError)
 			log.Printf("user %s %s health check cancelled: %v", userID, mode, ctx.Err())
 			return
 		default:
@@ -495,21 +571,25 @@ func (api *API) startUserContainer(userID, mode string) {
 	}
 
 	if !reachable {
-		api.updateAndPersistStatus(userID, mode, StatusError)
 		log.Printf("user %s %s container started but health check failed", userID, mode)
 		return
 	}
 
-	api.updateAndPersistStatus(userID, mode, StatusRunning)
 	log.Printf("user %s %s container started and healthy", userID, mode)
 
 	if api.syncer != nil {
-		go api.syncer.MarkCredentialsVerified(uc)
+		strategies, _ := api.strategies.ListStrategies(userID, mode)
+		go api.syncer.MarkCredentialsVerified(userID, mode, strategies)
 	}
 
 	go func() {
 		grpcAddr := api.container.ContainerGRPCAddr(userID, mode)
 		for i := 0; i < 10; i++ {
+			select {
+			case <-api.stopCtx.Done():
+				return
+			default:
+			}
 			conn, err := net.DialTimeout("tcp", grpcAddr, time.Second)
 			if err == nil {
 				conn.Close()
@@ -526,14 +606,8 @@ func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
 	mode := modeFromQuery(r)
-
 	api.stopContainer(userID, mode)
-	api.users.UpdateStatus(userID, mode, StatusStopped)
-	if api.syncer != nil {
-		go api.syncer.SyncUser(userID, mode)
-	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID, "mode": mode})
 }
 
@@ -542,26 +616,45 @@ func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
-	containers := api.users.GetByUser(userID)
-	if len(containers) == 0 {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"user_id":    userID,
-			"containers": map[string]interface{}{},
-		})
-		return
-	}
-	for _, uc := range containers {
-		api.refreshContainerStatus(uc)
-	}
 	byMode := make(map[string]interface{})
-	for _, uc := range containers {
-		byMode[uc.Mode] = uc
+	for _, mode := range []string{ModeLive, ModePaper} {
+		if info := api.containerStatusForMode(userID, mode); info != nil {
+			byMode[mode] = info
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"user_id":    userID,
 		"containers": byMode,
 	})
+}
+
+// userFromURL extracts userID and mode from URL parameters, validates access.
+func (api *API) userFromURL(w http.ResponseWriter, r *http.Request) (string, string, bool) {
+	userID := chi.URLParam(r, "userID")
+	if !isValidUUID(userID) {
+		writeError(w, http.StatusBadRequest, "invalid user ID format")
+		return "", "", false
+	}
+	if headerID, ok := userIDFromRequest(r); ok && headerID != userID {
+		writeError(w, http.StatusForbidden, "user ID mismatch")
+		return "", "", false
+	}
+	mode := modeFromQuery(r)
+	return userID, mode, true
+}
+
+func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
+	userID, mode, ok := api.userFromURL(w, r)
+	if !ok {
+		return nil, "", false
+	}
+
+	if !api.isContainerRunning(userID, mode) {
+		writeError(w, http.StatusServiceUnavailable, "container is not running")
+		return nil, "", false
+	}
+
+	return api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context()), userID, true
 }
 
 func (api *API) ProxyToBot(w http.ResponseWriter, r *http.Request) {
@@ -576,12 +669,444 @@ func (api *API) ProxyToBot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mode := modeFromQuery(r)
-	if _, found := api.users.Get(userID, mode); !found {
+	if !api.strategies.YAMLExists(userID, mode) {
 		writeError(w, http.StatusNotFound, "user container not found")
 		return
 	}
 
 	api.proxy.ProxyToBot(w, r, userID, mode)
+}
+
+func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	mode := modeFromQuery(r)
+	tail := r.URL.Query().Get("tail")
+	if tail == "" {
+		tail = "200"
+	}
+
+	logs, err := api.container.Logs(userID, mode, tail)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+}
+
+func (api *API) BBGoPing(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	if err := client.Ping(); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("bbgo ping failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (api *API) BBGoSessions(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	sessions, err := client.GetSessions()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"sessions": sessions})
+}
+
+func (api *API) BBGoSessionDetail(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	session := chi.URLParam(r, "session")
+	detail, err := client.GetSession(session)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"session": detail})
+}
+
+func (api *API) BBGoSessionTrades(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	session := chi.URLParam(r, "session")
+	trades, err := client.GetSessionTrades(session)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"trades": trades})
+}
+
+func (api *API) BBGoSessionOpenOrders(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	session := chi.URLParam(r, "session")
+	orders, err := client.GetSessionOpenOrders(session)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"orders": orders})
+}
+
+func (api *API) BBGoSessionAccount(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	session := chi.URLParam(r, "session")
+	account, err := client.GetSessionAccount(session)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"account": account})
+}
+
+func (api *API) BBGoSessionBalances(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	session := chi.URLParam(r, "session")
+	balances, err := client.GetSessionBalances(session)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"balances": balances})
+}
+
+func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	session := chi.URLParam(r, "session")
+	symbols, err := client.GetSessionSymbols(session)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
+}
+
+func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
+	exchange := chi.URLParam(r, "exchange")
+	if exchange == "" {
+		writeError(w, http.StatusBadRequest, "exchange is required")
+		return
+	}
+	mode := r.URL.Query().Get("mode")
+	var restAddr string
+	if mode == ModePaper && api.cfg.MarketDataTestnetRESTAddr != "" {
+		restAddr = api.cfg.MarketDataTestnetRESTAddr
+	} else {
+		restAddr = api.cfg.MarketDataRESTAddr
+	}
+	base := "http://" + restAddr
+	client := api.newBBGoClient(base)
+	symbols, err := client.GetSessionSymbols(exchange)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
+}
+
+func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
+	exchange := chi.URLParam(r, "exchange")
+	symbol := r.URL.Query().Get("symbol")
+	if exchange == "" || symbol == "" {
+		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
+		return
+	}
+	mode := r.URL.Query().Get("mode")
+	hub := api.hubForMode(mode)
+	if hub == nil || hub.conn == nil {
+		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	client := pb.NewMarketDataQueryClient(hub.conn)
+	resp, err := client.QueryTicker(ctx, &pb.QueryTickerRequest{Exchange: exchange, Symbol: symbol})
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("query ticker: %s", err))
+		return
+	}
+	if resp.Error != nil {
+		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
+		return
+	}
+	if resp.Ticker == nil {
+		writeError(w, http.StatusNotFound, "ticker not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"ticker": map[string]interface{}{
+			"symbol": resp.Ticker.Symbol,
+			"open":   resp.Ticker.Open,
+			"high":   resp.Ticker.High,
+			"low":    resp.Ticker.Low,
+			"close":  resp.Ticker.Close,
+			"volume": resp.Ticker.Volume,
+		},
+	})
+}
+
+func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
+	exchange := chi.URLParam(r, "exchange")
+	symbol := r.URL.Query().Get("symbol")
+	if exchange == "" || symbol == "" {
+		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
+		return
+	}
+	mode := r.URL.Query().Get("mode")
+	hub := api.hubForMode(mode)
+	if hub == nil || hub.conn == nil {
+		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
+		return
+	}
+
+	interval := r.URL.Query().Get("interval")
+	if interval == "" {
+		interval = "1h"
+	}
+	limitStr := r.URL.Query().Get("limit")
+	limit := int64(500)
+	if limitStr != "" {
+		if l, err := strconv.ParseInt(limitStr, 10, 64); err == nil && l > 0 && l <= 1500 {
+			limit = l
+		}
+	}
+	startTimeStr := r.URL.Query().Get("start_time")
+	endTimeStr := r.URL.Query().Get("end_time")
+	var startTime, endTime int64
+	if startTimeStr != "" {
+		if t, err := strconv.ParseInt(startTimeStr, 10, 64); err == nil {
+			startTime = t
+		}
+	}
+	if endTimeStr != "" {
+		if t, err := strconv.ParseInt(endTimeStr, 10, 64); err == nil {
+			endTime = t
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	client := pb.NewMarketDataQueryClient(hub.conn)
+	resp, err := client.QueryKLines(ctx, &pb.QueryKLinesRequest{
+		Exchange:  exchange,
+		Symbol:    symbol,
+		Interval:  interval,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Limit:     limit,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("query klines: %s", err))
+		return
+	}
+	if resp.Error != nil {
+		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
+		return
+	}
+
+	klines := make([]map[string]interface{}, 0, len(resp.Klines))
+	for _, k := range resp.Klines {
+		klines = append(klines, map[string]interface{}{
+			"time":        k.StartTime,
+			"open":        k.Open,
+			"high":        k.High,
+			"low":         k.Low,
+			"close":       k.Close,
+			"volume":      k.Volume,
+			"quoteVolume": k.QuoteVolume,
+			"closed":      k.Closed,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"klines": klines})
+}
+
+func (api *API) BBGoAssets(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	assets, err := client.GetAssets()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"assets": assets})
+}
+
+func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	strategies, err := client.GetStrategies()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"strategies": strategies})
+}
+
+func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	exchange := r.URL.Query().Get("exchange")
+	symbol := r.URL.Query().Get("symbol")
+	gidStr := r.URL.Query().Get("gid")
+	var lastGID int64
+	if gidStr != "" {
+		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
+			lastGID = v
+		}
+	}
+
+	trades, err := client.GetTrades(exchange, symbol, lastGID)
+	if err != nil {
+		session := exchange
+		if session == "" {
+			if sessions, serr := client.GetSessions(); serr == nil && len(sessions) > 0 {
+				session = sessions[0].Name
+			}
+		}
+		if session != "" {
+			if st, serr := client.GetSessionTrades(session); serr == nil {
+				trades = st
+				err = nil
+			}
+		}
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"trades": trades})
+}
+
+func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	exchange := r.URL.Query().Get("exchange")
+	symbol := r.URL.Query().Get("symbol")
+	gidStr := r.URL.Query().Get("gid")
+	var lastGID int64
+	if gidStr != "" {
+		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
+			lastGID = v
+		}
+	}
+	orders, err := client.GetClosedOrders(exchange, symbol, lastGID)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"orders": orders})
+}
+
+func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
+	client, _, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+	period := r.URL.Query().Get("period")
+	segment := r.URL.Query().Get("segment")
+	volumes, err := client.GetTradingVolume(period, segment)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"tradingVolumes": volumes})
+}
+
+func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
+	userID, mode, ok := api.userFromURL(w, r)
+	if !ok {
+		return
+	}
+
+	// Paper mode stores data in container SQLite, not Supabase
+	if api.syncer != nil && mode != ModePaper {
+		trades, err := api.syncer.GetTradesForPnL(userID)
+		if err != nil {
+			log.Printf("pnl supabase fallback for user %s: %v", userID, err)
+		}
+		if err == nil && len(trades) > 0 {
+			report := calculatePnL(trades)
+			writeJSON(w, http.StatusOK, report)
+			return
+		}
+	}
+
+	if !api.isContainerRunning(userID, mode) {
+		writeError(w, http.StatusServiceUnavailable, "container is not running")
+		return
+	}
+	if api.container == nil {
+		writeError(w, http.StatusInternalServerError, "container manager not available")
+		return
+	}
+	client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
+
+	exchange := r.URL.Query().Get("exchange")
+	symbol := r.URL.Query().Get("symbol")
+
+	var lastGID int64
+	if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
+		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
+			lastGID = v
+		}
+	}
+
+	trades, err := client.GetAllTradesFrom(exchange, symbol, lastGID)
+	if err != nil {
+		session := exchange
+		if session == "" {
+			if sessions, serr := client.GetSessions(); serr == nil && len(sessions) > 0 {
+				session = sessions[0].Name
+			}
+		}
+		if session != "" {
+			if st, serr := client.GetSessionTrades(session); serr == nil {
+				trades = st
+				err = nil
+			}
+		}
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	report := calculatePnL(trades)
+	writeJSON(w, http.StatusOK, report)
 }
 
 func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
@@ -786,14 +1311,16 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		go api.syncer.SyncCredential(cred)
 	}
 
+	// Restart container if running and credentials verified
 	if cred.IsVerified {
 		mode := ModeLive
 		if req.IsTestnet {
 			mode = ModePaper
 		}
-		if uc, ok := api.users.Get(userID, mode); ok && uc.Status == StatusRunning {
-			api.users.UpdateStatus(userID, mode, StatusStarting)
-			go api.startUserContainer(userID, mode)
+		if api.isContainerRunning(userID, mode) {
+			if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
+				go api.startUserContainer(userID, mode)
+			}
 		}
 	}
 
@@ -863,15 +1390,17 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 			go api.syncer.DeleteCredential(userID, exchange, isTestnet)
 		}
 	}
+
 	mode := ModeLive
 	if isTestnet {
 		mode = ModePaper
 	}
-	if uc, ok := api.users.Get(userID, mode); ok && uc.Status == StatusRunning {
-		api.users.UpdateStatus(userID, mode, StatusStarting)
-		go api.startUserContainer(userID, mode)
-	}
+	if api.isContainerRunning(userID, mode) {
+		if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
+			go api.startUserContainer(userID, mode)
+		}
 
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -883,451 +1412,6 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
-}
-
-func (api *API) userFromURL(w http.ResponseWriter, r *http.Request) (*UserContainer, string, bool) {
-	userID := chi.URLParam(r, "userID")
-	if !isValidUUID(userID) {
-		writeError(w, http.StatusBadRequest, "invalid user ID format")
-		return nil, "", false
-	}
-	if headerID, ok := userIDFromRequest(r); ok && headerID != userID {
-		writeError(w, http.StatusForbidden, "user ID mismatch")
-		return nil, "", false
-	}
-
-	mode := modeFromQuery(r)
-	uc, found := api.users.Get(userID, mode)
-	if !found {
-		writeError(w, http.StatusNotFound, "user container not found")
-		return nil, "", false
-	}
-	return uc, userID, true
-}
-
-func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
-	uc, userID, ok := api.userFromURL(w, r)
-	if !ok {
-		return nil, "", false
-	}
-
-	if uc.Status != StatusRunning {
-		writeError(w, http.StatusServiceUnavailable, "container is not running")
-		return nil, "", false
-	}
-
-	return api.newBBGoClient(api.container.APIURL(userID, uc.Mode)).WithContext(r.Context()), userID, true
-}
-
-func (api *API) BBGoPing(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	if err := client.Ping(); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("bbgo ping failed: %v", err))
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func (api *API) BBGoSessions(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	sessions, err := client.GetSessions()
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"sessions": sessions})
-}
-
-func (api *API) BBGoSessionDetail(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	session := chi.URLParam(r, "session")
-	detail, err := client.GetSession(session)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"session": detail})
-}
-
-func (api *API) BBGoSessionTrades(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	session := chi.URLParam(r, "session")
-	trades, err := client.GetSessionTrades(session)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"trades": trades})
-}
-
-func (api *API) BBGoSessionOpenOrders(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	session := chi.URLParam(r, "session")
-	orders, err := client.GetSessionOpenOrders(session)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"orders": orders})
-}
-
-func (api *API) BBGoSessionAccount(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	session := chi.URLParam(r, "session")
-	account, err := client.GetSessionAccount(session)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"account": account})
-}
-
-func (api *API) BBGoSessionBalances(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	session := chi.URLParam(r, "session")
-	balances, err := client.GetSessionBalances(session)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"balances": balances})
-}
-
-func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	session := chi.URLParam(r, "session")
-	symbols, err := client.GetSessionSymbols(session)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
-}
-
-func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
-	exchange := chi.URLParam(r, "exchange")
-	if exchange == "" {
-		writeError(w, http.StatusBadRequest, "exchange is required")
-		return
-	}
-	base := "http://" + api.cfg.MarketDataRESTAddr
-	client := api.newBBGoClient(base)
-	symbols, err := client.GetSessionSymbols(exchange)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
-}
-
-func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
-	exchange := chi.URLParam(r, "exchange")
-	symbol := r.URL.Query().Get("symbol")
-	if exchange == "" || symbol == "" {
-		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
-		return
-	}
-	if api.hub == nil || api.hub.conn == nil {
-		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	client := pb.NewMarketDataQueryClient(api.hub.conn)
-	resp, err := client.QueryTicker(ctx, &pb.QueryTickerRequest{Exchange: exchange, Symbol: symbol})
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("query ticker: %s", err))
-		return
-	}
-	if resp.Error != nil {
-		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
-		return
-	}
-	if resp.Ticker == nil {
-		writeError(w, http.StatusNotFound, "ticker not found")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"ticker": map[string]interface{}{
-			"symbol": resp.Ticker.Symbol,
-			"open":   resp.Ticker.Open,
-			"high":   resp.Ticker.High,
-			"low":    resp.Ticker.Low,
-			"close":  resp.Ticker.Close,
-			"volume": resp.Ticker.Volume,
-		},
-	})
-}
-
-func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
-	exchange := chi.URLParam(r, "exchange")
-	symbol := r.URL.Query().Get("symbol")
-	if exchange == "" || symbol == "" {
-		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
-		return
-	}
-	if api.hub == nil || api.hub.conn == nil {
-		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
-		return
-	}
-
-	interval := r.URL.Query().Get("interval")
-	if interval == "" {
-		interval = "1h"
-	}
-	limitStr := r.URL.Query().Get("limit")
-	limit := int64(500)
-	if limitStr != "" {
-		if l, err := strconv.ParseInt(limitStr, 10, 64); err == nil && l > 0 && l <= 1500 {
-			limit = l
-		}
-	}
-	startTimeStr := r.URL.Query().Get("start_time")
-	endTimeStr := r.URL.Query().Get("end_time")
-	var startTime, endTime int64
-	if startTimeStr != "" {
-		if t, err := strconv.ParseInt(startTimeStr, 10, 64); err == nil {
-			startTime = t
-		}
-	}
-	if endTimeStr != "" {
-		if t, err := strconv.ParseInt(endTimeStr, 10, 64); err == nil {
-			endTime = t
-		}
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	client := pb.NewMarketDataQueryClient(api.hub.conn)
-	resp, err := client.QueryKLines(ctx, &pb.QueryKLinesRequest{
-		Exchange:  exchange,
-		Symbol:    symbol,
-		Interval:  interval,
-		StartTime: startTime,
-		EndTime:   endTime,
-		Limit:     limit,
-	})
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("query klines: %s", err))
-		return
-	}
-	if resp.Error != nil {
-		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
-		return
-	}
-
-	klines := make([]map[string]interface{}, 0, len(resp.Klines))
-	for _, k := range resp.Klines {
-		klines = append(klines, map[string]interface{}{
-			"time":        k.StartTime,
-			"open":        k.Open,
-			"high":        k.High,
-			"low":         k.Low,
-			"close":       k.Close,
-			"volume":      k.Volume,
-			"quoteVolume": k.QuoteVolume,
-			"closed":      k.Closed,
-		})
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"klines": klines})
-}
-
-func (api *API) BBGoAssets(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	assets, err := client.GetAssets()
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"assets": assets})
-}
-
-func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	strategies, err := client.GetStrategies()
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"strategies": strategies})
-}
-
-func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	exchange := r.URL.Query().Get("exchange")
-	symbol := r.URL.Query().Get("symbol")
-	gidStr := r.URL.Query().Get("gid")
-	var lastGID int64
-	if gidStr != "" {
-		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-			lastGID = v
-		}
-	}
-	trades, err := client.GetTrades(exchange, symbol, lastGID)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"trades": trades})
-}
-
-func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	exchange := r.URL.Query().Get("exchange")
-	symbol := r.URL.Query().Get("symbol")
-	gidStr := r.URL.Query().Get("gid")
-	var lastGID int64
-	if gidStr != "" {
-		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-			lastGID = v
-		}
-	}
-	orders, err := client.GetClosedOrders(exchange, symbol, lastGID)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"orders": orders})
-}
-
-func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
-	if !ok {
-		return
-	}
-	period := r.URL.Query().Get("period")
-	segment := r.URL.Query().Get("segment")
-	volumes, err := client.GetTradingVolume(period, segment)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"tradingVolumes": volumes})
-}
-
-func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
-	uc, userID, ok := api.userFromURL(w, r)
-	if !ok {
-		return
-	}
-
-	if api.syncer != nil {
-		trades, err := api.syncer.GetTradesForPnL(userID)
-		if err != nil {
-			log.Printf("pnl supabase fallback for user %s: %v", userID, err)
-		}
-		if err == nil && len(trades) > 0 {
-			report := calculatePnL(trades)
-			writeJSON(w, http.StatusOK, report)
-			return
-		}
-	}
-
-	if uc.Status != StatusRunning {
-		writeError(w, http.StatusServiceUnavailable, "container is not running")
-		return
-	}
-	if api.container == nil {
-		writeError(w, http.StatusInternalServerError, "container manager not available")
-		return
-	}
-	client := api.newBBGoClient(api.container.APIURL(userID, uc.Mode)).WithContext(r.Context())
-
-	exchange := r.URL.Query().Get("exchange")
-	symbol := r.URL.Query().Get("symbol")
-
-	var lastGID int64
-	if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
-		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-			lastGID = v
-		}
-	}
-
-	trades, err := client.GetAllTradesFrom(exchange, symbol, lastGID)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-
-	report := calculatePnL(trades)
-	writeJSON(w, http.StatusOK, report)
-}
-
-func (api *API) refreshContainerStatus(uc *UserContainer) {
-	if uc.Status != StatusRunning && uc.Status != StatusStarting {
-		return
-	}
-	running, err := api.container.CheckRunning(uc.UserID, uc.Mode)
-	if err != nil {
-		return
-	}
-	if !running {
-		api.updateAndPersistStatus(uc.UserID, uc.Mode, StatusStopped)
-		uc.Status = StatusStopped
-	}
-}
-
-func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := api.resolveUserID(w, r)
-	if !ok {
-		return
-	}
-
-	mode := modeFromQuery(r)
-	uc, found := api.users.Get(userID, mode)
-	if !found {
-		writeError(w, http.StatusNotFound, "user container not found")
-		return
-	}
-
-	tail := r.URL.Query().Get("tail")
-	if tail == "" {
-		tail = "200"
-	}
-
-	logs, err := api.container.Logs(uc.UserID, uc.Mode, tail)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
 }
 
 func (api *API) CreateNotificationConfig(w http.ResponseWriter, r *http.Request) {

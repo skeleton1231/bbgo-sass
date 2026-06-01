@@ -9,34 +9,24 @@ import (
 )
 
 func TestExtractSessionNames_SingleExchange(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid"},
-		},
-	}
-	sessions := extractSessionNames(uc)
+	sessions := extractSessionNames([]StrategyEntry{
+		{Exchange: "binance", Strategy: "grid"},
+	})
 	if len(sessions) != 1 || sessions[0] != "binance" {
 		t.Fatalf("expected [binance], got %v", sessions)
 	}
 }
 
 func TestExtractSessionNames_CrossExchange(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
-			{
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "binance", Exchange: "binance"},
-					{Name: "okex", Exchange: "okex"},
-				},
+	sessions := extractSessionNames([]StrategyEntry{
+		{
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "binance", Exchange: "binance"},
+				{Name: "okex", Exchange: "okex"},
 			},
 		},
-	}
-	sessions := extractSessionNames(uc)
+	})
 	if len(sessions) != 2 {
 		t.Fatalf("expected 2 sessions, got %d: %v", len(sessions), sessions)
 	}
@@ -46,15 +36,10 @@ func TestExtractSessionNames_CrossExchange(t *testing.T) {
 }
 
 func TestExtractSessionNames_Deduplicates(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid"},
-			{Exchange: "binance", Strategy: "xmaker"},
-		},
-	}
-	sessions := extractSessionNames(uc)
+	sessions := extractSessionNames([]StrategyEntry{
+		{Exchange: "binance", Strategy: "grid"},
+		{Exchange: "binance", Strategy: "xmaker"},
+	})
 	if len(sessions) != 1 {
 		t.Fatalf("expected 1 unique session, got %d: %v", len(sessions), sessions)
 	}
@@ -79,7 +64,7 @@ func TestWSTicket_IssueRedeem(t *testing.T) {
 func TestWSTicket_ExpiredTicket(t *testing.T) {
 	ts := NewWSTicketStore()
 	ts.mu.Lock()
-	ts.tickets["expired"] = &wsTicket{userID: "user-1", expiresAt: time.Now().Add(-1 * time.Second)}
+	ts.tickets["expired"] = &wsTicket{expiresAt: time.Now().Add(-1 * time.Second)}
 	ts.mu.Unlock()
 	_, ok := ts.Redeem("expired")
 	if ok {
@@ -107,8 +92,8 @@ func TestWSTicketStore_CleanupRemovesExpired(t *testing.T) {
 	defer ts.Close()
 
 	ts.mu.Lock()
-	ts.tickets["old"] = &wsTicket{userID: "user-1", expiresAt: time.Now().Add(-1 * time.Second)}
-	ts.tickets["fresh"] = &wsTicket{userID: "user-2", expiresAt: time.Now().Add(30 * time.Second)}
+	ts.tickets["old"] = &wsTicket{expiresAt: time.Now().Add(-1 * time.Second)}
+	ts.tickets["fresh"] = &wsTicket{expiresAt: time.Now().Add(30 * time.Second)}
 	ts.mu.Unlock()
 
 	time.Sleep(100 * time.Millisecond)

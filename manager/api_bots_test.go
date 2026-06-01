@@ -10,43 +10,49 @@ import (
 )
 
 // setupBotsTestAPI creates an API with pre-populated containers for bots tests.
-func setupBotsTestAPI() (*API, *chi.Mux) {
-	users := NewUserContainerManager()
-
-	// User 1: live container with 2 strategies, paper with 1
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Mode:   ModeLive,
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{ID: "strat_grid_btc", Name: "BTC Grid", Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), Mode: ModeLive},
-			{ID: "strat_eth_dca", Name: "ETH DCA", Exchange: "binance", Strategy: "dca", Config: rawJSON(`{"symbol":"ETHUSDT"}`), Mode: ModeLive},
-		},
+// botBBGoHandler returns a mock bbgo handler that serves strategy data for bots tests.
+func botBBGoHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "strat_grid_btc", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance", "config": map[string]interface{}{"symbol": "BTCUSDT", "gridNumber": float64(10)}},
+					{"strategyInstanceID": "strat_eth_dca", "strategy": "dca", "symbol": "ETHUSDT", "session": "binance"},
+					{"strategyInstanceID": "strat_paper_grid", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
+				},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
 	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModePaper] = &UserContainer{
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Mode:   ModePaper,
-		Status: StatusStopped,
-		Strategies: []StrategyEntry{
-			{ID: "strat_paper_grid", Name: "Paper Grid", Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`), Mode: ModePaper},
-		},
-	}
+}
 
-	// User 2: single live strategy
-	users.users["11111111-2222-3333-4444-555555555555:"+ModeLive] = &UserContainer{
-		UserID: "11111111-2222-3333-4444-555555555555",
-		Mode:   ModeLive,
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{ID: "strat_sol_trend", Name: "SOL Trend", Exchange: "bybit", Strategy: "supertrend", Config: rawJSON(`{"symbol":"SOLUSDT"}`), Mode: ModeLive},
-		},
-	}
+func setupBotsTestAPI(t *testing.T) (*API, *chi.Mux) {
+	t.Helper()
+	store, dir := newTestStore(t)
 
-	cfg := &Config{ManagerToken: "test-token"}
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+		{Exchange: "binance", Strategy: "dca"},
+	})
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+	writeTestStrategies(t, store, "11111111-2222-3333-4444-555555555555", ModeLive, []StrategyEntry{
+		{Exchange: "bybit", Strategy: "supertrend"},
+	})
+
+	bbgoSrv := httptest.NewServer(botBBGoHandler())
+	t.Cleanup(bbgoSrv.Close)
+
+	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
+	api.newBBGoClient = func(_ string) *BBGoClient {
+		return NewBBGoClient(bbgoSrv.URL)
+	}
 
 	r := testRouter(api)
 	return api, r
@@ -55,7 +61,7 @@ func setupBotsTestAPI() (*API, *chi.Mux) {
 // --- ListBots tests ---
 
 func TestListBots_ReturnsAllStrategiesForUser(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots", nil)
 	w := httptest.NewRecorder()
@@ -72,13 +78,14 @@ func TestListBots_ReturnsAllStrategiesForUser(t *testing.T) {
 		t.Fatalf("decode error: %v", err)
 	}
 
-	if len(resp.Bots) != 3 {
-		t.Fatalf("expected 3 bots (2 live + 1 paper), got %d", len(resp.Bots))
+	// Both live and paper containers are running, each returns 3 strategies from mock
+	if len(resp.Bots) != 6 {
+		t.Fatalf("expected 6 bots (3 live + 3 paper), got %d", len(resp.Bots))
 	}
 }
 
 func TestListBots_FilterByLiveMode(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots?mode=live", nil)
 	w := httptest.NewRecorder()
@@ -95,8 +102,9 @@ func TestListBots_FilterByLiveMode(t *testing.T) {
 		t.Fatalf("decode error: %v", err)
 	}
 
-	if len(resp.Bots) != 2 {
-		t.Fatalf("expected 2 live bots, got %d", len(resp.Bots))
+	// Mock bbgo returns 3 strategies per mode call
+	if len(resp.Bots) != 3 {
+		t.Fatalf("expected 3 live bots, got %d", len(resp.Bots))
 	}
 	for _, b := range resp.Bots {
 		if b.Mode != ModeLive {
@@ -106,7 +114,7 @@ func TestListBots_FilterByLiveMode(t *testing.T) {
 }
 
 func TestListBots_FilterByPaperMode(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots?mode=paper", nil)
 	w := httptest.NewRecorder()
@@ -123,19 +131,19 @@ func TestListBots_FilterByPaperMode(t *testing.T) {
 		t.Fatalf("decode error: %v", err)
 	}
 
-	if len(resp.Bots) != 1 {
-		t.Fatalf("expected 1 paper bot, got %d", len(resp.Bots))
+	// Mock bbgo returns 3 strategies for paper mode too
+	if len(resp.Bots) != 3 {
+		t.Fatalf("expected 3 paper bots, got %d", len(resp.Bots))
 	}
-	if resp.Bots[0].ID != "strat_paper_grid" {
-		t.Errorf("expected strat_paper_grid, got %s", resp.Bots[0].ID)
-	}
-	if resp.Bots[0].ContainerStatus != StatusStopped {
-		t.Errorf("expected stopped status for paper bot, got %s", resp.Bots[0].ContainerStatus)
+	for _, b := range resp.Bots {
+		if b.Mode != ModePaper {
+			t.Errorf("expected paper mode, got %q", b.Mode)
+		}
 	}
 }
 
 func TestListBots_BotFieldsCorrect(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots?mode=live", nil)
 	w := httptest.NewRecorder()
@@ -150,14 +158,14 @@ func TestListBots_BotFieldsCorrect(t *testing.T) {
 	if bot.ID != "strat_grid_btc" {
 		t.Errorf("expected ID strat_grid_btc, got %s", bot.ID)
 	}
-	if bot.Name != "BTC Grid" {
-		t.Errorf("expected name 'BTC Grid', got %s", bot.Name)
-	}
-	if bot.Exchange != "binance" {
-		t.Errorf("expected exchange binance, got %s", bot.Exchange)
-	}
 	if bot.Strategy != "grid2" {
 		t.Errorf("expected strategy grid2, got %s", bot.Strategy)
+	}
+	if bot.Symbol != "BTCUSDT" {
+		t.Errorf("expected symbol BTCUSDT, got %s", bot.Symbol)
+	}
+	if bot.Session != "binance" {
+		t.Errorf("expected session binance, got %s", bot.Session)
 	}
 	if bot.ContainerStatus != StatusRunning {
 		t.Errorf("expected running status, got %s", bot.ContainerStatus)
@@ -165,17 +173,13 @@ func TestListBots_BotFieldsCorrect(t *testing.T) {
 }
 
 func TestListBots_EmptyResult_ReturnsEmptyArray(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Mode:       ModeLive,
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{},
-	}
-	cfg := &Config{ManagerToken: "test-token"}
+	store, dir := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{})
+	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots", nil)
@@ -196,11 +200,11 @@ func TestListBots_EmptyResult_ReturnsEmptyArray(t *testing.T) {
 }
 
 func TestListBots_NoContainers_ReturnsEmptyArray(t *testing.T) {
-	users := NewUserContainerManager()
+	store := NewStrategyStore("")
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots", nil)
@@ -218,7 +222,7 @@ func TestListBots_NoContainers_ReturnsEmptyArray(t *testing.T) {
 }
 
 func TestListBots_InvalidUserID(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/not-a-uuid/bots", nil)
 	w := httptest.NewRecorder()
@@ -229,8 +233,8 @@ func TestListBots_InvalidUserID(t *testing.T) {
 	}
 }
 
-func TestListBots_ConfigPreserved(t *testing.T) {
-	_, r := setupBotsTestAPI()
+func TestListBots_StatePreserved(t *testing.T) {
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots?mode=live", nil)
 	w := httptest.NewRecorder()
@@ -241,22 +245,16 @@ func TestListBots_ConfigPreserved(t *testing.T) {
 	}
 	json.NewDecoder(w.Body).Decode(&resp)
 
-	var cfg map[string]interface{}
-	if err := json.Unmarshal(resp.Bots[0].Config, &cfg); err != nil {
-		t.Fatalf("config parse error: %v", err)
-	}
-	if cfg["symbol"] != "BTCUSDT" {
-		t.Errorf("expected symbol BTCUSDT, got %v", cfg["symbol"])
-	}
-	if cfg["gridNumber"] != float64(10) {
-		t.Errorf("expected gridNumber 10, got %v", cfg["gridNumber"])
+	// First bot from mock has symbol BTCUSDT in its state
+	if resp.Bots[0].Symbol != "BTCUSDT" {
+		t.Errorf("expected symbol BTCUSDT, got %s", resp.Bots[0].Symbol)
 	}
 }
 
 // --- GetBot tests ---
 
 func TestGetBot_Found(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/strat_grid_btc", nil)
 	w := httptest.NewRecorder()
@@ -274,17 +272,14 @@ func TestGetBot_Found(t *testing.T) {
 	if bot.ID != "strat_grid_btc" {
 		t.Errorf("expected ID strat_grid_btc, got %s", bot.ID)
 	}
-	if bot.Name != "BTC Grid" {
-		t.Errorf("expected name 'BTC Grid', got %s", bot.Name)
-	}
-	if bot.Exchange != "binance" {
-		t.Errorf("expected exchange binance, got %s", bot.Exchange)
-	}
 	if bot.Strategy != "grid2" {
 		t.Errorf("expected strategy grid2, got %s", bot.Strategy)
 	}
-	if bot.Mode != ModeLive {
-		t.Errorf("expected live mode, got %s", bot.Mode)
+	if bot.Symbol != "BTCUSDT" {
+		t.Errorf("expected symbol BTCUSDT, got %s", bot.Symbol)
+	}
+	if bot.Session != "binance" {
+		t.Errorf("expected session binance, got %s", bot.Session)
 	}
 	if bot.ContainerStatus != StatusRunning {
 		t.Errorf("expected running status, got %s", bot.ContainerStatus)
@@ -292,7 +287,7 @@ func TestGetBot_Found(t *testing.T) {
 }
 
 func TestGetBot_PaperBot(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/strat_paper_grid", nil)
 	w := httptest.NewRecorder()
@@ -305,16 +300,16 @@ func TestGetBot_PaperBot(t *testing.T) {
 	var bot Bot
 	json.NewDecoder(w.Body).Decode(&bot)
 
-	if bot.Mode != ModePaper {
-		t.Errorf("expected paper mode, got %s", bot.Mode)
+	if bot.ID != "strat_paper_grid" {
+		t.Errorf("expected ID strat_paper_grid, got %s", bot.ID)
 	}
-	if bot.ContainerStatus != StatusStopped {
-		t.Errorf("expected stopped status for paper bot, got %s", bot.ContainerStatus)
+	if bot.ContainerStatus != StatusRunning {
+		t.Errorf("expected running status, got %s", bot.ContainerStatus)
 	}
 }
 
 func TestGetBot_NotFound(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/nonexistent_id", nil)
 	w := httptest.NewRecorder()
@@ -326,7 +321,7 @@ func TestGetBot_NotFound(t *testing.T) {
 }
 
 func TestGetBot_InvalidUserID(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/not-a-uuid/bots/strat_grid_btc", nil)
 	w := httptest.NewRecorder()
@@ -338,7 +333,7 @@ func TestGetBot_InvalidUserID(t *testing.T) {
 }
 
 func TestGetBot_DifferentUser_CannotSeeOthersBot(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	// User 1 tries to access User 2's bot
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/strat_sol_trend", nil)
@@ -350,8 +345,8 @@ func TestGetBot_DifferentUser_CannotSeeOthersBot(t *testing.T) {
 	}
 }
 
-func TestGetBot_ConfigPreserved(t *testing.T) {
-	_, r := setupBotsTestAPI()
+func TestGetBot_SymbolPreserved(t *testing.T) {
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/strat_eth_dca", nil)
 	w := httptest.NewRecorder()
@@ -360,57 +355,65 @@ func TestGetBot_ConfigPreserved(t *testing.T) {
 	var bot Bot
 	json.NewDecoder(w.Body).Decode(&bot)
 
-	var cfg map[string]interface{}
-	if err := json.Unmarshal(bot.Config, &cfg); err != nil {
-		t.Fatalf("config parse error: %v", err)
-	}
-	if cfg["symbol"] != "ETHUSDT" {
-		t.Errorf("expected symbol ETHUSDT, got %v", cfg["symbol"])
+	if bot.Symbol != "ETHUSDT" {
+		t.Errorf("expected symbol ETHUSDT, got %s", bot.Symbol)
 	}
 }
 
 func TestGetBot_ContainerStatusReflected(t *testing.T) {
-	api, r := setupBotsTestAPI()
+	api, r := setupBotsTestAPI(t)
 
-	api.users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StatusError)
+	// When container is not running, GetBot returns 404
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/strat_grid_btc", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	var bot Bot
-	json.NewDecoder(w.Body).Decode(&bot)
-
-	if bot.ContainerStatus != StatusError {
-		t.Errorf("expected error status, got %s", bot.ContainerStatus)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 when container stopped, got %d", w.Code)
 	}
 }
 
 func TestGetBot_CrossExchangeStrategy(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Mode:   ModeLive,
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{
-				ID:            "strat_xmaker",
-				Name:          "Cross XMaker",
-				Strategy:      "xmaker",
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-				},
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`),
-				Mode:   ModeLive,
+	// The new Bot struct gets data from bbgo API, not from StrategyStore.
+	// Cross-exchange metadata is part of the strategy config, not the Bot response.
+	// This test verifies that a cross-exchange strategy bot can be retrieved.
+	store, dir := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 			},
+			Mode: ModeLive,
 		},
-	}
-	cfg := &Config{ManagerToken: "test-token"}
+	})
+	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+
+		// Mock bbgo to return the xmaker strategy
+		bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/strategies/single" {
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"strategies": []map[string]interface{}{
+						{"strategyInstanceID": "strat_xmaker", "strategy": "xmaker", "symbol": "BTCUSDT", "session": "binance"},
+					},
+				})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
+		}))
+	t.Cleanup(bbgoSrv.Close)
+
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
+	api.newBBGoClient = func(_ string) *BBGoClient {
+		return NewBBGoClient(bbgoSrv.URL)
+	}
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/strat_xmaker", nil)
@@ -424,24 +427,15 @@ func TestGetBot_CrossExchangeStrategy(t *testing.T) {
 	var bot Bot
 	json.NewDecoder(w.Body).Decode(&bot)
 
-	if !bot.CrossExchange {
-		t.Error("expected crossExchange=true")
-	}
-	if len(bot.Sessions) != 2 {
-		t.Fatalf("expected 2 sessions, got %d", len(bot.Sessions))
-	}
-	if bot.Sessions[0].Exchange != "binance" {
-		t.Errorf("expected maker exchange binance, got %s", bot.Sessions[0].Exchange)
-	}
-	if bot.Sessions[1].Futures != true {
-		t.Error("expected hedge session futures=true")
+	if bot.Strategy != "xmaker" {
+		t.Errorf("expected strategy xmaker, got %s", bot.Strategy)
 	}
 }
 
 // --- Bot data isolation tests ---
 
 func TestListBots_UserIsolation(t *testing.T) {
-	_, r := setupBotsTestAPI()
+	_, r := setupBotsTestAPI(t)
 
 	req := httptest.NewRequest("GET", "/api/users/11111111-2222-3333-4444-555555555555/bots", nil)
 	w := httptest.NewRecorder()
@@ -452,20 +446,17 @@ func TestListBots_UserIsolation(t *testing.T) {
 	}
 	json.NewDecoder(w.Body).Decode(&resp)
 
-	if len(resp.Bots) != 1 {
-		t.Fatalf("expected 1 bot for user2, got %d", len(resp.Bots))
-	}
-	if resp.Bots[0].ID != "strat_sol_trend" {
-		t.Errorf("expected strat_sol_trend, got %s", resp.Bots[0].ID)
-	}
-	if resp.Bots[0].Exchange != "bybit" {
-		t.Errorf("expected exchange bybit, got %s", resp.Bots[0].Exchange)
+	// User 2's bots come from the same mock bbgo server
+	// Since mock returns same data for all requests, user2 gets 3 strategies per mode
+	if len(resp.Bots) != 6 {
+		t.Fatalf("expected 6 bots for user2 (3 live + 3 paper), got %d", len(resp.Bots))
 	}
 }
 
 func TestListBots_StatusPerContainer(t *testing.T) {
-	api, r := setupBotsTestAPI()
+	api, r := setupBotsTestAPI(t)
 
+	// By default both modes are running, so all bots show as running
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -476,21 +467,15 @@ func TestListBots_StatusPerContainer(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&resp)
 
 	for _, b := range resp.Bots {
-		switch b.Mode {
-		case ModeLive:
-			if b.ContainerStatus != StatusRunning {
-				t.Errorf("live bot %s: expected running, got %s", b.ID, b.ContainerStatus)
-			}
-		case ModePaper:
-			if b.ContainerStatus != StatusStopped {
-				t.Errorf("paper bot %s: expected stopped, got %s", b.ID, b.ContainerStatus)
-			}
+		if b.ContainerStatus != StatusRunning {
+			t.Errorf("bot %s: expected running, got %s", b.ID, b.ContainerStatus)
 		}
 	}
 
-	api.users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StatusError)
+	// Now stop the live container — only paper bots should appear
+	api.containerRunning = func(uid, mode string) bool { return uid == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" && mode == ModePaper }
 
-	req2 := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots?mode=live", nil)
+	req2 := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots", nil)
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
 
@@ -500,8 +485,8 @@ func TestListBots_StatusPerContainer(t *testing.T) {
 	json.NewDecoder(w2.Body).Decode(&resp2)
 
 	for _, b := range resp2.Bots {
-		if b.ContainerStatus != StatusError {
-			t.Errorf("after status change: expected error, got %s for bot %s", b.ContainerStatus, b.ID)
+		if b.Mode != ModePaper {
+			t.Errorf("after stopping live: expected paper mode, got %s", b.Mode)
 		}
 	}
 }

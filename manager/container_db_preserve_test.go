@@ -28,15 +28,12 @@ func TestCreateAndStart_PreservesDB(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -70,19 +67,15 @@ func TestCreateAndStart_SecondRestart_KeepsDB(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
 
-	cm.CreateAndStart(uc)
+	cm.CreateAndStart("test-user", ModeLive)
 	os.WriteFile(dbPath, []byte("second-state"), 0o644)
 
-	cm.CreateAndStart(uc)
+	cm.CreateAndStart("test-user", ModeLive)
 
 	data, err := os.ReadFile(dbPath)
 	if err != nil {
@@ -111,15 +104,12 @@ func TestCreateAndStart_NoDB_NoBackup(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 

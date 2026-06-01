@@ -101,36 +101,23 @@ func (cm *ContainerManager) APIURL(userID, mode string) string {
 	return fmt.Sprintf("http://%s:%d", cm.containerName(userID, mode), cm.cfg.BBGOPort)
 }
 
-func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
-	mode := uc.Mode
-	name := cm.containerName(uc.UserID, mode)
-	cm.StopAndRemove(uc.UserID, mode)
+func (cm *ContainerManager) CreateAndStart(userID, mode string) error {
+	name := cm.containerName(userID, mode)
+	cm.StopAndRemove(userID, mode)
 
-	hDir := cm.hostDir(uc.UserID, mode)
+	hDir := cm.hostDir(userID, mode)
 	if err := os.MkdirAll(hDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	yamlContent, err := buildUserYAML(uc, func(exchange string) bool {
-		if cm.creds == nil {
-			return false
-		}
-		// Paper mode: only Binance gets credentials, other exchanges run PublicOnly
-		if mode == ModePaper && exchange != paperExchange {
-			return false
-		}
-		wantTestnet := mode == ModePaper
-		_, _, _, err := cm.creds.GetDecryptedByMode(uc.UserID, exchange, wantTestnet)
-		return err == nil
-	})
-	if err != nil {
-		return fmt.Errorf("build config for user %s: %w", uc.UserID, err)
-	}
-	if err := os.WriteFile(hDir+"/bbgo.yaml", yamlContent, 0o644); err != nil {
-		return fmt.Errorf("write config: %w", err)
+	// bbgo.yaml should already exist on disk (written by StrategyStore)
+	yamlPath := hDir + "/bbgo.yaml"
+	if _, err := os.Stat(yamlPath); err != nil {
+		return fmt.Errorf("bbgo.yaml not found for user %s: %w", userID, err)
 	}
 
-	containerDir := cm.userDir(uc.UserID, mode)
+	containerDir := cm.userDir(userID, mode)
+	strategies, _ := parseStrategiesFromYAMLFile(yamlPath)
 	args := []string{
 		"run", "-d",
 		"--name", name,
@@ -139,8 +126,8 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 		"--workdir", containerDir,
 		"--restart", "unless-stopped",
 	}
-	args = append(args, cm.resourceArgs(uc.Mode)...)
-	args = append(args, cm.envArgs(uc)...)
+	args = append(args, cm.resourceArgs(mode)...)
+	args = append(args, cm.envArgs(userID, mode, strategies)...)
 	args = append(args,
 		cm.cfg.BBGOImage,
 		"run",
@@ -161,8 +148,16 @@ func (cm *ContainerManager) CreateAndStart(uc *UserContainer) error {
 	return nil
 }
 
-func (cm *ContainerManager) Restart(uc *UserContainer) error {
-	return cm.CreateAndStart(uc)
+func (cm *ContainerManager) Restart(userID, mode string) error {
+	return cm.CreateAndStart(userID, mode)
+}
+
+func parseStrategiesFromYAMLFile(path string) ([]StrategyEntry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return parseStrategiesFromYAML(data)
 }
 
 func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]byte, error) {
@@ -320,38 +315,42 @@ func (cm *ContainerManager) resourceArgs(mode string) []string {
 	return args
 }
 
-func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
+func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEntry) []string {
 	args := []string{}
 
 	// Paper containers get PAPER_TRADE=1 (bbgo uses this to enable testnet mode)
-	if uc.Mode == ModePaper {
+	if mode == ModePaper {
 		args = append(args, "-e", "PAPER_TRADE=1")
 	}
 
-	if uc.Mode == ModePaper {
+	if mode == ModePaper {
 		args = append(args,
 			"-e", "DB_DRIVER=sqlite3",
-			"-e", "DB_DSN="+filepath.Join(cm.userDir(uc.UserID, ModePaper), "bbgo.db"),
+			"-e", "DB_DSN="+filepath.Join(cm.userDir(userID, ModePaper), "bbgo.db"),
 		)
 	} else {
 		args = append(args,
 			"-e", "DB_DRIVER=supabase",
 			"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
 			"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
-			"-e", "BBGO_USER_ID="+uc.UserID,
+			"-e", "BBGO_USER_ID="+userID,
 		)
 	}
 	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
 
 	if cm.cfg.MarketDataAddr != "" {
-		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
+		addr := cm.cfg.MarketDataAddr
+		if mode == ModePaper && cm.cfg.MarketDataTestnetAddr != "" {
+			addr = cm.cfg.MarketDataTestnetAddr
+		}
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+addr)
 	}
 
 	// Inject credentials: paper mode only injects Binance testnet creds
 	if cm.creds != nil {
 		injected := map[string]bool{}
-		wantTestnet := uc.Mode == ModePaper
-		for _, s := range uc.Strategies {
+		wantTestnet := mode == ModePaper
+		for _, s := range strategies {
 			exchanges := []string{}
 			if s.CrossExchange {
 				for _, sr := range s.Sessions {
@@ -365,11 +364,11 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 					continue
 				}
 				// Paper mode: only inject Binance testnet credentials
-				if uc.Mode == ModePaper && ex != paperExchange {
+				if mode == ModePaper && ex != paperExchange {
 					injected[ex] = true
 					continue
 				}
-				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(uc.UserID, ex, wantTestnet)
+				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(userID, ex, wantTestnet)
 				if err == nil {
 					prefix := exchangeEnvPrefix(ex)
 					args = append(args,
@@ -379,7 +378,7 @@ func (cm *ContainerManager) envArgs(uc *UserContainer) []string {
 					if passphrase != "" {
 						args = append(args, "-e", prefix+"_API_PASSPHRASE="+passphrase)
 					}
-					if uc.Mode == ModePaper {
+					if mode == ModePaper {
 						args = append(args, "-e", prefix+"_TESTNET=1")
 					}
 				}
@@ -444,7 +443,7 @@ func (cm *ContainerManager) ContainerGRPCAddr(userID, mode string) string {
 
 // DiscoverContainers scans Docker for running bbgo-* containers and returns
 // the userIDs and modes found. Used during startup to detect orphaned containers
-// that aren't in the Supabase user_containers table.
+// that don't have corresponding bbgo.yaml configs on disk.
 func (cm *ContainerManager) DiscoverContainers() map[string][]string {
 	out, err := cm.docker("ps", "--filter", "name="+containerPrefix, "--format", "{{.Names}}")
 	if err != nil {

@@ -30,7 +30,7 @@ func main() {
 	}
 
 	credStore := NewCredentialStore(cfg.DataDir, enc)
-	users := NewUserContainerManager()
+	strategies := NewStrategyStore(cfg.DataDir)
 
 	containerPool := pool.New(5)
 	defer containerPool.Release()
@@ -46,43 +46,32 @@ func main() {
 		log.Fatalf("network error: %v", err)
 	}
 
-	syncer := NewSyncerWithCreds(users, supaClient, credStore)
-
+	syncer := NewSyncerWithCreds(supaClient, credStore)
 	notifier := NewNotifier(cfg.DataDir, enc)
 	syncer.SetNotifier(notifier)
 
-	recoveredUsers, err := syncer.LoadUsersFromSupabase()
-	if err != nil {
-		log.Printf("warning: could not load users from supabase: %v", err)
-	} else {
-		users.Restore(recoveredUsers)
-		recoveryResults := containerMgr.RecoverUsers(recoveredUsers)
-		for _, r := range recoveryResults {
-			users.UpdateStatus(r.UserID, r.Mode, r.Status)
-		}
-		for _, uc := range recoveredUsers {
-			notifier.LoadUser(uc.UserID)
-		}
-		log.Printf("restored %d users from supabase", len(recoveredUsers))
+	// Recover running containers from Docker
+	allUsers := strategies.ScanUsers()
+	recovered := containerMgr.RecoverUsers(allUsers)
+	for _, r := range recovered {
+		notifier.LoadUser(r.UserID)
 	}
+	log.Printf("recovered %d user containers", len(recovered))
 
-	// Discover orphaned Docker containers not tracked in Supabase
+	// Discover orphaned Docker containers not tracked in YAML
 	discovered := containerMgr.DiscoverContainers()
 	for uid, modes := range discovered {
 		if !isValidUUID(uid) {
 			continue
 		}
 		for _, m := range modes {
-			if _, exists := users.Get(uid, m); exists {
+			if strategies.YAMLExists(uid, m) {
 				continue
 			}
-			log.Printf("discovered orphaned container: %s (%s), registering", uid, m)
-			users.RegisterContainer(uid, m, StatusRunning)
-			syncer.SyncUser(uid, m)
+			log.Printf("discovered orphaned container: %s (%s), no bbgo.yaml — stopping", uid, m)
+			containerMgr.Stop(uid, m)
 		}
 	}
-
-	syncer.SyncAll()
 
 	// Auto-sync backtest data on startup (background, non-blocking)
 	btSyncPool := pool.New(2)
@@ -118,14 +107,9 @@ func main() {
 				return
 			case <-ticker.C:
 			}
-			allUsers := users.ListUsers()
-			for _, r := range containerMgr.CheckAndRecover(allUsers) {
-				if r.Error != "" {
-					users.UpdateStatus(r.UserID, r.Mode, StatusError)
-					syncer.SyncUser(r.UserID, r.Mode)
-				}
+			users := strategies.ScanUsers()
+			for _, r := range containerMgr.CheckAndRecover(users) {
 				if r.Restarted {
-					syncer.SyncUser(r.UserID, r.Mode)
 					notifier.Dispatch(r.UserID, NotificationEvent{
 						Type:    "container",
 						Title:   "Container Restarted",
@@ -133,7 +117,7 @@ func main() {
 					})
 				}
 			}
-			containerMgr.CleanupStopped(allUsers)
+			containerMgr.CleanupStopped(users)
 		}
 	}()
 
@@ -144,6 +128,15 @@ func main() {
 		log.Printf("warning: marketdata hub not available (%v), real-time data disabled", err)
 	} else {
 		hub = h
+	}
+
+	var testnetHub *MarketDataHub
+	if cfg.MarketDataTestnetAddr != "" {
+		if h, err := NewMarketDataHub(cfg.MarketDataTestnetAddr, cfg.MarketSubscriptions); err != nil {
+			log.Printf("warning: testnet marketdata hub not available (%v), paper mode will use live data", err)
+		} else {
+			testnetHub = h
+		}
 	}
 
 	btJobStore := NewBacktestJobStore(cfg.DataDir)
@@ -162,7 +155,7 @@ func main() {
 		}
 	}()
 
-	api := NewAPI(cfg, users, containerMgr, proxy, credStore, enc, syncer, hub, notifier, btExecutor, btJobStore)
+	api := NewAPI(cfg, strategies, containerMgr, proxy, credStore, enc, syncer, hub, testnetHub, notifier, btExecutor, btJobStore)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -199,6 +192,9 @@ func main() {
 	}
 	if hub != nil {
 		hub.Close()
+	}
+	if testnetHub != nil {
+		testnetHub.Close()
 	}
 	log.Println("server stopped")
 }

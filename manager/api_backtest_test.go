@@ -12,13 +12,7 @@ import (
 
 func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 	t.Helper()
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2"}},
-	}
+	store := NewStrategyStore("")
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -32,7 +26,7 @@ func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 	btJobs := NewBacktestJobStore(t.TempDir())
 	btExec := NewBacktestExecutor(btJobs, cm, nil)
 
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, btExec, btJobs)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, btExec, btJobs)
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -222,7 +216,7 @@ func TestAPI_GetBacktestJob(t *testing.T) {
 	_, store, r := setupBacktestTestAPI(t)
 
 	store.Create(&BacktestJob{
-		ID:        "bt-test-1",
+			ID:       "bt-test-1",
 		UserID:    "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -265,8 +259,8 @@ func TestAPI_GetBacktestJob_NotFound(t *testing.T) {
 func TestAPI_GetBacktestJob_OtherUser(t *testing.T) {
 	_, store, r := setupBacktestTestAPI(t)
 
-	store.Create(&BacktestJob{
-		ID:       "bt-other-user",
+		store.Create(&BacktestJob{
+			ID:       "bt-other-user",
 		UserID:   "ffffffff-ffff-ffff-ffff-ffffffffffff",
 		Strategy: "grid2",
 		Config:   json.RawMessage(`{}`),
@@ -285,23 +279,24 @@ func TestAPI_ListBacktestJobs(t *testing.T) {
 	_, store, r := setupBacktestTestAPI(t)
 
 	store.Create(&BacktestJob{
-		ID:       "bt-1",
+		ID:       "bt-user-1",
 		UserID:   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Strategy: "grid2",
 		Config:   json.RawMessage(`{}`),
 	})
 	store.Create(&BacktestJob{
-		ID:       "bt-2",
+		ID:       "bt-user-2",
 		UserID:   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Strategy: "dca",
 		Config:   json.RawMessage(`{}`),
 	})
 	store.Create(&BacktestJob{
-		ID:       "bt-3",
+		ID:       "bt-other",
 		UserID:   "ffffffff-ffff-ffff-ffff-ffffffffffff",
 		Strategy: "grid2",
 		Config:   json.RawMessage(`{}`),
 	})
+
 
 	req := httptest.NewRequest("GET", "/api/backtest/jobs", nil)
 	w := httptest.NewRecorder()
@@ -341,9 +336,9 @@ func TestAPI_ListBacktestJobs_Empty(t *testing.T) {
 func TestAPI_HasDataForRange_AlwaysSyncs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
-	users := NewUserContainerManager()
+	store := NewStrategyStore("")
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
 		t.Error("expected false — sync should always be forced")

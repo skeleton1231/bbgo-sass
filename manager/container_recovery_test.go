@@ -136,8 +136,9 @@ func TestCleanupStopped_RemovesExitedAndDead(t *testing.T) {
 		return "", nil
 	}
 
-	users := []*UserContainer{
-		{UserID: "user-restarting", Mode: ModeLive, Status: StatusStarting},
+	// user-restarting is tracked, so bbgo-user-restarting is skipped
+	users := []UserMode{
+		{UserID: "user-restarting", Mode: ModeLive},
 	}
 	cleaned := cm.CleanupStopped(users)
 
@@ -165,8 +166,9 @@ func TestCleanupStopped_SkipsRunningContainers(t *testing.T) {
 		return "", nil
 	}
 
-	users := []*UserContainer{
-		{UserID: "user-1", Mode: ModeLive, Status: StatusRunning},
+	// user-1 is tracked, so bbgo-user-1 should be skipped
+	users := []UserMode{
+		{UserID: "user-1", Mode: ModeLive},
 	}
 	cleaned := cm.CleanupStopped(users)
 	if cleaned != 0 {
@@ -182,38 +184,6 @@ func TestCleanupStopped_EmptyDocker(t *testing.T) {
 	cleaned := cm.CleanupStopped(nil)
 	if cleaned != 0 {
 		t.Errorf("cleaned = %d, want 0", cleaned)
-	}
-}
-
-func TestRegisterContainer_CreatesContainer(t *testing.T) {
-	m := NewUserContainerManager()
-	m.RegisterContainer("user-1", ModeLive, StatusRunning)
-
-	uc, ok := m.Get("user-1", ModeLive)
-	if !ok {
-		t.Fatal("container should exist after RegisterContainer")
-	}
-	if len(uc.Strategies) != 0 {
-		t.Errorf("strategies = %d, want 0", len(uc.Strategies))
-	}
-	if uc.Status != StatusRunning {
-		t.Errorf("status = %q, want %q", uc.Status, StatusRunning)
-	}
-}
-
-func TestRegisterContainer_DoesNotOverwrite(t *testing.T) {
-	m := NewUserContainerManager()
-	entry := StrategyEntry{ID: "strat-1", Name: "test", Exchange: "binance", Strategy: "grid2"}
-	m.AddStrategy("user-1", ModeLive, entry)
-
-	m.RegisterContainer("user-1", ModeLive, StatusStopped)
-
-	uc, _ := m.Get("user-1", ModeLive)
-	if len(uc.Strategies) != 1 {
-		t.Errorf("strategies = %d, want 1 (should not overwrite)", len(uc.Strategies))
-	}
-	if uc.Strategies[0].ID != "strat-1" {
-		t.Errorf("strategy ID = %q, want strat-1", uc.Strategies[0].ID)
 	}
 }
 

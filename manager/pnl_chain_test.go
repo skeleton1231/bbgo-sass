@@ -223,29 +223,25 @@ func TestEnvArgs_CrossExchange_InjectsMultipleCredentials(t *testing.T) {
 		key, _ := enc.Encrypt(ex + "_key")
 		secret, _ := enc.Encrypt(ex + "_secret")
 		creds.Upsert(ExchangeCredential{
-			ID: "cred-" + ex, UserID: userID, Exchange: ex,
-			APIKeyEncrypted: key, APISecretEncrypted: secret,
+			UserID:             userID,
+			Exchange:           ex,
+			APIKeyEncrypted:    key,
+			APISecretEncrypted: secret,
 		})
 	}
 
 	cfg := &Config{DataDir: tmpDir, BBGOPort: 8080}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: userID,
-		Strategies: []StrategyEntry{
-			{
-				ID: "s1", Strategy: "xmaker", CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "binance", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "okex", Exchange: "okex", EnvVarPrefix: "OKEX"},
-				},
+	args := cm.envArgs(userID, ModeLive, []StrategyEntry{
+		{
+			Strategy: "xmaker", CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "binance", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "okex", Exchange: "okex", EnvVarPrefix: "OKEX"},
 			},
 		},
-	}
-
-	args := cm.envArgs(uc)
+	})
 
 	hasBinanceKey := false
 	hasOkexKey := false
@@ -277,22 +273,16 @@ func TestEnvArgs_PassphraseInjection(t *testing.T) {
 	secret, _ := enc.Encrypt("okex_secret")
 	passphrase, _ := enc.Encrypt("okex_pass")
 	creds.Upsert(ExchangeCredential{
-		ID: "cred-okex", UserID: userID, Exchange: "okex",
+		UserID: userID, Exchange: "okex",
 		APIKeyEncrypted: key, APISecretEncrypted: secret, PassphraseEncrypted: passphrase,
 	})
 
 	cfg := &Config{DataDir: tmpDir, BBGOPort: 8080}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: userID,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "okex", Strategy: "grid2", Mode: "live"},
-		},
-	}
-
-	args := cm.envArgs(uc)
+	args := cm.envArgs(userID, ModeLive, []StrategyEntry{
+		{Exchange: "okex", Strategy: "grid2", Mode: "live"},
+	})
 
 	hasPassphrase := false
 	for _, a := range args {
@@ -316,23 +306,17 @@ func TestEnvArgs_NoDuplicateForSameExchange(t *testing.T) {
 	key, _ := enc.Encrypt("key1")
 	secret, _ := enc.Encrypt("secret1")
 	creds.Upsert(ExchangeCredential{
-		ID: "cred-1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: key, APISecretEncrypted: secret,
 	})
 
 	cfg := &Config{DataDir: tmpDir, BBGOPort: 8080}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: userID,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"},
-			{ID: "s2", Exchange: "binance", Strategy: "grid2", Mode: "live", Config: []byte(`{"symbol":"ETHUSDT"}`)},
-		},
-	}
-
-	args := cm.envArgs(uc)
+	args := cm.envArgs(userID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live"},
+		{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: []byte(`{"symbol":"ETHUSDT"}`)},
+	})
 
 	count := 0
 	for _, a := range args {
@@ -348,16 +332,10 @@ func TestEnvArgs_NoDuplicateForSameExchange(t *testing.T) {
 // --- buildUserYAML: paper mode sets PAPER_TRADE in YAML environment ---
 
 func TestBuildUserYAML_PaperEnv_PublicOnly(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "user-yaml",
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "paper",
-				Config: []byte(`{"symbol":"BTCUSDT","upperPrice":"60000","lowerPrice":"40000","gridNumber":10,"quantity":"0.001"}`)},
-		},
-	}
-
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return false })
+	yamlBytes, err := buildUserYAML("user-yaml", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper",
+			Config: []byte(`{"symbol":"BTCUSDT","upperPrice":"60000","lowerPrice":"40000","gridNumber":10,"quantity":"0.001"}`)},
+	}, func(string) bool { return false })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,16 +352,10 @@ func TestBuildUserYAML_PaperEnv_PublicOnly(t *testing.T) {
 // --- buildUserYAML: live mode with credentials does NOT set publicOnly ---
 
 func TestBuildUserYAML_LiveEnv_NoPublicOnly(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-yaml",
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live",
-				Config: []byte(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
+	yamlBytes, err := buildUserYAML("user-yaml", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: []byte(`{"symbol":"BTCUSDT"}`)},
+	}, func(string) bool { return true })
 	if err != nil {
 		t.Fatal(err)
 	}

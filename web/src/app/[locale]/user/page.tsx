@@ -210,16 +210,21 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <div className="divide-y">
-            {activeContainer?.strategies.map((s) => (
-              <div key={s.id} className="flex items-center justify-between px-6 py-3.5">
+            {activeContainer?.strategies?.map((s) => {
+              const id = (s.strategyInstanceID as string) ?? ''
+              const strategy = (s.strategy as string) ?? ''
+              const symbol = (s.symbol as string) ?? ''
+              const session = (s.session as string) ?? ''
+              return (
+              <div key={id} className="flex items-center justify-between px-6 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
                     <Bot className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{s.name || s.strategy}</p>
+                    <p className="text-sm font-medium">{strategy}</p>
                     <p className="text-xs text-muted-foreground">
-                      {s.exchange} · {s.strategy}
+                      {session} · {symbol}
                     </p>
                   </div>
                 </div>
@@ -233,7 +238,7 @@ export default function DashboardPage() {
                   {isActive ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
                 </Badge>
               </div>
-            ))}
+            )})}
           </div>
         </Card>
       )}

@@ -23,50 +23,6 @@ func NewSupabaseClient(supabaseURL, supabaseKey string) (*SupabaseClient, error)
 	return &SupabaseClient{client: client}, nil
 }
 
-func (sc *SupabaseClient) LoadUserContainers() ([]*UserContainer, error) {
-	data, _, err := sc.client.From("user_containers").Select("*", "", false).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("load user containers: %w", err)
-	}
-
-	var rows []PublicUserContainersSelect
-	if err := json.Unmarshal(data, &rows); err != nil {
-		return nil, err
-	}
-
-	users := make([]*UserContainer, len(rows))
-	for i, r := range rows {
-		uc := &UserContainer{UserID: r.UserId, Mode: r.Mode, Status: r.Status}
-		if uc.Mode == "" {
-			uc.Mode = ModeLive
-		}
-		if r.Strategies != nil {
-			if b, err := json.Marshal(r.Strategies); err == nil {
-				json.Unmarshal(b, &uc.Strategies)
-			}
-		}
-		users[i] = uc
-	}
-	return users, nil
-}
-
-func (sc *SupabaseClient) UpsertUser(uc *UserContainer) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	row := PublicUserContainersInsert{
-		UserId:     uc.UserID,
-		Mode:       ptrStr(uc.Mode),
-		Status:     ptrStr(uc.Status),
-		Strategies: uc.Strategies,
-		CreatedAt:  ptrStr(now),
-		UpdatedAt:  ptrStr(now),
-	}
-	_, _, err := sc.client.From("user_containers").Upsert(row, "user_id,mode", "", "").Execute()
-	if err != nil {
-		return fmt.Errorf("upsert user %s: %w", uc.UserID, err)
-	}
-	return nil
-}
-
 func (sc *SupabaseClient) UpsertCredential(cred ExchangeCredential) error {
 	id := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339)

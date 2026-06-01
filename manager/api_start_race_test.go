@@ -11,14 +11,10 @@ import (
 )
 
 func TestAPI_StartUser_IdempotentWhenStarting(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StrategyEntry{
-		ID:       "s1",
-		Exchange: "binance",
-		Strategy: "grid",
-		Config:   rawJSON(`{}`),
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`)},
 	})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StatusStarting)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -27,45 +23,51 @@ func TestAPI_StartUser_IdempotentWhenStarting(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	defer api.Close()
 	api.containerRunning = func(_, _ string) bool { return false }
 
-	// Block startContainer so the goroutine stays alive — if the fix is wrong,
-	// the goroutine would call this and we'd detect it.
 	var startCalls int64
 	unblock := make(chan struct{})
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		atomic.AddInt64(&startCalls, 1)
 		<-unblock
 		return nil
 	}
 
 	r := testRouter(api)
+
+	// First request triggers start
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusAccepted {
-		t.Fatalf("expected 202 for already-starting user, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("first request: expected 202, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Give any stray goroutine time to call containerStart
+	// Second request while starting — should be idempotent (returns starting, no new containerStart)
+	req2 := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusAccepted {
+		t.Fatalf("second request: expected 202, got %d: %s", w2.Code, w2.Body.String())
+	}
+
 	time.Sleep(100 * time.Millisecond)
 	calls := atomic.LoadInt64(&startCalls)
 	close(unblock)
 
-	if calls != 0 {
-		t.Fatalf("containerStart should NOT be called when status is already starting, got %d calls", calls)
+	if calls != 1 {
+		t.Fatalf("expected exactly 1 containerStart, got %d", calls)
 	}
 }
 
 func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, StrategyEntry{
-		ID:       "s1",
-		Exchange: "binance",
-		Strategy: "grid",
-		Config:   rawJSON(`{}`),
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`)},
 	})
 
 	cfg := &Config{
@@ -75,12 +77,13 @@ func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
+	defer api.Close()
 
 	var startCalls int64
 	unblock := make(chan struct{})
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		atomic.AddInt64(&startCalls, 1)
 		<-unblock
 		return nil
@@ -119,14 +122,10 @@ func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 
 func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	users := NewUserContainerManager()
-	users.AddStrategy(userID, ModeLive, StrategyEntry{
-		ID:       "s1",
-		Exchange: "binance",
-		Strategy: "grid",
-		Config:   rawJSON(`{}`),
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, userID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Config: rawJSON(`{}`)},
 	})
-	users.UpdateStatus(userID, ModeLive, StatusRunning)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -135,12 +134,13 @@ func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_, _ string) bool { return false }
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
+	defer api.Close()
 
 	unblock := make(chan struct{})
 	var startCalls int64
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		atomic.AddInt64(&startCalls, 1)
 		<-unblock
 		return nil

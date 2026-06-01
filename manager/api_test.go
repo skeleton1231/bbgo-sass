@@ -9,14 +9,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func setupTestAPI(bbgoHandler http.HandlerFunc) (*API, *httptest.Server) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+func setupTestAPI(t *testing.T, bbgoHandler http.HandlerFunc) (*API, *httptest.Server) {
+	t.Helper()
+	store, _ := newTestStore(t)
+
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
 
 	bbgoSrv := httptest.NewServer(bbgoHandler)
 
@@ -27,10 +26,12 @@ func setupTestAPI(bbgoHandler http.HandlerFunc) (*API, *httptest.Server) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return true }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
+	t.Cleanup(func() { bbgoSrv.Close(); api.Close() })
 	return api, bbgoSrv
 }
 
@@ -47,7 +48,7 @@ func testRouter(api *API) *chi.Mux {
 }
 
 func TestAPI_BBGoPing(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 	}))
 	defer bbgoSrv.Close()
@@ -64,7 +65,7 @@ func TestAPI_BBGoPing(t *testing.T) {
 }
 
 func TestAPI_BBGoSessions(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"sessions": []BBGoSession{{Name: "binance", ExchangeName: "binance"}},
@@ -94,7 +95,7 @@ func TestAPI_BBGoSessions(t *testing.T) {
 }
 
 func TestAPI_BBGoBalances(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions/binance/account/balances" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"balances": map[string]interface{}{
@@ -119,7 +120,7 @@ func TestAPI_BBGoBalances(t *testing.T) {
 }
 
 func TestAPI_BBGoTrades_WithQueryParams(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/trades" {
 			if r.URL.Query().Get("exchange") != "binance" {
 				t.Errorf("expected exchange=binance, got %s", r.URL.Query().Get("exchange"))
@@ -148,11 +149,12 @@ func TestAPI_BBGoTrades_WithQueryParams(t *testing.T) {
 }
 
 func TestAPI_BBGo_UserNotFound(t *testing.T) {
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/ping", nil)
@@ -160,17 +162,17 @@ func TestAPI_BBGo_UserNotFound(t *testing.T) {
 
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for unknown user, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 for user without running container, got %d", w.Code)
 	}
 }
 
 func TestAPI_BBGo_InvalidUserID(t *testing.T) {
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/not-a-uuid/bbgo/ping", nil)
@@ -184,16 +186,15 @@ func TestAPI_BBGo_InvalidUserID(t *testing.T) {
 }
 
 func TestAPI_BBGo_ContainerStopped(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status: StatusStopped,
-	}
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/ping", nil)
@@ -207,7 +208,7 @@ func TestAPI_BBGo_ContainerStopped(t *testing.T) {
 }
 
 func TestAPI_BBGoAssets(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/assets" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"assets": map[string]interface{}{"BTC": map[string]string{"currency": "BTC", "total": "1.0", "available": "1.0", "lock": "0", "netAsset": "1.0", "netAssetInUSD": "43000"}},
@@ -230,7 +231,7 @@ func TestAPI_BBGoAssets(t *testing.T) {
 }
 
 func TestAPI_BBGoClosedOrders(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/orders/closed" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"orders": []interface{}{
@@ -255,7 +256,7 @@ func TestAPI_BBGoClosedOrders(t *testing.T) {
 }
 
 func TestAPI_BBGoTradingVolume(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/trading-volume" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"tradingVolumes": []interface{}{},

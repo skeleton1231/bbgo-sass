@@ -83,15 +83,19 @@ func TestAPI_CreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	tnKey, _ := api.encryptor.Encrypt("tn-key")
 	tnSec, _ := api.encryptor.Encrypt("tn-secret")
 	api.creds.Upsert(ExchangeCredential{
-		ID: "tn1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
 	})
 
-	api.users.AddStrategy(userID, ModePaper, StrategyEntry{ID: "s0", Exchange: "binance", Strategy: "grid", Mode: "paper"})
-	api.users.UpdateStatus(userID, ModePaper, StatusStarting)
+	writeTestStrategies(t, api.strategies, userID, ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+
+	// Simulate "starting" state via the starting sync.Map
+	api.starting.Store(userID+":"+ModePaper, true)
 
 	startCount := 0
-	api.containerStart = func(uc *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		startCount++
 		return nil
 	}
@@ -123,13 +127,9 @@ func TestAPI_CreateStrategy_ModeInheritsFromExisting(t *testing.T) {
 	tnKey, _ := api.encryptor.Encrypt("tn-key")
 	tnSec, _ := api.encryptor.Encrypt("tn-secret")
 	api.creds.Upsert(ExchangeCredential{
-		ID: "tn1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
 	})
-
-	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
-		{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "paper"},
-	}
 
 	r := testRouter(api)
 	stratBody := `{"name":"No Mode","exchange":"binance","strategy":"grid","config":{}}`
@@ -151,14 +151,10 @@ func TestEnvArgs_PaperStrategy_SetsPaperTrade(t *testing.T) {
 	creds := NewCredentialStore(tmpDir, enc)
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080, BBGOGRPCPort: 9090}, creds: creds}
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid", Mode: "paper"},
-		},
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "paper"},
 	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, strategies)
 
 	hasPaper := false
 	for i, a := range args {
@@ -183,7 +179,6 @@ func TestEnvArgs_LiveStrategy_NoPaperTrade(t *testing.T) {
 	keyEnc, _ := enc.Encrypt("key")
 	secretEnc, _ := enc.Encrypt("secret")
 	creds.Upsert(ExchangeCredential{
-		ID:                 "cred1",
 		UserID:             "test-user",
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
@@ -191,14 +186,10 @@ func TestEnvArgs_LiveStrategy_NoPaperTrade(t *testing.T) {
 	})
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080, BBGOGRPCPort: 9090, MarketDataAddr: "marketdata:9090"}, creds: creds}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid", Mode: "live"},
-		},
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "live"},
 	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, strategies)
 
 	for _, a := range args {
 		if a == "PAPER_TRADE=1" {
@@ -231,8 +222,16 @@ func TestAPI_DeleteCredential_RunningContainer_SetsStarting(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID+":"+ModeLive].Status = StatusRunning
+	writeTestStrategies(t, api.strategies, userID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 	api.containerRunning = func(string, _ string) bool { return true }
+
+	var restartCalled bool
+	api.containerStart = func(userID, mode string) error {
+		restartCalled = true
+		return nil
+	}
 
 	credBody := `{"exchange":"binance","api_key":"testkey","api_secret":"testsecret"}`
 	r := testRouter(api)
@@ -248,8 +247,6 @@ func TestAPI_DeleteCredential_RunningContainer_SetsStarting(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&credResp)
 	credID, _ := credResp["id"].(string)
 
-	api.containerStart = func(uc *UserContainer) error { return nil }
-
 	req2 := httptest.NewRequest(http.MethodDelete, "/api/credentials/"+credID, nil)
 	req2.Header.Set("X-User-Id", userID)
 	w2 := httptest.NewRecorder()
@@ -259,9 +256,8 @@ func TestAPI_DeleteCredential_RunningContainer_SetsStarting(t *testing.T) {
 		t.Fatalf("delete credential: expected 200, got %d: %s", w2.Code, w2.Body.String())
 	}
 
-	// Verify status changed to starting (triggers async restart)
-	uc, _ := api.users.Get(userID, ModeLive)
-	if uc.Status != StatusStarting {
-		t.Errorf("expected status=starting after credential delete on running container, got %s", uc.Status)
+	time.Sleep(200 * time.Millisecond)
+	if !restartCalled {
+		t.Error("expected container restart after credential delete on running container")
 	}
 }

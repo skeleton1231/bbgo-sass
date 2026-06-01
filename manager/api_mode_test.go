@@ -10,26 +10,21 @@ import (
 
 func setupModeTestAPI(t *testing.T, existingMode string) *API {
 	t.Helper()
-	users := NewUserContainerManager()
-	strategies := []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}}
+	store, dir := newTestStore(t)
+	strats := []StrategyEntry{{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)}}
 	if existingMode != "" {
-		strategies[0].Mode = existingMode
+		strats[0].Mode = existingMode
 	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: strategies,
-	}
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, strats)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
 		ManagerToken: "test-token",
-		DataDir:      t.TempDir(),
+		DataDir:      dir,
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	return NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	return NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 func TestAPI_CreateStrategy_LiveOnlyRejectsPaper(t *testing.T) {

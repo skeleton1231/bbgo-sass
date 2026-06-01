@@ -37,8 +37,10 @@ func NewWSTicketStore() *WSTicketStore {
 		tickets: make(map[string]*wsTicket),
 		done:    make(chan struct{}),
 	}
-	go ts.cleanup()
 	return ts
+}
+
+func (ts *WSTicketStore) startCleanup() {
 }
 
 func (ts *WSTicketStore) Close() {
@@ -49,27 +51,19 @@ func (ts *WSTicketStore) Close() {
 	}
 }
 
-func (ts *WSTicketStore) cleanup() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ts.done:
-			return
-		case <-ticker.C:
+func (ts *WSTicketStore) purgeExpired() {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	now := time.Now()
+	for k, t := range ts.tickets {
+		if now.After(t.expiresAt) {
+			delete(ts.tickets, k)
 		}
-		ts.mu.Lock()
-		now := time.Now()
-		for k, t := range ts.tickets {
-			if now.After(t.expiresAt) {
-				delete(ts.tickets, k)
-			}
-		}
-		ts.mu.Unlock()
 	}
 }
 
 func (ts *WSTicketStore) Issue(userID string) string {
+	ts.purgeExpired()
 	b := make([]byte, 24)
 	rand.Read(b)
 	ticket := hex.EncodeToString(b)
@@ -125,7 +119,11 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.CloseNow()
 
-	if api.hub == nil {
+	// Determine mode for hub selection
+	wsMode := r.URL.Query().Get("mode")
+	hub := api.hubForMode(wsMode)
+
+	if hub == nil {
 		wsWrite(conn, r.Context(), nil, []byte(`{"error":"marketdata not available"}`))
 		return
 	}
@@ -133,34 +131,35 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	// Subscribe to market data
-	marketCh, err := api.hub.SubscribeMarket(ctx)
+	// Subscribe to market data from the mode-appropriate hub
+	marketCh, err := hub.SubscribeMarket(ctx)
 	if err != nil {
 		log.Printf("ws market subscribe error: %v", err)
 		return
 	}
-	defer api.hub.Unsubscribe("market", marketCh)
+	defer hub.Unsubscribe("market", marketCh)
 
-	// Subscribe to user data if container is running
+	// Subscribe to user data from the user's bbgo container (not the marketdata hub).
+	// The hub only manages the subscription channel; the actual gRPC connection dials
+	// the container directly via containerAddr, so the hub used here doesn't matter.
 	var userCh chan json.RawMessage
-	wsMode := r.URL.Query().Get("mode")
-	containers := api.users.GetByUser(userID)
-	for _, uc := range containers {
-		if uc.Status != StatusRunning {
+	for _, mode := range []string{ModeLive, ModePaper} {
+		if wsMode != "" && mode != wsMode {
 			continue
 		}
-		if wsMode != "" && uc.Mode != wsMode {
+		if !api.isContainerRunning(userID, mode) {
 			continue
 		}
-		containerAddr := api.container.ContainerGRPCAddr(userID, uc.Mode)
-		sessions := extractSessionNames(uc)
-		ch, err := api.hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
+		containerAddr := api.container.ContainerGRPCAddr(userID, mode)
+		strategies, _ := api.strategies.ListStrategies(userID, mode)
+		sessions := extractSessionNames(strategies)
+		ch, err := hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
 		if err != nil {
-			log.Printf("ws user data subscribe error for %s (%s): %v", userID, uc.Mode, err)
+			log.Printf("ws user data subscribe error for %s (%s): %v", userID, mode, err)
 			continue
 		}
 		userCh = ch
-		defer api.hub.Unsubscribe("user:"+userID, userCh)
+		defer hub.Unsubscribe("user:"+userID, userCh)
 		break
 	}
 
@@ -225,9 +224,9 @@ func wsWrite(conn *websocket.Conn, ctx context.Context, mu *sync.Mutex, msg []by
 	return err == nil
 }
 
-func extractSessionNames(uc *UserContainer) []string {
+func extractSessionNames(strategies []StrategyEntry) []string {
 	seen := map[string]bool{}
-	for _, s := range uc.Strategies {
+	for _, s := range strategies {
 		if s.CrossExchange {
 			for _, sr := range s.Sessions {
 				if !seen[sr.Name] {

@@ -105,6 +105,9 @@ func (n *Notifier) LoadUser(userID string) {
 func (n *Notifier) Create(userID string, cfg NotificationConfig) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	if cfg.Channel.ID == "" {
+		cfg.Channel.ID = generateID("n")
+	}
 	configs := n.configs[userID]
 	configs = append(configs, cfg)
 	n.configs[userID] = configs

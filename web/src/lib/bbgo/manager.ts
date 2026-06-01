@@ -46,7 +46,9 @@ export interface UserContainer {
   user_id: string
   mode: 'live' | 'paper'
   status: 'running' | 'stopped' | 'error' | 'starting'
-  strategies: StrategyEntry[]
+  // When running: array of bbgo strategy state objects (strategyInstanceID, strategy, symbol, etc.)
+  // When stopped: null
+  strategies: Record<string, unknown>[] | null
 }
 
 export interface UserContainersResponse {

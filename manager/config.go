@@ -37,8 +37,10 @@ type Config struct {
 	BBGOGRPCPort        int
 	ManagerToken        string
 	WSAllowedOrigins    []string
-	MarketDataAddr      string
-	MarketDataRESTAddr  string
+	MarketDataAddr            string
+	MarketDataRESTAddr        string
+	MarketDataTestnetAddr     string
+	MarketDataTestnetRESTAddr string
 	MarketSubscriptions []MarketSub
 	BacktestSymbols     []string
 	BacktestExchanges   []string
@@ -70,8 +72,10 @@ func LoadConfig() (*Config, error) {
 		BBGOGRPCPort:        getEnvInt("BBGO_GRPC_PORT", 9090),
 		ManagerToken:        getEnv("MANAGER_TOKEN", ""),
 		WSAllowedOrigins:    getEnvSlice("WS_ALLOWED_ORIGINS", nil),
-		MarketDataAddr:      getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),
-		MarketDataRESTAddr:  getEnv("MARKETDATA_REST_ADDR", "bbgo-marketdata:8080"),
+		MarketDataAddr:            getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),
+		MarketDataRESTAddr:        getEnv("MARKETDATA_REST_ADDR", "bbgo-marketdata:8080"),
+		MarketDataTestnetAddr:     getEnv("MARKETDATA_TESTNET_ADDR", "bbgo-marketdata-testnet:9090"),
+		MarketDataTestnetRESTAddr: getEnv("MARKETDATA_TESTNET_REST_ADDR", "bbgo-marketdata-testnet:8080"),
 		MarketSubscriptions: parseMarketSubs(getEnvSlice("MARKET_SUBSCRIPTIONS", nil)),
 		BacktestSymbols:     getEnvSlice("BACKTEST_SYMBOLS", []string{"BTCUSDT", "ETHUSDT"}),
 		BacktestExchanges:   getEnvSlice("BACKTEST_EXCHANGES", []string{"binance"}),

@@ -40,18 +40,20 @@ func chiReq2(method, url, body string, params map[string]string) *http.Request {
 
 func setupProxyAPI(t *testing.T, bbgoHandler http.HandlerFunc) (*API, func()) {
 	t.Helper()
-	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModeLive, StatusRunning)
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeee000001", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(bbgoHandler))
 	api := &API{
-		users:     users,
-		container: &ContainerManager{cfg: &Config{BBGOPort: 8080}},
+		strategies: store,
+		container:  &ContainerManager{cfg: &Config{BBGOPort: 8080}},
 		newBBGoClient: func(baseURL string) *BBGoClient {
 			return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
 		},
-		wsTickets: NewWSTicketStore(),
+		wsTickets:        NewWSTicketStore(),
+		containerRunning: func(_, _ string) bool { return true },
 	}
 	return api, func() { api.Close(); bbgoSrv.Close() }
 }
@@ -80,13 +82,16 @@ func TestBBGoSessionDetail_Proxy(t *testing.T) {
 }
 
 func TestBBGoSessionDetail_NotRunning(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy(proxyUID, ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, proxyUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 
 	api := &API{
-		users:     users,
-		container: &ContainerManager{cfg: &Config{BBGOPort: 8080}},
-		wsTickets: NewWSTicketStore(),
+		strategies:       store,
+		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
+		wsTickets:        NewWSTicketStore(),
+		containerRunning: func(_, _ string) bool { return false },
 	}
 	defer api.Close()
 
@@ -106,7 +111,7 @@ func TestBBGoSessionDetail_NotRunning(t *testing.T) {
 func TestBBGoSessionTrades_Proxy(t *testing.T) {
 	api, cleanup := setupProxyAPI(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions/binance/trades" {
-			w.Write([]byte(`{"trades":[{"id":1,"symbol":"BTCUSDT"}]}`))
+			w.Write([]byte(`{"trades":{"BTCUSDT":{"Trades":[{"id":1,"symbol":"BTCUSDT"}]}}}`))
 		}
 	})
 	defer cleanup()
@@ -204,19 +209,10 @@ func TestBBGoTradingVolume_Proxy(t *testing.T) {
 
 // --- SyncCredential ---
 
-func TestSyncCredential_UpsertsUser(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy("aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2", Mode: "live"})
-	users.UpdateStatus("aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", ModeLive, StatusRunning)
-
+func TestSyncCredential_Basic(t *testing.T) {
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" && strings.Contains(r.URL.Path, "user_containers") {
-			w.WriteHeader(200)
-			w.Write([]byte(`[{"user_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeee000020"}]`))
-		} else {
-			w.WriteHeader(200)
-			w.Write([]byte(`[]`))
-		}
+		w.WriteHeader(200)
+		w.Write([]byte(`[]`))
 	}))
 	defer supabaseSrv.Close()
 
@@ -224,24 +220,22 @@ func TestSyncCredential_UpsertsUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := NewSyncer(users, supaClient)
-	s.SyncCredential(ExchangeCredential{UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000020", Exchange: "binance"})
+	s := NewSyncer(supaClient)
+	s.SyncCredential(ExchangeCredential{Exchange: "binance"})
 }
 
 // --- SyncBacktestData validation ---
 
 func TestSyncBacktestData_InvalidBody(t *testing.T) {
-	users := NewUserContainerManager()
 	cm := &ContainerManager{cfg: &Config{BBGOPort: 8080}}
 	api := &API{
-		users:     users,
 		container: cm,
 		btSyncSem: make(chan struct{}, 2),
 		wsTickets: NewWSTicketStore(),
 	}
 	defer api.Close()
 
-	req := httptest.NewRequest("POST", "/api/backtest/sync", strings.NewReader(`not json`))
+	req := httptest.NewRequest("POST", "/api/backtest/sync", strings.NewReader("not json"))
 	req.Header.Set("X-User-Id", proxyUID)
 	req.Header.Set("X-Manager-Token", "test")
 	w := httptest.NewRecorder()
@@ -253,20 +247,14 @@ func TestSyncBacktestData_InvalidBody(t *testing.T) {
 }
 
 func TestSyncBacktestData_TooManySymbols(t *testing.T) {
-	users := NewUserContainerManager()
 	cm := &ContainerManager{cfg: &Config{BBGOPort: 8080}}
 	api := &API{
-		users:     users,
 		container: cm,
 		btSyncSem: make(chan struct{}, 2),
 		wsTickets: NewWSTicketStore(),
 	}
 	defer api.Close()
 
-	symbols := make([]string, 11)
-	for i := range symbols {
-		symbols[i] = "SYM" + strings.Repeat("A", 10)
-	}
 	body := `{"exchange":"binance","symbols":["A","B","C","D","E","F","G","H","I","J","K"]}`
 	req := httptest.NewRequest("POST", "/api/backtest/sync", strings.NewReader(body))
 	req.Header.Set("X-User-Id", proxyUID)
@@ -279,59 +267,19 @@ func TestSyncBacktestData_TooManySymbols(t *testing.T) {
 	}
 }
 
-// --- UpsertUser edge cases ---
-
-func TestUpsertUser_NewUser(t *testing.T) {
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
-	}))
-	defer supabaseSrv.Close()
-
-	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := NewSyncer(nil, supaClient)
-
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000021",
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
-		},
-	}
-	s.UpsertUser(uc)
-}
-
-func TestUpsertUser_SupabaseError(t *testing.T) {
-	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
-	}))
-	defer supabaseSrv.Close()
-
-	supaClient, err := NewSupabaseClient(supabaseSrv.URL, "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := NewSyncer(nil, supaClient)
-
-	uc := &UserContainer{UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeee000022", Status: StatusRunning}
-	// UpsertUser logs errors but does not return them; just ensure it doesn't panic
-	s.UpsertUser(uc)
-}
-
 // --- bbgoClientForUser stopped container ---
 
 func TestBBGoClientForUser_StoppedContainer(t *testing.T) {
-	users := NewUserContainerManager()
-	users.AddStrategy(proxyUID, ModeLive, StrategyEntry{Exchange: "binance", Strategy: "grid2"})
+	store, _ := newTestStore(t)
+	writeTestStrategies(t, store, proxyUID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
 
 	api := &API{
-		users:     users,
-		container: &ContainerManager{cfg: &Config{BBGOPort: 8080}},
-		wsTickets: NewWSTicketStore(),
+		strategies:       store,
+		container:        &ContainerManager{cfg: &Config{BBGOPort: 8080}},
+		wsTickets:        NewWSTicketStore(),
+		containerRunning: func(_, _ string) bool { return false },
 	}
 	defer api.Close()
 

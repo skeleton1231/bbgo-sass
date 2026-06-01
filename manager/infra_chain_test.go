@@ -170,15 +170,11 @@ func TestNormalizeStrategyConfig_FieldAlias(t *testing.T) {
 }
 
 func TestBuildUserYAML_LegacyAlias_Normalized(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "u1",
-		Strategies: []StrategyEntry{
-			{Strategy: "sentinel_anomaly", Exchange: "binance", Mode: "live",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
+	strategies := []StrategyEntry{
+		{Strategy: "sentinel_anomaly", Exchange: "binance", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
 	}
-	yaml, err := buildUserYAML(uc, func(ex string) bool { return true })
+	yaml, err := buildUserYAML("u1", ModeLive, strategies, func(ex string) bool { return true })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,23 +187,6 @@ func TestBuildUserYAML_LegacyAlias_Normalized(t *testing.T) {
 	}
 }
 
-func TestCloneUserContainer_DeepCopy(t *testing.T) {
-	original := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "u1",
-		Status: StatusRunning,
-		Strategies: []StrategyEntry{
-			{ID: "s1", Strategy: "grid2", Exchange: "binance"},
-		},
-	}
-	cloned := cloneUserContainer(original)
-
-	cloned.Strategies[0].ID = "modified"
-	if original.Strategies[0].ID != "s1" {
-		t.Error("clone should not share slice backing with original")
-	}
-}
-
 func TestDBBackup_OnCreateAndStart(t *testing.T) {
 	dir := t.TempDir()
 	userDir := filepath.Join(dir, "test-user")
@@ -215,6 +194,11 @@ func TestDBBackup_OnCreateAndStart(t *testing.T) {
 
 	dbPath := filepath.Join(userDir, "bbgo.db")
 	os.WriteFile(dbPath, []byte("fake-db-content"), 0o644)
+
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}
 
 	cfg := &Config{
 		ManagerToken:  "tok",
@@ -229,15 +213,8 @@ func TestDBBackup_OnCreateAndStart(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, strategies)
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -252,6 +229,11 @@ func TestDBBackup_NoDB_NoError(t *testing.T) {
 	userDir := filepath.Join(dir, "test-user")
 	os.MkdirAll(userDir, 0o755)
 
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}
+
 	cfg := &Config{
 		ManagerToken:  "tok",
 		DataDir:       dir,
@@ -265,15 +247,8 @@ func TestDBBackup_NoDB_NoError(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, strategies)
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart without prior db: %v", err)
 	}
 }

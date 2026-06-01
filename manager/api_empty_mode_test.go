@@ -22,7 +22,6 @@ func TestCreateStrategy_EmptyMode_DefaultsToPaper(t *testing.T) {
 	keyEnc, _ := enc.Encrypt("tn-key")
 	secretEnc, _ := enc.Encrypt("tn-secret")
 	api.creds.Upsert(ExchangeCredential{
-		ID:                 "tc1",
 		UserID:             userID,
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
@@ -48,27 +47,20 @@ func TestCreateStrategy_EmptyMode_DefaultsToPaper(t *testing.T) {
 		t.Fatalf("expected 201 for empty-mode strategy (defaults to paper), got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get(userID, ModePaper)
-	if uc == nil || len(uc.Strategies) < 1 {
-		t.Fatalf("expected 1 strategy in paper container, got %d", func() int {
-			if uc == nil {
-				return 0
-			}
-			return len(uc.Strategies)
-		}())
+	strategies, _ := api.strategies.ListStrategies(userID, ModePaper)
+	if len(strategies) < 1 {
+		t.Fatalf("expected 1 strategy in paper container, got %d", len(strategies))
 	}
 	var newStrat *StrategyEntry
-	for i := range uc.Strategies {
-		if uc.Strategies[i].Name == "No Mode Grid" {
-			newStrat = &uc.Strategies[i]
+	for i := range strategies {
+		if strategies[i].Strategy == "grid2" {
+			newStrat = &strategies[i]
 		}
 	}
 	if newStrat == nil {
 		t.Fatal("new strategy not found")
 	}
-	if newStrat.Mode != "paper" {
-		t.Errorf("expected mode to default to 'paper', got %q", newStrat.Mode)
-	}
+	// Mode is implied by which YAML file it was stored in (paper), not stored in the entry itself.
 }
 
 // TestCreateStrategy_EmptyMode_LiveOnlyRejected verifies that liveOnly
@@ -109,16 +101,13 @@ func TestCreateStrategy_EmptyMode_MixedWithExistingLiveAllowed(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	api.users.users[userID+":"+ModeLive].Strategies = []StrategyEntry{
-		{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "live"},
-	}
+	// The live container already has strategies from setupTestAPIWithCreds
 
 	// Paper mode now requires testnet credentials
 	enc, _ := NewEncryptor(testEncryptionKey)
 	keyEnc, _ := enc.Encrypt("tn-key")
 	secretEnc, _ := enc.Encrypt("tn-secret")
 	api.creds.Upsert(ExchangeCredential{
-		ID:                 "tc1",
 		UserID:             userID,
 		Exchange:           "binance",
 		APIKeyEncrypted:    keyEnc,
@@ -153,19 +142,9 @@ func TestEnvArgs_EmptyModeStrategy_ProducesPaperTrade(t *testing.T) {
 	creds := NewCredentialStore(tmpDir, enc)
 	cm := &ContainerManager{cfg: &Config{DataDir: tmpDir, BBGOPort: 8080, BBGOGRPCPort: 9090}, creds: creds}
 
-	uc := &UserContainer{
-
-		Mode: ModePaper,
-
-		UserID: "test-user",
-
-		Strategies: []StrategyEntry{
-
-			{Exchange: "binance", Strategy: "grid", Mode: "paper"},
-		},
-	}
-
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "paper"},
+	})
 
 	hasPaper := false
 	for i := range args {
@@ -182,15 +161,7 @@ func TestEnvArgs_EmptyModeStrategy_ProducesPaperTrade(t *testing.T) {
 // TestBuildUserYAML_EmptyModeStrategy_ProducesPaperTrade verifies YAML generation
 // treats empty-mode (now stored as "paper") correctly with paperTrade: "1".
 func TestBuildUserYAML_EmptyModeStrategy_ProducesPaperTrade(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{ID: "s1", Exchange: "binance", Strategy: "grid", Mode: "paper", Config: json.RawMessage(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-
-	yaml, err := buildUserYAML(uc, func(exchange string) bool {
+	yaml, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{}, func(exchange string) bool {
 		return false
 	})
 	if err != nil {

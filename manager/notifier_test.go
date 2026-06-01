@@ -26,7 +26,6 @@ func TestDispatch_ConcurrentCreate(t *testing.T) {
 	n.configs["user1"] = []NotificationConfig{
 		{
 			Channel: NotificationChannel{
-				ID:         "ch1",
 				Type:       "slack",
 				WebhookURL: webhook,
 				Enabled:    true,
@@ -65,7 +64,6 @@ func TestDispatch_RateLimitsEvents(t *testing.T) {
 	n.configs["user1"] = []NotificationConfig{
 		{
 			Channel: NotificationChannel{
-				ID:         "ch1",
 				Type:       "slack",
 				WebhookURL: webhook,
 				Enabled:    true,
@@ -105,7 +103,6 @@ func TestDispatch_DisabledChannel(t *testing.T) {
 	n.configs["user1"] = []NotificationConfig{
 		{
 			Channel: NotificationChannel{
-				ID:      "ch1",
 				Type:    "slack",
 				Enabled: false,
 			},

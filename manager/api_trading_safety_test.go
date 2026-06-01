@@ -24,10 +24,10 @@ func TestListCredentials_DoesNotLeakEncryptedData(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 
 	insertTestCredential(t, creds, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "binance", "my-api-key", "my-api-secret")
 
@@ -63,23 +63,23 @@ func TestListCredentials_DoesNotLeakEncryptedData(t *testing.T) {
 // TestBBGoData_NonRunningContainer_Returns503 verifies that all bbgo data
 // endpoints return 503 when the container is not running.
 func TestBBGoData_NonRunningContainer_Returns503(t *testing.T) {
+	store, _ := newTestStore(t)
+	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	writeTestStrategies(t, store, userID, ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2"},
+	})
+
 	cfg := &Config{ManagerToken: "test-token"}
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.Header.Set("X-Manager-Token", "test-token")
-			r.Header.Set("X-User-Id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+			r.Header.Set("X-User-Id", userID)
 			next.ServeHTTP(w, r)
 		})
 	})
@@ -89,11 +89,11 @@ func TestBBGoData_NonRunningContainer_Returns503(t *testing.T) {
 		name string
 		path string
 	}{
-		{"ping", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/ping"},
-		{"sessions", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/sessions"},
-		{"trades", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/trades"},
-		{"assets", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/assets"},
-		{"strategies", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/strategies"},
+		{"ping", "/api/users/" + userID + "/bbgo/ping"},
+		{"sessions", "/api/users/" + userID + "/bbgo/sessions"},
+		{"trades", "/api/users/" + userID + "/bbgo/trades"},
+		{"assets", "/api/users/" + userID + "/bbgo/assets"},
+		{"strategies", "/api/users/" + userID + "/bbgo/strategies"},
 	}
 
 	for _, ep := range endpoints {
@@ -120,7 +120,7 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	tnKey, _ := enc.Encrypt("tn-key")
 	tnSec, _ := enc.Encrypt("tn-secret")
 	creds.Upsert(ExchangeCredential{
-		ID: "tn1", UserID: userID, Exchange: "binance",
+		UserID: userID, Exchange: "binance",
 		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
 	})
 	cfg := &Config{
@@ -129,10 +129,10 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	}))
 	defer bbgoSrv.Close()
 
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 	api.containerRunning = func(_, _ string) bool { return false }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
@@ -173,9 +173,9 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 
 	// Step 2: Wait for async start to complete (simulate health check success)
 	time.Sleep(200 * time.Millisecond)
-	users.UpdateStatus(userID, ModePaper, StatusRunning)
 
-	// Step 3: Check status
+	// Step 3: Check status — mark as running for the test
+	api.containerRunning = func(_, _ string) bool { return true }
 	req = httptest.NewRequest("GET", "/api/users/"+userID+"/status", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -207,8 +207,8 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	}
 
 	// Step 6: Verify YAML was generated (paper mode)
-	uc, _ := users.Get(userID, ModePaper)
-	yaml, err := buildUserYAML(uc, func(_ string) bool { return false })
+	strats, _ := store.ListStrategies(userID, ModePaper)
+	yaml, err := buildUserYAML(userID, ModePaper, strats, func(_ string) bool { return false })
 	if err != nil {
 		t.Fatalf("step6 yaml: %v", err)
 	}
@@ -218,6 +218,7 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	}
 
 	// Step 7: Stop container
+	api.containerRunning = func(_, _ string) bool { return false }
 	req = httptest.NewRequest("POST", "/api/users/"+userID+"/stop?mode=paper", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -248,12 +249,13 @@ func TestLiveTrading_HappyPath(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := testRouter(api)
 
@@ -279,8 +281,8 @@ func TestLiveTrading_HappyPath(t *testing.T) {
 	}
 
 	// Step 3: Verify YAML does NOT have PAPER_TRADE
-	uc, _ := users.Get(userID, ModeLive)
-	yaml, err := buildUserYAML(uc, func(_ string) bool { return false })
+	strats, _ := store.ListStrategies(userID, ModeLive)
+	yaml, err := buildUserYAML(userID, ModeLive, strats, func(_ string) bool { return false })
 	if err != nil {
 		t.Fatalf("step3 yaml: %v", err)
 	}
@@ -290,7 +292,7 @@ func TestLiveTrading_HappyPath(t *testing.T) {
 	}
 
 	// Step 4: Verify env args include real credentials
-	args := cm.envArgs(uc)
+	args := cm.envArgs(userID, ModeLive, strats)
 	foundKey := false
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-e" && strings.HasPrefix(args[i+1], "BINANCE_API_KEY=") {
@@ -319,10 +321,11 @@ func TestLiveOnlyStrategy_PaperModeBlocked(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	insertTestCredential(t, creds, userID, "binance", "key", "secret")
 
@@ -355,13 +358,14 @@ func TestLiveOnlyStrategy_LiveModeAccepted(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	insertTestCredential(t, creds, userID, "binance", "key", "secret")
-	api.containerStart = func(_ *UserContainer) error { return nil }
+	api.containerStart = func(userID, mode string) error { return nil }
 
 	r := testRouter(api)
 	body := `{"name":"BollMaker","exchange":"binance","strategy":"bollmaker","config":{"symbol":"BTCUSDT"},"mode":"live"}`
@@ -389,23 +393,18 @@ func TestDeleteCredential_StoppedContainer_NoRestart(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
-	users.users[userID+":"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     userID,
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid2", Mode: "live"}},
-	}
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 
 	insertTestCredential(t, creds, userID, "binance", "k", "s")
 	stored, _ := creds.List(userID)
 	credID := stored[0].ID
 
 	var restartCalled bool
-	api.containerStart = func(_ *UserContainer) error {
+	api.containerStart = func(userID, mode string) error {
 		restartCalled = true
 		return nil
 	}
@@ -438,10 +437,10 @@ func TestCreateCredential_PassphraseEncrypted(t *testing.T) {
 		ManagerToken: "test-token",
 		DataDir:      dir,
 	}
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, userID)
 	body := `{"exchange":"okex","api_key":"okx-key","api_secret":"okx-secret","passphrase":"my-pass"}`
@@ -460,58 +459,5 @@ func TestCreateCredential_PassphraseEncrypted(t *testing.T) {
 	}
 	if passPlain != "my-pass" {
 		t.Errorf("expected passphrase 'my-pass', got %q", passPlain)
-	}
-}
-
-// TestRefreshContainerStatus_ErrorLeavesUnchanged verifies that
-// refreshContainerStatus leaves the status unchanged when Docker
-// is unreachable (error from CheckRunning).
-func TestRefreshContainerStatus_ErrorLeavesUnchanged(t *testing.T) {
-	cfg := &Config{
-		SupabaseURL:  "http://localhost:1",
-		SupabaseKey:  "test",
-		ManagerToken: "test-token",
-	}
-	users := NewUserContainerManager()
-	uc := &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusRunning,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = uc
-
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	// pool is nil → CheckRunning calls docker CLI which fails → error returned
-	// refreshContainerStatus should leave status unchanged on error
-	api.refreshContainerStatus(uc)
-	if uc.Status != StatusRunning {
-		t.Errorf("expected status unchanged (running) on docker error, got %s", uc.Status)
-	}
-}
-
-// TestRefreshContainerStatus_SkipsStoppedContainer verifies refreshContainerStatus
-// is a no-op for already-stopped containers.
-func TestRefreshContainerStatus_SkipsStoppedContainer(t *testing.T) {
-	cfg := &Config{ManagerToken: "test-token"}
-	users := NewUserContainerManager()
-	uc := &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1"}},
-	}
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = uc
-
-	cm := &ContainerManager{cfg: cfg, pool: nil}
-	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
-
-	api.refreshContainerStatus(uc)
-	if uc.Status != StatusStopped {
-		t.Errorf("expected status unchanged, got %s", uc.Status)
 	}
 }

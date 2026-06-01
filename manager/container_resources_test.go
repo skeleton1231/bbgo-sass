@@ -111,15 +111,12 @@ func TestCreateAndStart_IncludeResourceLimits_Live(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid", Mode: "live",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -161,15 +158,12 @@ func TestCreateAndStart_IncludeResourceLimits_Paper(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid", Mode: "paper",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "paper",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModePaper); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -208,15 +202,12 @@ func TestCreateAndStart_NoResourceLimits_WhenEmpty(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid", Mode: "live",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 

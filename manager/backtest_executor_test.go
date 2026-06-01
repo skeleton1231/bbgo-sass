@@ -30,7 +30,6 @@ func TestBacktestExecutor_FullFlow_SyncAndRun(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-exec-1",
 		UserID:    "user-1",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -40,14 +39,15 @@ func TestBacktestExecutor_FullFlow_SyncAndRun(t *testing.T) {
 		Config:    json.RawMessage(`{"symbol":"BTCUSDT"}`),
 		NeedSync:  true,
 	}
+	job.ID = generateID("bt")
 
 	if err := exec.Submit(job); err != nil {
 		t.Fatalf("Submit failed: %v", err)
 	}
 
-	assertJobEventually(t, store, "bt-exec-1", JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobCompleted, 5*time.Second)
 
-	got, found := store.Get("bt-exec-1")
+	got, found := store.Get(job.ID)
 	if !found {
 		t.Fatal("job not found")
 	}
@@ -93,7 +93,6 @@ func TestBacktestExecutor_SkipSync(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-nosync",
 		UserID:    "user-1",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -104,8 +103,9 @@ func TestBacktestExecutor_SkipSync(t *testing.T) {
 		NeedSync:  false,
 	}
 
+	job.ID = generateID("bt")
 	exec.Submit(job)
-	assertJobEventually(t, store, "bt-nosync", JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobCompleted, 5*time.Second)
 
 	mu.Lock()
 	if syncCalled {
@@ -133,7 +133,6 @@ func TestBacktestExecutor_SyncFailure(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-syncfail",
 		UserID:    "user-1",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -144,10 +143,11 @@ func TestBacktestExecutor_SyncFailure(t *testing.T) {
 		NeedSync:  true,
 	}
 
+	job.ID = generateID("bt")
 	exec.Submit(job)
-	assertJobEventually(t, store, "bt-syncfail", JobFailed, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobFailed, 5*time.Second)
 
-	got, _ := store.Get("bt-syncfail")
+	got, _ := store.Get(job.ID)
 	if got.Error == "" {
 		t.Error("expected error message to be set")
 	}
@@ -173,7 +173,6 @@ func TestBacktestExecutor_RunFailure(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-runfail",
 		UserID:    "user-1",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -183,11 +182,12 @@ func TestBacktestExecutor_RunFailure(t *testing.T) {
 		Config:    json.RawMessage(`{"symbol":"BTCUSDT"}`),
 		NeedSync:  true,
 	}
+	job.ID = generateID("bt")
 
 	exec.Submit(job)
-	assertJobEventually(t, store, "bt-runfail", JobFailed, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobFailed, 5*time.Second)
 
-	got, _ := store.Get("bt-runfail")
+	got, _ := store.Get(job.ID)
 	if got.Error == "" {
 		t.Error("expected error message on run failure")
 	}
@@ -207,7 +207,6 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-slot-1",
 		UserID:    "user-1",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -218,16 +217,17 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 		NeedSync:  true,
 	}
 
+	job.ID = generateID("bt")
 	exec.Submit(job)
-	assertJobEventually(t, store, "bt-slot-1", JobFailed, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobFailed, 5*time.Second)
 
 	job2 := &BacktestJob{
-		ID:       "bt-slot-2",
 		UserID:   "user-1",
 		Strategy: "grid2",
 		Config:   json.RawMessage(`{}`),
 		NeedSync: false,
 	}
+	job2.ID = generateID("bt")
 	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
 		return []byte("ok"), nil
 	}
@@ -235,7 +235,7 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 	if err := exec.Submit(job2); err != nil {
 		t.Fatalf("expected to acquire slot after failure released it: %v", err)
 	}
-	assertJobEventually(t, store, "bt-slot-2", JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, job2.ID, JobCompleted, 5*time.Second)
 }
 
 func TestBacktestExecutor_StatusTransitions(t *testing.T) {
@@ -257,7 +257,6 @@ func TestBacktestExecutor_StatusTransitions(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:        "bt-statuses",
 		UserID:    "user-1",
 		Strategy:  "grid2",
 		Exchange:  "binance",
@@ -267,13 +266,14 @@ func TestBacktestExecutor_StatusTransitions(t *testing.T) {
 		Config:    json.RawMessage(`{}`),
 		NeedSync:  true,
 	}
+	job.ID = generateID("bt")
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			got, found := store.Get("bt-statuses")
+			got, found := store.Get(job.ID)
 			if !found {
 				continue
 			}
@@ -289,7 +289,10 @@ func TestBacktestExecutor_StatusTransitions(t *testing.T) {
 	}()
 
 	exec.Submit(job)
-	assertJobEventually(t, store, "bt-statuses", JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobCompleted, 5*time.Second)
+
+	// Give the poller goroutine time to observe the final status.
+	time.Sleep(50 * time.Millisecond)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -326,17 +329,17 @@ func TestBacktestExecutor_InvalidConfig(t *testing.T) {
 	}
 
 	job := &BacktestJob{
-		ID:       "bt-badcfg",
 		UserID:   "user-1",
 		Strategy: "grid2",
 		Config:   json.RawMessage(`{invalid json`),
 		NeedSync: false,
 	}
+	job.ID = generateID("bt")
 
 	exec.Submit(job)
-	assertJobEventually(t, store, "bt-badcfg", JobFailed, 5*time.Second)
+	assertJobEventually(t, store, job.ID, JobFailed, 5*time.Second)
 
-	got, _ := store.Get("bt-badcfg")
+	got, _ := store.Get(job.ID)
 	if got.Error == "" {
 		t.Error("expected error for invalid config")
 	}
@@ -375,10 +378,10 @@ func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 
 	var mu sync.Mutex
 	var completedIDs []string
+	var firstJobID string
 
 	for i := range 3 {
 		job := &BacktestJob{
-			ID:        fmt.Sprintf("bt-concurrent-%d", i),
 			UserID:    "user-1",
 			Strategy:  "grid2",
 			Exchange:  "binance",
@@ -388,11 +391,13 @@ func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 			Config:    json.RawMessage(`{"symbol":"BTCUSDT"}`),
 			NeedSync:  false,
 		}
+		job.ID = generateID("bt")
 
 		err := exec.Submit(job)
 		mu.Lock()
 		if i == 0 {
 			// First job should acquire the slot
+			firstJobID = job.ID
 			if err != nil {
 				t.Errorf("job %d: expected to submit, got %v", i, err)
 			}
@@ -406,20 +411,20 @@ func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 	}
 
 	// Wait for the first job to complete, freeing the slot
-	assertJobEventually(t, store, "bt-concurrent-0", JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, firstJobID, JobCompleted, 5*time.Second)
 
 	// Now we should be able to submit again
 	job4 := &BacktestJob{
-		ID:       "bt-concurrent-after",
 		UserID:   "user-1",
 		Strategy: "grid2",
 		Config:   json.RawMessage(`{"symbol":"BTCUSDT"}`),
 		NeedSync: false,
 	}
+	job4.ID = generateID("bt")
 	if err := exec.Submit(job4); err != nil {
 		t.Fatalf("expected to submit after slot freed: %v", err)
 	}
-	assertJobEventually(t, store, "bt-concurrent-after", JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, job4.ID, JobCompleted, 5*time.Second)
 
 	mu.Lock()
 	_ = completedIDs

@@ -4,6 +4,7 @@
 #       before building this image, otherwise SQLite backtests will fail.
 FROM golang:1.26-bookworm AS builder
 
+ENV GOPROXY=https://goproxy.cn,direct
 RUN apt-get update && apt-get install -y gcc libc6-dev git && rm -rf /var/lib/apt/lists/*
 
 COPY . /src

@@ -22,13 +22,13 @@ func newTradingChainSetup(t *testing.T) *tradingChainSetup {
 	enc, err := NewEncryptor(testEncryptionKey)
 	require.NoError(t, err)
 	creds := NewCredentialStore(t.TempDir(), enc)
-	users := NewUserContainerManager()
+	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: &Config{
 		DataVolume: "bbgo-data", BBGOPort: 8080, BBGOGRPCPort: 9090,
 	}, creds: creds}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(&Config{Port: 8090, ManagerToken: "test"}, users, cm, proxy, creds, enc, nil, nil, nil, nil, nil)
-	api.containerStart = func(uc *UserContainer) error { return nil }
+	api := NewAPI(&Config{Port: 8090, ManagerToken: "test"}, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api.containerStart = func(userID, mode string) error { return nil }
 	api.containerStop = func(string, _ string) {}
 	api.containerRunning = func(string, _ string) bool { return false }
 	return &tradingChainSetup{api, cm, creds, enc}
@@ -41,26 +41,21 @@ func (s *tradingChainSetup) storeCred(t *testing.T, exchange, key, secret string
 	secEnc, err := s.enc.Encrypt(secret)
 	require.NoError(t, err)
 	require.NoError(t, s.creds.Upsert(ExchangeCredential{
-		ID: "cred-" + exchange, UserID: testUUID, Exchange: exchange,
+		UserID: testUUID, Exchange: exchange,
 		APIKeyEncrypted: keyEnc, APISecretEncrypted: secEnc,
 	}))
 }
-
 // Test: Live grid strategy produces correct YAML + env args for bbgo container
 func TestTradingChain_LiveGrid_FullYAMLAndEnv(t *testing.T) {
 	s := newTradingChainSetup(t)
 	s.storeCred(t, "binance", "livekey", "livesecret")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{{
-			ID: "strat-1", Strategy: "grid", Exchange: "binance", Mode: "live",
-			Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10,"upperPrice":50000,"lowerPrice":40000}`),
-		}},
-	}
+	strategies := []StrategyEntry{{
+		Strategy: "grid", Exchange: "binance", Mode: "live",
+		Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10,"upperPrice":50000,"lowerPrice":40000}`),
+	}}
 
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
+	yamlBytes, err := buildUserYAML(testUUID, ModeLive, strategies, func(string) bool { return true })
 	require.NoError(t, err)
 
 	var cfg bbgoConfig
@@ -75,7 +70,7 @@ func TestTradingChain_LiveGrid_FullYAMLAndEnv(t *testing.T) {
 	assert.Contains(t, cfg.ExchangeStrategies[0], "grid")
 	assert.Empty(t, cfg.Environment.PaperTrade)
 
-	args := s.container.envArgs(uc)
+	args := s.container.envArgs(testUUID, ModeLive, strategies)
 	argsStr := strings.Join(args, " ")
 	assert.NotContains(t, argsStr, "PAPER_TRADE")
 	assert.Contains(t, argsStr, "BINANCE_API_KEY=livekey")
@@ -86,16 +81,12 @@ func TestTradingChain_LiveGrid_FullYAMLAndEnv(t *testing.T) {
 func TestTradingChain_PaperGrid_YAMLAndEnv(t *testing.T) {
 	s := newTradingChainSetup(t)
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{{
-			ID: "strat-1", Strategy: "grid", Exchange: "binance", Mode: "paper",
-			Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
-		}},
-	}
+	strategies := []StrategyEntry{{
+		Strategy: "grid", Exchange: "binance", Mode: "paper",
+		Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
+	}}
 
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return false })
+	yamlBytes, err := buildUserYAML(testUUID, ModePaper, strategies, func(string) bool { return false })
 	require.NoError(t, err)
 
 	var cfg bbgoConfig
@@ -103,7 +94,7 @@ func TestTradingChain_PaperGrid_YAMLAndEnv(t *testing.T) {
 	assert.True(t, cfg.Sessions["binance"].PublicOnly)
 	assert.Equal(t, "1", cfg.Environment.PaperTrade)
 
-	args := s.container.envArgs(uc)
+	args := s.container.envArgs(testUUID, ModePaper, strategies)
 	assert.Contains(t, strings.Join(args, " "), "PAPER_TRADE=1")
 }
 
@@ -113,20 +104,16 @@ func TestTradingChain_CrossExchange_YAML(t *testing.T) {
 	s.storeCred(t, "binance", "bkey", "bsec")
 	s.storeCred(t, "bybit", "ykey", "ysec")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{{
-			ID: "strat-x1", Strategy: "xmaker", Mode: "live", CrossExchange: true,
-			Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001}`),
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance"},
-				{Name: "taker", Exchange: "bybit"},
-			},
-		}},
-	}
+	strategies := []StrategyEntry{{
+		Strategy: "xmaker", Mode: "live", CrossExchange: true,
+		Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance"},
+			{Name: "taker", Exchange: "bybit"},
+		},
+	}}
 
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
+	yamlBytes, err := buildUserYAML(testUUID, ModeLive, strategies, func(string) bool { return true })
 	require.NoError(t, err)
 
 	var cfg bbgoConfig
@@ -140,7 +127,7 @@ func TestTradingChain_CrossExchange_YAML(t *testing.T) {
 	require.Len(t, cfg.CrossExchangeStrategies, 1)
 	assert.Contains(t, cfg.CrossExchangeStrategies[0], "xmaker")
 
-	args := s.container.envArgs(uc)
+	args := s.container.envArgs(testUUID, ModeLive, strategies)
 	argsStr := strings.Join(args, " ")
 	assert.Contains(t, argsStr, "BINANCE_API_KEY=bkey")
 	assert.Contains(t, argsStr, "BYBIT_API_KEY=ykey")
@@ -155,32 +142,24 @@ func TestTradingChain_LegacyAliases(t *testing.T) {
 		{"ewoDgtrd", "ewo_dgtrd"},
 	} {
 		t.Run(tc.frontend, func(t *testing.T) {
-			uc := &UserContainer{
-				Mode:   ModeLive,
-				UserID: testUUID,
-				Strategies: []StrategyEntry{{
-					Strategy: tc.frontend, Exchange: "binance", Mode: "live",
-					Config: json.RawMessage(`{"symbol":"BTCUSDT"}`),
-				}},
-			}
-			yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
+			strategies := []StrategyEntry{{
+				Strategy: tc.frontend, Exchange: "binance", Mode: "live",
+				Config: json.RawMessage(`{"symbol":"BTCUSDT"}`),
+			}}
+			yamlBytes, err := buildUserYAML(testUUID, ModeLive, strategies, func(string) bool { return true })
 			require.NoError(t, err)
 			assert.Contains(t, string(yamlBytes), tc.bbgoID+":")
 		})
 	}
 }
 
-// Test: DCA field rename interval→investmentInterval
+// Test: DCA field rename interval->investmentInterval
 func TestTradingChain_DCA_FieldRename(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{{
-			Strategy: "dca", Exchange: "binance", Mode: "live",
-			Config: json.RawMessage(`{"symbol":"BTCUSDT","interval":"1h","quantity":0.001}`),
-		}},
-	}
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
+	strategies := []StrategyEntry{{
+		Strategy: "dca", Exchange: "binance", Mode: "live",
+		Config: json.RawMessage(`{"symbol":"BTCUSDT","interval":"1h","quantity":0.001}`),
+	}}
+	yamlBytes, err := buildUserYAML(testUUID, ModeLive, strategies, func(string) bool { return true })
 	require.NoError(t, err)
 	yamlStr := string(yamlBytes)
 	assert.Contains(t, yamlStr, "investmentInterval:")
@@ -188,18 +167,14 @@ func TestTradingChain_DCA_FieldRename(t *testing.T) {
 
 // Test: Multiple strategies on different exchanges produce correct multi-session YAML
 func TestTradingChain_MultipleExchanges(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: testUUID,
-		Strategies: []StrategyEntry{
-			{Strategy: "grid", Exchange: "binance", Mode: "live",
-				Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10}`)},
-			{Strategy: "twap", Exchange: "okex", Mode: "live",
-				Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.1}`)},
-		},
+	strategies := []StrategyEntry{
+		{Strategy: "grid", Exchange: "binance", Mode: "live",
+			Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10}`)},
+		{Strategy: "twap", Exchange: "okex", Mode: "live",
+			Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.1}`)},
 	}
 
-	yamlBytes, err := buildUserYAML(uc, func(string) bool { return true })
+	yamlBytes, err := buildUserYAML(testUUID, ModeLive, strategies, func(string) bool { return true })
 	require.NoError(t, err)
 
 	var cfg bbgoConfig

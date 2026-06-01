@@ -28,22 +28,18 @@ func TestE2E_PaperTradingChain(t *testing.T) {
 	}
 	cm := NewContainerManager(cfg, creds, nil)
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Name:     "Paper Grid",
-				Exchange: "binance",
-				Strategy: "grid2",
-				Mode:     "paper",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
-			},
+	strategies := []StrategyEntry{
+		{
+			Name:     "Paper Grid",
+			Exchange: "binance",
+			Strategy: "grid2",
+			Mode:     "paper",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
 		},
 	}
 
 	// Step 1: Build YAML — must have PAPER_TRADE and publicOnly
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModePaper, strategies, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("build yaml: %v", err)
 	}
@@ -71,7 +67,7 @@ func TestE2E_PaperTradingChain(t *testing.T) {
 	}
 
 	// Step 3: envArgs — must have PAPER_TRADE=1, must NOT have API keys
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, strategies)
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
 			if args[i] == "-e" && args[i+1] == key {
@@ -122,22 +118,18 @@ func TestE2E_LiveTradingChain(t *testing.T) {
 
 	insertTestCredential(t, creds, "test-user", "binance", "live-key-123", "live-secret-456")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Name:     "Live Grid",
-				Exchange: "binance",
-				Strategy: "grid2",
-				Mode:     "live",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
-			},
+	strategies := []StrategyEntry{
+		{
+			Name:     "Live Grid",
+			Exchange: "binance",
+			Strategy: "grid2",
+			Mode:     "live",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
 		},
 	}
 
 	// Step 1: Build YAML — no PAPER_TRADE, no publicOnly
-	yaml, err := buildUserYAML(uc, func(exchange string) bool {
+	yaml, err := buildUserYAML("test-user", ModeLive, strategies, func(exchange string) bool {
 		_, _, _, err := creds.GetDecrypted("test-user", exchange)
 		return err == nil
 	})
@@ -153,7 +145,7 @@ func TestE2E_LiveTradingChain(t *testing.T) {
 	}
 
 	// Step 2: envArgs — API keys injected, no PAPER_TRADE
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, strategies)
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
 			if args[i] == "-e" && args[i+1] == key {
@@ -196,26 +188,22 @@ func TestE2E_CrossExchangeChain(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "binance", "bin-key", "bin-secret")
 	insertTestCredential(t, creds, "test-user", "bybit", "byb-key", "byb-secret")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Name:          "XMaker",
-				Strategy:      "xmaker",
-				Mode:          "live",
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-				},
-				Config: rawJSON(`{"symbol":"BTCUSDT","spread":0.001}`),
+	strategies := []StrategyEntry{
+		{
+			Name:          "XMaker",
+			Strategy:      "xmaker",
+			Mode:          "live",
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 			},
+			Config: rawJSON(`{"symbol":"BTCUSDT","spread":0.001}`),
 		},
 	}
 
 	// Step 1: YAML has crossExchangeStrategies, both exchanges, futures flag
-	yaml, err := buildUserYAML(uc, func(exchange string) bool {
+	yaml, err := buildUserYAML("test-user", ModeLive, strategies, func(exchange string) bool {
 		_, _, _, err := creds.GetDecrypted("test-user", exchange)
 		return err == nil
 	})
@@ -234,7 +222,7 @@ func TestE2E_CrossExchangeChain(t *testing.T) {
 	}
 
 	// Step 2: envArgs injects both exchange credentials
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, strategies)
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
 			if args[i] == "-e" && args[i+1] == key {

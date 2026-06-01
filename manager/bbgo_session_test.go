@@ -34,8 +34,12 @@ func TestBBGoClient_GetSession(t *testing.T) {
 func TestBBGoClient_GetSessionTrades(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"trades": []map[string]interface{}{
-				{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1"},
+			"trades": map[string]interface{}{
+				"BTCUSDT": map[string]interface{}{
+					"Trades": []map[string]interface{}{
+						{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1"},
+					},
+				},
 			},
 		})
 	}))

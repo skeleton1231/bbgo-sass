@@ -34,23 +34,20 @@ func TestLiveTradingChain(t *testing.T) {
 	})
 
 	// Step 2: User creates a live grid2 strategy
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModeLive
+	ucStrategies := []StrategyEntry{
 			{
-				ID:       "s1",
-				Name:     "BTC Grid",
+					Name:     "BTC Grid",
 				Exchange: "binance",
 				Strategy: "grid2",
 				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`),
 				Mode:     "live",
 			},
-		},
-	}
+		}
 
 	// Step 3: Verify YAML generation for live mode
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool {
+	yamlBytes, err := buildUserYAML(ucUserID, ucMode, ucStrategies, func(exchange string) bool {
 		_, _, _, err := creds.GetDecrypted("user-1", exchange)
 		return err == nil
 	})
@@ -97,22 +94,19 @@ func TestPaperTradingChain(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModePaper
+	ucStrategies := []StrategyEntry{
 			{
-				ID:       "s1",
-				Name:     "BTC Grid Paper",
+					Name:     "BTC Grid Paper",
 				Exchange: "binance",
 				Strategy: "grid2",
 				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`),
 				Mode:     "paper",
 			},
-		},
-	}
+		}
 
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool {
+	yamlBytes, err := buildUserYAML(ucUserID, ucMode, ucStrategies, func(exchange string) bool {
 		_, _, _, err := creds.GetDecrypted("user-1", exchange)
 		return err == nil
 	})
@@ -151,10 +145,9 @@ func TestCrossExchangeLiveChain(t *testing.T) {
 		})
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModeLive
+	ucStrategies := []StrategyEntry{
 			{
 				Strategy:      "xmaker",
 				CrossExchange: true,
@@ -165,10 +158,9 @@ func TestCrossExchangeLiveChain(t *testing.T) {
 					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 				},
 			},
-		},
-	}
+		}
 
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool {
+	yamlBytes, err := buildUserYAML(ucUserID, ucMode, ucStrategies, func(exchange string) bool {
 		_, _, _, err := creds.GetDecrypted("user-1", exchange)
 		return err == nil
 	})
@@ -208,10 +200,9 @@ func TestCrossExchangeLiveChain(t *testing.T) {
 
 // TestCrossExchangeEnvPrefixAutoFill verifies that empty EnvVarPrefix is auto-computed from exchange name
 func TestCrossExchangeEnvPrefixAutoFill(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModeLive
+	ucStrategies := []StrategyEntry{
 			{
 				Strategy:      "xmaker",
 				CrossExchange: true,
@@ -222,10 +213,9 @@ func TestCrossExchangeEnvPrefixAutoFill(t *testing.T) {
 					{Name: "hedge", Exchange: "bybit", Futures: true}, // EnvVarPrefix intentionally empty
 				},
 			},
-		},
-	}
+		}
 
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yamlBytes, err := buildUserYAML(ucUserID, ucMode, ucStrategies, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("buildUserYAML: %v", err)
 	}
@@ -326,8 +316,8 @@ func TestMixedModePrevention(t *testing.T) {
 		APIKeyEncrypted: tnKeyEnc, APISecretEncrypted: tnSecretEnc, IsTestnet: true,
 	})
 
-	users := NewUserContainerManager()
-	api := NewAPI(cfg, users, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil)
+	store := NewStrategyStore("")
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	// Create first strategy as live
@@ -357,8 +347,8 @@ func TestLiveModeRequiresCredentials(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
-	api := NewAPI(cfg, users, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil)
+	store := NewStrategyStore("")
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	createBody := `{"name":"Live Grid","strategy":"grid2","exchange":"binance","config":{"symbol":"BTCUSDT"},"mode":"live"}`
@@ -381,8 +371,8 @@ func TestPaperModeWithLiveOnlyStrategy(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
-	api := NewAPI(cfg, users, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil)
+	store := NewStrategyStore("")
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	liveOnlyTests := []string{"bollmaker", "supertrend", "dca2", "wall", "drift"}
@@ -407,8 +397,8 @@ func TestLegacyAliasPaperRejection(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	users := NewUserContainerManager()
-	api := NewAPI(cfg, users, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil)
+	store := NewStrategyStore("")
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	tests := []struct {
@@ -442,15 +432,13 @@ func TestEnvArgs_PaperMode(t *testing.T) {
 	cfg := &Config{BBGOPort: 8080, BBGOGRPCPort: 9090, MarketDataAddr: "marketdata:9090"}
 	cm := NewContainerManager(cfg, creds, nil)
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModePaper
+	ucStrategies := []StrategyEntry{
 			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-		},
-	}
+		}
 
-	args := cm.envArgs(uc)
+	args := cm.envArgs(ucUserID, ucMode, ucStrategies)
 
 	argsStr := strings.Join(args, " ")
 	if !strings.Contains(argsStr, "PAPER_TRADE=1") {
@@ -487,15 +475,13 @@ func TestEnvArgs_LiveMode(t *testing.T) {
 		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc, PassphraseEncrypted: passEnc,
 	})
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModeLive
+	ucStrategies := []StrategyEntry{
 			{Exchange: "okex", Strategy: "grid2", Mode: "live"},
-		},
-	}
+		}
 
-	args := cm.envArgs(uc)
+	args := cm.envArgs(ucUserID, ucMode, ucStrategies)
 
 	argsStr := strings.Join(args, " ")
 	if strings.Contains(argsStr, "PAPER_TRADE") {
@@ -529,10 +515,9 @@ func TestEnvArgs_CrossExchange_MultipleExchanges(t *testing.T) {
 		})
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModeLive
+	ucStrategies := []StrategyEntry{
 			{
 				Strategy:      "xmaker",
 				CrossExchange: true,
@@ -542,10 +527,9 @@ func TestEnvArgs_CrossExchange_MultipleExchanges(t *testing.T) {
 					{Name: "hedge", Exchange: "bybit", Futures: true},
 				},
 			},
-		},
-	}
+		}
 
-	args := cm.envArgs(uc)
+	args := cm.envArgs(ucUserID, ucMode, ucStrategies)
 
 	argsStr := strings.Join(args, " ")
 	if !strings.Contains(argsStr, "BINANCE_API_KEY=binance-key") {
@@ -575,10 +559,9 @@ func TestCrossExchangePublicOnlyPartialCredentials(t *testing.T) {
 		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
 	})
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "user-1",
-		Strategies: []StrategyEntry{
+	ucUserID := "user-1"
+	ucMode := ModeLive
+	ucStrategies := []StrategyEntry{
 			{
 				Strategy:      "xmaker",
 				CrossExchange: true,
@@ -589,10 +572,9 @@ func TestCrossExchangePublicOnlyPartialCredentials(t *testing.T) {
 					{Name: "hedge", Exchange: "bybit", Futures: true},
 				},
 			},
-		},
-	}
+		}
 
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool {
+	yamlBytes, err := buildUserYAML(ucUserID, ucMode, ucStrategies, func(exchange string) bool {
 		_, _, _, err := creds.GetDecrypted("user-1", exchange)
 		return err == nil
 	})
@@ -643,5 +625,150 @@ func TestProxyStripAuthHeaders(t *testing.T) {
 	}
 	if receivedHeaders.Get("X-User-Id") != "" {
 		t.Error("proxy must strip X-User-Id before forwarding to bbgo container")
+	}
+}
+
+// TestPaperModeFullLifecycle traces: create strategy → query all bbgo endpoints → verify mode routing
+func TestPaperModeFullLifecycle(t *testing.T) {
+	tmpDir := t.TempDir()
+	enc, _ := NewEncryptor(testEncryptionKey)
+	creds := NewCredentialStore(tmpDir, enc)
+	store, _ := newTestStore(t)
+	cfg := &Config{DataDir: tmpDir, ManagerToken: "test-token", SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
+	cm := &ContainerManager{cfg: cfg, creds: creds}
+	proxy := NewBotProxy(cm)
+	supaClient, _ := NewSupabaseClient("http://localhost:1", "test")
+	syncer := NewSyncer(supaClient)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
+
+	// Insert testnet credential so paper mode start is allowed
+	tnKey, _ := enc.Encrypt("tn-key")
+	tnSec, _ := enc.Encrypt("tn-secret")
+	creds.Upsert(ExchangeCredential{
+		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", Exchange: "binance",
+		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true, IsVerified: true,
+	})
+
+	var bbgoRequests []string
+	var mu sync.Mutex
+	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		bbgoRequests = append(bbgoRequests, r.Method+" "+r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/api/ping":
+			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
+		case "/api/sessions":
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"sessions": []map[string]interface{}{{"name": "binance", "exchange": "binance"}},
+			})
+		case "/api/strategies/single":
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
+				},
+			})
+		case "/api/assets":
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"assets": map[string]interface{}{
+					"USDT": map[string]string{"currency": "USDT", "total": "10000", "available": "8000"},
+				},
+			})
+		case "/api/trades":
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"trades": []map[string]interface{}{
+					{"gid": 1, "symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1", "fee": "2.5", "tradedAt": "2024-01-01"},
+				},
+			})
+		case "/api/orders/closed":
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"orders": []map[string]interface{}{
+					{"gid": 1, "symbol": "BTCUSDT", "side": "BUY", "orderType": "LIMIT", "price": "50000", "status": "FILLED"},
+				},
+			})
+		case "/api/trading-volume":
+			json.NewEncoder(w).Encode(map[string]interface{}{"tradingVolumes": []interface{}{}})
+		default:
+			json.NewEncoder(w).Encode(map[string]interface{}{})
+		}
+	}))
+	t.Cleanup(bbgoSrv.Close)
+	api.newBBGoClient = func(baseURL string) *BBGoClient {
+		return &BBGoClient{baseURL: bbgoSrv.URL, client: bbgoSrv.Client()}
+	}
+	api.containerRunning = func(uid, mode string) bool {
+		return uid == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" && mode == ModePaper
+	}
+	api.container.apiURLFn = func(_, _ string) string { return bbgoSrv.URL }
+
+	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	r := testRouter(api)
+
+	// Step 1: Create paper strategy
+	body := `{"name":"Paper Grid","exchange":"binance","strategy":"grid2","config":{"symbol":"BTCUSDT"},"mode":"paper"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", strings.NewReader(body))
+	req.Header.Set("X-User-Id", userID)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create strategy: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Step 2: Query all bbgo data endpoints with mode=paper
+	endpoints := []struct {
+		path, key string
+	}{
+		{"/bbgo/ping?mode=paper", "status"},
+		{"/bbgo/sessions?mode=paper", "sessions"},
+		{"/bbgo/assets?mode=paper", "assets"},
+		{"/bbgo/trades?mode=paper", "trades"},
+		{"/bbgo/orders/closed?mode=paper", "orders"},
+		{"/bbgo/strategies?mode=paper", "strategies"},
+		{"/bbgo/trading-volume?mode=paper", "tradingVolumes"},
+	}
+	for _, ep := range endpoints {
+		req := httptest.NewRequest(http.MethodGet, "/api/users/"+userID+ep.path, nil)
+		req.Header.Set("X-User-Id", userID)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("GET %s: expected 200, got %d: %s", ep.path, w.Code, w.Body.String())
+			continue
+		}
+		var resp map[string]interface{}
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Errorf("GET %s: decode: %v", ep.path, err)
+			continue
+		}
+		if _, ok := resp[ep.key]; !ok {
+			t.Errorf("GET %s: missing key %q", ep.path, ep.key)
+		}
+	}
+
+	// Step 3: Verify bbgo container received all 7 requests
+	mu.Lock()
+	reqs := bbgoRequests
+	mu.Unlock()
+	for _, ep := range []string{"/api/ping", "/api/sessions", "/api/assets", "/api/trades", "/api/orders/closed", "/api/strategies/single", "/api/trading-volume"} {
+		found := false
+		for _, r := range reqs {
+			if r == "GET "+ep {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("bbgo never received %s (got: %v)", ep, reqs)
+		}
+	}
+
+	// Step 4: Live mode returns 503 (no live container running)
+	req = httptest.NewRequest(http.MethodGet, "/api/users/"+userID+"/bbgo/ping?mode=live", nil)
+	req.Header.Set("X-User-Id", userID)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("live ping: expected 503, got %d", w.Code)
 	}
 }

@@ -17,7 +17,7 @@ type pnlTestSetup struct {
 	bbgoCalled bool
 }
 
-func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http.HandlerFunc) *pnlTestSetup {
+func setupPnLTest(t *testing.T, containerRunning bool, supabaseHandler, bbgoHandler http.HandlerFunc) *pnlTestSetup {
 	t.Helper()
 
 	supabaseSrv := httptest.NewServer(supabaseHandler)
@@ -34,13 +34,7 @@ func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http
 		bbgoURL = bbgoSrv.URL
 	}
 
-	users := NewUserContainerManager()
-	users.users[pnlTestUserID+":"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     pnlTestUserID,
-		Status:     status,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store := NewStrategyStore("")
 
 	cfg := &Config{
 		SupabaseURL:  supabaseSrv.URL,
@@ -52,9 +46,10 @@ func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http
 	if err != nil {
 		t.Fatal(err)
 	}
-	syncer := NewSyncer(users, supaClient)
+	syncer := NewSyncer(supaClient)
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, syncer, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, syncer, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return containerRunning }
 	if bbgoURL != "" {
 		api.newBBGoClient = func(_ string) *BBGoClient { return NewBBGoClient(bbgoURL) }
 	}
@@ -72,7 +67,7 @@ func setupPnLTest(t *testing.T, status string, supabaseHandler, bbgoHandler http
 }
 
 func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
-	setup := setupPnLTest(t, StatusRunning,
+	setup := setupPnLTest(t, true,
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
@@ -117,7 +112,7 @@ func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 }
 
 func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
-	setup := setupPnLTest(t, StatusRunning,
+	setup := setupPnLTest(t, true,
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
@@ -157,7 +152,7 @@ func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
 }
 
 func TestBBGoPnL_WorksWhenContainerStopped(t *testing.T) {
-	setup := setupPnLTest(t, StatusStopped,
+	setup := setupPnLTest(t, false,
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
@@ -205,7 +200,7 @@ func TestSyncer_GetTradesForPnL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	syncer := NewSyncer(NewUserContainerManager(), supaClient)
+	syncer := NewSyncer(supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err != nil {
@@ -238,7 +233,7 @@ func TestSyncer_GetTradesForPnL_ServerError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	syncer := NewSyncer(NewUserContainerManager(), supaClient)
+	syncer := NewSyncer(supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err == nil {
@@ -260,7 +255,7 @@ func TestSyncer_GetTradesForPnL_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	syncer := NewSyncer(NewUserContainerManager(), supaClient)
+	syncer := NewSyncer(supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err != nil {
@@ -304,7 +299,7 @@ func TestSyncer_GetTradesForPnL_Pagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	syncer := NewSyncer(NewUserContainerManager(), supaClient)
+	syncer := NewSyncer(supaClient)
 
 	trades, err := syncer.GetTradesForPnL("user-1")
 	if err != nil {
@@ -315,5 +310,70 @@ func TestSyncer_GetTradesForPnL_Pagination(t *testing.T) {
 	}
 	if callCount != 2 {
 		t.Errorf("expected 2 API calls (full page + empty), got %d", callCount)
+	}
+}
+
+// --- Paper mode PnL: skips Supabase, queries bbgo container directly ---
+
+func TestBBGoPnL_PaperMode_SkipsSupabase(t *testing.T) {
+	supabaseCalled := false
+	setup := setupPnLTest(t, true,
+		func(w http.ResponseWriter, r *http.Request) {
+			supabaseCalled = true
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode([]interface{}{})
+		},
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/trades" {
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"trades": []map[string]interface{}{
+						{"gid": 1, "symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1", "fee": "25", "tradedAt": "2024-01-01"},
+						{"gid": 2, "symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1", "fee": "27", "tradedAt": "2024-01-02"},
+					},
+				})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{})
+		},
+	)
+
+	req := httptest.NewRequest("GET", "/api/users/"+pnlTestUserID+"/bbgo/pnl?mode=paper", nil)
+	w := httptest.NewRecorder()
+	setup.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if supabaseCalled {
+		t.Error("paper mode should NOT call Supabase")
+	}
+	if !setup.bbgoCalled {
+		t.Error("paper mode should call bbgo container")
+	}
+
+	var report PnLReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode pnl report: %v", err)
+	}
+	if len(report.Symbols) != 1 {
+		t.Errorf("expected 1 symbol, got %d", len(report.Symbols))
+	}
+}
+
+func TestBBGoPnL_PaperMode_ContainerNotRunning(t *testing.T) {
+	setup := setupPnLTest(t, false,
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode([]interface{}{})
+		},
+		nil,
+	)
+
+	req := httptest.NewRequest("GET", "/api/users/"+pnlTestUserID+"/bbgo/pnl?mode=paper", nil)
+	w := httptest.NewRecorder()
+	setup.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("paper mode with stopped container = %d, want 503", w.Code)
 	}
 }

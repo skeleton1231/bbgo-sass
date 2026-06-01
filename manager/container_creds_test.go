@@ -29,8 +29,6 @@ func setupContainerManager(t *testing.T) (*ContainerManager, *CredentialStore) {
 	return cm, creds
 }
 
-const testEncryptionKey = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
-
 func insertTestCredential(t *testing.T, cs *CredentialStore, userID, exchange, apiKey, apiSecret string) {
 	t.Helper()
 	enc := cs.crypto
@@ -43,7 +41,7 @@ func insertTestCredential(t *testing.T, cs *CredentialStore, userID, exchange, a
 		t.Fatalf("encrypt api secret: %v", err)
 	}
 	cred := ExchangeCredential{
-		ID:                 generateID("cred"),
+		ID:                generateID("cred"),
 		UserID:             userID,
 		Exchange:           exchange,
 		APIKeyEncrypted:    keyEnc,
@@ -66,7 +64,7 @@ func insertTestnetCredential(t *testing.T, cs *CredentialStore, userID, exchange
 		t.Fatalf("encrypt api secret: %v", err)
 	}
 	cred := ExchangeCredential{
-		ID:                 generateID("cred"),
+		ID:                generateID("cred"),
 		UserID:             userID,
 		Exchange:           exchange,
 		APIKeyEncrypted:    keyEnc,
@@ -80,14 +78,9 @@ func insertTestnetCredential(t *testing.T, cs *CredentialStore, userID, exchange
 
 func TestEnvArgs_PaperMode_SetsEnv(t *testing.T) {
 	cm, _ := setupContainerManager(t)
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+	})
 
 	found := false
 	for i := 0; i < len(args)-1; i++ {
@@ -103,14 +96,9 @@ func TestEnvArgs_PaperMode_SetsEnv(t *testing.T) {
 
 func TestEnvArgs_LiveMode_NoPaperTradeEnv(t *testing.T) {
 	cm, _ := setupContainerManager(t)
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live"},
+	})
 
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-e" && args[i+1] == "PAPER_TRADE=1" {
@@ -123,14 +111,9 @@ func TestEnvArgs_InjectsCredentials(t *testing.T) {
 	cm, creds := setupContainerManager(t)
 	insertTestCredential(t, creds, "test-user", "binance", "my-api-key", "my-api-secret")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live"},
+	})
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
@@ -150,14 +133,9 @@ func TestEnvArgs_InjectsCredentials(t *testing.T) {
 
 func TestEnvArgs_NoCredentials_NoInjection(t *testing.T) {
 	cm, _ := setupContainerManager(t)
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+	})
 
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-e" {
@@ -174,15 +152,10 @@ func TestEnvArgs_MultipleExchanges_InjectsBoth(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "binance", "binance-key", "binance-secret")
 	insertTestCredential(t, creds, "test-user", "okex", "okex-key", "okex-secret")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live"},
-			{Exchange: "okex", Strategy: "dca", Mode: "live"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live"},
+		{Exchange: "okex", Strategy: "dca", Mode: "live"},
+	})
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
@@ -205,15 +178,10 @@ func TestEnvArgs_PaperMode_NonBinanceCredentials_NotInjected(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "binance", "binance-key", "binance-secret")
 	insertTestCredential(t, creds, "test-user", "okex", "okex-key", "okex-secret")
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-			{Exchange: "okex", Strategy: "dca", Mode: "paper"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+		{Exchange: "okex", Strategy: "dca", Mode: "paper"},
+	})
 
 	joined := strings.Join(args, " ")
 	if strings.Contains(joined, "OKEX_API_KEY") {
@@ -228,14 +196,9 @@ func TestEnvArgs_PaperMode_OnlyInjectsBinanceTestnet(t *testing.T) {
 	cm, creds := setupContainerManager(t)
 	insertTestnetCredential(t, creds, "test-user", "binance", "testnet-key", "testnet-secret")
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+	})
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
@@ -258,22 +221,18 @@ func TestEnvArgs_PaperMode_CrossExchange_NonBinanceNotInjected(t *testing.T) {
 	insertTestnetCredential(t, creds, "test-user", "binance", "binance-testnet-key", "binance-testnet-secret")
 	insertTestCredential(t, creds, "test-user", "bybit", "bybit-key", "bybit-secret")
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				CrossExchange: true,
-				Mode:          "paper",
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-				},
+	strategies := []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			CrossExchange: true,
+			Mode:          "paper",
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 			},
 		},
 	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModePaper, strategies)
 
 	joined := strings.Join(args, " ")
 	if !strings.Contains(joined, "BINANCE_API_KEY=binance-testnet-key") {
@@ -289,22 +248,18 @@ func TestEnvArgs_CrossExchange_InjectsAllSessionExchanges(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "binance", "binance-key", "binance-secret")
 	insertTestCredential(t, creds, "test-user", "bybit", "bybit-key", "bybit-secret")
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				CrossExchange: true,
-				Mode:          "live",
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-				},
+	strategies := []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			CrossExchange: true,
+			Mode:          "live",
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 			},
 		},
 	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, strategies)
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
@@ -330,18 +285,13 @@ func TestEnvArgs_Passphrase_Injected(t *testing.T) {
 	secretEnc, _ := enc.Encrypt("secret")
 	passEnc, _ := enc.Encrypt("mypass")
 	creds.Upsert(ExchangeCredential{
-		ID: "cred1", UserID: "test-user", Exchange: "okex",
+		UserID: "test-user", Exchange: "okex",
 		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc, PassphraseEncrypted: passEnc,
 	})
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "okex", Strategy: "grid2", Mode: "live"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "okex", Strategy: "grid2", Mode: "live"},
+	})
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
@@ -364,14 +314,9 @@ func TestEnvArgs_Passphrase_Injected(t *testing.T) {
 
 func TestEnvArgs_MarketDataServiceURL(t *testing.T) {
 	cm, _ := setupContainerManager(t)
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+	})
 
 	findEnv := func(key string) bool {
 		for i := 0; i < len(args)-1; i++ {
@@ -400,14 +345,9 @@ func TestEnvArgs_NoMarketDataAddr(t *testing.T) {
 		MarketDataAddr: "",
 	}
 	cm := NewContainerManager(cfg, creds, nil)
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
-		},
-	}
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
+	})
 
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-e" && strings.HasPrefix(args[i+1], "MARKET_DATA_SERVICE_URL=") {
@@ -417,14 +357,9 @@ func TestEnvArgs_NoMarketDataAddr(t *testing.T) {
 }
 
 func TestBuildUserYAML_PublicOnly_NoCredentials(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -435,14 +370,9 @@ func TestBuildUserYAML_PublicOnly_NoCredentials(t *testing.T) {
 }
 
 func TestBuildUserYAML_PublicOnlyFalse_WithCredentials(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return true })
+	yaml, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}, func(exchange string) bool { return true })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -453,15 +383,10 @@ func TestBuildUserYAML_PublicOnlyFalse_WithCredentials(t *testing.T) {
 }
 
 func TestBuildUserYAML_PaperMode_NonBinance_AlwaysPublicOnly(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "okex", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
 	// Simulates the actual CreateAndStart callback which returns false for non-binance in paper mode
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "okex", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -472,14 +397,9 @@ func TestBuildUserYAML_PaperMode_NonBinance_AlwaysPublicOnly(t *testing.T) {
 }
 
 func TestBuildUserYAML_PaperMode_Binance_PublicOnlyWhenNoCreds(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -490,14 +410,9 @@ func TestBuildUserYAML_PaperMode_Binance_PublicOnlyWhenNoCreds(t *testing.T) {
 }
 
 func TestBuildUserYAML_PaperMode_Binance_NotPublicOnlyWithCreds(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return exchange == "binance" })
+	yaml, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	}, func(exchange string) bool { return exchange == "binance" })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -512,14 +427,9 @@ func TestWriteYAMLToDisk(t *testing.T) {
 	userDir := filepath.Join(dir, "test-user")
 	os.MkdirAll(userDir, 0o755)
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`)},
-		},
-	}
-	yaml, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	yaml, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper", Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`)},
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("build yaml: %v", err)
 	}

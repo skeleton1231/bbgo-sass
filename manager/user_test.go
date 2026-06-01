@@ -6,18 +6,13 @@ import (
 )
 
 func TestBuildUserYAML_SingleExchange(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy: "grid2",
-				Exchange: "binance",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-			},
+	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
+		{
+			Strategy: "grid2",
+			Exchange: "binance",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
 		},
-	}
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,23 +38,18 @@ func TestBuildUserYAML_SingleExchange(t *testing.T) {
 }
 
 func TestBuildUserYAML_CrossExchange(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				Exchange:      "",
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-				},
-				Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001,"spread":0.001}`),
+	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			Exchange:      "",
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 			},
+			Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001,"spread":0.001}`),
 		},
-	}
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,28 +76,23 @@ func TestBuildUserYAML_CrossExchange(t *testing.T) {
 }
 
 func TestBuildUserYAML_Mixed(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy: "grid2",
-				Exchange: "binance",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-			},
-			{
-				Strategy:      "xfunding",
-				Exchange:      "",
-				CrossExchange: true,
-				Sessions: []SessionRoleConfig{
-					{Name: "spot", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "futures", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
-				},
-				Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-			},
+	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
+		{
+			Strategy: "grid2",
+			Exchange: "binance",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
 		},
-	}
-	yamlBytes, err := buildUserYAML(uc, func(exchange string) bool { return false })
+		{
+			Strategy:      "xfunding",
+			Exchange:      "",
+			CrossExchange: true,
+			Sessions: []SessionRoleConfig{
+				{Name: "spot", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "futures", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
+			},
+			Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		},
+	}, func(exchange string) bool { return false })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -157,10 +142,6 @@ func TestBuildBacktestYAML(t *testing.T) {
 	if !strings.Contains(s, "2024-01-01") {
 		t.Error("expected start time in backtest YAML")
 	}
-}
-
-func rawJSON(s string) []byte {
-	return []byte(s)
 }
 
 func TestBuildBacktestYAML_Table(t *testing.T) {

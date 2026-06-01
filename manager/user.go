@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -88,11 +89,6 @@ func normalizeStrategyConfig(strategy string, params map[string]interface{}) (st
 	return strategy, params
 }
 
-// userContainerKey returns the composite key for the user container map.
-func userContainerKey(userID, mode string) string {
-	return userID + ":" + mode
-}
-
 type SessionRoleConfig struct {
 	Name         string `json:"name"`
 	Exchange     string `json:"exchange"`
@@ -101,7 +97,6 @@ type SessionRoleConfig struct {
 }
 
 type StrategyEntry struct {
-	ID            string              `json:"id"`
 	Name          string              `json:"name"`
 	Exchange      string              `json:"exchange"`
 	Strategy      string              `json:"strategy"`
@@ -111,161 +106,224 @@ type StrategyEntry struct {
 	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
 }
 
-type UserContainer struct {
-	UserID     string          `json:"user_id"`
-	Mode       string          `json:"mode"`
-	Status     string          `json:"status"`
-	Strategies []StrategyEntry `json:"strategies"`
+// UserMode identifies a user+mode pair for container tracking.
+type UserMode struct {
+	UserID string
+	Mode   string
 }
 
-type UserContainerManager struct {
-	mu    sync.RWMutex
-	users map[string]*UserContainer // key: "{userID}:{mode}"
+// StrategyStore manages bbgo.yaml files on disk as the source of truth
+// for user strategy configurations. No in-memory state, no database sync.
+type StrategyStore struct {
+	dataDir string
 }
 
-func NewUserContainerManager() *UserContainerManager {
-	return &UserContainerManager{users: make(map[string]*UserContainer)}
+func NewStrategyStore(dataDir string) *StrategyStore {
+	return &StrategyStore{dataDir: dataDir}
 }
 
-func (m *UserContainerManager) Get(userID, mode string) (*UserContainer, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	uc, ok := m.users[userContainerKey(userID, mode)]
-	if !ok {
-		return nil, false
+// yamlPath returns the path to bbgo.yaml for a given user/mode.
+func (s *StrategyStore) yamlPath(userID, mode string) string {
+	dir := filepath.Join(s.dataDir, userID)
+	if mode == ModePaper {
+		dir += "-paper"
 	}
-	return cloneUserContainer(uc), true
+	return filepath.Join(dir, "bbgo.yaml")
 }
 
-// GetByUser returns all containers for a user (live and/or paper).
-func (m *UserContainerManager) GetByUser(userID string) []*UserContainer {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	var result []*UserContainer
-	for _, uc := range m.users {
-		if uc.UserID == userID {
-			result = append(result, cloneUserContainer(uc))
+// hostDir returns the host directory for user/mode config files.
+func (s *StrategyStore) hostDir(userID, mode string) string {
+	dir := filepath.Join(s.dataDir, userID)
+	if mode == ModePaper {
+		dir += "-paper"
+	}
+	return dir
+}
+
+// ReadYAML reads the raw bbgo.yaml content for a user/mode.
+func (s *StrategyStore) ReadYAML(userID, mode string) ([]byte, error) {
+	return os.ReadFile(s.yamlPath(userID, mode))
+}
+
+// YAMLExists returns true if a bbgo.yaml exists for the user/mode.
+func (s *StrategyStore) YAMLExists(userID, mode string) bool {
+	_, err := os.Stat(s.yamlPath(userID, mode))
+	return err == nil
+}
+
+// ListStrategies parses bbgo.yaml and returns the configured strategy entries.
+func (s *StrategyStore) ListStrategies(userID, mode string) ([]StrategyEntry, error) {
+	data, err := s.ReadYAML(userID, mode)
+	if err != nil {
+		return nil, err
+	}
+	return parseStrategiesFromYAML(data)
+}
+
+// parseStrategiesFromYAML extracts StrategyEntry list from bbgo config YAML.
+func parseStrategiesFromYAML(data []byte) ([]StrategyEntry, error) {
+	var cfg bbgoConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("parse bbgo.yaml: %w", err)
+	}
+
+	var entries []StrategyEntry
+
+	for _, es := range cfg.ExchangeStrategies {
+		entry, ok := parseExchangeStrategyEntry(es)
+		if ok {
+			entries = append(entries, entry)
+		}
+	}
+
+	for _, cs := range cfg.CrossExchangeStrategies {
+		entry, ok := parseCrossStrategyEntry(cs)
+		if ok {
+			entries = append(entries, entry)
+		}
+	}
+
+	return entries, nil
+}
+
+// parseExchangeStrategyEntry extracts a StrategyEntry from an exchangeStrategy YAML map.
+// Format: {"on": "binance", "grid2": {symbol: "BTCUSDT", ...}}
+func parseExchangeStrategyEntry(m map[string]interface{}) (StrategyEntry, bool) {
+	exchange, _ := m["on"].(string)
+	if exchange == "" {
+		return StrategyEntry{}, false
+	}
+
+	for key, val := range m {
+		if key == "on" {
+			continue
+		}
+		config, err := json.Marshal(val)
+		if err != nil {
+			continue
+		}
+		return StrategyEntry{
+			Exchange: exchange,
+			Strategy: key,
+			Config:   config,
+		}, true
+	}
+	return StrategyEntry{}, false
+}
+
+// parseCrossStrategyEntry extracts a StrategyEntry from a crossExchangeStrategy YAML map.
+// Format: {"xmaker": {symbol: "BTCUSDT", ...}}
+func parseCrossStrategyEntry(m map[string]interface{}) (StrategyEntry, bool) {
+	for key, val := range m {
+		config, err := json.Marshal(val)
+		if err != nil {
+			continue
+		}
+		return StrategyEntry{
+			Strategy:      key,
+			Config:        config,
+			CrossExchange: true,
+		}, true
+	}
+	return StrategyEntry{}, false
+}
+
+// AddStrategy adds a new strategy, regenerates bbgo.yaml, and writes to disk.
+func (s *StrategyStore) AddStrategy(userID, mode string, entry StrategyEntry, hasCredentials func(exchange string) bool) error {
+	var existing []StrategyEntry
+	if data, err := s.ReadYAML(userID, mode); err == nil {
+		existing, _ = parseStrategiesFromYAML(data)
+	}
+	existing = append(existing, entry)
+
+	return s.writeYAML(userID, mode, existing, hasCredentials)
+}
+
+// RemoveStrategy removes a strategy by type+symbol match, regenerates bbgo.yaml.
+// Returns (found bool, err error).
+func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol string) (bool, error) {
+	entries, err := s.ListStrategies(userID, mode)
+	if err != nil {
+		return false, err
+	}
+
+	filtered := make([]StrategyEntry, 0, len(entries))
+	found := false
+	for _, e := range entries {
+		eSymbol := extractSymbolFromConfig(e.Config)
+		if e.Strategy == strategy && eSymbol == symbol && !found {
+			found = true
+			continue
+		}
+		filtered = append(filtered, e)
+	}
+	if !found {
+		return false, nil
+	}
+
+	if len(filtered) == 0 {
+		os.Remove(s.yamlPath(userID, mode))
+		return true, nil
+	}
+
+	hasCred := func(string) bool { return false }
+	return true, s.writeYAML(userID, mode, filtered, hasCred)
+}
+
+// writeYAML regenerates bbgo.yaml from the given strategy entries.
+func (s *StrategyStore) writeYAML(userID, mode string, entries []StrategyEntry, hasCredentials func(exchange string) bool) error {
+	dir := s.hostDir(userID, mode)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	yamlContent, err := buildUserYAML(userID, mode, entries, hasCredentials)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(s.yamlPath(userID, mode), yamlContent, 0o644)
+}
+
+// extractSymbolFromConfig returns the symbol from a strategy config JSON.
+func extractSymbolFromConfig(config json.RawMessage) string {
+	var m map[string]interface{}
+	if err := json.Unmarshal(config, &m); err != nil {
+		return ""
+	}
+	s, _ := m["symbol"].(string)
+	return s
+}
+
+// ScanUsers scans DATA_DIR for bbgo.yaml files and returns discovered user/mode pairs.
+func (s *StrategyStore) ScanUsers() []UserMode {
+	var result []UserMode
+	entries, err := os.ReadDir(s.dataDir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
+		if _, err := os.Stat(yamlPath); err == nil {
+			userID := name
+			result = append(result, UserMode{UserID: userID, Mode: ModeLive})
+		}
+		if strings.HasSuffix(name, "-paper") {
+			yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
+			if _, err := os.Stat(yamlPath); err == nil {
+				userID := strings.TrimSuffix(name, "-paper")
+				result = append(result, UserMode{UserID: userID, Mode: ModePaper})
+			}
 		}
 	}
 	return result
 }
 
-// FindStrategy searches all containers for a user to find one containing the given strategyID.
-// Returns the container mode and whether it was found.
-func (m *UserContainerManager) FindStrategy(userID, strategyID string) (string, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, uc := range m.users {
-		if uc.UserID != userID {
-			continue
-		}
-		for _, s := range uc.Strategies {
-			if s.ID == strategyID {
-				return uc.Mode, true
-			}
-		}
-	}
-	return "", false
-}
-
-func (m *UserContainerManager) UpdateStatus(userID, mode, status string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if uc, ok := m.users[userContainerKey(userID, mode)]; ok {
-		uc.Status = status
-	}
-}
-
-func (m *UserContainerManager) CompareAndSetStatus(userID, mode, oldStatus, newStatus string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if uc, ok := m.users[userContainerKey(userID, mode)]; ok && uc.Status == oldStatus {
-		uc.Status = newStatus
-		return true
-	}
-	return false
-}
-
-func (m *UserContainerManager) AddStrategy(userID, mode string, entry StrategyEntry) (*UserContainer, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	key := userContainerKey(userID, mode)
-	uc, ok := m.users[key]
-	created := !ok
-	if !ok {
-		uc = &UserContainer{
-			UserID:     userID,
-			Mode:       mode,
-			Status:     StatusStopped,
-			Strategies: []StrategyEntry{},
-		}
-		m.users[key] = uc
-	}
-	uc.Strategies = append(uc.Strategies, entry)
-	return cloneUserContainer(uc), created
-}
-
-// RemoveStrategy removes a strategy from whichever container holds it.
-// Returns (found, modeOfContainer).
-func (m *UserContainerManager) RemoveStrategy(userID, strategyID string) (bool, string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for key, uc := range m.users {
-		if uc.UserID != userID {
-			continue
-		}
-		for i, s := range uc.Strategies {
-			if s.ID == strategyID {
-				uc.Strategies = append(uc.Strategies[:i], uc.Strategies[i+1:]...)
-				if len(uc.Strategies) == 0 {
-					delete(m.users, key)
-				}
-				return true, uc.Mode
-			}
-		}
-	}
-	return false, ""
-}
-
-func (m *UserContainerManager) ListUsers() []*UserContainer {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	list := make([]*UserContainer, 0, len(m.users))
-	for _, uc := range m.users {
-		list = append(list, cloneUserContainer(uc))
-	}
-	return list
-}
-
-// RegisterContainer creates a UserContainer entry without strategies.
-// Used for orphaned containers discovered in Docker but not tracked in Supabase.
-func (m *UserContainerManager) RegisterContainer(userID, mode, status string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := userContainerKey(userID, mode)
-	if _, ok := m.users[key]; ok {
-		return
-	}
-	m.users[key] = &UserContainer{
-		UserID:     userID,
-		Mode:       mode,
-		Status:     status,
-		Strategies: []StrategyEntry{},
-	}
-}
-
-func (m *UserContainerManager) Restore(users []*UserContainer) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.users = make(map[string]*UserContainer)
-	for _, uc := range users {
-		if uc.Mode == "" {
-			uc.Mode = ModeLive
-		}
-		m.users[userContainerKey(uc.UserID, uc.Mode)] = uc
-	}
-}
+// --- YAML config types ---
 
 type databaseConfig struct {
 	Driver string `yaml:"driver"`
@@ -307,17 +365,18 @@ type environmentConfig struct {
 	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery"`
 }
 
-// buildUserYAML generates the bbgo YAML config for a container. The mode is determined
-// by uc.Mode — paper containers get PAPER_TRADE=1, live containers do not.
-func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool) ([]byte, error) {
+// buildUserYAML generates the bbgo YAML config from strategy entries.
+func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentials func(exchange string) bool) ([]byte, error) {
 	exchanges := map[string]exchangeConfig{}
 	sessions := map[string]sessionConfig{}
 	var exchangeStrategies []map[string]interface{}
 	var crossStrategies []map[string]interface{}
 
-	for _, s := range uc.Strategies {
+	for _, s := range strategies {
 		var params map[string]interface{}
-		if err := json.Unmarshal(s.Config, &params); err != nil {
+		if len(s.Config) == 0 {
+			params = map[string]interface{}{}
+		} else if err := json.Unmarshal(s.Config, &params); err != nil {
 			var rawStr string
 			if err2 := json.Unmarshal(s.Config, &rawStr); err2 == nil {
 				strategyID := s.Strategy
@@ -336,7 +395,7 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		s.Strategy, params = normalizeStrategyConfig(s.Strategy, params)
 
 		if s.CrossExchange {
-			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials, uc.Mode)
+			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials, mode)
 			crossStrategies = append(crossStrategies, csEntry)
 			continue
 		}
@@ -362,17 +421,17 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		exchangeStrategies = append(exchangeStrategies, entry)
 	}
 
-	dataDir := uc.UserID
-	if uc.Mode == ModePaper {
-		dataDir = uc.UserID + "-paper"
+	dataDir := userID
+	if mode == ModePaper {
+		dataDir = userID + "-paper"
 	}
 	cfg := bbgoConfig{
 		Database: &databaseConfig{
 			Driver: "sqlite3",
 			DSN:    fmt.Sprintf("file:/data/%s/bbgo.db?cache=shared&_journal_mode=WAL", dataDir),
 		},
-		Sessions:                sessions,
-		Exchange:                exchanges,
+		Sessions: sessions,
+		Exchange: exchanges,
 		Sync: &syncConfig{
 			UserDataStream: &syncUserDataStreamConfig{
 				Trades:       true,
@@ -383,7 +442,7 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 		CrossExchangeStrategies: crossStrategies,
 	}
 	cfg.Environment = &environmentConfig{}
-	if uc.Mode == ModePaper {
+	if mode == ModePaper {
 		cfg.Environment.PaperTrade = "1"
 	} else {
 		cfg.Environment.DisableStartupBalanceQuery = true
@@ -391,7 +450,7 @@ func buildUserYAML(uc *UserContainer, hasCredentials func(exchange string) bool)
 
 	out, err := yaml.Marshal(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("marshal bbgo config for user %s: %w", uc.UserID, err)
+		return nil, fmt.Errorf("marshal bbgo config for user %s: %w", userID, err)
 	}
 	return out, nil
 }
@@ -554,13 +613,4 @@ func isValidTradingPair(symbol string) bool {
 		}
 	}
 	return false
-}
-
-func cloneUserContainer(uc *UserContainer) *UserContainer {
-	cp := *uc
-	if len(uc.Strategies) > 0 {
-		cp.Strategies = make([]StrategyEntry, len(uc.Strategies))
-		copy(cp.Strategies, uc.Strategies)
-	}
-	return &cp
 }

@@ -10,15 +10,23 @@ import (
 )
 
 func setupMarketDataAPI(hub *MarketDataHub) (*API, *chi.Mux) {
+	return setupMarketDataAPIWithTestnet(hub, nil)
+}
+
+func setupMarketDataAPIWithTestnet(hub *MarketDataHub, testnetHub *MarketDataHub) (*API, *chi.Mux) {
 	cfg := &Config{
-		SupabaseURL:  "http://localhost:1",
-		SupabaseKey:  "test",
-		ManagerToken: "test-token",
+		SupabaseURL:               "http://localhost:1",
+		SupabaseKey:               "test",
+		ManagerToken:              "test-token",
+		MarketDataAddr:            "bbgo-marketdata:9090",
+		MarketDataRESTAddr:        "bbgo-marketdata:8080",
+		MarketDataTestnetAddr:     "bbgo-marketdata-testnet:9090",
+		MarketDataTestnetRESTAddr: "bbgo-marketdata-testnet:8080",
 	}
-	users := NewUserContainerManager()
+	store := NewStrategyStore("")
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, hub, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, hub, testnetHub, nil, nil, nil)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

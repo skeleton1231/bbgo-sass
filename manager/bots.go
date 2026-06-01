@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -9,18 +9,17 @@ import (
 
 // Bot represents a single strategy instance (a "bot" in the web UI).
 type Bot struct {
-	ID              string              `json:"id"`
-	Name            string              `json:"name"`
-	Exchange        string              `json:"exchange"`
-	Strategy        string              `json:"strategy"`
-	Config          json.RawMessage     `json:"config"`
-	Mode            string              `json:"mode"`
-	CrossExchange   bool                `json:"crossExchange"`
-	Sessions        []SessionRoleConfig `json:"sessions,omitempty"`
-	ContainerStatus string              `json:"container_status"`
+	ID              string          `json:"id"`
+	Strategy        string          `json:"strategy"`
+	Symbol          string          `json:"symbol"`
+	Session         string          `json:"session"`
+	State           interface{}     `json:"state"`
+	ContainerStatus string          `json:"container_status"`
+	Mode            string          `json:"mode"`
 }
 
-// ListBots returns all bots (strategy instances) for a user, optionally filtered by mode.
+// ListBots returns all bots for a user. Only available when container is running
+// (data comes from bbgo API). Returns empty list for stopped containers.
 func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
@@ -28,25 +27,34 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mode := r.URL.Query().Get("mode")
-	containers := api.users.GetByUser(userID)
+	modes := []string{ModeLive, ModePaper}
+	if mode != "" {
+		modes = []string{mode}
+	}
 
 	var bots []Bot
-	for _, uc := range containers {
-		if mode != "" && uc.Mode != mode {
+	for _, m := range modes {
+		if !api.isContainerRunning(userID, m) {
 			continue
 		}
-		api.refreshContainerStatus(uc)
-		for _, s := range uc.Strategies {
+		client := api.newBBGoClient(api.container.APIURL(userID, m))
+		strategies, err := client.GetStrategies()
+		if err != nil {
+			continue
+		}
+		for _, s := range strategies {
+			id, _ := s["strategyInstanceID"].(string)
+			strat, _ := s["strategy"].(string)
+			symbol, _ := s["symbol"].(string)
+			session, _ := s["session"].(string)
 			bots = append(bots, Bot{
-				ID:              s.ID,
-				Name:            s.Name,
-				Exchange:        s.Exchange,
-				Strategy:        s.Strategy,
-				Config:          s.Config,
-				Mode:            s.Mode,
-				CrossExchange:   s.CrossExchange,
-				Sessions:        s.Sessions,
-				ContainerStatus: uc.Status,
+				ID:              id,
+				Strategy:        strat,
+				Symbol:          symbol,
+				Session:         session,
+				State:           s,
+				ContainerStatus: StatusRunning,
+				Mode:            m,
 			})
 		}
 	}
@@ -59,7 +67,7 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetBot returns a single bot (strategy instance) by its ID.
+// GetBot returns a single bot by bbgo strategyInstanceID. Only works when container is running.
 func (api *API) GetBot(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
@@ -67,42 +75,37 @@ func (api *API) GetBot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	botID := chi.URLParam(r, "botID")
-	mode, found := api.users.FindStrategy(userID, botID)
-	if !found {
-		writeError(w, http.StatusNotFound, "bot not found")
-		return
-	}
 
-	uc, exists := api.users.Get(userID, mode)
-	if !exists {
-		writeError(w, http.StatusNotFound, "bot not found")
-		return
-	}
-
-	api.refreshContainerStatus(uc)
-
-	var entry *StrategyEntry
-	for i := range uc.Strategies {
-		if uc.Strategies[i].ID == botID {
-			e := uc.Strategies[i]
-			entry = &e
-			break
+	// Search across both modes
+	for _, m := range []string{ModeLive, ModePaper} {
+		if !api.isContainerRunning(userID, m) {
+			continue
+		}
+		client := api.newBBGoClient(api.container.APIURL(userID, m))
+		strategies, err := client.GetStrategies()
+		if err != nil {
+			continue
+		}
+		for _, s := range strategies {
+			id, _ := s["strategyInstanceID"].(string)
+			if id != botID {
+				continue
+			}
+			strat, _ := s["strategy"].(string)
+			symbol, _ := s["symbol"].(string)
+			session, _ := s["session"].(string)
+			writeJSON(w, http.StatusOK, Bot{
+				ID:              id,
+				Strategy:        strat,
+				Symbol:          symbol,
+				Session:         session,
+				State:           s,
+				ContainerStatus: StatusRunning,
+				Mode:            m,
+			})
+			return
 		}
 	}
-	if entry == nil {
-		writeError(w, http.StatusNotFound, "bot not found")
-		return
-	}
 
-	writeJSON(w, http.StatusOK, Bot{
-		ID:              entry.ID,
-		Name:            entry.Name,
-		Exchange:        entry.Exchange,
-		Strategy:        entry.Strategy,
-		Config:          entry.Config,
-		Mode:            entry.Mode,
-		CrossExchange:   entry.CrossExchange,
-		Sessions:        entry.Sessions,
-		ContainerStatus: uc.Status,
-	})
+	writeError(w, http.StatusNotFound, fmt.Sprintf("bot %s not found (container may be stopped)", botID))
 }

@@ -37,28 +37,18 @@ func TestAPI_CreateStrategy(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp UserContainer
+	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp.UserID != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
-		t.Errorf("expected user ID in response, got %s", resp.UserID)
+	if resp["user_id"] != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
+		t.Errorf("expected user ID in response, got %v", resp["user_id"])
 	}
-	if len(resp.Strategies) != 1 {
-		t.Errorf("expected 1 strategy (new paper strategy), got %d", len(resp.Strategies))
-	}
-	found := false
-	for _, s := range resp.Strategies {
-		if s.Strategy == "grid2" && s.Name == "My Grid" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected to find new grid2 strategy in response")
+	if resp["status"] != "created" {
+		t.Errorf("expected status 'created', got %v", resp["status"])
 	}
 }
 
 func TestAPI_CreateStrategy_MissingStrategy(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	body := map[string]interface{}{"exchange": "binance"}
@@ -74,7 +64,7 @@ func TestAPI_CreateStrategy_MissingStrategy(t *testing.T) {
 }
 
 func TestAPI_CreateStrategy_MissingExchange(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	body := map[string]interface{}{"strategy": "grid2"}
@@ -114,25 +104,15 @@ func TestAPI_CreateStrategy_CrossExchange(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp UserContainer
+	var resp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&resp)
-	found := false
-	for _, s := range resp.Strategies {
-		if s.Strategy == "xmaker" && s.CrossExchange {
-			found = true
-			if len(s.Sessions) != 2 {
-				t.Errorf("expected 2 sessions, got %d", len(s.Sessions))
-			}
-			break
-		}
-	}
-	if !found {
-		t.Error("expected to find cross-exchange xmaker strategy")
+	if resp["status"] != "created" {
+		t.Errorf("expected status 'created', got %v", resp["status"])
 	}
 }
 
 func TestAPI_CreateStrategy_CrossExchangeMissingSessions(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	body := map[string]interface{}{"strategy": "xmaker", "crossExchange": true}
@@ -148,7 +128,22 @@ func TestAPI_CreateStrategy_CrossExchangeMissingSessions(t *testing.T) {
 }
 
 func TestAPI_ListStrategies(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	bbgoHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT"},
+				},
+			})
+			return
+		}
+		if r.URL.Path == "/api/ping" {
+			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	api, _ := setupTestAPI(t, bbgoHandler)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", nil)
@@ -174,7 +169,7 @@ func TestAPI_ListStrategies(t *testing.T) {
 }
 
 func TestAPI_ListStrategies_UserNotFound(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/00000000-0000-0000-0000-000000000000/strategies", nil)
@@ -194,7 +189,19 @@ func TestAPI_ListStrategies_UserNotFound(t *testing.T) {
 }
 
 func TestAPI_DeleteStrategy(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance"},
+				},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"message": "ok"})
+	}))
+	defer bbgoSrv.Close()
+
 	r := testRouter(api)
 
 	req := httptest.NewRequest("DELETE", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies/s1", nil)
@@ -205,14 +212,26 @@ func TestAPI_DeleteStrategy(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
-	if uc != nil && len(uc.Strategies) != 0 {
-		t.Errorf("expected 0 strategies after delete, got %d", len(uc.Strategies))
+	strats, _ := api.strategies.ListStrategies("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
+	if len(strats) != 0 {
+		t.Errorf("expected 0 strategies after delete, got %d", len(strats))
 	}
 }
 
 func TestAPI_DeleteStrategy_NotFound(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/strategies/single" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"strategies": []map[string]interface{}{
+					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance"},
+				},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"message": "ok"})
+	}))
+	defer bbgoSrv.Close()
+
 	r := testRouter(api)
 
 	req := httptest.NewRequest("DELETE", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies/nonexistent", nil)
@@ -225,7 +244,7 @@ func TestAPI_DeleteStrategy_NotFound(t *testing.T) {
 }
 
 func TestAPI_StopUser(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/stop", nil)
@@ -241,24 +260,15 @@ func TestAPI_StopUser(t *testing.T) {
 	if resp["status"] != "stopped" {
 		t.Errorf("expected stopped status, got %s", resp["status"])
 	}
-
-	uc, _ := api.users.Get("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive)
-	if uc.Status != StatusStopped {
-		t.Errorf("expected user status stopped, got %s", uc.Status)
-	}
 }
 
 func TestAPI_StartUser_NoStrategies(t *testing.T) {
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:   ModeLive,
-		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status: StatusStopped,
-	}
+	store, _ := newTestStore(t)
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -271,7 +281,7 @@ func TestAPI_StartUser_NoStrategies(t *testing.T) {
 }
 
 func TestAPI_UserStatus(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status", nil)
@@ -295,7 +305,7 @@ func TestAPI_UserStatus(t *testing.T) {
 }
 
 func TestAPI_Health(t *testing.T) {
-	api, _ := setupTestAPI(nil)
+	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/health", nil)
@@ -320,7 +330,7 @@ func TestAPI_Health(t *testing.T) {
 }
 
 func TestAPI_BBGoStrategies(t *testing.T) {
-	api, bbgoSrv := setupTestAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"strategies": []map[string]interface{}{
@@ -352,13 +362,7 @@ func TestAPI_BBGoStrategies(t *testing.T) {
 
 func setupStoppedTestAPI(t *testing.T) *API {
 	t.Helper()
-	users := NewUserContainerManager()
-	users.users["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"+ModeLive] = &UserContainer{
-		Mode:       ModeLive,
-		UserID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-		Status:     StatusStopped,
-		Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}},
-	}
+	store, _ := newTestStore(t)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -367,22 +371,21 @@ func setupStoppedTestAPI(t *testing.T) *API {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, users, cm, proxy, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api.containerRunning = func(_, _ string) bool { return false }
 	return api
 }
 
 func TestContainerManager_RecoverUsers_Concurrent(t *testing.T) {
-	users := NewUserContainerManager()
-	uc1 := &UserContainer{UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", Status: StatusStopped, Strategies: []StrategyEntry{{ID: "s1", Exchange: "binance", Strategy: "grid"}}}
-	uc2 := &UserContainer{UserID: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff", Status: StatusStopped, Strategies: []StrategyEntry{{ID: "s2", Exchange: "binance", Strategy: "grid"}}}
-	users.Restore([]*UserContainer{uc1, uc2})
-
 	cfg := &Config{ManagerToken: "test-token", DataDir: t.TempDir()}
 	p := pool.New(5)
 	defer p.Release()
 	cm := &ContainerManager{cfg: cfg, pool: p}
 
-	results := cm.RecoverUsers([]*UserContainer{uc1, uc2})
+	um1 := UserMode{UserID: "user-1", Mode: ModeLive}
+	um2 := UserMode{UserID: "user-2", Mode: ModeLive}
+
+	results := cm.RecoverUsers([]UserMode{um1, um2})
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
@@ -396,12 +399,6 @@ func TestContainerManager_RecoverUsers_Concurrent(t *testing.T) {
 		if r.Status == "" {
 			t.Error("expected non-empty status in result")
 		}
-	}
-
-	// Verify original UserContainer structs were NOT mutated
-	orig1, _ := users.Get(uc1.UserID, ModeLive)
-	if orig1.Status != StatusStopped {
-		t.Errorf("original user status should not be mutated by RecoverUsers, got %s", orig1.Status)
 	}
 }
 

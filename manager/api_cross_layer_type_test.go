@@ -10,30 +10,26 @@ import (
 // TestCrossExchangeYAML_XMaker verifies the full YAML generation for an
 // xmaker cross-exchange strategy with maker+hedge sessions.
 func TestCrossExchangeYAML_XMaker(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				Mode:          "live",
-				CrossExchange: true,
-				Config: rawJSON(`{
-					"symbol": "BTCUSDT",
-					"spread": 0.001,
-					"quantity": 0.01,
-					"updateInterval": "1m",
-					"hedgeInterval": "5m"
-				}`),
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-				},
+	strategies := []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			Mode:          "live",
+			CrossExchange: true,
+			Config: rawJSON(`{
+				"symbol": "BTCUSDT",
+				"spread": 0.001,
+				"quantity": 0.01,
+				"updateInterval": "1m",
+				"hedgeInterval": "5m"
+			}`),
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 			},
 		},
 	}
 
-	yamlBytes, err := buildUserYAML(uc, func(ex string) bool { return true })
+	yamlBytes, err := buildUserYAML("test-user", ModeLive, strategies, func(ex string) bool { return true })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,24 +69,20 @@ func TestCrossExchangeYAML_XMaker(t *testing.T) {
 
 // TestCrossExchangeYAML_PaperMode verifies paper mode for cross-exchange.
 func TestCrossExchangeYAML_PaperMode(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				Mode:          "paper",
-				CrossExchange: true,
-				Config:        rawJSON(`{"symbol": "ETHUSDT", "quantity": 0.1}`),
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-					{Name: "hedge", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
-				},
+	strategies := []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			Mode:          "paper",
+			CrossExchange: true,
+			Config:        rawJSON(`{"symbol": "ETHUSDT", "quantity": 0.1}`),
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+				{Name: "hedge", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
 			},
 		},
 	}
 
-	yamlBytes, err := buildUserYAML(uc, func(ex string) bool { return false })
+	yamlBytes, err := buildUserYAML("test-user", ModePaper, strategies, func(ex string) bool { return false })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,24 +111,20 @@ func TestEnvArgs_MultiExchangeCredentials(t *testing.T) {
 	cfg := &Config{DataVolume: "vol", DockerNetwork: "net", BBGOImage: "img"}
 	cm := NewContainerManager(cfg, creds, nil)
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Strategy:      "xmaker",
-				Mode:          "live",
-				CrossExchange: true,
-				Config:        rawJSON(`{"symbol":"BTCUSDT","quantity":0.01}`),
-				Sessions: []SessionRoleConfig{
-					{Name: "maker", Exchange: "binance"},
-					{Name: "hedge", Exchange: "bybit", Futures: true},
-				},
+	strategies := []StrategyEntry{
+		{
+			Strategy:      "xmaker",
+			Mode:          "live",
+			CrossExchange: true,
+			Config:        rawJSON(`{"symbol":"BTCUSDT","quantity":0.01}`),
+			Sessions: []SessionRoleConfig{
+				{Name: "maker", Exchange: "binance"},
+				{Name: "hedge", Exchange: "bybit", Futures: true},
 			},
 		},
 	}
 
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, strategies)
 	cmdStr := strings.Join(args, " ")
 
 	if !strings.Contains(cmdStr, "BINANCE_API_KEY=binance-key") {
@@ -170,16 +158,12 @@ func TestEnvArgs_CredentialDeduplication(t *testing.T) {
 	cfg := &Config{DataVolume: "vol", DockerNetwork: "net", BBGOImage: "img"}
 	cm := NewContainerManager(cfg, creds, nil)
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-			{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"ETHUSDT"}`)},
-		},
+	strategies := []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+		{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"ETHUSDT"}`)},
 	}
 
-	args := cm.envArgs(uc)
+	args := cm.envArgs("test-user", ModeLive, strategies)
 	count := strings.Count(strings.Join(args, " "), "BINANCE_API_KEY=key")
 	if count != 1 {
 		t.Errorf("expected BINANCE_API_KEY injected exactly once, got %d", count)
@@ -234,20 +218,16 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 			if tt.mode == "paper" {
 				containerMode = ModePaper
 			}
-			uc := &UserContainer{
-				Mode:   containerMode,
-				UserID: "test-user",
-				Strategies: []StrategyEntry{
-					{
-						Strategy: tt.strategy,
-						Mode:     tt.mode,
-						Config:   rawJSON(tt.config),
-						Exchange: "binance",
-					},
+			strategies := []StrategyEntry{
+				{
+					Strategy: tt.strategy,
+					Mode:     tt.mode,
+					Config:   rawJSON(tt.config),
+					Exchange: "binance",
 				},
 			}
 
-			yamlBytes, err := buildUserYAML(uc, func(ex string) bool { return tt.mode == "live" })
+			yamlBytes, err := buildUserYAML("test-user", containerMode, strategies, func(ex string) bool { return tt.mode == "live" })
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -327,20 +307,16 @@ func TestExchangePrefixes_FrontendBackendAlignment(t *testing.T) {
 
 // TestYAMLStructure_ParsesCorrectly verifies generated YAML is valid bbgo config.
 func TestYAMLStructure_ParsesCorrectly(t *testing.T) {
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{
-				Exchange: "binance",
-				Strategy: "grid2",
-				Mode:     "paper",
-				Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`),
-			},
+	strategies := []StrategyEntry{
+		{
+			Exchange: "binance",
+			Strategy: "grid2",
+			Mode:     "paper",
+			Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`),
 		},
 	}
 
-	yamlBytes, err := buildUserYAML(uc, func(ex string) bool { return false })
+	yamlBytes, err := buildUserYAML("test-user", ModePaper, strategies, func(ex string) bool { return false })
 	if err != nil {
 		t.Fatal(err)
 	}

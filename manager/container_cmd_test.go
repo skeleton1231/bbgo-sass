@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -35,15 +36,13 @@ func TestCreateAndStart_FullDockerCommand_LiveMode(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live",
-				Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	// Write YAML to disk so CreateAndStart can read it
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -123,15 +122,12 @@ func TestCreateAndStart_FullDockerCommand_PaperMode(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModePaper,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "paper",
-				Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModePaper, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "paper",
+			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModePaper); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -165,15 +161,12 @@ func TestCreateAndStart_YAMLWrittenForLive(t *testing.T) {
 		return "container-id", nil
 	}
 
-	uc := &UserContainer{
-		Mode:   ModeLive,
-		UserID: "test-user",
-		Strategies: []StrategyEntry{
-			{Exchange: "binance", Strategy: "grid2", Mode: "live",
-				Config: rawJSON(`{"symbol":"ETHUSDT","gridNumber":5}`)},
-		},
-	}
-	if err := cm.CreateAndStart(uc); err != nil {
+	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
+		{Exchange: "binance", Strategy: "grid2", Mode: "live",
+			Config: rawJSON(`{"symbol":"ETHUSDT","gridNumber":5}`)},
+	})
+
+	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
 		t.Fatalf("CreateAndStart: %v", err)
 	}
 
@@ -194,5 +187,24 @@ func TestCreateAndStart_YAMLWrittenForLive(t *testing.T) {
 	}
 	if !strings.Contains(yaml, "gridNumber:") {
 		t.Error("expected gridNumber config in YAML")
+	}
+}
+
+// writeTestUserYAML writes a bbgo.yaml for the given user/mode/strategies
+// into the data directory structure expected by CreateAndStart.
+func writeTestUserYAML(t *testing.T, dataDir, userID, mode string, strategies []StrategyEntry) {
+	t.Helper()
+	userDir := filepath.Join(dataDir, userID)
+	if mode == ModePaper {
+		userDir += "-paper"
+	}
+	os.MkdirAll(userDir, 0o755)
+
+	yaml, err := buildUserYAML(userID, mode, strategies, func(string) bool { return false })
+	if err != nil {
+		t.Fatalf("build yaml for %s/%s: %v", userID, mode, err)
+	}
+	if err := os.WriteFile(filepath.Join(userDir, "bbgo.yaml"), yaml, 0o644); err != nil {
+		t.Fatalf("write yaml: %v", err)
 	}
 }
