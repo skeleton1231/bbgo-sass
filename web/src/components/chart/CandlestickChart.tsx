@@ -126,6 +126,7 @@ export function CandlestickChart({
   const prevCandleCountRef = useRef(0)
   const prevDataKeyRef = useRef(dataKey)
   const hadDataRef = useRef(false)
+  const isInitialLoadRef = useRef(true)
   const onVisibleRangeChangeRef = useRef(onVisibleTimeRangeChange)
   const onCrosshairMoveRef = useRef(onCrosshairMove)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: TradeMarker } | null>(null)
@@ -143,6 +144,7 @@ export function CandlestickChart({
       prevDataKeyRef.current = dataKey
       prevCandleCountRef.current = 0
       hadDataRef.current = false
+      isInitialLoadRef.current = true
     }
   }, [dataKey])
 
@@ -211,6 +213,7 @@ export function CandlestickChart({
     priceLinesRef.current = []
     markersRef.current = null
     prevMarkersKeyRef.current = ''
+    isInitialLoadRef.current = true
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -273,14 +276,17 @@ export function CandlestickChart({
       candleSeriesRef.current.setData(candleData)
       volumeSeriesRef.current.setData(volumeData)
       const ts = chartRef.current?.timeScale()
-      if (ts && candles.length > 80) {
-        const visibleStart = candles[candles.length - 80]
-        const visibleEnd = candles[candles.length - 1]
-        if (visibleStart && visibleEnd) {
-          ts.setVisibleRange({ from: visibleStart.time, to: visibleEnd.time })
+      if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false
+        if (ts && candles.length > 80) {
+          const visibleStart = candles[candles.length - 80]
+          const visibleEnd = candles[candles.length - 1]
+          if (visibleStart && visibleEnd) {
+            ts.setVisibleRange({ from: visibleStart.time, to: visibleEnd.time })
+          }
+        } else {
+          ts?.fitContent()
         }
-      } else {
-        ts?.fitContent()
       }
     } else {
       const lastCandle = candles[candles.length - 1]
@@ -303,6 +309,7 @@ export function CandlestickChart({
     }
 
     if (tradeMarkers && tradeMarkers.length > 0) {
+      const candleTimes = candles.map((c) => c.time as number)
       const markers = tradeMarkers
         .sort((a, b) => (a.time as number) - (b.time as number))
         .map((t) => {
@@ -310,8 +317,9 @@ export function CandlestickChart({
           const actionLabel = action === 'open' ? ' Open' : action === 'close' ? ' Close' : action === 'add' ? ' Add' : action === 'reduce' ? ' Reduce' : ''
           const isOpen = action === 'open'
           const isClose = action === 'close'
+          const snappedTime = snapToNearestCandle(t.time as number, candleTimes)
           return {
-            time: t.time,
+            time: (snappedTime ?? t.time) as Time,
             position: t.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
             color: isOpen ? '#3b82f6' : isClose ? '#f97316' : t.side === 'BUY' ? '#22c55e' : '#ef4444',
             shape: isOpen ? 'circle' as const : isClose ? 'square' as const : t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
@@ -471,6 +479,34 @@ export function CandlestickChart({
       )}
     </div>
   )
+}
+
+function snapToNearestCandle(target: number, sortedCandleTimes: number[]): number | null {
+  if (sortedCandleTimes.length === 0) return null
+  if (sortedCandleTimes.length === 1) {
+    const diff = Math.abs(target - sortedCandleTimes[0]!)
+    return diff <= 7200 ? sortedCandleTimes[0]! : null
+  }
+
+  let lo = 0
+  let hi = sortedCandleTimes.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (sortedCandleTimes[mid]! < target) lo = mid + 1
+    else hi = mid
+  }
+
+  const prev = lo > 0 ? sortedCandleTimes[lo - 1]! : null
+  const next = sortedCandleTimes[lo]!
+
+  let nearest: number
+  if (!prev) {
+    nearest = next
+  } else {
+    nearest = (target - prev) <= (next - target) ? prev : next
+  }
+
+  return Math.abs(target - nearest) <= 7200 ? nearest : null
 }
 
 function TradeTooltip({ x, y, data, onClose }: {

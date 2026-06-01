@@ -114,6 +114,7 @@ export default function BotDetailPage() {
     exchange: activeExchange || exchange,
     symbol,
     interval: klineInterval,
+    mode,
     enabled: !!exchange && !!symbol,
   })
 
@@ -225,8 +226,24 @@ export default function BotDetailPage() {
     if (!strategyStatesData?.strategies) return null
     const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
     if (!matching) return null
-    return extractStrategyStats(matching as Record<string, unknown>)
-  }, [strategyStatesData, findMatchingStrategy])
+    const stats = extractStrategyStats(matching as Record<string, unknown>)
+    if (!stats) return null
+
+    // Fallback: when bbgo strategy state reports zero position but trades show otherwise,
+    // use the trade-computed position from PnL data
+    if (stats.base === 0 && pnlData?.symbols) {
+      const symPnl = pnlData.symbols.find((s) => s.symbol === symbol)
+      if (symPnl && symPnl.openPosition > 0) {
+        return {
+          ...stats,
+          base: symPnl.openPosition,
+          quote: symPnl.openPositionCost,
+          averageCost: symPnl.openPositionCost / symPnl.openPosition,
+        }
+      }
+    }
+    return stats
+  }, [strategyStatesData, findMatchingStrategy, pnlData?.symbols, symbol])
 
   interface DepthMessage {
     type: string
@@ -246,6 +263,7 @@ export default function BotDetailPage() {
 
   const { connected: wsConnected } = useMarketData({
     userId,
+    mode,
     enabled: isRunning,
     onMessage: handleWSMessage,
   })

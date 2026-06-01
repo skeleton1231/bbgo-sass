@@ -70,6 +70,20 @@ describe('computePnlCurve', () => {
     expect(result[1]!.value).toBe(1)
   })
 
+  it('deduplicates same-second trades (floor + keep last)', () => {
+    const trades: PnlTrade[] = [
+      { ...base, side: 'BUY', price: '72000', quantity: '0.001', time: '2026-05-28T10:00:00.100Z' },
+      { ...base, side: 'BUY', price: '72000', quantity: '0.001', time: '2026-05-28T10:00:00.500Z' },
+      { ...base, side: 'SELL', price: '73000', quantity: '0.002', time: '2026-05-28T10:00:01.000Z' },
+    ]
+    const result = computePnlCurve(trades)
+    expect(result).toHaveLength(2)
+    expect(Number.isInteger(result[0]!.time)).toBe(true)
+    expect(Number.isInteger(result[1]!.time)).toBe(true)
+    expect(result[0]!.value).toBe(0)
+    expect(result[1]!.value).toBe(2)
+  })
+
   it('handles multiple round-trip trades', () => {
     const trades: PnlTrade[] = [
       { ...base, side: 'BUY', price: '70000', quantity: '0.001', time: '2026-05-28T10:00:00Z' },

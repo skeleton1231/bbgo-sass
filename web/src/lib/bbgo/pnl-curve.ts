@@ -19,6 +19,13 @@ export interface PnlTrade {
  * Each SELL is matched against previous BUYs to compute profit.
  * Returns an array of cumulative P&L points suitable for LineSeries overlay.
  */
+const QUOTE_CURRENCIES = new Set(['USDT', 'USDC', 'BUSD', 'TUSD', 'DAI', 'FDUSD'])
+
+function feeInQuote(fee: number, feeCurrency?: string, tradePrice?: number): number {
+  if (!feeCurrency || QUOTE_CURRENCIES.has(feeCurrency)) return fee
+  return tradePrice ? fee * tradePrice : fee
+}
+
 export function computePnlCurve(trades: PnlTrade[]): PnlPoint[] {
   if (trades.length === 0) return []
 
@@ -51,10 +58,16 @@ export function computePnlCurve(trades: PnlTrade[]): PnlPoint[] {
       cumulative += price * qty - matchedCost
     }
 
-    cumulative -= fee
+    cumulative -= feeInQuote(fee, trade.feeCurrency, price)
 
-    const ts = new Date(trade.time).getTime() / 1000
-    points.push({ time: ts as Time, value: Math.round(cumulative * 100) / 100 })
+    const ts = Math.floor(new Date(trade.time).getTime() / 1000)
+    const value = Math.round(cumulative * 100) / 100
+    const last = points[points.length - 1]
+    if (last && (last.time as number) === ts) {
+      last.value = value
+    } else {
+      points.push({ time: ts as Time, value })
+    }
   }
 
   return points

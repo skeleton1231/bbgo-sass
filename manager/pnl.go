@@ -8,12 +8,13 @@ import (
 )
 
 type PnLTrade struct {
-	Symbol   string
-	Side     string
-	Price    float64
-	Quantity float64
-	Fee      float64
-	TradedAt string
+	Symbol      string
+	Side        string
+	Price       float64
+	Quantity    float64
+	Fee         float64
+	FeeCurrency string
+	TradedAt    string
 }
 
 type SymbolPnL struct {
@@ -78,6 +79,22 @@ func (q *fifoQueue) remaining() []fifoItem {
 	return q.items[q.head:]
 }
 
+func isQuoteCurrency(currency string) bool {
+	switch currency {
+	case "", "USDT", "USDC", "BUSD", "TUSD", "DAI", "FDUSD":
+		return true
+	}
+	return false
+}
+
+func feeInQuoteCurrency(fee float64, feeCurrency string, tradePrice float64) float64 {
+	fee = math.Abs(fee)
+	if isQuoteCurrency(feeCurrency) {
+		return fee
+	}
+	return fee * tradePrice
+}
+
 func calculatePnL(trades []BBGoTrade) PnLReport {
 	grouped := make(map[string][]PnLTrade)
 	for _, t := range trades {
@@ -92,7 +109,8 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 			Side:     t.Side,
 			Price:    price,
 			Quantity: qty,
-			Fee:      fee,
+			Fee:         fee,
+			FeeCurrency: t.FeeCurrency,
 			TradedAt: t.TradedAt,
 		})
 	}
@@ -110,7 +128,7 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 
 		for _, t := range symTrades {
 			symPnL.TradeCount++
-			symPnL.TotalFees += math.Abs(t.Fee)
+			symPnL.TotalFees += feeInQuoteCurrency(t.Fee, t.FeeCurrency, t.Price)
 
 			if t.Side == "BUY" {
 				symPnL.TotalBuys += t.Quantity
