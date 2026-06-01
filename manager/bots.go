@@ -9,13 +9,48 @@ import (
 
 // Bot represents a single strategy instance (a "bot" in the web UI).
 type Bot struct {
-	ID              string          `json:"id"`
-	Strategy        string          `json:"strategy"`
-	Symbol          string          `json:"symbol"`
-	Session         string          `json:"session"`
-	State           interface{}     `json:"state"`
-	ContainerStatus string          `json:"container_status"`
-	Mode            string          `json:"mode"`
+	ID              string      `json:"id"`
+	Strategy        string      `json:"strategy"`
+	Symbol          string      `json:"symbol"`
+	Exchange        string      `json:"exchange"`
+	Session         string      `json:"session"`
+	Config          interface{} `json:"config"`
+	State           interface{} `json:"state"`
+	ContainerStatus string      `json:"container_status"`
+	Mode            string      `json:"mode"`
+}
+
+// botFromStrategy builds a Bot from a bbgo strategy state map.
+// bbgo returns {"on": [...], "grid2": {symbol, ...}, "strategy": "grid2", "strategyInstanceID": "..."}
+func botFromStrategy(s map[string]interface{}, mode string) Bot {
+	id, _ := s["strategyInstanceID"].(string)
+	strategy, _ := s["strategy"].(string)
+
+	var session string
+	if on, ok := s["on"].([]interface{}); ok && len(on) > 0 {
+		session, _ = on[0].(string)
+	}
+
+	var symbol string
+	var config interface{}
+	if cfg, ok := s[strategy]; ok {
+		config = cfg
+		if m, ok := cfg.(map[string]interface{}); ok {
+			symbol, _ = m["symbol"].(string)
+		}
+	}
+
+	return Bot{
+		ID:              id,
+		Strategy:        strategy,
+		Symbol:          symbol,
+		Exchange:        session,
+		Session:         session,
+		Config:          config,
+		State:           s,
+		ContainerStatus: StatusRunning,
+		Mode:            mode,
+	}
 }
 
 // ListBots returns all bots for a user. Only available when container is running
@@ -43,19 +78,7 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		for _, s := range strategies {
-			id, _ := s["strategyInstanceID"].(string)
-			strat, _ := s["strategy"].(string)
-			symbol, _ := s["symbol"].(string)
-			session, _ := s["session"].(string)
-			bots = append(bots, Bot{
-				ID:              id,
-				Strategy:        strat,
-				Symbol:          symbol,
-				Session:         session,
-				State:           s,
-				ContainerStatus: StatusRunning,
-				Mode:            m,
-			})
+			bots = append(bots, botFromStrategy(s, m))
 		}
 	}
 
@@ -91,18 +114,7 @@ func (api *API) GetBot(w http.ResponseWriter, r *http.Request) {
 			if id != botID {
 				continue
 			}
-			strat, _ := s["strategy"].(string)
-			symbol, _ := s["symbol"].(string)
-			session, _ := s["session"].(string)
-			writeJSON(w, http.StatusOK, Bot{
-				ID:              id,
-				Strategy:        strat,
-				Symbol:          symbol,
-				Session:         session,
-				State:           s,
-				ContainerStatus: StatusRunning,
-				Mode:            m,
-			})
+			writeJSON(w, http.StatusOK, botFromStrategy(s, m))
 			return
 		}
 	}

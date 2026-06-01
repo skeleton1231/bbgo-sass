@@ -60,14 +60,14 @@ export interface UserContainersResponse {
 
 export interface Bot {
   id: string
-  name: string
-  exchange: string
   strategy: string
+  symbol: string
+  exchange: string
+  session: string
   config: Record<string, unknown>
-  mode: 'live' | 'paper'
-  crossExchange: boolean
-  sessions: SessionRoleConfig[]
+  state: Record<string, unknown>
   container_status: 'running' | 'stopped' | 'error' | 'starting'
+  mode: 'live' | 'paper'
 }
 
 export interface BotListResponse {

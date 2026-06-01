@@ -131,8 +131,8 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
       {bots.map((bot) => {
         const status = bot.container_status
         const isRunning = status === 'running'
-        const symbol = (bot.config?.symbol as string) ?? ''
-        const exchange = bot.exchange || (bot.sessions?.[0]?.exchange ?? '')
+        const symbol = bot.symbol || (bot.config?.symbol as string) || ''
+        const exchange = bot.exchange || (bot.session ?? '')
 
         return (
           <div key={bot.id} className="flex items-center justify-between rounded-lg border bg-card p-4">
@@ -142,7 +142,7 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">{bot.name || bot.strategy}</p>
+                  <p className="font-medium">{bot.strategy}</p>
                   <Badge variant="outline" className="rounded-full text-[10px]">
                     {t(`mode.${bot.mode}`)}
                   </Badge>

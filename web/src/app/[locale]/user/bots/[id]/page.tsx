@@ -80,7 +80,7 @@ export default function BotDetailPage() {
 
   const isRunning = bot?.container_status === 'running'
   const exchange = bot?.exchange ?? ''
-  const symbol = (bot?.config?.symbol as string) ?? ''
+  const symbol = bot?.symbol || (bot?.config?.symbol as string) || ''
 
   const [selectedSession, setSelectedSession] = useState('')
   const [klineInterval, setKlineInterval] = useState('1h')
@@ -321,7 +321,7 @@ export default function BotDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             {t('backToBots')}
           </button>
-          <h1 className="text-2xl font-semibold tracking-tight truncate">{bot.name || bot.strategy}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight truncate">{bot.strategy}</h1>
           <p className="text-sm text-muted-foreground">
             {exchange}{symbol ? ` · ${symbol}` : ''} · {bot.strategy} · {t(`mode.${mode}`)}
           </p>

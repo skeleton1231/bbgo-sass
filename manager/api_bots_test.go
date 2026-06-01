@@ -16,9 +16,24 @@ func botBBGoHandler() http.HandlerFunc {
 		if r.URL.Path == "/api/strategies/single" {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"strategies": []map[string]interface{}{
-					{"strategyInstanceID": "strat_grid_btc", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance", "config": map[string]interface{}{"symbol": "BTCUSDT", "gridNumber": float64(10)}},
-					{"strategyInstanceID": "strat_eth_dca", "strategy": "dca", "symbol": "ETHUSDT", "session": "binance"},
-					{"strategyInstanceID": "strat_paper_grid", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
+					{
+						"strategyInstanceID": "strat_grid_btc",
+						"strategy":           "grid2",
+						"on":                 []interface{}{"binance"},
+						"grid2":              map[string]interface{}{"symbol": "BTCUSDT", "gridNumber": float64(10)},
+					},
+					{
+						"strategyInstanceID": "strat_eth_dca",
+						"strategy":           "dca",
+						"on":                 []interface{}{"binance"},
+						"dca":                map[string]interface{}{"symbol": "ETHUSDT"},
+					},
+					{
+						"strategyInstanceID": "strat_paper_grid",
+						"strategy":           "grid2",
+						"on":                 []interface{}{"binance"},
+						"grid2":              map[string]interface{}{"symbol": "BTCUSDT"},
+					},
 				},
 			})
 			return
