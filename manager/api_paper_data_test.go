@@ -11,16 +11,16 @@ import (
 
 func TestBBGoClient_GetSessionTrades_MultipleSymbols(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"trades": map[string]interface{}{
-				"BTCUSDT": map[string]interface{}{
-					"Trades": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"trades": map[string]any{
+				"BTCUSDT": map[string]any{
+					"Trades": []map[string]any{
 						{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1"},
 						{"symbol": "BTCUSDT", "side": "SELL", "price": "51000", "quantity": "0.1"},
 					},
 				},
-				"ETHUSDT": map[string]interface{}{
-					"Trades": []map[string]interface{}{
+				"ETHUSDT": map[string]any{
+					"Trades": []map[string]any{
 						{"symbol": "ETHUSDT", "side": "BUY", "price": "3000", "quantity": "1.0"},
 					},
 				},
@@ -51,8 +51,8 @@ func TestBBGoClient_GetSessionTrades_MultipleSymbols(t *testing.T) {
 
 func TestBBGoClient_GetSessionTrades_EmptyResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"trades": map[string]interface{}{},
+		json.NewEncoder(w).Encode(map[string]any{
+			"trades": map[string]any{},
 		})
 	}))
 	defer srv.Close()
@@ -76,10 +76,10 @@ func TestBBGoTrades_FallbackToSessionTrades(t *testing.T) {
 			return
 		}
 		if r.URL.Path == "/api/sessions/binance/trades" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"trades": map[string]interface{}{
-					"BTCUSDT": map[string]interface{}{
-						"Trades": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"trades": map[string]any{
+					"BTCUSDT": map[string]any{
+						"Trades": []map[string]any{
 							{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1"},
 						},
 					},
@@ -129,9 +129,9 @@ func TestBBGoTrades_FallbackToSessionTrades(t *testing.T) {
 		t.Fatalf("expected 200 after fallback, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	trades, ok := resp["trades"].([]interface{})
+	trades, ok := resp["trades"].([]any)
 	if !ok || len(trades) != 1 {
 		t.Errorf("expected 1 trade from session fallback, got %v", resp["trades"])
 	}
@@ -142,14 +142,14 @@ func TestPnL_PaperMode_SkipsSupabase(t *testing.T) {
 	supaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		supaQueried = true
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 	}))
 	defer supaSrv.Close()
 
 	containerSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/trades" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"trades": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"trades": []map[string]any{
 					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1", "fee": "0.001", "feeCurrency": "BNB", "tradedAt": "2026-01-01T00:00:00Z"},
 				},
 			})

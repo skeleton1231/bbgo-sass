@@ -189,7 +189,7 @@ func TestCreateCredential_Verified_SetsIsVerified(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["is_verified"] != true {
 		t.Errorf("expected is_verified=true, got %v", resp["is_verified"])
@@ -226,7 +226,7 @@ func TestCreateCredential_VerificationFailed_SetsError(t *testing.T) {
 		t.Fatalf("expected 201 (created but unverified), got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["is_verified"] != false {
 		t.Errorf("expected is_verified=false, got %v", resp["is_verified"])

@@ -67,7 +67,7 @@ func TestAPI_BBGoPing(t *testing.T) {
 func TestAPI_BBGoSessions(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"sessions": []BBGoSession{{Name: "binance", ExchangeName: "binance"}},
 			})
 			return
@@ -86,9 +86,9 @@ func TestAPI_BBGoSessions(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	sessions := resp["sessions"].([]interface{})
+	sessions := resp["sessions"].([]any)
 	if len(sessions) != 1 {
 		t.Errorf("expected 1 session, got %d", len(sessions))
 	}
@@ -97,8 +97,8 @@ func TestAPI_BBGoSessions(t *testing.T) {
 func TestAPI_BBGoBalances(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions/binance/account/balances" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"balances": map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"balances": map[string]any{
 					"BTC": map[string]string{"currency": "BTC", "available": "1.5", "locked": "0.5"},
 				},
 			})
@@ -128,8 +128,8 @@ func TestAPI_BBGoTrades_WithQueryParams(t *testing.T) {
 			if r.URL.Query().Get("gid") != "100" {
 				t.Errorf("expected gid=100, got %s", r.URL.Query().Get("gid"))
 			}
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"trades": []interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"trades": []any{},
 			})
 			return
 		}
@@ -210,8 +210,8 @@ func TestAPI_BBGo_ContainerStopped(t *testing.T) {
 func TestAPI_BBGoAssets(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/assets" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"assets": map[string]interface{}{"BTC": map[string]string{"currency": "BTC", "total": "1.0", "available": "1.0", "lock": "0", "netAsset": "1.0", "netAssetInUSD": "43000"}},
+			json.NewEncoder(w).Encode(map[string]any{
+				"assets": map[string]any{"BTC": map[string]string{"currency": "BTC", "total": "1.0", "available": "1.0", "lock": "0", "netAsset": "1.0", "netAssetInUSD": "43000"}},
 			})
 			return
 		}
@@ -233,9 +233,9 @@ func TestAPI_BBGoAssets(t *testing.T) {
 func TestAPI_BBGoClosedOrders(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/orders/closed" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"orders": []interface{}{
-					map[string]interface{}{"orderID": 100, "symbol": "BTCUSDT", "status": "FILLED"},
+			json.NewEncoder(w).Encode(map[string]any{
+				"orders": []any{
+					map[string]any{"orderID": 100, "symbol": "BTCUSDT", "status": "FILLED"},
 				},
 			})
 			return
@@ -258,8 +258,8 @@ func TestAPI_BBGoClosedOrders(t *testing.T) {
 func TestAPI_BBGoTradingVolume(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/trading-volume" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"tradingVolumes": []interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"tradingVolumes": []any{},
 			})
 			return
 		}

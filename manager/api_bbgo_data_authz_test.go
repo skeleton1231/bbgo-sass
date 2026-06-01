@@ -27,8 +27,8 @@ func TestBBGoDataEndpoints_UserIDMismatch_Rejected(t *testing.T) {
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"trades": []interface{}{},
+		json.NewEncoder(w).Encode(map[string]any{
+			"trades": []any{},
 		})
 	}))
 	defer bbgoSrv.Close()
@@ -93,7 +93,7 @@ func TestBBGoDataEndpoints_MatchingUserID_Accepted(t *testing.T) {
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
+		json.NewEncoder(w).Encode(map[string]any{"message": "ok"})
 	}))
 	defer bbgoSrv.Close()
 	api.newBBGoClient = func(_ string) *BBGoClient {
@@ -134,8 +134,8 @@ func TestPnLEndpoint_UserIDMismatch_Rejected(t *testing.T) {
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"trades": []interface{}{},
+		json.NewEncoder(w).Encode(map[string]any{
+			"trades": []any{},
 		})
 	}))
 	defer bbgoSrv.Close()
@@ -191,7 +191,7 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"exchange":   "binance",
 		"api_key":    "new-key",
 		"api_secret": "new-secret",

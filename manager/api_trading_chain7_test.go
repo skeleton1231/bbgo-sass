@@ -309,7 +309,7 @@ func TestNotificationAPI_CRUD(t *testing.T) {
 		t.Fatalf("create: status = %d, want 201: %s", w.Code, w.Body.String())
 	}
 
-	var created map[string]interface{}
+	var created map[string]any
 	json.NewDecoder(w.Body).Decode(&created)
 	id, _ := created["id"].(string)
 	if id == "" {
@@ -326,7 +326,7 @@ func TestNotificationAPI_CRUD(t *testing.T) {
 		t.Fatalf("list: status = %d, want 200", w2.Code)
 	}
 
-	var listed []map[string]interface{}
+	var listed []map[string]any
 	json.NewDecoder(w2.Body).Decode(&listed)
 	if len(listed) != 1 {
 		t.Fatalf("expected 1 config, got %d", len(listed))

@@ -298,7 +298,7 @@ func TestBBGoClient_GetTradingVolume(t *testing.T) {
 		if r.URL.Query().Get("period") != "day" {
 			t.Errorf("expected period=day, got %s", r.URL.Query().Get("period"))
 		}
-		json.NewEncoder(w).Encode(BBGoTradingVolumeResponse{TradingVolumes: []interface{}{}})
+		json.NewEncoder(w).Encode(BBGoTradingVolumeResponse{TradingVolumes: json.RawMessage("[]")})
 	}))
 	defer srv.Close()
 

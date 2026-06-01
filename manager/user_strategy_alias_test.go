@@ -37,7 +37,7 @@ var frontendStrategyIDs = []string{
 
 func TestNormalizeStrategyConfig_ResolvesAllFrontendIDs(t *testing.T) {
 	for _, id := range frontendStrategyIDs {
-		resolved, _ := normalizeStrategyConfig(id, map[string]interface{}{})
+		resolved, _ := normalizeStrategyConfig(id, map[string]any{})
 		if !knownBBGoStrategies[resolved] {
 			t.Errorf("frontend strategy %q resolves to %q which is NOT a known bbgo strategy ID", id, resolved)
 		}
@@ -57,7 +57,7 @@ func TestNormalizeStrategyConfig_AliasDirection(t *testing.T) {
 		{"sentinel", "sentinel"},
 	}
 	for _, tt := range tests {
-		resolved, _ := normalizeStrategyConfig(tt.input, map[string]interface{}{})
+		resolved, _ := normalizeStrategyConfig(tt.input, map[string]any{})
 		if resolved != tt.expected {
 			t.Errorf("normalizeStrategyConfig(%q) = %q, want %q", tt.input, resolved, tt.expected)
 		}
@@ -65,7 +65,7 @@ func TestNormalizeStrategyConfig_AliasDirection(t *testing.T) {
 }
 
 func TestLegacyFieldAliases(t *testing.T) {
-	params := map[string]interface{}{"interval": "1h"}
+	params := map[string]any{"interval": "1h"}
 	_, result := normalizeStrategyConfig("dca", params)
 	if _, has := result["investmentInterval"]; !has {
 		t.Error("dca 'interval' should be renamed to 'investmentInterval'")

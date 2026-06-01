@@ -62,7 +62,7 @@ func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID, m
 		if r.Context().Err() != nil {
 			code = http.StatusServiceUnavailable
 		}
-		writeJSON(w, code, map[string]interface{}{
+		writeJSON(w, code, map[string]any{
 			"error":   "bot api unavailable",
 			"user_id": userID,
 			"details": err.Error(),

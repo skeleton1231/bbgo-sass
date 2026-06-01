@@ -31,11 +31,11 @@ func TestCreateStrategy_EmptyMode_DefaultsToPaper(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "No Mode Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", bytes.NewReader(b))
@@ -74,11 +74,11 @@ func TestCreateStrategy_EmptyMode_LiveOnlyRejected(t *testing.T) {
 
 	for _, strategy := range []string{"bollmaker", "supertrend", "dca2"} {
 		t.Run(strategy, func(t *testing.T) {
-			body := map[string]interface{}{
+			body := map[string]any{
 				"name":     "No Mode LiveOnly",
 				"exchange": "binance",
 				"strategy": strategy,
-				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"config":   map[string]any{"symbol": "BTCUSDT"},
 			}
 			b, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", bytes.NewReader(b))
@@ -117,11 +117,11 @@ func TestCreateStrategy_EmptyMode_MixedWithExistingLiveAllowed(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "No Mode Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", bytes.NewReader(b))

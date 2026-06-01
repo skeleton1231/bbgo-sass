@@ -19,16 +19,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-// containerInfo is the API response for a user's container state per mode.
-type containerInfo struct {
-	UserID string          `json:"user_id"`
-	Mode   string          `json:"mode"`
-	Status string          `json:"status"`
-	// Strategies is populated from bbgo API when container is running.
-	// nil when container is stopped (Approach B: no strategy data when stopped).
-	Strategies interface{} `json:"strategies"`
-}
-
 type API struct {
 	cfg        *Config
 	strategies *StrategyStore
@@ -170,10 +160,10 @@ func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
 			running++
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  "ok",
-		"users":   len(users),
-		"running": running,
+	writeJSON(w, http.StatusOK, healthResponse{
+		Status:  "ok",
+		Users:   len(users),
+		Running: running,
 	})
 }
 
@@ -268,7 +258,7 @@ func (api *API) containerStatusForMode(userID, mode string) *containerInfo {
 	strategies, err := client.GetStrategies()
 	if err != nil {
 		log.Printf("list strategies from bbgo for %s (%s): %v", userID, mode, err)
-		info.Strategies = []interface{}{}
+		info.Strategies = []BBGoStrategyState{}
 	} else {
 		info.Strategies = strategies
 	}
@@ -382,10 +372,10 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"status":  "created",
-		"user_id": userID,
-		"mode":    req.Mode,
+	writeJSON(w, http.StatusCreated, strategyCreatedResponse{
+		Status: "created",
+		UserID: userID,
+		Mode:   req.Mode,
 	})
 }
 
@@ -394,15 +384,15 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	byMode := make(map[string]interface{})
+	byMode := make(map[string]*containerInfo)
 	for _, mode := range []string{ModeLive, ModePaper} {
 		if info := api.containerStatusForMode(userID, mode); info != nil {
 			byMode[mode] = info
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"user_id":    userID,
-		"containers": byMode,
+	writeJSON(w, http.StatusOK, containerStatusResponse{
+		UserID:     userID,
+		Containers: byMode,
 	})
 }
 
@@ -429,7 +419,7 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var target map[string]interface{}
+	var target BBGoStrategyState
 	for _, s := range bbgoStrategies {
 		if id, _ := s["strategyInstanceID"].(string); id == strategyID {
 			target = s
@@ -458,7 +448,7 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	strategies, _ := api.strategies.ListStrategies(userID, mode)
 	if len(strategies) == 0 {
 		api.stopContainer(userID, mode)
-		writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "reason": "no strategies left"})
+		writeJSON(w, http.StatusOK, statusStopped{Status: "stopped", Reason: "no strategies left"})
 		return
 	}
 
@@ -616,16 +606,13 @@ func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	byMode := make(map[string]interface{})
+	byMode := make(map[string]*containerInfo)
 	for _, mode := range []string{ModeLive, ModePaper} {
 		if info := api.containerStatusForMode(userID, mode); info != nil {
 			byMode[mode] = info
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"user_id":    userID,
-		"containers": byMode,
-	})
+	writeJSON(w, http.StatusOK, containerStatusResponse{UserID: userID, Containers: byMode})
 }
 
 // userFromURL extracts userID and mode from URL parameters, validates access.
@@ -694,7 +681,7 @@ func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+	writeJSON(w, http.StatusOK, logsResponse{Logs: logs})
 }
 
 func (api *API) BBGoPing(w http.ResponseWriter, r *http.Request) {
@@ -719,7 +706,7 @@ func (api *API) BBGoSessions(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"sessions": sessions})
+	writeJSON(w, http.StatusOK, sessionsResponse{Sessions: sessions})
 }
 
 func (api *API) BBGoSessionDetail(w http.ResponseWriter, r *http.Request) {
@@ -733,7 +720,7 @@ func (api *API) BBGoSessionDetail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"session": detail})
+	writeJSON(w, http.StatusOK, sessionDetailResponse{Session: *detail})
 }
 
 func (api *API) BBGoSessionTrades(w http.ResponseWriter, r *http.Request) {
@@ -747,7 +734,7 @@ func (api *API) BBGoSessionTrades(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"trades": trades})
+	writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
 }
 
 func (api *API) BBGoSessionOpenOrders(w http.ResponseWriter, r *http.Request) {
@@ -761,7 +748,7 @@ func (api *API) BBGoSessionOpenOrders(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"orders": orders})
+	writeJSON(w, http.StatusOK, ordersResponse{Orders: orders})
 }
 
 func (api *API) BBGoSessionAccount(w http.ResponseWriter, r *http.Request) {
@@ -775,7 +762,7 @@ func (api *API) BBGoSessionAccount(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"account": account})
+	writeJSON(w, http.StatusOK, accountResponse{Account: account})
 }
 
 func (api *API) BBGoSessionBalances(w http.ResponseWriter, r *http.Request) {
@@ -789,7 +776,7 @@ func (api *API) BBGoSessionBalances(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"balances": balances})
+	writeJSON(w, http.StatusOK, balancesResponse{Balances: balances})
 }
 
 func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
@@ -803,7 +790,7 @@ func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
+	writeJSON(w, http.StatusOK, symbolsResponse{Symbols: filterTradingPairs(symbols)})
 }
 
 func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
@@ -826,7 +813,7 @@ func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"symbols": filterTradingPairs(symbols)})
+	writeJSON(w, http.StatusOK, symbolsResponse{Symbols: filterTradingPairs(symbols)})
 }
 
 func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
@@ -858,16 +845,14 @@ func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "ticker not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"ticker": map[string]interface{}{
-			"symbol": resp.Ticker.Symbol,
-			"open":   resp.Ticker.Open,
-			"high":   resp.Ticker.High,
-			"low":    resp.Ticker.Low,
-			"close":  resp.Ticker.Close,
-			"volume": resp.Ticker.Volume,
-		},
-	})
+	writeJSON(w, http.StatusOK, tickerResponse{Ticker: tickerData{
+		Symbol: resp.Ticker.Symbol,
+		Open:   resp.Ticker.Open,
+		High:   resp.Ticker.High,
+		Low:    resp.Ticker.Low,
+		Close:  resp.Ticker.Close,
+		Volume: resp.Ticker.Volume,
+	}})
 }
 
 func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
@@ -930,20 +915,20 @@ func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	klines := make([]map[string]interface{}, 0, len(resp.Klines))
+	klines := make([]klineEntry, 0, len(resp.Klines))
 	for _, k := range resp.Klines {
-		klines = append(klines, map[string]interface{}{
-			"time":        k.StartTime,
-			"open":        k.Open,
-			"high":        k.High,
-			"low":         k.Low,
-			"close":       k.Close,
-			"volume":      k.Volume,
-			"quoteVolume": k.QuoteVolume,
-			"closed":      k.Closed,
+		klines = append(klines, klineEntry{
+			Time:        k.StartTime,
+			Open:        k.Open,
+			High:        k.High,
+			Low:         k.Low,
+			Close:       k.Close,
+			Volume:      k.Volume,
+			QuoteVolume: k.QuoteVolume,
+			Closed:      k.Closed,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"klines": klines})
+	writeJSON(w, http.StatusOK, klinesResponse{Klines: klines})
 }
 
 func (api *API) BBGoAssets(w http.ResponseWriter, r *http.Request) {
@@ -956,7 +941,7 @@ func (api *API) BBGoAssets(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"assets": assets})
+	writeJSON(w, http.StatusOK, assetsResponse{Assets: assets})
 }
 
 func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
@@ -969,7 +954,7 @@ func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"strategies": strategies})
+	writeJSON(w, http.StatusOK, bbgoStrategiesResponse{Strategies: strategies})
 }
 
 func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
@@ -1006,7 +991,7 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"trades": trades})
+	writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
 }
 
 func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {
@@ -1028,7 +1013,7 @@ func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"orders": orders})
+	writeJSON(w, http.StatusOK, ordersResponse{Orders: orders})
 }
 
 func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
@@ -1043,7 +1028,7 @@ func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"tradingVolumes": volumes})
+	writeJSON(w, http.StatusOK, tradingVolumeResponse{TradingVolumes: volumes})
 }
 
 func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
@@ -1140,9 +1125,7 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"output": string(result),
-	})
+	writeJSON(w, http.StatusOK, backtestResultResponse{Output: string(result)})
 }
 
 func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
@@ -1187,11 +1170,6 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		req.EndTime = "2025-12-31"
 	}
 
-	type syncResult struct {
-		Symbol string `json:"symbol"`
-		Output string `json:"output"`
-		Error  string `json:"error,omitempty"`
-	}
 	log.Printf("backtest sync requested by user %s: %s %v %s-%s", userID, req.Exchange, req.Symbols, req.StartTime, req.EndTime)
 	results := make([]syncResult, len(req.Symbols))
 	var wg sync.WaitGroup
@@ -1208,10 +1186,7 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		}(i, sym)
 	}
 	wg.Wait()
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"exchange": req.Exchange,
-		"synced":   results,
-	})
+	writeJSON(w, http.StatusOK, backtestSyncResponse{Exchange: req.Exchange, Synced: results})
 }
 
 func (api *API) BacktestSyncStatus(w http.ResponseWriter, _ *http.Request) {
@@ -1222,17 +1197,10 @@ func (api *API) BacktestSyncStatus(w http.ResponseWriter, _ *http.Request) {
 	dbPath += "/backtest.db"
 	info, err := os.Stat(dbPath)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"available": false,
-			"error":     err.Error(),
-		})
+		writeJSON(w, http.StatusOK, backtestSyncStatusResponse{Available: false, Error: err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"available": true,
-		"size":      info.Size(),
-		"modified":  info.ModTime().Format(time.RFC3339),
-	})
+	writeJSON(w, http.StatusOK, backtestSyncStatusResponse{Available: true, Size: info.Size(), Modified: info.ModTime().Format(time.RFC3339)})
 }
 
 func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
@@ -1324,15 +1292,15 @@ func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp := map[string]interface{}{
-		"id":          cred.ID,
-		"user_id":     cred.UserID,
-		"exchange":    cred.Exchange,
-		"is_testnet":  cred.IsTestnet,
-		"is_verified": cred.IsVerified,
+	resp := credentialResponse{
+		ID:         cred.ID,
+		UserID:     cred.UserID,
+		Exchange:   cred.Exchange,
+		IsTestnet:  cred.IsTestnet,
+		IsVerified: cred.IsVerified,
 	}
 	if !result.Verified {
-		resp["verify_error"] = result.Error
+		resp.VerifyError = result.Error
 	}
 	writeJSON(w, http.StatusCreated, resp)
 }
@@ -1348,14 +1316,14 @@ func (api *API) ListCredentials(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	safe := make([]map[string]interface{}, len(creds))
+	safe := make([]credentialResponse, len(creds))
 	for i, c := range creds {
-		safe[i] = map[string]interface{}{
-			"id":          c.ID,
-			"user_id":     c.UserID,
-			"exchange":    c.Exchange,
-			"is_testnet":  c.IsTestnet,
-			"is_verified": c.IsVerified,
+		safe[i] = credentialResponse{
+			ID:         c.ID,
+			UserID:     c.UserID,
+			Exchange:   c.Exchange,
+			IsTestnet:  c.IsTestnet,
+			IsVerified: c.IsVerified,
 		}
 	}
 	writeJSON(w, http.StatusOK, safe)
@@ -1404,7 +1372,7 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
@@ -1488,12 +1456,7 @@ func (api *API) CreateNotificationConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"id":      ch.ID,
-		"type":    ch.Type,
-		"enabled": ch.Enabled,
-		"rules":   cfg.Rules,
-	})
+	writeJSON(w, http.StatusCreated, notifConfigResponse{ID: ch.ID, Type: ch.Type, Enabled: ch.Enabled, Rules: cfg.Rules})
 }
 
 func (api *API) ListNotificationConfigs(w http.ResponseWriter, r *http.Request) {
@@ -1503,13 +1466,13 @@ func (api *API) ListNotificationConfigs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	configs := api.notifier.List(userID)
-	safe := make([]map[string]interface{}, len(configs))
+	safe := make([]notifConfigResponse, len(configs))
 	for i, c := range configs {
-		safe[i] = map[string]interface{}{
-			"id":      c.Channel.ID,
-			"type":    c.Channel.Type,
-			"enabled": c.Channel.Enabled,
-			"rules":   c.Rules,
+		safe[i] = notifConfigResponse{
+			ID:      c.Channel.ID,
+			Type:    c.Channel.Type,
+			Enabled: c.Channel.Enabled,
+			Rules:   c.Rules,
 		}
 	}
 	writeJSON(w, http.StatusOK, safe)
@@ -1579,11 +1542,9 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 		req.Exchange = "binance"
 	}
 	if req.Symbol == "" {
-		var cfg map[string]interface{}
-		if err := json.Unmarshal(req.Config, &cfg); err == nil {
-			if s, ok := cfg["symbol"].(string); ok && s != "" {
-				req.Symbol = s
-			}
+		var sym struct{ Symbol string `json:"symbol"` }
+		if err := json.Unmarshal(req.Config, &sym); err == nil && sym.Symbol != "" {
+			req.Symbol = sym.Symbol
 		}
 		if req.Symbol == "" {
 			req.Symbol = "BTCUSDT"
@@ -1620,11 +1581,7 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 	if refreshed != nil {
 		status = refreshed.Status
 	}
-	writeJSON(w, http.StatusAccepted, map[string]interface{}{
-		"job_id":    job.ID,
-		"status":    status,
-		"need_sync": needSync,
-	})
+	writeJSON(w, http.StatusAccepted, backtestSubmitResponse{JobID: job.ID, Status: status, NeedSync: needSync})
 }
 
 func (api *API) GetBacktestJob(w http.ResponseWriter, r *http.Request) {
@@ -1657,9 +1614,7 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 	if jobs == nil {
 		jobs = []*BacktestJob{}
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"jobs": jobs,
-	})
+	writeJSON(w, http.StatusOK, backtestJobsResponse{Jobs: jobs})
 }
 
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {

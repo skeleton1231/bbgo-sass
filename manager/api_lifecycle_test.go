@@ -14,11 +14,11 @@ func TestAPI_CreateStrategy(t *testing.T) {
 	api := setupStoppedTestAPI(t)
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "My Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config": map[string]interface{}{
+		"config": map[string]any{
 			"symbol":     "BTCUSDT",
 			"gridNumber": 10,
 			"upperPrice": 70000,
@@ -37,7 +37,7 @@ func TestAPI_CreateStrategy(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["user_id"] != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
 		t.Errorf("expected user ID in response, got %v", resp["user_id"])
@@ -51,7 +51,7 @@ func TestAPI_CreateStrategy_MissingStrategy(t *testing.T) {
 	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
-	body := map[string]interface{}{"exchange": "binance"}
+	body := map[string]any{"exchange": "binance"}
 	b, _ := json.Marshal(body)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -67,7 +67,7 @@ func TestAPI_CreateStrategy_MissingExchange(t *testing.T) {
 	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
-	body := map[string]interface{}{"strategy": "grid2"}
+	body := map[string]any{"strategy": "grid2"}
 	b, _ := json.Marshal(body)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -83,12 +83,12 @@ func TestAPI_CreateStrategy_CrossExchange(t *testing.T) {
 	api := setupStoppedTestAPI(t)
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":          "XMaker",
 		"strategy":      "xmaker",
 		"crossExchange": true,
-		"config":        map[string]interface{}{"symbol": "BTCUSDT"},
-		"sessions": []map[string]interface{}{
+		"config":        map[string]any{"symbol": "BTCUSDT"},
+		"sessions": []map[string]any{
 			{"name": "maker", "exchange": "binance", "envVarPrefix": "BINANCE", "futures": false},
 			{"name": "hedge", "exchange": "bybit", "envVarPrefix": "BYBIT", "futures": true},
 		},
@@ -104,7 +104,7 @@ func TestAPI_CreateStrategy_CrossExchange(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["status"] != "created" {
 		t.Errorf("expected status 'created', got %v", resp["status"])
@@ -115,7 +115,7 @@ func TestAPI_CreateStrategy_CrossExchangeMissingSessions(t *testing.T) {
 	api, _ := setupTestAPI(t, nil)
 	r := testRouter(api)
 
-	body := map[string]interface{}{"strategy": "xmaker", "crossExchange": true}
+	body := map[string]any{"strategy": "xmaker", "crossExchange": true}
 	b, _ := json.Marshal(body)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -130,8 +130,8 @@ func TestAPI_CreateStrategy_CrossExchangeMissingSessions(t *testing.T) {
 func TestAPI_ListStrategies(t *testing.T) {
 	bbgoHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT"},
 				},
 			})
@@ -154,15 +154,15 @@ func TestAPI_ListStrategies(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
-	liveContainer, _ := containers["live"].(map[string]interface{})
-	strategies, _ := liveContainer["strategies"].([]interface{})
+	containers, _ := resp["containers"].(map[string]any)
+	liveContainer, _ := containers["live"].(map[string]any)
+	strategies, _ := liveContainer["strategies"].([]any)
 	if len(strategies) != 1 {
 		t.Fatalf("expected 1 strategy, got %d", len(strategies))
 	}
-	firstStrategy, _ := strategies[0].(map[string]interface{})
+	firstStrategy, _ := strategies[0].(map[string]any)
 	if firstStrategy["strategy"] != "grid" {
 		t.Errorf("expected grid strategy, got %v", firstStrategy["strategy"])
 	}
@@ -180,9 +180,9 @@ func TestAPI_ListStrategies_UserNotFound(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
+	containers, _ := resp["containers"].(map[string]any)
 	if len(containers) != 0 {
 		t.Errorf("expected empty containers for unknown user, got %v", containers)
 	}
@@ -191,8 +191,8 @@ func TestAPI_ListStrategies_UserNotFound(t *testing.T) {
 func TestAPI_DeleteStrategy(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance"},
 				},
 			})
@@ -221,8 +221,8 @@ func TestAPI_DeleteStrategy(t *testing.T) {
 func TestAPI_DeleteStrategy_NotFound(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "s1", "strategy": "grid", "symbol": "BTCUSDT", "session": "binance"},
 				},
 			})
@@ -292,10 +292,10 @@ func TestAPI_UserStatus(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
-	liveContainer, _ := containers["live"].(map[string]interface{})
+	containers, _ := resp["containers"].(map[string]any)
+	liveContainer, _ := containers["live"].(map[string]any)
 	if liveContainer["user_id"] != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" {
 		t.Errorf("expected user ID, got %v", liveContainer["user_id"])
 	}
@@ -316,7 +316,7 @@ func TestAPI_Health(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["status"] != "ok" {
 		t.Errorf("expected ok, got %v", resp["status"])
@@ -332,8 +332,8 @@ func TestAPI_Health(t *testing.T) {
 func TestAPI_BBGoStrategies(t *testing.T) {
 	api, bbgoSrv := setupTestAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategy": "grid2", "symbol": "BTCUSDT"},
 				},
 			})
@@ -352,9 +352,9 @@ func TestAPI_BBGoStrategies(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	strategies := resp["strategies"].([]interface{})
+	strategies := resp["strategies"].([]any)
 	if len(strategies) != 1 {
 		t.Errorf("expected 1 strategy, got %d", len(strategies))
 	}
@@ -406,7 +406,7 @@ func TestAPI_CreateCredential_InvalidExchange(t *testing.T) {
 	api := setupStoppedTestAPI(t)
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"exchange":   "fakeexchange",
 		"api_key":    "key123",
 		"api_secret": "secret456",

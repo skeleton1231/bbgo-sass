@@ -321,8 +321,8 @@ func (h *MarketDataHub) Close() {
 	}
 }
 
-func marketDataToJSON(md *pb.MarketData) map[string]interface{} {
-	result := map[string]interface{}{
+func marketDataToJSON(md *pb.MarketData) map[string]any {
+	result := map[string]any{
 		"exchange": md.Exchange,
 		"symbol":   md.Symbol,
 		"channel":  md.Channel.String(),
@@ -330,13 +330,13 @@ func marketDataToJSON(md *pb.MarketData) map[string]interface{} {
 	}
 
 	if md.Depth != nil {
-		result["depth"] = map[string]interface{}{
+		result["depth"] = map[string]any{
 			"bids": priceVolumeSlice(md.Depth.Bids),
 			"asks": priceVolumeSlice(md.Depth.Asks),
 		}
 	}
 	if md.Kline != nil {
-		result["kline"] = map[string]interface{}{
+		result["kline"] = map[string]any{
 			"open":      md.Kline.Open,
 			"high":      md.Kline.High,
 			"low":       md.Kline.Low,
@@ -347,7 +347,7 @@ func marketDataToJSON(md *pb.MarketData) map[string]interface{} {
 		}
 	}
 	if md.Ticker != nil {
-		result["ticker"] = map[string]interface{}{
+		result["ticker"] = map[string]any{
 			"open":   md.Ticker.Open,
 			"high":   md.Ticker.High,
 			"low":    md.Ticker.Low,
@@ -356,9 +356,9 @@ func marketDataToJSON(md *pb.MarketData) map[string]interface{} {
 		}
 	}
 	if len(md.Trades) > 0 {
-		trades := make([]map[string]interface{}, len(md.Trades))
+		trades := make([]map[string]any, len(md.Trades))
 		for i, t := range md.Trades {
-			trades[i] = map[string]interface{}{
+			trades[i] = map[string]any{
 				"id":        t.Id,
 				"price":     t.Price,
 				"quantity":  t.Quantity,
@@ -371,17 +371,17 @@ func marketDataToJSON(md *pb.MarketData) map[string]interface{} {
 	return result
 }
 
-func userDataToJSON(ud *pb.UserData) map[string]interface{} {
-	result := map[string]interface{}{
+func userDataToJSON(ud *pb.UserData) map[string]any {
+	result := map[string]any{
 		"session":  ud.Session,
 		"exchange": ud.Exchange,
 		"channel":  ud.Channel.String(),
 		"event":    ud.Event.String(),
 	}
 	if len(ud.Balances) > 0 {
-		balances := make([]map[string]interface{}, len(ud.Balances))
+		balances := make([]map[string]any, len(ud.Balances))
 		for i, b := range ud.Balances {
-			balances[i] = map[string]interface{}{
+			balances[i] = map[string]any{
 				"currency":  b.Currency,
 				"available": b.Available,
 				"locked":    b.Locked,
@@ -390,9 +390,9 @@ func userDataToJSON(ud *pb.UserData) map[string]interface{} {
 		result["balances"] = balances
 	}
 	if len(ud.Orders) > 0 {
-		orders := make([]map[string]interface{}, len(ud.Orders))
+		orders := make([]map[string]any, len(ud.Orders))
 		for i, o := range ud.Orders {
-			orders[i] = map[string]interface{}{
+			orders[i] = map[string]any{
 				"id":               o.Id,
 				"symbol":           o.Symbol,
 				"side":             o.Side.String(),
@@ -405,9 +405,9 @@ func userDataToJSON(ud *pb.UserData) map[string]interface{} {
 		result["orders"] = orders
 	}
 	if len(ud.Trades) > 0 {
-		trades := make([]map[string]interface{}, len(ud.Trades))
+		trades := make([]map[string]any, len(ud.Trades))
 		for i, t := range ud.Trades {
-			trades[i] = map[string]interface{}{
+			trades[i] = map[string]any{
 				"id":       t.Id,
 				"price":    t.Price,
 				"quantity": t.Quantity,
@@ -420,10 +420,10 @@ func userDataToJSON(ud *pb.UserData) map[string]interface{} {
 	return result
 }
 
-func priceVolumeSlice(pv []*pb.PriceVolume) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(pv))
+func priceVolumeSlice(pv []*pb.PriceVolume) []map[string]any {
+	result := make([]map[string]any, len(pv))
 	for i, p := range pv {
-		result[i] = map[string]interface{}{"price": p.Price, "volume": p.Volume}
+		result[i] = map[string]any{"price": p.Price, "volume": p.Volume}
 	}
 	return result
 }

@@ -44,13 +44,13 @@ func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 func TestAPI_SubmitBacktest(t *testing.T) {
 	_, _, r := setupBacktestTestAPI(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"strategy":   "grid2",
 		"exchange":   "binance",
 		"symbol":     "BTCUSDT",
 		"start_time": "2024-01-01",
 		"end_time":   "2024-03-01",
-		"config": map[string]interface{}{
+		"config": map[string]any{
 			"symbol":     "BTCUSDT",
 			"gridNumber": 10,
 		},
@@ -65,7 +65,7 @@ func TestAPI_SubmitBacktest(t *testing.T) {
 		t.Fatalf("expected 202, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["job_id"] == nil || resp["job_id"] == "" {
 		t.Error("expected job_id in response")
@@ -78,7 +78,7 @@ func TestAPI_SubmitBacktest(t *testing.T) {
 func TestAPI_SubmitBacktest_MissingStrategy(t *testing.T) {
 	_, _, r := setupBacktestTestAPI(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"exchange": "binance",
 	}
 	b, _ := json.Marshal(body)
@@ -95,10 +95,10 @@ func TestAPI_SubmitBacktest_MissingStrategy(t *testing.T) {
 func TestAPI_SubmitBacktest_DefaultsSymbol(t *testing.T) {
 	_, store, r := setupBacktestTestAPI(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"strategy": "grid2",
 		"exchange": "binance",
-		"config": map[string]interface{}{
+		"config": map[string]any{
 			"symbol": "ETHUSDT",
 		},
 	}
@@ -112,7 +112,7 @@ func TestAPI_SubmitBacktest_DefaultsSymbol(t *testing.T) {
 		t.Fatalf("expected 202, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	jobID := resp["job_id"].(string)
 
@@ -128,9 +128,9 @@ func TestAPI_SubmitBacktest_DefaultsSymbol(t *testing.T) {
 func TestAPI_SubmitBacktest_DefaultsFallback(t *testing.T) {
 	_, store, r := setupBacktestTestAPI(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"strategy": "grid2",
-		"config":   map[string]interface{}{},
+		"config":   map[string]any{},
 	}
 	b, _ := json.Marshal(body)
 
@@ -142,7 +142,7 @@ func TestAPI_SubmitBacktest_DefaultsFallback(t *testing.T) {
 		t.Fatalf("expected 202, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	jobID := resp["job_id"].(string)
 
@@ -167,9 +167,9 @@ func TestAPI_SubmitBacktest_ServerBusy(t *testing.T) {
 	store.AcquireSlot()
 	defer store.ReleaseSlot()
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"strategy": "grid2",
-		"config":   map[string]interface{}{},
+		"config":   map[string]any{},
 	}
 	b, _ := json.Marshal(body)
 
@@ -200,7 +200,7 @@ func TestAPI_SubmitBacktest_NoAuth(t *testing.T) {
 	r := chi.NewRouter()
 	r.Post("/api/backtest/submit", api.SubmitBacktest)
 
-	body := map[string]interface{}{"strategy": "grid2"}
+	body := map[string]any{"strategy": "grid2"}
 	b, _ := json.Marshal(body)
 
 	req := httptest.NewRequest("POST", "/api/backtest/submit", bytes.NewReader(b))
@@ -306,9 +306,9 @@ func TestAPI_ListBacktestJobs(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	jobs := resp["jobs"].([]interface{})
+	jobs := resp["jobs"].([]any)
 	if len(jobs) != 2 {
 		t.Errorf("expected 2 jobs for user, got %d", len(jobs))
 	}
@@ -325,9 +325,9 @@ func TestAPI_ListBacktestJobs_Empty(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	jobs := resp["jobs"].([]interface{})
+	jobs := resp["jobs"].([]any)
 	if len(jobs) != 0 {
 		t.Errorf("expected 0 jobs, got %d", len(jobs))
 	}
@@ -348,42 +348,42 @@ func TestAPI_HasDataForRange_AlwaysSyncs(t *testing.T) {
 func TestAPI_SubmitBacktest_Validation(t *testing.T) {
 	tests := []struct {
 		name     string
-		body     map[string]interface{}
+		body     map[string]any
 		wantCode int
 	}{
 		{
 			name:     "start_after_end_time",
-			body:     map[string]interface{}{"strategy": "grid2", "start_time": "2025-01-01", "end_time": "2024-01-01"},
+			body:     map[string]any{"strategy": "grid2", "start_time": "2025-01-01", "end_time": "2024-01-01"},
 			wantCode: http.StatusAccepted,
 		},
 		{
 			name:     "empty_config",
-			body:     map[string]interface{}{"strategy": "grid2", "config": map[string]interface{}{}},
+			body:     map[string]any{"strategy": "grid2", "config": map[string]any{}},
 			wantCode: http.StatusAccepted,
 		},
 		{
 			name:     "nil_config",
-			body:     map[string]interface{}{"strategy": "grid2"},
+			body:     map[string]any{"strategy": "grid2"},
 			wantCode: http.StatusAccepted,
 		},
 		{
 			name:     "very_long_date_range",
-			body:     map[string]interface{}{"strategy": "grid2", "start_time": "2020-01-01", "end_time": "2026-01-01"},
+			body:     map[string]any{"strategy": "grid2", "start_time": "2020-01-01", "end_time": "2026-01-01"},
 			wantCode: http.StatusAccepted,
 		},
 		{
 			name:     "single_day_range",
-			body:     map[string]interface{}{"strategy": "grid2", "start_time": "2024-06-01", "end_time": "2024-06-01"},
+			body:     map[string]any{"strategy": "grid2", "start_time": "2024-06-01", "end_time": "2024-06-01"},
 			wantCode: http.StatusAccepted,
 		},
 		{
 			name:     "supported_exchange_bybit",
-			body:     map[string]interface{}{"strategy": "grid2", "exchange": "bybit", "symbol": "BTCUSDT"},
+			body:     map[string]any{"strategy": "grid2", "exchange": "bybit", "symbol": "BTCUSDT"},
 			wantCode: http.StatusAccepted,
 		},
 		{
 			name:     "supported_exchange_okex",
-			body:     map[string]interface{}{"strategy": "grid2", "exchange": "okex", "symbol": "BTCUSDT"},
+			body:     map[string]any{"strategy": "grid2", "exchange": "okex", "symbol": "BTCUSDT"},
 			wantCode: http.StatusAccepted,
 		},
 	}
@@ -401,7 +401,7 @@ func TestAPI_SubmitBacktest_Validation(t *testing.T) {
 			}
 
 			if tt.wantCode == http.StatusAccepted {
-				var resp map[string]interface{}
+				var resp map[string]any
 				json.NewDecoder(w.Body).Decode(&resp)
 				if resp["job_id"] == nil || resp["job_id"] == "" {
 					t.Error("expected job_id in accepted response")

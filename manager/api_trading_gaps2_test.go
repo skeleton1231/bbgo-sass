@@ -16,7 +16,7 @@ func TestAPI_MarketSymbols_ProxiesToMarketDataREST(t *testing.T) {
 	defer cleanup()
 
 	symbolsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"symbols": []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "INVALIDPAIR", "123456"},
 		})
 	}))
@@ -37,9 +37,9 @@ func TestAPI_MarketSymbols_ProxiesToMarketDataREST(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	symbols, ok := resp["symbols"].([]interface{})
+	symbols, ok := resp["symbols"].([]any)
 	if !ok || len(symbols) != 3 {
 		t.Fatalf("expected 3 filtered symbols, got %d: %v", len(symbols), resp["symbols"])
 	}
@@ -243,7 +243,7 @@ func TestAPI_DeleteCredential_RunningContainer_SetsStarting(t *testing.T) {
 		t.Fatalf("create credential: expected 201, got %d", w.Code)
 	}
 
-	var credResp map[string]interface{}
+	var credResp map[string]any
 	json.NewDecoder(w.Body).Decode(&credResp)
 	credID, _ := credResp["id"].(string)
 

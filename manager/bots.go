@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -9,36 +10,40 @@ import (
 
 // Bot represents a single strategy instance (a "bot" in the web UI).
 type Bot struct {
-	ID              string      `json:"id"`
-	Strategy        string      `json:"strategy"`
-	Symbol          string      `json:"symbol"`
-	Exchange        string      `json:"exchange"`
-	Session         string      `json:"session"`
-	Config          interface{} `json:"config"`
-	State           interface{} `json:"state"`
-	ContainerStatus string      `json:"container_status"`
-	Mode            string      `json:"mode"`
+	ID              string          `json:"id"`
+	Strategy        string          `json:"strategy"`
+	Symbol          string          `json:"symbol"`
+	Exchange        string          `json:"exchange"`
+	Session         string          `json:"session"`
+	Config          json.RawMessage `json:"config"`
+	State           json.RawMessage `json:"state"`
+	ContainerStatus string          `json:"container_status"`
+	Mode            string          `json:"mode"`
 }
 
 // botFromStrategy builds a Bot from a bbgo strategy state map.
 // bbgo returns {"on": [...], "grid2": {symbol, ...}, "strategy": "grid2", "strategyInstanceID": "..."}
-func botFromStrategy(s map[string]interface{}, mode string) Bot {
+func botFromStrategy(s BBGoStrategyState, mode string) Bot {
 	id, _ := s["strategyInstanceID"].(string)
 	strategy, _ := s["strategy"].(string)
 
 	var session string
-	if on, ok := s["on"].([]interface{}); ok && len(on) > 0 {
+	if on, ok := s["on"].([]any); ok && len(on) > 0 {
 		session, _ = on[0].(string)
 	}
 
 	var symbol string
-	var config interface{}
+	var config json.RawMessage
 	if cfg, ok := s[strategy]; ok {
-		config = cfg
-		if m, ok := cfg.(map[string]interface{}); ok {
+		if raw, err := json.Marshal(cfg); err == nil {
+			config = raw
+		}
+		if m, ok := cfg.(map[string]any); ok {
 			symbol, _ = m["symbol"].(string)
 		}
 	}
+
+	state, _ := json.Marshal(s)
 
 	return Bot{
 		ID:              id,
@@ -47,7 +52,7 @@ func botFromStrategy(s map[string]interface{}, mode string) Bot {
 		Exchange:        session,
 		Session:         session,
 		Config:          config,
-		State:           s,
+		State:           state,
 		ContainerStatus: StatusRunning,
 		Mode:            mode,
 	}
@@ -85,9 +90,7 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 	if bots == nil {
 		bots = []Bot{}
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"bots": bots,
-	})
+	writeJSON(w, http.StatusOK, botsResponse{Bots: bots})
 }
 
 // GetBot returns a single bot by bbgo strategyInstanceID. Only works when container is running.

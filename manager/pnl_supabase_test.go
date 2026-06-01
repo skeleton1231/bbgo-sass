@@ -71,14 +71,14 @@ func TestBBGoPnL_UsesSupabaseFirst(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode([]map[string]interface{}{
+				json.NewEncoder(w).Encode([]map[string]any{
 					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1.0", "fee": "25", "traded_at": "2024-01-01T00:00:00Z"},
 					{"symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1.0", "fee": "27.5", "traded_at": "2024-01-02T00:00:00Z"},
 				})
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]interface{}{})
+			json.NewEncoder(w).Encode([]any{})
 		},
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -116,7 +116,7 @@ func TestBBGoPnL_FallsBackToContainer(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode([]interface{}{})
+				json.NewEncoder(w).Encode([]any{})
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -156,13 +156,13 @@ func TestBBGoPnL_WorksWhenContainerStopped(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/rest/v1/trades" {
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode([]map[string]interface{}{
+				json.NewEncoder(w).Encode([]map[string]any{
 					{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.5", "fee": "12.5", "traded_at": "2024-01-01T00:00:00Z"},
 				})
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]interface{}{})
+			json.NewEncoder(w).Encode([]any{})
 		},
 		nil,
 	)
@@ -189,7 +189,7 @@ func TestSyncer_GetTradesForPnL(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		json.NewEncoder(w).Encode([]map[string]any{
 			{"symbol": "BTCUSDT", "side": "BUY", "price": "42000", "quantity": "0.1", "fee": "2.1", "traded_at": "2024-01-15T10:00:00Z"},
 			{"symbol": "ETHUSDT", "side": "SELL", "price": "2500", "quantity": "4", "fee": "5", "traded_at": "2024-01-15T11:00:00Z"},
 		})
@@ -247,7 +247,7 @@ func TestSyncer_GetTradesForPnL_ServerError(t *testing.T) {
 func TestSyncer_GetTradesForPnL_Empty(t *testing.T) {
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 	}))
 	defer supabaseSrv.Close()
 
@@ -280,10 +280,10 @@ func TestSyncer_GetTradesForPnL_Pagination(t *testing.T) {
 			t.Errorf("expected limit=%d, got %s", pnlPageSize, limit)
 		}
 
-		var page []map[string]interface{}
+		var page []map[string]any
 		if offset == "0" {
 			for i := 0; i < pnlPageSize; i++ {
-				page = append(page, map[string]interface{}{
+				page = append(page, map[string]any{
 					"symbol": "BTCUSDT", "side": "BUY",
 					"price": "50000", "quantity": "1", "fee": "25",
 					"traded_at": fmt.Sprintf("2024-01-%02dT00:00:00Z", (i%28)+1),
@@ -321,19 +321,19 @@ func TestBBGoPnL_PaperMode_SkipsSupabase(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request) {
 			supabaseCalled = true
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]interface{}{})
+			json.NewEncoder(w).Encode([]any{})
 		},
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/api/trades" {
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"trades": []map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
+					"trades": []map[string]any{
 						{"gid": 1, "symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1", "fee": "25", "tradedAt": "2024-01-01"},
 						{"gid": 2, "symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1", "fee": "27", "tradedAt": "2024-01-02"},
 					},
 				})
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			json.NewEncoder(w).Encode(map[string]any{})
 		},
 	)
 
@@ -364,7 +364,7 @@ func TestBBGoPnL_PaperMode_ContainerNotRunning(t *testing.T) {
 	setup := setupPnLTest(t, false,
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]interface{}{})
+			json.NewEncoder(w).Encode([]any{})
 		},
 		nil,
 	)

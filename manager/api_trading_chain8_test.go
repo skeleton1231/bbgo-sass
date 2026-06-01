@@ -54,7 +54,7 @@ func TestAPI_CreateCredential_Success(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create credential: status = %d, want 201: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["exchange"] != "binance" {
 		t.Errorf("expected exchange binance, got %v", resp["exchange"])
@@ -115,7 +115,7 @@ func TestAPI_ListCredentials_AfterCreate(t *testing.T) {
 	if w2.Code != http.StatusOK {
 		t.Fatalf("list: status = %d, want 200", w2.Code)
 	}
-	var list []map[string]interface{}
+	var list []map[string]any
 	json.NewDecoder(w2.Body).Decode(&list)
 	if len(list) != 1 {
 		t.Fatalf("expected 1 credential, got %d", len(list))
@@ -134,7 +134,7 @@ func TestAPI_DeleteCredential_Success(t *testing.T) {
 	req.Header.Set("X-User-Id", credsUID)
 	w := httptest.NewRecorder()
 	api.CreateCredential(w, req)
-	var created map[string]interface{}
+	var created map[string]any
 	json.NewDecoder(w.Body).Decode(&created)
 	credID := created["id"].(string)
 
@@ -151,7 +151,7 @@ func TestAPI_DeleteCredential_Success(t *testing.T) {
 	req3.Header.Set("X-User-Id", credsUID)
 	w3 := httptest.NewRecorder()
 	api.ListCredentials(w3, req3)
-	var list []map[string]interface{}
+	var list []map[string]any
 	json.NewDecoder(w3.Body).Decode(&list)
 	if len(list) != 0 {
 		t.Errorf("expected 0 credentials after delete, got %d", len(list))
@@ -301,7 +301,7 @@ func TestAPI_WSTicket_IssuesValidTicket(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("ticket: status = %d, want 200: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	ticket, ok := resp["ticket"].(string)
 	if !ok || ticket == "" {

@@ -29,7 +29,7 @@ func (c *BBGoClient) WithContext(ctx context.Context) *BBGoClient {
 	return &BBGoClient{baseURL: c.baseURL, client: c.client, ctx: ctx}
 }
 
-func (c *BBGoClient) get(path string, result interface{}) error {
+func (c *BBGoClient) get(path string, result any) error {
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
 		return fmt.Errorf("bbgo api %s: %w", path, err)
@@ -245,10 +245,10 @@ type BBGoBalance struct {
 }
 
 type BBGoAccountResponse struct {
-	Account interface{} `json:"account"`
+	Account json.RawMessage `json:"account"`
 }
 
-func (c *BBGoClient) GetSessionAccount(session string) (interface{}, error) {
+func (c *BBGoClient) GetSessionAccount(session string) (json.RawMessage, error) {
 	var resp BBGoAccountResponse
 	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/account", &resp); err != nil {
 		return nil, err
@@ -304,7 +304,7 @@ func (c *BBGoClient) GetAssets() (map[string]BBGoAsset, error) {
 	return resp.Assets, nil
 }
 
-type BBGoStrategyState map[string]interface{}
+type BBGoStrategyState map[string]any
 
 type BBGoStrategiesResponse struct {
 	Strategies []BBGoStrategyState `json:"strategies"`
@@ -319,10 +319,10 @@ func (c *BBGoClient) GetStrategies() ([]BBGoStrategyState, error) {
 }
 
 type BBGoTradingVolumeResponse struct {
-	TradingVolumes interface{} `json:"tradingVolumes"`
+	TradingVolumes json.RawMessage `json:"tradingVolumes"`
 }
 
-func (c *BBGoClient) GetTradingVolume(period, segment string) (interface{}, error) {
+func (c *BBGoClient) GetTradingVolume(period, segment string) (json.RawMessage, error) {
 	path := "/api/trading-volume"
 	q := url.Values{}
 	if period != "" {

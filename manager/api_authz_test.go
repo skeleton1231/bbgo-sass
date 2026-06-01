@@ -133,11 +133,11 @@ func TestResolveUserID_CreateStrategy_MismatchBlocked(t *testing.T) {
 
 	r := testRouterWithUser(api, "11111111-2222-3333-4444-555555555555")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Evil Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 	}
 	b, _ := json.Marshal(body)
@@ -176,7 +176,7 @@ func TestCredentialEndpoint_UsesHeaderUserID(t *testing.T) {
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"exchange":   "binance",
 		"api_key":    "my-key",
 		"api_secret": "my-secret",
@@ -223,7 +223,7 @@ func TestCredentialEndpoint_MissingUserID_Rejected(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"exchange":   "binance",
 		"api_key":    "my-key",
 		"api_secret": "my-secret",

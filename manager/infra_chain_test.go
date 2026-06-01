@@ -143,7 +143,7 @@ func TestBuildSyncConfig_YAMLStructure(t *testing.T) {
 }
 
 func TestNormalizeStrategyConfig_LegacyAlias(t *testing.T) {
-	s, p := normalizeStrategyConfig("sentinel_anomaly", map[string]interface{}{"threshold": 0.5})
+	s, p := normalizeStrategyConfig("sentinel_anomaly", map[string]any{"threshold": 0.5})
 	if s != "sentinel" {
 		t.Errorf("got %q, want sentinel", s)
 	}
@@ -153,7 +153,7 @@ func TestNormalizeStrategyConfig_LegacyAlias(t *testing.T) {
 }
 
 func TestNormalizeStrategyConfig_FieldAlias(t *testing.T) {
-	params := map[string]interface{}{"interval": "1h", "symbol": "BTCUSDT"}
+	params := map[string]any{"interval": "1h", "symbol": "BTCUSDT"}
 	s, p := normalizeStrategyConfig("dca", params)
 	if s != "dca" {
 		t.Errorf("got %q, want dca", s)

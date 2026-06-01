@@ -12,8 +12,8 @@ func TestBBGoClient_GetSession(t *testing.T) {
 		if r.URL.Path != "/api/sessions/binance" {
 			t.Errorf("expected /api/sessions/binance, got %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"session": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"session": map[string]any{
 				"name":         "binance",
 				"exchange": "binance",
 			},
@@ -33,10 +33,10 @@ func TestBBGoClient_GetSession(t *testing.T) {
 
 func TestBBGoClient_GetSessionTrades(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"trades": map[string]interface{}{
-				"BTCUSDT": map[string]interface{}{
-					"Trades": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"trades": map[string]any{
+				"BTCUSDT": map[string]any{
+					"Trades": []map[string]any{
 						{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1"},
 					},
 				},
@@ -60,8 +60,8 @@ func TestBBGoClient_GetSessionTrades(t *testing.T) {
 
 func TestBBGoClient_GetSessionOpenOrders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"orders": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"orders": []map[string]any{
 				{"id": "o1", "symbol": "BTCUSDT", "side": "BUY", "price": "49000", "quantity": "0.5"},
 			},
 		})
@@ -80,9 +80,9 @@ func TestBBGoClient_GetSessionOpenOrders(t *testing.T) {
 
 func TestBBGoClient_GetSessionAccount(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"account": map[string]interface{}{
-				"balances": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"account": map[string]any{
+				"balances": map[string]any{
 					"USDT": map[string]string{"available": "10000", "locked": "0"},
 				},
 			},

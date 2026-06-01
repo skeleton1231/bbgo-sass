@@ -33,11 +33,11 @@ func TestAPI_CreateStrategy_LiveOnlyRejectsPaper(t *testing.T) {
 
 	for _, strategy := range []string{"bollmaker", "supertrend", "dca2", "sentinel_anomaly"} {
 		t.Run(strategy, func(t *testing.T) {
-			body := map[string]interface{}{
+			body := map[string]any{
 				"name":     "test",
 				"exchange": "binance",
 				"strategy": strategy,
-				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"config":   map[string]any{"symbol": "BTCUSDT"},
 				"mode":     "paper",
 			}
 			b, _ := json.Marshal(body)
@@ -56,11 +56,11 @@ func TestAPI_CreateStrategy_LiveOnlyAcceptsLive(t *testing.T) {
 	api := setupModeTestAPI(t, "live")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "BollMaker",
 		"exchange": "binance",
 		"strategy": "bollmaker",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -77,11 +77,11 @@ func TestAPI_CreateStrategy_MixedModeAcceptsPaper(t *testing.T) {
 	api := setupModeTestAPI(t, "live")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Paper Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 	}
 	b, _ := json.Marshal(body)
@@ -98,11 +98,11 @@ func TestAPI_CreateStrategy_MixedModeAcceptsLive(t *testing.T) {
 	api := setupModeTestAPI(t, "paper")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Live Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -119,11 +119,11 @@ func TestAPI_CreateStrategy_SameModeAccepts(t *testing.T) {
 	api := setupModeTestAPI(t, "paper")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Another Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "ETHUSDT"},
+		"config":   map[string]any{"symbol": "ETHUSDT"},
 		"mode":     "paper",
 	}
 	b, _ := json.Marshal(body)
@@ -140,11 +140,11 @@ func TestAPI_CreateStrategy_LiveOnlyLegacyAlias(t *testing.T) {
 	api := setupModeTestAPI(t, "paper")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Sentinel",
 		"exchange": "binance",
 		"strategy": "sentinel",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 	}
 	b, _ := json.Marshal(body)
@@ -196,11 +196,11 @@ func TestAPI_CreateStrategy_EmptyNameRejected(t *testing.T) {
 	api := setupModeTestAPI(t, "paper")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 	}
 	b, _ := json.Marshal(body)
@@ -219,11 +219,11 @@ func TestAPI_CreateStrategy_InvalidModeRejected(t *testing.T) {
 
 	for _, mode := range []string{"test123", "PAPER", "LIVE", "demo", "backtest"} {
 		t.Run(mode, func(t *testing.T) {
-			body := map[string]interface{}{
+			body := map[string]any{
 				"name":     "test",
 				"exchange": "binance",
 				"strategy": "grid2",
-				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"config":   map[string]any{"symbol": "BTCUSDT"},
 				"mode":     mode,
 			}
 			b, _ := json.Marshal(body)
@@ -242,11 +242,11 @@ func TestAPI_CreateStrategy_NoModeWithExistingMode(t *testing.T) {
 	api := setupModeTestAPI(t, "live")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "No Mode Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", bytes.NewReader(b))
@@ -264,11 +264,11 @@ func TestAPI_CreateStrategy_PaperMode_RejectsNonBinance(t *testing.T) {
 
 	for _, exchange := range []string{"okex", "bybit", "kucoin", "bitget", "max", "coinbase", "bitfinex"} {
 		t.Run(exchange, func(t *testing.T) {
-			body := map[string]interface{}{
+			body := map[string]any{
 				"name":     "test",
 				"exchange": exchange,
 				"strategy": "grid2",
-				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"config":   map[string]any{"symbol": "BTCUSDT"},
 				"mode":     "paper",
 			}
 			b, _ := json.Marshal(body)
@@ -290,11 +290,11 @@ func TestAPI_CreateStrategy_PaperMode_AcceptsBinance(t *testing.T) {
 	api := setupModeTestAPI(t, "")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Paper Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 	}
 	b, _ := json.Marshal(body)
@@ -313,11 +313,11 @@ func TestAPI_CreateStrategy_LiveMode_AcceptsAllExchanges(t *testing.T) {
 
 	for _, exchange := range []string{"binance", "okex", "bybit", "kucoin"} {
 		t.Run(exchange, func(t *testing.T) {
-			body := map[string]interface{}{
+			body := map[string]any{
 				"name":     "test",
 				"exchange": exchange,
 				"strategy": "grid2",
-				"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+				"config":   map[string]any{"symbol": "BTCUSDT"},
 				"mode":     "live",
 			}
 			b, _ := json.Marshal(body)
@@ -336,14 +336,14 @@ func TestAPI_CreateStrategy_PaperMode_CrossExchange_RejectsNonBinance(t *testing
 	api := setupModeTestAPI(t, "")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "xmaker paper",
 		"exchange": "",
 		"strategy": "xmaker",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 		"crossExchange": true,
-		"sessions": []map[string]interface{}{
+		"sessions": []map[string]any{
 			{"name": "maker", "exchange": "binance", "envVarPrefix": "BINANCE"},
 			{"name": "hedge", "exchange": "bybit", "envVarPrefix": "BYBIT", "futures": true},
 		},
@@ -365,14 +365,14 @@ func TestAPI_CreateStrategy_PaperMode_CrossExchange_AcceptsAllBinance(t *testing
 	api := setupModeTestAPI(t, "")
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "xmaker paper all binance",
 		"exchange": "",
 		"strategy": "xmaker",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "paper",
 		"crossExchange": true,
-		"sessions": []map[string]interface{}{
+		"sessions": []map[string]any{
 			{"name": "maker", "exchange": "binance", "envVarPrefix": "BINANCE"},
 			{"name": "hedge", "exchange": "binance", "envVarPrefix": "BINANCE", "futures": true},
 		},

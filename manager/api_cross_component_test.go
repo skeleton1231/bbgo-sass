@@ -234,9 +234,9 @@ func TestUserStatus_UnknownUser_ReturnsStopped(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, ok := resp["containers"].(map[string]interface{})
+	containers, ok := resp["containers"].(map[string]any)
 	if !ok || len(containers) != 0 {
 		t.Errorf("expected empty containers for unknown user, got %v", resp)
 	}
@@ -262,9 +262,9 @@ func TestListStrategies_UnknownUser_ReturnsEmpty(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, ok := resp["containers"].(map[string]interface{})
+	containers, ok := resp["containers"].(map[string]any)
 	if !ok || len(containers) != 0 {
 		t.Errorf("expected empty containers for unknown user, got %v", resp)
 	}
@@ -368,8 +368,8 @@ func TestCreateStrategy_CrossExchange_RequiresSessions(t *testing.T) {
 func TestDeleteStrategy_NotFound(t *testing.T) {
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT"},
 				},
 			})
@@ -430,7 +430,7 @@ func TestHealthEndpoint_ReturnsCounts(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["users"].(float64) != 2 {
 		t.Errorf("expected 2 users, got %v", resp["users"])
@@ -465,7 +465,7 @@ func TestBacktestSync_TooManySymbols(t *testing.T) {
 	for i := range symbols {
 		symbols[i] = "SYM" + string(rune('A'+i)) + "USDT"
 	}
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange":   "binance",
 		"symbols":    symbols,
 		"start_time": "2024-01-01",

@@ -293,7 +293,7 @@ func makeStrategyRequest(method, path, body string) *http.Request {
 func TestMixedModePrevention(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 	}))
 	defer srv.Close()
 
@@ -660,37 +660,37 @@ func TestPaperModeFullLifecycle(t *testing.T) {
 		case "/api/ping":
 			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 		case "/api/sessions":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"sessions": []map[string]interface{}{{"name": "binance", "exchange": "binance"}},
+			json.NewEncoder(w).Encode(map[string]any{
+				"sessions": []map[string]any{{"name": "binance", "exchange": "binance"}},
 			})
 		case "/api/strategies/single":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
 				},
 			})
 		case "/api/assets":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"assets": map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"assets": map[string]any{
 					"USDT": map[string]string{"currency": "USDT", "total": "10000", "available": "8000"},
 				},
 			})
 		case "/api/trades":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"trades": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"trades": []map[string]any{
 					{"gid": 1, "symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "0.1", "fee": "2.5", "tradedAt": "2024-01-01"},
 				},
 			})
 		case "/api/orders/closed":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"orders": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"orders": []map[string]any{
 					{"gid": 1, "symbol": "BTCUSDT", "side": "BUY", "orderType": "LIMIT", "price": "50000", "status": "FILLED"},
 				},
 			})
 		case "/api/trading-volume":
-			json.NewEncoder(w).Encode(map[string]interface{}{"tradingVolumes": []interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"tradingVolumes": []any{}})
 		default:
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			json.NewEncoder(w).Encode(map[string]any{})
 		}
 	}))
 	t.Cleanup(bbgoSrv.Close)
@@ -736,7 +736,7 @@ func TestPaperModeFullLifecycle(t *testing.T) {
 			t.Errorf("GET %s: expected 200, got %d: %s", ep.path, w.Code, w.Body.String())
 			continue
 		}
-		var resp map[string]interface{}
+		var resp map[string]any
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Errorf("GET %s: decode: %v", ep.path, err)
 			continue

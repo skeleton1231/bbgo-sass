@@ -50,11 +50,11 @@ func TestMarketDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected BTCUSDT, got %v", result["symbol"])
 	}
 
-	depth, ok := result["depth"].(map[string]interface{})
+	depth, ok := result["depth"].(map[string]any)
 	if !ok {
 		t.Fatal("expected depth map")
 	}
-	bids, ok := depth["bids"].([]map[string]interface{})
+	bids, ok := depth["bids"].([]map[string]any)
 	if !ok || len(bids) != 1 {
 		t.Fatalf("expected 1 bid, got %v", depth["bids"])
 	}
@@ -62,7 +62,7 @@ func TestMarketDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected bid price 50000, got %s", bids[0]["price"])
 	}
 
-	kline, ok := result["kline"].(map[string]interface{})
+	kline, ok := result["kline"].(map[string]any)
 	if !ok {
 		t.Fatal("expected kline map")
 	}
@@ -70,7 +70,7 @@ func TestMarketDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected kline open 49900, got %v", kline["open"])
 	}
 
-	ticker, ok := result["ticker"].(map[string]interface{})
+	ticker, ok := result["ticker"].(map[string]any)
 	if !ok {
 		t.Fatal("expected ticker map")
 	}
@@ -78,7 +78,7 @@ func TestMarketDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected ticker close 50100, got %v", ticker["close"])
 	}
 
-	trades, ok := result["trades"].([]map[string]interface{})
+	trades, ok := result["trades"].([]map[string]any)
 	if !ok || len(trades) != 2 {
 		t.Fatalf("expected 2 trades, got %v", result["trades"])
 	}
@@ -134,7 +134,7 @@ func TestUserDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected binance, got %v", result["session"])
 	}
 
-	balances, ok := result["balances"].([]map[string]interface{})
+	balances, ok := result["balances"].([]map[string]any)
 	if !ok || len(balances) != 2 {
 		t.Fatalf("expected 2 balances, got %v", result["balances"])
 	}
@@ -145,7 +145,7 @@ func TestUserDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected 1.5, got %s", balances[0]["available"])
 	}
 
-	orders, ok := result["orders"].([]map[string]interface{})
+	orders, ok := result["orders"].([]map[string]any)
 	if !ok || len(orders) != 1 {
 		t.Fatalf("expected 1 order, got %v", result["orders"])
 	}
@@ -153,7 +153,7 @@ func TestUserDataToJSON_AllFields(t *testing.T) {
 		t.Errorf("expected BTCUSDT, got %v", orders[0]["symbol"])
 	}
 
-	trades, ok := result["trades"].([]map[string]interface{})
+	trades, ok := result["trades"].([]map[string]any)
 	if !ok || len(trades) != 1 {
 		t.Fatalf("expected 1 trade, got %v", result["trades"])
 	}
@@ -219,7 +219,7 @@ func TestMarketDataToJSON_RoundTrip(t *testing.T) {
 		t.Fatalf("marshal error: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		t.Fatalf("unmarshal error: %v", err)
 	}

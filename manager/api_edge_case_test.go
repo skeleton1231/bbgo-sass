@@ -35,11 +35,11 @@ func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -83,11 +83,11 @@ func TestCreateStrategy_ErrorContainer_NoAutoStart(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -134,11 +134,11 @@ func TestCreateStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -228,7 +228,7 @@ func TestCredentialCreate_StoppedContainer_NoRestart(t *testing.T) {
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"exchange":   "binance",
 		"api_key":    "new-key",
 		"api_secret": "new-secret",

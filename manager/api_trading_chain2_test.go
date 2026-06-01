@@ -105,18 +105,18 @@ func TestSyncer_MarkCredentialsVerified_UnusedExchange(t *testing.T) {
 
 func TestSyncer_SyncCredential(t *testing.T) {
 	var mu sync.Mutex
-	var received map[string]interface{}
+	var received map[string]any
 
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" && r.URL.Path == "/rest/v1/exchange_credentials" {
-			var payload map[string]interface{}
+			var payload map[string]any
 			json.NewDecoder(r.Body).Decode(&payload)
 			mu.Lock()
 			received = payload
 			mu.Unlock()
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 	}))
 	defer supabaseSrv.Close()
 

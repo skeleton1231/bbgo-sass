@@ -24,35 +24,35 @@ func chain10Setup(t *testing.T) (*API, *chi.Mux, *httptest.Server) {
 		case "/api/ping":
 			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 		case "/api/sessions":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"sessions": []map[string]interface{}{{"name": "binance", "exchange": "binance"}},
+			json.NewEncoder(w).Encode(map[string]any{
+				"sessions": []map[string]any{{"name": "binance", "exchange": "binance"}},
 			})
 		case "/api/sessions/binance":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"session": map[string]interface{}{"name": "binance", "exchange": "binance"},
+			json.NewEncoder(w).Encode(map[string]any{
+				"session": map[string]any{"name": "binance", "exchange": "binance"},
 			})
 		case "/api/sessions/binance/trades":
-			json.NewEncoder(w).Encode(map[string]interface{}{"trades": map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"trades": map[string]any{}})
 		case "/api/sessions/binance/open-orders":
-			json.NewEncoder(w).Encode(map[string]interface{}{"orders": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"orders": []map[string]any{}})
 		case "/api/sessions/binance/account":
-			json.NewEncoder(w).Encode(map[string]interface{}{"account": map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"account": map[string]any{}})
 		case "/api/sessions/binance/account/balances":
-			json.NewEncoder(w).Encode(map[string]interface{}{"balances": map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"balances": map[string]any{}})
 		case "/api/sessions/binance/symbols":
-			json.NewEncoder(w).Encode(map[string]interface{}{"symbols": []string{"BTCUSDT"}})
+			json.NewEncoder(w).Encode(map[string]any{"symbols": []string{"BTCUSDT"}})
 		case "/api/assets":
-			json.NewEncoder(w).Encode(map[string]interface{}{"assets": map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"assets": map[string]any{}})
 		case "/api/strategies/single":
-			json.NewEncoder(w).Encode(map[string]interface{}{"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{"strategies": []map[string]any{
 				{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
 			}})
 		case "/api/trades":
-			json.NewEncoder(w).Encode(map[string]interface{}{"trades": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"trades": []map[string]any{}})
 		case "/api/orders/closed":
-			json.NewEncoder(w).Encode(map[string]interface{}{"orders": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"orders": []map[string]any{}})
 		case "/api/trading-volume":
-			json.NewEncoder(w).Encode(map[string]interface{}{"tradingVolumes": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"tradingVolumes": []map[string]any{}})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -113,7 +113,7 @@ func TestTradingChain_Health(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("health = %d, want 200", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["running"].(float64) != 1 {
 		t.Errorf("running = %v, want 1", resp["running"])
@@ -132,9 +132,9 @@ func TestTradingChain_ListStrategies_UserNotFound(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
+	containers, _ := resp["containers"].(map[string]any)
 	if len(containers) != 0 {
 		t.Errorf("unknown user containers = %v, want empty", containers)
 	}
@@ -154,11 +154,11 @@ func TestTradingChain_ListStrategies_WithStrategies(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
-	liveContainer, _ := containers["live"].(map[string]interface{})
-	strats, _ := liveContainer["strategies"].([]interface{})
+	containers, _ := resp["containers"].(map[string]any)
+	liveContainer, _ := containers["live"].(map[string]any)
+	strats, _ := liveContainer["strategies"].([]any)
 	if len(strats) != 1 {
 		t.Errorf("strategies count = %d, want 1", len(strats))
 	}
@@ -240,9 +240,9 @@ func TestTradingChain_UserStatus_UnknownUser(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
+	containers, _ := resp["containers"].(map[string]any)
 	if len(containers) != 0 {
 		t.Errorf("unknown user should have empty containers, got %v", containers)
 	}
@@ -263,10 +263,10 @@ func TestTradingChain_UserStatus_RunningUser(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	containers, _ := resp["containers"].(map[string]interface{})
-	liveContainer, _ := containers["live"].(map[string]interface{})
+	containers, _ := resp["containers"].(map[string]any)
+	liveContainer, _ := containers["live"].(map[string]any)
 	if liveContainer == nil {
 		t.Fatal("expected live container in response")
 	}
@@ -315,7 +315,7 @@ func TestTradingChain_BacktestSyncStatus_NoFile(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["available"].(bool) {
 		t.Error("should report unavailable when file missing")
@@ -339,7 +339,7 @@ func TestTradingChain_BacktestSyncStatus_WithFile(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if !resp["available"].(bool) {
 		t.Error("should report available when file exists")
@@ -371,9 +371,9 @@ func TestTradingChain_RunBacktest_Success(t *testing.T) {
 		return []byte("BACKTEST RESULT: profit=100"), nil
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"strategy":   "grid2",
-		"config":     map[string]interface{}{"symbol": "BTCUSDT", "quantity": 0.001},
+		"config":     map[string]any{"symbol": "BTCUSDT", "quantity": 0.001},
 		"exchange":   "binance",
 		"start_time": "2024-01-01",
 		"end_time":   "2024-12-31",
@@ -385,7 +385,7 @@ func TestTradingChain_RunBacktest_Success(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("backtest = %d, want 200; body: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if !strings.Contains(resp["output"].(string), "BACKTEST RESULT") {
 		t.Error("expected backtest output in response")
@@ -402,7 +402,7 @@ func TestTradingChain_SyncBacktestData_Defaults(t *testing.T) {
 		return "synced " + symbol, nil
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange": "binance",
 	})
 	req := httptest.NewRequest("POST", "/api/backtest/sync", bytes.NewReader(body))
@@ -412,9 +412,9 @@ func TestTradingChain_SyncBacktestData_Defaults(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("sync = %d, want 200; body: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
-	results := resp["synced"].([]interface{})
+	results := resp["synced"].([]any)
 	// Default symbols: BTCUSDT, ETHUSDT
 	if len(results) != 2 {
 		t.Errorf("synced symbols = %d, want 2", len(results))
@@ -428,7 +428,7 @@ func TestTradingChain_SyncBacktestData_TooManySymbols(t *testing.T) {
 	for i := range symbols {
 		symbols[i] = "SYM" + strings.Repeat("A", 5)
 	}
-	body, _ := json.Marshal(map[string]interface{}{"symbols": symbols})
+	body, _ := json.Marshal(map[string]any{"symbols": symbols})
 	req := httptest.NewRequest("POST", "/api/backtest/sync", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -443,7 +443,7 @@ func TestTradingChain_SyncBacktestData_TooManySymbols(t *testing.T) {
 func TestTradingChain_CreateCredential_Success(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange":   "binance",
 		"api_key":    "testkey123",
 		"api_secret": "testsecret456",
@@ -455,7 +455,7 @@ func TestTradingChain_CreateCredential_Success(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create credential = %d, want 201; body: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["exchange"] != "binance" {
 		t.Errorf("exchange = %v, want binance", resp["exchange"])
@@ -468,7 +468,7 @@ func TestTradingChain_CreateCredential_Success(t *testing.T) {
 func TestTradingChain_CreateCredential_MissingFields(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange": "binance",
 	})
 	req := httptest.NewRequest("POST", "/api/credentials", bytes.NewReader(body))
@@ -483,7 +483,7 @@ func TestTradingChain_CreateCredential_MissingFields(t *testing.T) {
 func TestTradingChain_CreateCredential_UnsupportedExchange(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange":   "unknown_exchange",
 		"api_key":    "k",
 		"api_secret": "s",
@@ -517,7 +517,7 @@ func TestTradingChain_ListCredentials(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list = %d", w.Code)
 	}
-	var resp []map[string]interface{}
+	var resp []map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if len(resp) != 1 {
 		t.Errorf("credentials count = %d, want 1", len(resp))
@@ -632,7 +632,7 @@ func TestTradingChain_StopUser_Success(t *testing.T) {
 func TestTradingChain_CreateStrategy_MissingStrategy(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange": "binance",
 		"name":     "my-bot",
 		"mode":     "live",
@@ -655,12 +655,12 @@ func TestTradingChain_CreateStrategy_LiveNoCreds_Rejected(t *testing.T) {
 	}, func(string) bool { return true })
 	// status derived from container running mock
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"strategy": "grid2",
 		"exchange": "binance",
 		"name":     "live-bot",
 		"mode":     "live",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT", "quantity": 0.001},
+		"config":   map[string]any{"symbol": "BTCUSDT", "quantity": 0.001},
 	})
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/strategies", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -684,12 +684,12 @@ func TestTradingChain_CreateStrategy_LiveWithCreds_Accepted(t *testing.T) {
 		APISecretEncrypted: secretEnc,
 	})
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"strategy": "grid2",
 		"exchange": "binance",
 		"name":     "live-bot",
 		"mode":     "live",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT", "quantity": 0.001},
+		"config":   map[string]any{"symbol": "BTCUSDT", "quantity": 0.001},
 	})
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/strategies", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -703,12 +703,12 @@ func TestTradingChain_CreateStrategy_LiveWithCreds_Accepted(t *testing.T) {
 func TestTradingChain_CreateStrategy_PaperNoCreds_Rejected(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"strategy": "grid2",
 		"exchange": "binance",
 		"name":     "paper-bot",
 		"mode":     "paper",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT", "quantity": 0.001},
+		"config":   map[string]any{"symbol": "BTCUSDT", "quantity": 0.001},
 	})
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/strategies", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -723,12 +723,12 @@ func TestTradingChain_CreateStrategy_LiveOnlyPaper_Rejected(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
 	// sentinel is liveOnly — paper mode should be rejected
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"strategy": "sentinel",
 		"exchange": "binance",
 		"name":     "sentinel-bot",
 		"mode":     "paper",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 	})
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/strategies", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -768,12 +768,12 @@ func TestTradingChain_CreateStrategy_ModeConflict(t *testing.T) {
 		})
 
 	// Add paper strategy — goes to separate container, allowed
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"strategy": "grid2",
 		"exchange": "binance",
 		"name":     "paper-bot",
 		"mode":     "paper",
-		"config":   map[string]interface{}{"symbol": "ETHUSDT"},
+		"config":   map[string]any{"symbol": "ETHUSDT"},
 	})
 	req := httptest.NewRequest("POST", "/api/users/"+chain10UID+"/strategies", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -927,7 +927,7 @@ func TestTradingChain_SyncBacktestData_ConcurrencyLimit(t *testing.T) {
 	api.btSyncSem <- struct{}{}
 	defer func() { <-api.btSyncSem; <-api.btSyncSem }()
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"exchange": "binance",
 		"symbols":  []string{"BTCUSDT"},
 	})
@@ -975,10 +975,10 @@ func TestTradingChain_Notification_CreateListDelete(t *testing.T) {
 	api.notifier = NewNotifier(t.TempDir(), api.encryptor)
 
 	// Create — use slack so we don't need encryption for token
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"type":        "slack",
 		"webhook_url": "https://hooks.slack.com/test",
-		"rules":       map[string]interface{}{"trade_events": true},
+		"rules":       map[string]any{"trade_events": true},
 	})
 	req := httptest.NewRequest("POST", "/api/notifications/config", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -987,7 +987,7 @@ func TestTradingChain_Notification_CreateListDelete(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create notification = %d, want 201; body: %s", w.Code, w.Body.String())
 	}
-	var createResp map[string]interface{}
+	var createResp map[string]any
 	json.NewDecoder(w.Body).Decode(&createResp)
 	notifID := createResp["id"].(string)
 

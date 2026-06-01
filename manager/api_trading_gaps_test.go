@@ -179,8 +179,8 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "strat-1", "strategy": "grid2", "symbol": "BTCUSDT", "session": "binance"},
 					{"strategyInstanceID": "strat-2", "strategy": "supertrend", "symbol": "ETHUSDT", "session": "binance"},
 				},
@@ -240,13 +240,13 @@ func TestAPI_PnL_SupabaseFallback_WhenStopped(t *testing.T) {
 	supabaseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if r.URL.Path == "/rest/v1/trades" {
-			json.NewEncoder(w).Encode([]map[string]interface{}{
+			json.NewEncoder(w).Encode([]map[string]any{
 				{"symbol": "BTCUSDT", "side": "BUY", "price": "50000", "quantity": "1", "fee": "10", "traded_at": "2024-01-01"},
 				{"symbol": "BTCUSDT", "side": "SELL", "price": "55000", "quantity": "1", "fee": "10", "traded_at": "2024-01-02"},
 			})
 			return
 		}
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 	}))
 	defer supabaseSrv.Close()
 

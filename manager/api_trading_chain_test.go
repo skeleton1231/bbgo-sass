@@ -32,11 +32,11 @@ func TestAPI_CreateStrategy_LiveRequiresCredentials(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Live Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -75,11 +75,11 @@ func TestAPI_CreateStrategy_LiveWithCredentials_Accepted(t *testing.T) {
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":     "Live Grid",
 		"exchange": "binance",
 		"strategy": "grid2",
-		"config":   map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":   map[string]any{"symbol": "BTCUSDT"},
 		"mode":     "live",
 	}
 	b, _ := json.Marshal(body)
@@ -115,13 +115,13 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 
 	r := testRouter(api)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":          "XMaker",
 		"strategy":      "xmaker",
 		"crossExchange": true,
-		"config":        map[string]interface{}{"symbol": "BTCUSDT"},
+		"config":        map[string]any{"symbol": "BTCUSDT"},
 		"mode":          "live",
-		"sessions": []map[string]interface{}{
+		"sessions": []map[string]any{
 			{"name": "maker", "exchange": "binance", "envVarPrefix": "BINANCE"},
 			{"name": "hedge", "exchange": "bybit", "envVarPrefix": "BYBIT"},
 		},
@@ -143,8 +143,8 @@ func TestAPI_DeleteLastStrategy_StopsContainer(t *testing.T) {
 	var stopCalled bool
 	bbgoHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT"},
 				},
 			})
@@ -180,8 +180,8 @@ func TestAPI_DeleteStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 	var restartCalled bool
 	bbgoHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{"strategyInstanceID": "s1", "strategy": "grid2", "symbol": "BTCUSDT"},
 					{"strategyInstanceID": "s2", "strategy": "supertrend", "symbol": "ETHUSDT"},
 				},

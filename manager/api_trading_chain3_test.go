@@ -23,7 +23,7 @@ func TestMarketDataToJSON_Trade(t *testing.T) {
 		},
 	}
 	result := marketDataToJSON(md)
-	trades, ok := result["trades"].([]map[string]interface{})
+	trades, ok := result["trades"].([]map[string]any)
 	if !ok || len(trades) != 1 {
 		t.Fatalf("trades wrong type or len")
 	}
@@ -45,7 +45,7 @@ func TestMarketDataToJSON_KLine(t *testing.T) {
 		},
 	}
 	result := marketDataToJSON(md)
-	kline, ok := result["kline"].(map[string]interface{})
+	kline, ok := result["kline"].(map[string]any)
 	if !ok {
 		t.Fatal("kline not a map")
 	}
@@ -67,11 +67,11 @@ func TestMarketDataToJSON_Depth(t *testing.T) {
 		},
 	}
 	result := marketDataToJSON(md)
-	depth, ok := result["depth"].(map[string]interface{})
+	depth, ok := result["depth"].(map[string]any)
 	if !ok {
 		t.Fatal("depth not a map")
 	}
-	bids, _ := depth["bids"].([]map[string]interface{})
+	bids, _ := depth["bids"].([]map[string]any)
 	if len(bids) != 1 || bids[0]["price"] != "50000" {
 		t.Errorf("bids = %v", bids)
 	}
@@ -84,7 +84,7 @@ func TestMarketDataToJSON_Ticker(t *testing.T) {
 		Ticker: &pb.Ticker{Open: 3000, High: 3100, Low: 2950, Close: 3050, Volume: 5000},
 	}
 	result := marketDataToJSON(md)
-	ticker, ok := result["ticker"].(map[string]interface{})
+	ticker, ok := result["ticker"].(map[string]any)
 	if !ok {
 		t.Fatal("ticker not a map")
 	}
@@ -102,7 +102,7 @@ func TestUserDataToJSON_Balances(t *testing.T) {
 		},
 	}
 	result := userDataToJSON(ud)
-	balances, ok := result["balances"].([]map[string]interface{})
+	balances, ok := result["balances"].([]map[string]any)
 	if !ok || len(balances) != 1 {
 		t.Fatalf("balances wrong type or len")
 	}
@@ -120,7 +120,7 @@ func TestUserDataToJSON_Orders(t *testing.T) {
 		},
 	}
 	result := userDataToJSON(ud)
-	orders, ok := result["orders"].([]map[string]interface{})
+	orders, ok := result["orders"].([]map[string]any)
 	if !ok || len(orders) != 1 {
 		t.Fatalf("orders wrong type or len")
 	}
@@ -138,7 +138,7 @@ func TestUserDataToJSON_Trades(t *testing.T) {
 		},
 	}
 	result := userDataToJSON(ud)
-	trades, ok := result["trades"].([]map[string]interface{})
+	trades, ok := result["trades"].([]map[string]any)
 	if !ok || len(trades) != 1 {
 		t.Fatalf("trades wrong type or len")
 	}

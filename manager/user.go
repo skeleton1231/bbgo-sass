@@ -72,7 +72,7 @@ var legacyFieldAliases = map[string]map[string]string{
 }
 
 // normalizeStrategyConfig fixes old strategy IDs and field names from legacy DB records.
-func normalizeStrategyConfig(strategy string, params map[string]interface{}) (string, map[string]interface{}) {
+func normalizeStrategyConfig(strategy string, params map[string]any) (string, map[string]any) {
 	if alias, ok := legacyStrategyAliases[strategy]; ok {
 		strategy = alias
 	}
@@ -188,7 +188,7 @@ func parseStrategiesFromYAML(data []byte) ([]StrategyEntry, error) {
 
 // parseExchangeStrategyEntry extracts a StrategyEntry from an exchangeStrategy YAML map.
 // Format: {"on": "binance", "grid2": {symbol: "BTCUSDT", ...}}
-func parseExchangeStrategyEntry(m map[string]interface{}) (StrategyEntry, bool) {
+func parseExchangeStrategyEntry(m map[string]any) (StrategyEntry, bool) {
 	exchange, _ := m["on"].(string)
 	if exchange == "" {
 		return StrategyEntry{}, false
@@ -213,7 +213,7 @@ func parseExchangeStrategyEntry(m map[string]interface{}) (StrategyEntry, bool) 
 
 // parseCrossStrategyEntry extracts a StrategyEntry from a crossExchangeStrategy YAML map.
 // Format: {"xmaker": {symbol: "BTCUSDT", ...}}
-func parseCrossStrategyEntry(m map[string]interface{}) (StrategyEntry, bool) {
+func parseCrossStrategyEntry(m map[string]any) (StrategyEntry, bool) {
 	for key, val := range m {
 		config, err := json.Marshal(val)
 		if err != nil {
@@ -287,7 +287,7 @@ func (s *StrategyStore) writeYAML(userID, mode string, entries []StrategyEntry, 
 
 // extractSymbolFromConfig returns the symbol from a strategy config JSON.
 func extractSymbolFromConfig(config json.RawMessage) string {
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal(config, &m); err != nil {
 		return ""
 	}
@@ -345,8 +345,8 @@ type bbgoConfig struct {
 	Exchange                map[string]exchangeConfig `yaml:"exchange"`
 	Environment             *environmentConfig        `yaml:"environment,omitempty"`
 	Sync                    *syncConfig               `yaml:"sync,omitempty"`
-	ExchangeStrategies      []map[string]interface{}  `yaml:"exchangeStrategies,omitempty"`
-	CrossExchangeStrategies []map[string]interface{}  `yaml:"crossExchangeStrategies,omitempty"`
+	ExchangeStrategies      []map[string]any  `yaml:"exchangeStrategies,omitempty"`
+	CrossExchangeStrategies []map[string]any  `yaml:"crossExchangeStrategies,omitempty"`
 }
 
 type sessionConfig struct {
@@ -369,13 +369,13 @@ type environmentConfig struct {
 func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentials func(exchange string) bool) ([]byte, error) {
 	exchanges := map[string]exchangeConfig{}
 	sessions := map[string]sessionConfig{}
-	var exchangeStrategies []map[string]interface{}
-	var crossStrategies []map[string]interface{}
+	var exchangeStrategies []map[string]any
+	var crossStrategies []map[string]any
 
 	for _, s := range strategies {
-		var params map[string]interface{}
+		var params map[string]any
 		if len(s.Config) == 0 {
-			params = map[string]interface{}{}
+			params = map[string]any{}
 		} else if err := json.Unmarshal(s.Config, &params); err != nil {
 			var rawStr string
 			if err2 := json.Unmarshal(s.Config, &rawStr); err2 == nil {
@@ -383,7 +383,7 @@ func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentia
 				if alias, ok := legacyStrategyAliases[strategyID]; ok {
 					strategyID = alias
 				}
-				entry := map[string]interface{}{
+				entry := map[string]any{
 					"on":       s.Exchange,
 					strategyID: rawStr,
 				}
@@ -414,7 +414,7 @@ func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentia
 			}
 		}
 
-		entry := map[string]interface{}{
+		entry := map[string]any{
 			"on":       s.Exchange,
 			s.Strategy: params,
 		}
@@ -455,7 +455,7 @@ func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentia
 	return out, nil
 }
 
-func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool, mode string) map[string]interface{} {
+func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool, mode string) map[string]any {
 	for _, sr := range s.Sessions {
 		prefix := sr.EnvVarPrefix
 		if prefix == "" {
@@ -478,13 +478,13 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]interface{}, 
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		s.Strategy: params,
 	}
 }
 
 func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string) ([]byte, error) {
-	var allParams map[string]interface{}
+	var allParams map[string]any
 	if err := json.Unmarshal(rawConfig, &allParams); err != nil {
 		return nil, err
 	}
@@ -528,7 +528,7 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 			Exchange     string `yaml:"exchange"`
 			EnvVarPrefix string `yaml:"envVarPrefix"`
 		} `yaml:"sessions"`
-		ExchangeStrategies []map[string]interface{} `yaml:"exchangeStrategies"`
+		ExchangeStrategies []map[string]any `yaml:"exchangeStrategies"`
 		Backtest           struct {
 			Sessions  []string `yaml:"sessions"`
 			Symbols   []string `yaml:"symbols"`
@@ -550,7 +550,7 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 		}{
 			exchange: {Exchange: exchange, EnvVarPrefix: prefix},
 		},
-		ExchangeStrategies: []map[string]interface{}{
+		ExchangeStrategies: []map[string]any{
 			{
 				"on":     exchange,
 				strategy: allParams,

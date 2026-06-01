@@ -40,7 +40,7 @@ func TestAPI_CreateNotificationConfig_Telegram(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["type"] != "telegram" {
 		t.Errorf("expected type=telegram, got %v", resp["type"])
@@ -48,7 +48,7 @@ func TestAPI_CreateNotificationConfig_Telegram(t *testing.T) {
 	if resp["enabled"] != true {
 		t.Errorf("expected enabled=true, got %v", resp["enabled"])
 	}
-	rules, ok := resp["rules"].(map[string]interface{})
+	rules, ok := resp["rules"].(map[string]any)
 	if !ok {
 		t.Fatal("expected rules object")
 	}
@@ -144,7 +144,7 @@ func TestAPI_ListNotificationConfigs_ReturnsCreated(t *testing.T) {
 		t.Fatalf("list: expected 200, got %d", w2.Code)
 	}
 
-	var configs []map[string]interface{}
+	var configs []map[string]any
 	json.NewDecoder(w2.Body).Decode(&configs)
 	if len(configs) != 1 {
 		t.Fatalf("expected 1 config, got %d", len(configs))
@@ -169,7 +169,7 @@ func TestAPI_DeleteNotificationConfig_FullCRUD(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 201, got %d", w.Code)
 	}
-	var createResp map[string]interface{}
+	var createResp map[string]any
 	json.NewDecoder(w.Body).Decode(&createResp)
 	notifID, _ := createResp["id"].(string)
 
@@ -185,7 +185,7 @@ func TestAPI_DeleteNotificationConfig_FullCRUD(t *testing.T) {
 	req3.Header.Set("X-User-Id", userID)
 	w3 := httptest.NewRecorder()
 	r.ServeHTTP(w3, req3)
-	var configs []map[string]interface{}
+	var configs []map[string]any
 	json.NewDecoder(w3.Body).Decode(&configs)
 	if len(configs) != 0 {
 		t.Errorf("expected 0 configs after delete, got %d", len(configs))

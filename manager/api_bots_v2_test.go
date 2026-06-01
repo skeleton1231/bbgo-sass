@@ -12,11 +12,11 @@ import (
 // --- botFromStrategy unit tests ---
 
 func TestBotFromStrategy_ExtractsNestedSymbol(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy":           "grid2",
 		"strategyInstanceID": "grid2-BTCUSDT-size-5-75500-73000",
-		"on":                 []interface{}{"binance"},
-		"grid2": map[string]interface{}{
+		"on":                 []any{"binance"},
+		"grid2": map[string]any{
 			"symbol":     "BTCUSDT",
 			"gridNumber": float64(5),
 			"upperPrice": float64(75500),
@@ -50,11 +50,11 @@ func TestBotFromStrategy_ExtractsNestedSymbol(t *testing.T) {
 }
 
 func TestBotFromStrategy_ConfigContainsNestedStrategyParams(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy":           "grid2",
 		"strategyInstanceID": "grid2-BTCUSDT-size-5-75500-73000",
-		"on":                 []interface{}{"binance"},
-		"grid2": map[string]interface{}{
+		"on":                 []any{"binance"},
+		"grid2": map[string]any{
 			"symbol":     "BTCUSDT",
 			"gridNumber": float64(5),
 			"upperPrice": float64(75500),
@@ -64,9 +64,9 @@ func TestBotFromStrategy_ConfigContainsNestedStrategyParams(t *testing.T) {
 
 	bot := botFromStrategy(s, "live")
 
-	cfg, ok := bot.Config.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Config should be a map, got %T", bot.Config)
+	var cfg map[string]any
+	if err := json.Unmarshal(bot.Config, &cfg); err != nil {
+		t.Fatalf("Config: failed to unmarshal: %v", err)
 	}
 	if cfg["symbol"] != "BTCUSDT" {
 		t.Errorf("Config.symbol: got %v", cfg["symbol"])
@@ -80,20 +80,20 @@ func TestBotFromStrategy_ConfigContainsNestedStrategyParams(t *testing.T) {
 }
 
 func TestBotFromStrategy_StateContainsFullMap(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy":           "supertrend",
 		"strategyInstanceID": "supertrend-ETHUSDT",
-		"on":                 []interface{}{"binance"},
-		"supertrend": map[string]interface{}{
+		"on":                 []any{"binance"},
+		"supertrend": map[string]any{
 			"symbol": "ETHUSDT",
 		},
 	}
 
 	bot := botFromStrategy(s, "live")
 
-	state, ok := bot.State.(map[string]interface{})
-	if !ok {
-		t.Fatalf("State should be a map, got %T", bot.State)
+	var state map[string]any
+	if err := json.Unmarshal(bot.State, &state); err != nil {
+		t.Fatalf("State: failed to unmarshal: %v", err)
 	}
 	if state["strategy"] != "supertrend" {
 		t.Errorf("State.strategy: got %v", state["strategy"])
@@ -104,10 +104,10 @@ func TestBotFromStrategy_StateContainsFullMap(t *testing.T) {
 }
 
 func TestBotFromStrategy_MissingStrategyInstanceID(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy": "grid2",
-		"on":       []interface{}{"binance"},
-		"grid2": map[string]interface{}{
+		"on":       []any{"binance"},
+		"grid2": map[string]any{
 			"symbol": "BTCUSDT",
 		},
 	}
@@ -123,10 +123,10 @@ func TestBotFromStrategy_MissingStrategyInstanceID(t *testing.T) {
 }
 
 func TestBotFromStrategy_MissingOnArray(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy":           "grid2",
 		"strategyInstanceID": "grid2-BTCUSDT",
-		"grid2": map[string]interface{}{
+		"grid2": map[string]any{
 			"symbol": "BTCUSDT",
 		},
 	}
@@ -142,11 +142,11 @@ func TestBotFromStrategy_MissingOnArray(t *testing.T) {
 }
 
 func TestBotFromStrategy_EmptyOnArray(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy":           "grid2",
 		"strategyInstanceID": "grid2-BTCUSDT",
-		"on":                 []interface{}{},
-		"grid2": map[string]interface{}{
+		"on":                 []any{},
+		"grid2": map[string]any{
 			"symbol": "BTCUSDT",
 		},
 	}
@@ -159,10 +159,10 @@ func TestBotFromStrategy_EmptyOnArray(t *testing.T) {
 }
 
 func TestBotFromStrategy_NoNestedConfig(t *testing.T) {
-	s := map[string]interface{}{
+	s := map[string]any{
 		"strategy":           "grid2",
 		"strategyInstanceID": "grid2",
-		"on":                 []interface{}{"binance"},
+		"on":                 []any{"binance"},
 	}
 
 	bot := botFromStrategy(s, "paper")
@@ -183,13 +183,13 @@ func TestBotFromStrategy_NoNestedConfig(t *testing.T) {
 func realBBGoHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{
 						"strategy":           "grid2",
 						"strategyInstanceID": "grid2-BTCUSDT-size-5-75500-73000",
-						"on":                 []interface{}{"binance"},
-						"grid2": map[string]interface{}{
+						"on":                 []any{"binance"},
+						"grid2": map[string]any{
 							"symbol":     "BTCUSDT",
 							"gridNumber": float64(5),
 							"upperPrice": float64(75500),
@@ -199,8 +199,8 @@ func realBBGoHandler() http.HandlerFunc {
 					{
 						"strategy":           "dca",
 						"strategyInstanceID": "dca-ETHUSDT",
-						"on":                 []interface{}{"binance"},
-						"dca": map[string]interface{}{
+						"on":                 []any{"binance"},
+						"dca": map[string]any{
 							"symbol": "ETHUSDT",
 						},
 					},
@@ -208,7 +208,7 @@ func realBBGoHandler() http.HandlerFunc {
 			})
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
+		json.NewEncoder(w).Encode(map[string]any{"message": "ok"})
 	}
 }
 
@@ -278,9 +278,9 @@ func TestListBots_RealFormat_ExtractsFieldsCorrectly(t *testing.T) {
 		t.Errorf("Mode: got %q", bot.Mode)
 	}
 
-	cfg, ok := bot.Config.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Config: expected map, got %T", bot.Config)
+	var cfg map[string]any
+	if err := json.Unmarshal(bot.Config, &cfg); err != nil {
+		t.Fatalf("Config: failed to unmarshal: %v", err)
 	}
 	if cfg["upperPrice"] != float64(75500) {
 		t.Errorf("Config.upperPrice: got %v", cfg["upperPrice"])
@@ -316,9 +316,9 @@ func TestGetBot_RealFormat_ReturnsCorrectFields(t *testing.T) {
 		t.Errorf("Exchange: got %q", bot.Exchange)
 	}
 
-	cfg, ok := bot.Config.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Config: expected map, got %T", bot.Config)
+	var cfg map[string]any
+	if err := json.Unmarshal(bot.Config, &cfg); err != nil {
+		t.Fatalf("Config: failed to unmarshal: %v", err)
 	}
 	if cfg["gridNumber"] != float64(5) {
 		t.Errorf("Config.gridNumber: got %v", cfg["gridNumber"])

@@ -14,31 +14,31 @@ import (
 func botBBGoHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"strategies": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"strategies": []map[string]any{
 					{
 						"strategyInstanceID": "strat_grid_btc",
 						"strategy":           "grid2",
-						"on":                 []interface{}{"binance"},
-						"grid2":              map[string]interface{}{"symbol": "BTCUSDT", "gridNumber": float64(10)},
+						"on":                 []any{"binance"},
+						"grid2":              map[string]any{"symbol": "BTCUSDT", "gridNumber": float64(10)},
 					},
 					{
 						"strategyInstanceID": "strat_eth_dca",
 						"strategy":           "dca",
-						"on":                 []interface{}{"binance"},
-						"dca":                map[string]interface{}{"symbol": "ETHUSDT"},
+						"on":                 []any{"binance"},
+						"dca":                map[string]any{"symbol": "ETHUSDT"},
 					},
 					{
 						"strategyInstanceID": "strat_paper_grid",
 						"strategy":           "grid2",
-						"on":                 []interface{}{"binance"},
-						"grid2":              map[string]interface{}{"symbol": "BTCUSDT"},
+						"on":                 []any{"binance"},
+						"grid2":              map[string]any{"symbol": "BTCUSDT"},
 					},
 				},
 			})
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
+		json.NewEncoder(w).Encode(map[string]any{"message": "ok"})
 	}
 }
 
@@ -413,14 +413,14 @@ func TestGetBot_CrossExchangeStrategy(t *testing.T) {
 		// Mock bbgo to return the xmaker strategy
 		bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/api/strategies/single" {
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"strategies": []map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
+					"strategies": []map[string]any{
 						{"strategyInstanceID": "strat_xmaker", "strategy": "xmaker", "symbol": "BTCUSDT", "session": "binance"},
 					},
 				})
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]interface{}{"message": "ok"})
+			json.NewEncoder(w).Encode(map[string]any{"message": "ok"})
 		}))
 	t.Cleanup(bbgoSrv.Close)
 

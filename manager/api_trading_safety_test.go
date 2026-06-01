@@ -47,7 +47,7 @@ func TestListCredentials_DoesNotLeakEncryptedData(t *testing.T) {
 		}
 	}
 
-	var result []map[string]interface{}
+	var result []map[string]any
 	json.NewDecoder(w.Body).Decode(&result)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 credential, got %d", len(result))
@@ -140,13 +140,13 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 		case "/api/ping":
 			json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 		case "/api/sessions":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"sessions": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"sessions": []map[string]any{
 					{"name": "binance", "exchange": "binance"},
 				},
 			})
 		case "/api/trades":
-			json.NewEncoder(w).Encode(map[string]interface{}{"trades": []interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"trades": []any{}})
 		default:
 			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 		}
@@ -182,10 +182,10 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("step3 status: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var statusResp map[string]interface{}
+	var statusResp map[string]any
 	json.NewDecoder(w.Body).Decode(&statusResp)
-	containers, _ := statusResp["containers"].(map[string]interface{})
-	paperContainer, _ := containers["paper"].(map[string]interface{})
+	containers, _ := statusResp["containers"].(map[string]any)
+	paperContainer, _ := containers["paper"].(map[string]any)
 	if paperContainer["status"] != StatusRunning {
 		t.Errorf("step3: expected running, got %v", paperContainer["status"])
 	}
