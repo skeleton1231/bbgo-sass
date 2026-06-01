@@ -99,7 +99,7 @@ func TestBacktestExecutor_NotificationOnComplete(t *testing.T) {
 
 	store := NewBacktestJobStore(tmpDir)
 	exec := NewBacktestExecutor(store, nil, notifier)
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
 	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
@@ -138,7 +138,7 @@ func TestBacktestExecutor_NotificationOnFailure(t *testing.T) {
 
 	store := NewBacktestJobStore(tmpDir)
 	exec := NewBacktestExecutor(store, nil, notifier)
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "", errTestSyncFail
 	}
 

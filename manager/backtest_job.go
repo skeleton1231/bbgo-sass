@@ -216,7 +216,7 @@ type BacktestExecutor struct {
 	notifier  *Notifier
 
 	// Test hooks — override in tests to mock Docker operations.
-	syncFn func(exchange, symbol, startTime, endTime string) (string, error)
+	syncFn func(userID, exchange, symbol, startTime, endTime string) (string, error)
 	runFn  func(userID string, yamlContent []byte) ([]byte, error)
 }
 
@@ -228,11 +228,11 @@ func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier
 	}
 }
 
-func (ex *BacktestExecutor) syncBacktest(exchange, symbol, startTime, endTime string) (string, error) {
+func (ex *BacktestExecutor) syncBacktest(userID, exchange, symbol, startTime, endTime string) (string, error) {
 	if ex.syncFn != nil {
-		return ex.syncFn(exchange, symbol, startTime, endTime)
+		return ex.syncFn(userID, exchange, symbol, startTime, endTime)
 	}
-	return ex.container.SyncBacktest(exchange, symbol, startTime, endTime)
+	return ex.container.SyncBacktest(userID, exchange, symbol, startTime, endTime)
 }
 
 func (ex *BacktestExecutor) runBacktest(userID string, yamlContent []byte) ([]byte, error) {
@@ -259,7 +259,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	if job.NeedSync {
 		ex.store.UpdateStatus(job.ID, JobDownloading, "syncing market data...")
-		out, err := ex.syncBacktest(job.Exchange, job.Symbol, job.StartTime, job.EndTime)
+		out, err := ex.syncBacktest(job.UserID, job.Exchange, job.Symbol, job.StartTime, job.EndTime)
 		if err != nil {
 			ex.store.FailJob(job.ID, "data sync failed", fmt.Sprintf("data sync failed: %s", err))
 			ex.notify(job, "Backtest Data Sync Failed", fmt.Sprintf("Strategy %s on %s/%s: data sync failed", job.Strategy, job.Exchange, job.Symbol))

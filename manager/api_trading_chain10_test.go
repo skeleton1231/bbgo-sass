@@ -398,7 +398,7 @@ func TestTradingChain_SyncBacktestData_Defaults(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 	api.container.cfg.DataDir = t.TempDir()
 
-	api.container.syncBacktestFn = func(exchange, symbol, start, end string) (string, error) {
+	api.container.syncBacktestFn = func(userID, exchange, symbol, start, end string) (string, error) {
 		return "synced " + symbol, nil
 	}
 

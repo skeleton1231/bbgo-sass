@@ -73,28 +73,6 @@ func main() {
 		}
 	}
 
-	// Auto-sync backtest data on startup (background, non-blocking)
-	btSyncPool := pool.New(2)
-	defer btSyncPool.Release()
-	go func() {
-		time.Sleep(30 * time.Second)
-		for _, ex := range cfg.BacktestExchanges {
-			for _, sym := range cfg.BacktestSymbols {
-				ex, sym := ex, sym
-				if err := btSyncPool.Submit(func() {
-					log.Printf("auto-syncing backtest data: %s/%s", ex, sym)
-					if out, err := containerMgr.SyncBacktest(ex, sym, cfg.BacktestStartTime, cfg.BacktestEndTime); err != nil {
-						log.Printf("backtest auto-sync %s/%s failed: %v (output: %s)", ex, sym, err, out)
-					} else {
-						log.Printf("backtest auto-sync %s/%s done", ex, sym)
-					}
-				}); err != nil {
-					log.Printf("backtest auto-sync submit %s/%s: %v", ex, sym, err)
-				}
-			}
-		}
-		btSyncPool.Wait()
-	}()
 
 	// Periodic health check
 	done := make(chan struct{})

@@ -16,7 +16,7 @@ func TestBacktestExecutor_FullFlow_SyncAndRun(t *testing.T) {
 
 	var syncCalled, runCalled bool
 	var mu sync.Mutex
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		mu.Lock()
 		syncCalled = true
 		mu.Unlock()
@@ -82,7 +82,7 @@ func TestBacktestExecutor_SkipSync(t *testing.T) {
 
 	var syncCalled bool
 	var mu sync.Mutex
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		mu.Lock()
 		syncCalled = true
 		mu.Unlock()
@@ -122,7 +122,7 @@ func TestBacktestExecutor_SyncFailure(t *testing.T) {
 
 	var runCalled bool
 	var mu sync.Mutex
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "", fmt.Errorf("sync error: network timeout")
 	}
 	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
@@ -165,7 +165,7 @@ func TestBacktestExecutor_RunFailure(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
 	exec := NewBacktestExecutor(store, cm, nil)
 
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
 	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
@@ -202,7 +202,7 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
 	exec := NewBacktestExecutor(store, cm, nil)
 
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "", fmt.Errorf("sync error")
 	}
 
@@ -247,7 +247,7 @@ func TestBacktestExecutor_StatusTransitions(t *testing.T) {
 	var statuses []string
 	var mu sync.Mutex
 
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		time.Sleep(50 * time.Millisecond)
 		return "synced", nil
 	}
@@ -318,7 +318,7 @@ func TestBacktestExecutor_InvalidConfig(t *testing.T) {
 
 	var runCalled bool
 	var mu sync.Mutex
-	exec.syncFn = func(exchange, symbol, startTime, endTime string) (string, error) {
+	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
 	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {

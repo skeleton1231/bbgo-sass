@@ -1199,7 +1199,7 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(idx int, sym string) {
 			defer wg.Done()
-			out, err := api.container.SyncBacktest(req.Exchange, sym, req.StartTime, req.EndTime)
+			out, err := api.container.SyncBacktest(userID, req.Exchange, sym, req.StartTime, req.EndTime)
 			r := syncResult{Symbol: sym, Output: out}
 			if err != nil {
 				r.Error = err.Error()
