@@ -215,14 +215,18 @@ func TestBacktestJobStore_Semaphore(t *testing.T) {
 	store := NewBacktestJobStore(dir)
 
 	if !store.AcquireSlot() {
-		t.Error("expected to acquire slot")
+		t.Error("expected to acquire first slot")
+	}
+	if !store.AcquireSlot() {
+		t.Error("expected to acquire second slot (concurrency=2)")
 	}
 	if store.AcquireSlot() {
-		t.Error("expected slot to be full (concurrency=1)")
+		t.Error("expected slot to be full (concurrency=2)")
 	}
 	store.ReleaseSlot()
 	if !store.AcquireSlot() {
 		t.Error("expected to acquire slot after release")
 	}
+	store.ReleaseSlot()
 	store.ReleaseSlot()
 }

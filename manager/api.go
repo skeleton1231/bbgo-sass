@@ -1146,7 +1146,7 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := api.container.RunBacktest(userID, yamlContent)
+	result, err := api.container.RunBacktest(userID, generateID("bt"), yamlContent)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

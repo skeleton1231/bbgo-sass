@@ -102,7 +102,7 @@ func TestBacktestExecutor_NotificationOnComplete(t *testing.T) {
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		return []byte("backtest output"), nil
 	}
 

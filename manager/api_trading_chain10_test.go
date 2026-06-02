@@ -367,7 +367,7 @@ func TestTradingChain_RunBacktest_Success(t *testing.T) {
 	api, r, _ := chain10Setup(t)
 	api.container.cfg.DataDir = t.TempDir()
 
-	api.container.runBacktestFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	api.container.runBacktestFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		return []byte("BACKTEST RESULT: profit=100"), nil
 	}
 

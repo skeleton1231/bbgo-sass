@@ -22,7 +22,7 @@ func TestBacktestExecutor_FullFlow_SyncAndRun(t *testing.T) {
 		mu.Unlock()
 		return "synced 1000 candles", nil
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		mu.Lock()
 		runCalled = true
 		mu.Unlock()
@@ -88,7 +88,7 @@ func TestBacktestExecutor_SkipSync(t *testing.T) {
 		mu.Unlock()
 		return "", nil
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		return []byte("done"), nil
 	}
 
@@ -125,7 +125,7 @@ func TestBacktestExecutor_SyncFailure(t *testing.T) {
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "", fmt.Errorf("sync error: network timeout")
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		mu.Lock()
 		runCalled = true
 		mu.Unlock()
@@ -168,7 +168,7 @@ func TestBacktestExecutor_RunFailure(t *testing.T) {
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		return nil, fmt.Errorf("run error: container crashed")
 	}
 
@@ -228,7 +228,7 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 		NeedSync: false,
 	}
 	job2.ID = generateID("bt")
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		return []byte("ok"), nil
 	}
 
@@ -251,7 +251,7 @@ func TestBacktestExecutor_StatusTransitions(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		return "synced", nil
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		time.Sleep(50 * time.Millisecond)
 		return []byte("result"), nil
 	}
@@ -321,7 +321,7 @@ func TestBacktestExecutor_InvalidConfig(t *testing.T) {
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		mu.Lock()
 		runCalled = true
 		mu.Unlock()
@@ -368,17 +368,17 @@ func assertJobEventually(t *testing.T, store *BacktestJobStore, jobID, expectedS
 func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
-	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, checkRunningFn: func(string, string) (bool, error) { return false, fmt.Errorf("no docker") }}
 	exec := NewBacktestExecutor(store, cm, nil)
 
-	exec.runFn = func(userID string, yamlContent []byte) ([]byte, error) {
+	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		time.Sleep(200 * time.Millisecond) // simulate work
 		return []byte("result"), nil
 	}
 
 	var mu sync.Mutex
 	var completedIDs []string
-	var firstJobID string
+	var acceptedIDs []string
 
 	for i := range 3 {
 		job := &BacktestJob{
@@ -395,14 +395,14 @@ func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 
 		err := exec.Submit(job)
 		mu.Lock()
-		if i == 0 {
-			// First job should acquire the slot
-			firstJobID = job.ID
+		if i < 2 {
+			// First two jobs should acquire slots (concurrency=2)
+			acceptedIDs = append(acceptedIDs, job.ID)
 			if err != nil {
 				t.Errorf("job %d: expected to submit, got %v", i, err)
 			}
 		} else {
-			// Subsequent jobs should be rejected (concurrency=1)
+			// Third job should be rejected
 			if err == nil {
 				t.Errorf("job %d: expected server busy error", i)
 			}
@@ -410,8 +410,11 @@ func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 		mu.Unlock()
 	}
 
-	// Wait for the first job to complete, freeing the slot
-	assertJobEventually(t, store, firstJobID, JobCompleted, 5*time.Second)
+	// Wait for both accepted jobs to complete, freeing slots
+	assertJobEventually(t, store, acceptedIDs[0], JobCompleted, 5*time.Second)
+	assertJobEventually(t, store, acceptedIDs[1], JobCompleted, 5*time.Second)
+	// Give goroutines time to run deferred ReleaseSlot after status update
+	time.Sleep(100 * time.Millisecond)
 
 	// Now we should be able to submit again
 	job4 := &BacktestJob{

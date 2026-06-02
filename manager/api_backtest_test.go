@@ -165,6 +165,8 @@ func TestAPI_SubmitBacktest_ServerBusy(t *testing.T) {
 	_, store, r := setupBacktestTestAPI(t)
 
 	store.AcquireSlot()
+	store.AcquireSlot()
+	defer store.ReleaseSlot()
 	defer store.ReleaseSlot()
 
 	body := map[string]any{

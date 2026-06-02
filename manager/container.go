@@ -27,7 +27,7 @@ type ContainerManager struct {
 	pool  *pool.Pool
 
 	// test hooks
-	runBacktestFn  func(userID string, yamlContent []byte) ([]byte, error)
+	runBacktestFn  func(userID string, jobID string, yamlContent []byte) ([]byte, error)
 	syncBacktestFn func(userID, exchange, symbol, start, end string) (string, error)
 	logsFn         func(userID, mode string) (string, error)
 	apiURLFn       func(userID, mode string) string
@@ -172,9 +172,9 @@ func (cm *ContainerManager) backtestMode(userID string) (string, error) {
 	return "", fmt.Errorf("no running container found, please start a trading container first")
 }
 
-func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]byte, error) {
+func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 	if cm.runBacktestFn != nil {
-		return cm.runBacktestFn(userID, yamlContent)
+		return cm.runBacktestFn(userID, jobID, yamlContent)
 	}
 
 	mode, err := cm.backtestMode(userID)
@@ -182,7 +182,7 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		return nil, err
 	}
 
-	hostBacktestDir := cm.hostDir(userID, mode) + "/backtest"
+	hostBacktestDir := cm.hostDir(userID, mode) + "/backtest/" + jobID
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
@@ -193,8 +193,8 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 	}
 
 	containerName := cm.containerName(userID, mode)
-	containerConfigPath := cm.userDir(userID, mode) + "/backtest/bbgo.yaml"
-	containerDbPath := cm.userDir(userID, mode) + "/backtest/bbgo.db"
+	containerConfigPath := cm.userDir(userID, mode) + "/backtest/" + jobID + "/bbgo.yaml"
+	containerDbPath := cm.userDir(userID, mode) + "/backtest/" + jobID + "/bbgo.db"
 	args := []string{
 		"exec",
 		"-e", "DB_DRIVER=sqlite3",
@@ -218,6 +218,18 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		return nil, fmt.Errorf("backtest failed: %s: %w", out, err)
 	}
 	return []byte(out), nil
+}
+
+func (cm *ContainerManager) CleanupBacktest(userID, jobID string) {
+	if cm == nil {
+		return
+	}
+	mode, err := cm.backtestMode(userID)
+	if err != nil {
+		return
+	}
+	dir := cm.hostDir(userID, mode) + "/backtest/" + jobID
+	os.RemoveAll(dir)
 }
 
 func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, endTime string) (string, error) {

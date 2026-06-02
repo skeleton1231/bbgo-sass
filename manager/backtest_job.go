@@ -223,7 +223,7 @@ type BacktestExecutor struct {
 
 	// Test hooks — override in tests to mock Docker operations.
 	syncFn func(userID, exchange, symbol, startTime, endTime string) (string, error)
-	runFn  func(userID string, yamlContent []byte) ([]byte, error)
+	runFn  func(userID string, jobID string, yamlContent []byte) ([]byte, error)
 }
 
 func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier *Notifier) *BacktestExecutor {
@@ -241,11 +241,11 @@ func (ex *BacktestExecutor) syncBacktest(userID, exchange, symbol, startTime, en
 	return ex.container.SyncBacktest(userID, exchange, symbol, startTime, endTime)
 }
 
-func (ex *BacktestExecutor) runBacktest(userID string, yamlContent []byte) ([]byte, error) {
+func (ex *BacktestExecutor) runBacktest(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 	if ex.runFn != nil {
-		return ex.runFn(userID, yamlContent)
+		return ex.runFn(userID, jobID, yamlContent)
 	}
-	return ex.container.RunBacktest(userID, yamlContent)
+	return ex.container.RunBacktest(userID, jobID, yamlContent)
 }
 
 func (ex *BacktestExecutor) Submit(job *BacktestJob) error {
@@ -282,8 +282,9 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 		return
 	}
 
-	result, err := ex.runBacktest(job.UserID, yamlContent)
+	result, err := ex.runBacktest(job.UserID, job.ID, yamlContent)
 	if err != nil {
+		ex.container.CleanupBacktest(job.UserID, job.ID)
 		ex.store.FailJob(job.ID, "backtest failed", err.Error())
 		ex.notify(job, "Backtest Failed", fmt.Sprintf("Strategy %s: %s", job.Strategy, err.Error()))
 		return
@@ -291,6 +292,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	ex.store.SetOutput(job.ID, string(result))
 	ex.store.UpdateStatus(job.ID, JobCompleted, "done")
+	ex.container.CleanupBacktest(job.UserID, job.ID)
 	ex.notify(job, "Backtest Completed", fmt.Sprintf("Strategy %s on %s/%s completed successfully", job.Strategy, job.Exchange, job.Symbol))
 }
 
