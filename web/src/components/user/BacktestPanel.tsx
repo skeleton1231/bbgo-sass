@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
 import type { BacktestJob } from '@/lib/bbgo/queries'
@@ -42,7 +42,6 @@ export function BacktestPanel() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [manualResult, setManualResult] = useState<BacktestJob | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [priceSymbol, setPriceSymbol] = useState('')
 
   const { data: symbolsData } = useMarketSymbols(exchange)
 
@@ -66,25 +65,21 @@ export function BacktestPanel() {
 
   const handleSymbolChange = useCallback((newSymbol: string) => {
     setRawSymbol(newSymbol)
-    setPriceSymbol(newSymbol)
     setConfig((prev) => ({ ...prev, symbol: newSymbol }))
   }, [])
 
-  // Auto-fill upperPrice/lowerPrice once when ticker data arrives for a new symbol
-  const prevPriceSymbol = useRef('')
-  if (priceSymbol && priceSymbol !== prevPriceSymbol.current) {
-    prevPriceSymbol.current = priceSymbol
-    const ticker = tickerData?.ticker
-    if (ticker?.close && schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')) {
-      const price = ticker.close
-      const range = price * 0.2
-      setConfig((prev) => ({
-        ...prev,
-        upperPrice: Math.round((price + range) * 100) / 100,
-        lowerPrice: Math.round((price - range) * 100) / 100,
-      }))
-    }
-  }
+  // Auto-fill upperPrice/lowerPrice when ticker data arrives for the current symbol
+  useEffect(() => {
+    if (!symbol || !tickerData?.ticker?.close) return
+    if (!schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')) return
+    const price = tickerData.ticker.close
+    const range = price * 0.2
+    setConfig((prev) => ({
+      ...prev,
+      upperPrice: Math.round((price + range) * 100) / 100,
+      lowerPrice: Math.round((price - range) * 100) / 100,
+    }))
+  }, [symbol, tickerData?.ticker?.close, schema])
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)

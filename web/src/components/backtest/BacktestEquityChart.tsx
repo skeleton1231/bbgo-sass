@@ -120,38 +120,40 @@ export function BacktestEquityChart({ output }: BacktestEquityChartProps) {
   const t = useTranslations('Backtest')
   const parsed = useMemo(() => parseBacktestOutput(output), [output])
 
-  if (parsed.equityCurve.length === 0) {
+  if (!parsed.metrics && parsed.equityCurve.length === 0) {
     return null
   }
 
   return (
     <div className="space-y-4">
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={parsed.equityCurve}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis
-            dataKey="trade"
-            tick={{ fontSize: 11 }}
-            className="fill-muted-foreground"
-            label={{ value: t('tradeNumber'), position: 'insideBottomRight', offset: -5, fontSize: 10 }}
-          />
-          <YAxis
-            tick={{ fontSize: 11 }}
-            className="fill-muted-foreground"
-            tickFormatter={(v: number) => v.toFixed(2)}
-          />
-          <Tooltip content={<EquityTooltip tradeLabel={t('tradeNumber')} />} />
-          <ReferenceLine y={0} stroke="hsl(var(--border))" />
-          <Area
-            type="monotone"
-            dataKey="cumulativePnl"
-            stroke="hsl(221, 83%, 53%)"
-            fill="hsl(221, 83%, 53%, 0.15)"
-            strokeWidth={2}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      {parsed.equityCurve.length > 0 && (
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={parsed.equityCurve}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis
+              dataKey="trade"
+              tick={{ fontSize: 11 }}
+              className="fill-muted-foreground"
+              label={{ value: t('tradeNumber'), position: 'insideBottomRight', offset: -5, fontSize: 10 }}
+            />
+            <YAxis
+              tick={{ fontSize: 11 }}
+              className="fill-muted-foreground"
+              tickFormatter={(v: number) => v.toFixed(2)}
+            />
+            <Tooltip content={<EquityTooltip tradeLabel={t('tradeNumber')} />} />
+            <ReferenceLine y={0} stroke="hsl(var(--border))" />
+            <Area
+              type="monotone"
+              dataKey="cumulativePnl"
+              stroke="hsl(221, 83%, 53%)"
+              fill="hsl(221, 83%, 53%, 0.15)"
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
 
       {parsed.metrics && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
