@@ -177,6 +177,10 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 		return cm.runBacktestFn(userID, jobID, yamlContent)
 	}
 
+	if strings.Contains(jobID, "/") || strings.Contains(jobID, "..") {
+		return nil, fmt.Errorf("invalid job ID: %s", jobID)
+	}
+
 	mode, err := cm.backtestMode(userID)
 	if err != nil {
 		return nil, err
@@ -229,7 +233,9 @@ func (cm *ContainerManager) CleanupBacktest(userID, jobID string) {
 		return
 	}
 	dir := cm.hostDir(userID, mode) + "/backtest/" + jobID
-	os.RemoveAll(dir)
+	if err := os.RemoveAll(dir); err != nil {
+		log.Printf("cleanup backtest %s for user %s: %v", jobID, userID, err)
+	}
 }
 
 func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, endTime string) (string, error) {

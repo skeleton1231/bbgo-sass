@@ -1146,11 +1146,14 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := api.container.RunBacktest(userID, generateID("bt"), yamlContent)
+	jobID := generateID("bt")
+	result, err := api.container.RunBacktest(userID, jobID, yamlContent)
 	if err != nil {
+		api.container.CleanupBacktest(userID, jobID)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	api.container.CleanupBacktest(userID, jobID)
 
 	writeJSON(w, http.StatusOK, backtestResultResponse{Output: string(result)})
 }
