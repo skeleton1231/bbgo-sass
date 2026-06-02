@@ -14,6 +14,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error('Session expired')
   }
 
+  if (res.status === 503) {
+    throw new Error('Auth service unavailable — please check your network and try again')
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error || `Manager API error: ${res.status}`)

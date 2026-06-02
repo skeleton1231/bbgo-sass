@@ -36,14 +36,20 @@ async function handleRequest(
   request: NextRequest,
   params: Promise<{ path: string[] }>
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let userId: string
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    userId = user.id
+  } catch {
+    return NextResponse.json({ error: 'Auth service unavailable' }, { status: 503 })
   }
 
   const { path } = await params
-  const res = await forwardRequest(method, request, path, user.id)
+  const res = await forwardRequest(method, request, path, userId)
   const text = await res.text()
 
   try {

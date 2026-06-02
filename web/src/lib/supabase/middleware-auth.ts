@@ -87,9 +87,7 @@ export async function updateSession(request: NextRequest, response: NextResponse
     const { data } = await supabase.auth.getUser()
     user = data?.user ?? null
   } catch {
-    if (isProtectedRoute) {
-      return redirectWithCookies(request, reply, LOGIN_PATH, locale)
-    }
+    // Network/auth service error — don't kick user out, just continue
     return reply
   }
 
