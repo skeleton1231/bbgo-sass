@@ -3,8 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -424,5 +427,86 @@ func TestAPI_GetBacktestJob_InvalidID(t *testing.T) {
 		if w.Code != http.StatusNotFound {
 			t.Errorf("expected 404 for job id %q, got %d", id, w.Code)
 		}
+	}
+}
+
+func TestLegacyRunBacktest_CleanupOnSuccess(t *testing.T) {
+	var capturedJobID string
+	api, _, _ := setupBacktestTestAPI(t)
+	api.container.runBacktestFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
+		capturedJobID = jobID
+		return []byte("BACKTEST RESULT: profit=100"), nil
+	}
+
+	// Re-register with our modified API
+	r2 := chi.NewRouter()
+	r2.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Header.Set("X-Manager-Token", "test-token")
+			r.Header.Set("X-User-Id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+			next.ServeHTTP(w, r)
+		})
+	})
+	api.RegisterRoutes(r2)
+
+	body, _ := json.Marshal(map[string]any{
+		"strategy":   "grid2",
+		"config":     map[string]any{"symbol": "BTCUSDT"},
+		"exchange":   "binance",
+		"start_time": "2024-01-01",
+		"end_time":   "2024-03-01",
+	})
+	req := httptest.NewRequest("POST", "/api/backtest", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r2.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if capturedJobID == "" {
+		t.Error("expected non-empty jobID")
+	}
+}
+
+func TestLegacyRunBacktest_CleanupOnFailure(t *testing.T) {
+	api, _, _ := setupBacktestTestAPI(t)
+	dataDir := api.container.cfg.DataDir
+
+	var capturedJobID string
+	api.container.runBacktestFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
+		capturedJobID = jobID
+		// Create a file to verify cleanup happens
+		dir := filepath.Join(dataDir, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "backtest", jobID)
+		os.MkdirAll(dir, 0o755)
+		os.WriteFile(filepath.Join(dir, "bbgo.yaml"), yamlContent, 0o644)
+		return nil, fmt.Errorf("backtest crashed")
+	}
+
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Header.Set("X-Manager-Token", "test-token")
+			r.Header.Set("X-User-Id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+			next.ServeHTTP(w, r)
+		})
+	})
+	api.RegisterRoutes(r)
+
+	body, _ := json.Marshal(map[string]any{
+		"strategy":   "grid2",
+		"config":     map[string]any{"symbol": "BTCUSDT"},
+		"exchange":   "binance",
+		"start_time": "2024-01-01",
+		"end_time":   "2024-03-01",
+	})
+	req := httptest.NewRequest("POST", "/api/backtest", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+	if capturedJobID == "" {
+		t.Error("expected non-empty jobID")
 	}
 }
