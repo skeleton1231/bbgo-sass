@@ -199,11 +199,19 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		"exec",
 		"-e", "DB_DRIVER=sqlite3",
 		"-e", "DB_DSN=" + containerDbPath,
+		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
+		"-e", "BINANCE_TESTNET=",
+		"-e", "PAPER_TRADE=",
+	}
+	if cm.cfg.MarketDataAddr != "" {
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
+	}
+	args = append(args,
 		containerName,
 		"bbgo", "backtest",
 		"--sync",
 		"--config", containerConfigPath,
-	}
+	)
 
 	out, err := cm.dockerLong(args...)
 	if err != nil {
@@ -239,13 +247,22 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 	containerName := cm.containerName(userID, mode)
 	containerConfigPath := cm.userDir(userID, mode) + "/backtest/sync.yaml"
 	args := []string{
-		"exec", containerName,
+		"exec",
+		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
+		"-e", "BINANCE_TESTNET=",
+		"-e", "PAPER_TRADE=",
+	}
+	if cm.cfg.MarketDataAddr != "" {
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
+	}
+	args = append(args,
+		containerName,
 		"bbgo", "backtest",
 		"--sync",
 		"--sync-only",
 		"--sync-from", startTime,
 		"--config", containerConfigPath,
-	}
+	)
 
 	out, err := cm.dockerLong(args...)
 	if err != nil {
