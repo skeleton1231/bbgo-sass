@@ -204,8 +204,8 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 		"-e", "DB_DRIVER=sqlite3",
 		"-e", "DB_DSN=" + containerDbPath,
 		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
-		"-e", "BINANCE_TESTNET=",
-		"-e", "PAPER_TRADE=",
+		"-e", "BINANCE_TESTNET=0",
+		"-e", "PAPER_TRADE=0",
 	}
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
@@ -267,8 +267,8 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 	args := []string{
 		"exec",
 		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
-		"-e", "BINANCE_TESTNET=",
-		"-e", "PAPER_TRADE=",
+		"-e", "BINANCE_TESTNET=0",
+		"-e", "PAPER_TRADE=0",
 	}
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
