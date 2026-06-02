@@ -39,7 +39,7 @@ interface ParsedBacktest {
 
 const REALIZED_PROFIT_PATTERN = /REALIZED\s+PROFIT:\s*([-+]?[\d.,]+)\s+(\S+)/i
 const UNREALIZED_PROFIT_PATTERN = /UNREALIZED\s+PROFIT:\s*([-+]?[\d.,]+)\s+(\S+)/i
-const ASSET_INCREASED_PATTERN = /ASSET\s+INCREASED:\s*([-+]?[\d.,]+)\s+\S+\s+\(([+-]?[\d.]+)%\)/i
+const ASSET_INCREASED_PATTERN = /ASSET\s+(?:INCREASED|DECREASED):\s*([-+]?[\d.,]+)\s+\S+\s+\(([+-]?[\d.]+)%\)/i
 const TRADE_COUNT_PATTERN = /NUMBER\s+OF\s+TRADES:\s*(\d+)/i
 const SHARPE_PATTERN = /REALIZED\s+SHARPE\s+RATIO:\s*([-+]?[\d.,]+)/i
 const SORTINO_PATTERN = /REALIZED\s+SORTINO\s+RATIO:\s*([-+]?[\d.,]+)/i
