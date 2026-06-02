@@ -1660,7 +1660,22 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {
-	return false
+	dbPath := api.container.cfg.BacktestSharedDir
+	if dbPath == "" {
+		dbPath = api.container.cfg.DataDir + "/backtest-shared"
+	}
+	dbPath += "/backtest.db"
+	info, err := os.Stat(dbPath)
+	if err != nil || info.Size() < 1024 {
+		return false
+	}
+	start, err1 := time.Parse("2006-01-02", startTime)
+	end, err2 := time.Parse("2006-01-02", endTime)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	modTime := info.ModTime()
+	return !end.After(modTime) && modTime.Sub(start) > 0
 }
 
 func credModeError(mode, ex string) string {

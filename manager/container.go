@@ -160,17 +160,29 @@ func parseStrategiesFromYAMLFile(path string) ([]StrategyEntry, error) {
 	return parseStrategiesFromYAML(data)
 }
 
+// backtestMode returns the mode of an available container for backtest operations.
+// It prefers the paper container but falls back to the live container.
+func (cm *ContainerManager) backtestMode(userID string) (string, error) {
+	if cm.IsRunning(userID, ModePaper) {
+		return ModePaper, nil
+	}
+	if cm.IsRunning(userID, ModeLive) {
+		return ModeLive, nil
+	}
+	return "", fmt.Errorf("no running container found, please start a trading container first")
+}
+
 func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]byte, error) {
 	if cm.runBacktestFn != nil {
 		return cm.runBacktestFn(userID, yamlContent)
 	}
 
-	containerName := cm.containerName(userID, ModePaper)
-	if !cm.IsRunning(userID, ModePaper) {
-		return nil, fmt.Errorf("paper trading container is not running, please start it first")
+	mode, err := cm.backtestMode(userID)
+	if err != nil {
+		return nil, err
 	}
 
-	hostBacktestDir := cm.hostDir(userID, ModePaper) + "/backtest"
+	hostBacktestDir := cm.hostDir(userID, mode) + "/backtest"
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
@@ -180,9 +192,14 @@ func (cm *ContainerManager) RunBacktest(userID string, yamlContent []byte) ([]by
 		return nil, fmt.Errorf("write backtest config: %w", err)
 	}
 
-	containerConfigPath := cm.userDir(userID, ModePaper) + "/backtest/bbgo.yaml"
+	containerName := cm.containerName(userID, mode)
+	containerConfigPath := cm.userDir(userID, mode) + "/backtest/bbgo.yaml"
+	containerDbPath := cm.userDir(userID, mode) + "/backtest/bbgo.db"
 	args := []string{
-		"exec", containerName,
+		"exec",
+		"-e", "DB_DRIVER=sqlite3",
+		"-e", "DB_DSN=" + containerDbPath,
+		containerName,
 		"bbgo", "backtest",
 		"--sync",
 		"--config", containerConfigPath,
@@ -200,9 +217,9 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return cm.syncBacktestFn(userID, exchange, symbol, startTime, endTime)
 	}
 
-	containerName := cm.containerName(userID, ModePaper)
-	if !cm.IsRunning(userID, ModePaper) {
-		return "", fmt.Errorf("paper trading container is not running, please start it first")
+	mode, err := cm.backtestMode(userID)
+	if err != nil {
+		return "", err
 	}
 
 	yamlBytes, err := buildSyncConfig(exchange, symbol, startTime, endTime)
@@ -210,7 +227,7 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return "", err
 	}
 
-	hostBacktestDir := cm.hostDir(userID, ModePaper) + "/backtest"
+	hostBacktestDir := cm.hostDir(userID, mode) + "/backtest"
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir: %w", err)
 	}
@@ -219,7 +236,8 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return "", fmt.Errorf("write config: %w", err)
 	}
 
-	containerConfigPath := cm.userDir(userID, ModePaper) + "/backtest/sync.yaml"
+	containerName := cm.containerName(userID, mode)
+	containerConfigPath := cm.userDir(userID, mode) + "/backtest/sync.yaml"
 	args := []string{
 		"exec", containerName,
 		"bbgo", "backtest",

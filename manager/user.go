@@ -84,8 +84,8 @@ func normalizeStrategyConfig(strategy string, params map[string]any) (string, ma
 					if _, hasNew := params[newKey]; !hasNew {
 						params[newKey] = v
 					}
-					delete(params, oldKey)
 				}
+				delete(params, oldKey)
 			}
 		}
 	}
@@ -531,12 +531,34 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions
 	}
 }
 
+// backtestDefaults contains default values for strategy fields that are required
+// by bbgo but may not be sent by the frontend (e.g. interval, profitSpread).
+var backtestDefaults = map[string]map[string]any{
+	"emacross":    {"interval": "1h"},
+	"trendtrader": {"interval": "1h"},
+	"supertrend":  {"interval": "1h"},
+	"bollgrid":    {"interval": "1h", "profitSpread": 50, "gridPips": 50},
+	"bollmaker":   {"interval": "1h"},
+	"pivotshort":  {"interval": "1h"},
+	"swing":       {"interval": "1h"},
+	"flashcrash":  {"interval": "1h"},
+}
+
 func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string) ([]byte, error) {
 	var allParams map[string]any
 	if len(rawConfig) == 0 || string(rawConfig) == "null" {
 		allParams = map[string]any{}
 	} else if err := json.Unmarshal(rawConfig, &allParams); err != nil {
 		return nil, err
+	}
+
+	// Inject defaults for required fields missing from client config
+	if defaults, ok := backtestDefaults[strategy]; ok {
+		for k, v := range defaults {
+			if _, exists := allParams[k]; !exists {
+				allParams[k] = v
+			}
+		}
 	}
 
 	strategy, allParams = normalizeStrategyConfig(strategy, allParams)
