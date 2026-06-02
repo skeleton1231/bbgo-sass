@@ -51,7 +51,7 @@ func NewBacktestJobStore(dataDir string) *BacktestJobStore {
 	s := &BacktestJobStore{
 		jobs: make(map[string]*BacktestJob),
 		dir:  dir,
-		sem:  make(chan struct{}, 1),
+		sem:  make(chan struct{}, 2),
 	}
 
 	s.loadPersisted()
@@ -187,9 +187,15 @@ func (s *BacktestJobStore) loadPersisted() {
 		if err := json.Unmarshal(data, &job); err != nil {
 			continue
 		}
-		if job.Status == JobDownloading || job.Status == JobRunning {
-			job.Status = JobPending
-			job.Progress = ""
+		if job.Status == JobDownloading || job.Status == JobRunning || job.Status == JobPending {
+			if job.StartedAt != nil && !job.StartedAt.IsZero() && time.Since(*job.StartedAt) > 5*time.Minute {
+				job.Status = JobFailed
+				job.Progress = "job interrupted by manager restart"
+				s.persist(&job)
+			} else {
+				job.Status = JobPending
+				job.Progress = ""
+			}
 		}
 		s.jobs[job.ID] = &job
 	}
