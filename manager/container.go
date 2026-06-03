@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -197,8 +198,9 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 	}
 
 	containerName := cm.containerName(userID, mode)
-	containerConfigPath := cm.userDir(userID, mode) + "/backtest/" + jobID + "/bbgo.yaml"
-	containerDbPath := cm.userDir(userID, mode) + "/backtest/" + jobID + "/bbgo.db"
+	containerBacktestDir := cm.userDir(userID, mode) + "/backtest/" + jobID
+	containerConfigPath := containerBacktestDir + "/bbgo.yaml"
+	containerDbPath := containerBacktestDir + "/bbgo.db"
 	args := []string{
 		"exec",
 		"-e", "DB_DRIVER=sqlite3",
@@ -215,6 +217,7 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 		"bbgo", "backtest",
 		"--sync",
 		"--config", containerConfigPath,
+		"--output", containerBacktestDir,
 	)
 
 	out, err := cm.dockerLong(args...)
@@ -236,6 +239,35 @@ func (cm *ContainerManager) CleanupBacktest(userID, jobID string) {
 	if err := os.RemoveAll(dir); err != nil {
 		log.Printf("cleanup backtest %s for user %s: %v", jobID, userID, err)
 	}
+}
+
+func (cm *ContainerManager) BacktestReportDir(userID, jobID string) string {
+	mode, err := cm.backtestMode(userID)
+	if err != nil {
+		return ""
+	}
+	return cm.hostDir(userID, mode) + "/backtest/" + jobID
+}
+
+func (cm *ContainerManager) ReadBacktestReport(userID, jobID string) (json.RawMessage, []byte, error) {
+	reportDir := cm.BacktestReportDir(userID, jobID)
+	if reportDir == "" {
+		return nil, nil, fmt.Errorf("cannot resolve report dir for %s", jobID)
+	}
+
+	summaryPath := filepath.Join(reportDir, "summary.json")
+	summaryData, err := os.ReadFile(summaryPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read summary.json: %w", err)
+	}
+
+	var equityCurve []byte
+	equityPath := filepath.Join(reportDir, "equity_curve.tsv")
+	if data, err := os.ReadFile(equityPath); err == nil {
+		equityCurve = data
+	}
+
+	return json.RawMessage(summaryData), equityCurve, nil
 }
 
 func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, endTime string) (string, error) {

@@ -59,6 +59,7 @@ var liveOnlyStrategies = map[string]bool{
 	"support":          true,
 	"xpremium":         true,
 	"xnav":             true,
+	"harmonic":         true,
 }
 
 // legacyFieldAliases maps strategy IDs to old→new field renames.
@@ -534,14 +535,27 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions
 // backtestDefaults contains default values for strategy fields that are required
 // by bbgo but may not be sent by the frontend (e.g. interval, profitSpread).
 var backtestDefaults = map[string]map[string]any{
-	"emacross":    {"interval": "1h"},
-	"trendtrader": {"interval": "1h"},
-	"supertrend":  {"interval": "1h"},
+	"grid":        {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 50, "side": "both"},
+	"grid2":       {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
+	"xhedgegrid":  {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
 	"bollgrid":    {"interval": "1h", "profitSpread": 50, "gridPips": 50},
-	"bollmaker":   {"interval": "1h"},
-	"pivotshort":  {"interval": "1h"},
-	"swing":       {"interval": "1h"},
+	"emacross":    {"interval": "1h"},
+	"trendtrader": {"interval": "1h", "trendLine": map[string]any{"interval": "1h", "quantity": 0.001, "pivotRightWindow": 5}},
+	"supertrend":  {"interval": "1h", "quantity": 0.001},
+	"atrpin":      {"interval": "1h", "quantity": 0.001, "multiplier": 2.0},
+	"pivotshort":  {"interval": "1h", "breakLow": map[string]any{"interval": "1h", "window": 7, "ratio": 0.01}},
+	"swing":       {"interval": "1h", "movingAverageType": "SMA", "movingAverageWindow": 20, "movingAverageInterval": "1h", "baseQuantity": 0.0001},
+	"ewo_dgtrd":   {"interval": "1h", "sigWin": 5, "stoploss": 0.02},
+	"irr":         {"interval": "1h", "window": 20, "quantity": 0.001},
 	"flashcrash":  {"interval": "1h"},
+	"fixedmaker":  {"interval": "1m", "quantity": 0.001, "halfSpread": 0.001},
+	"fmaker":      {"interval": "1h", "spread": 0.001, "quantity": 0.001},
+	"bollmaker":   {"interval": "1h"},
+	"harmonic":    {"interval": "1h", "window": 20, "quantity": 0.001},
+	"dca":         {"investmentInterval": "1h", "budget": 500, "budgetPeriod": "day"},
+	"schedule":    {"interval": "1h", "quantity": 0.001, "side": "buy"},
+	"random":      {"schedule": "*/30 * * * *", "dryRun": true, "quantity": 0.001},
+	"techsignal":  {"interval": "1h", "supportDetection": []map[string]any{{"interval": "1h", "movingAverageInterval": "1h", "movingAverageWindow": 20, "movingAverageType": "SMA"}}},
 }
 
 func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string) ([]byte, error) {
@@ -667,7 +681,8 @@ func extractQuoteCurrency(symbol string) string {
 
 func backtestBalances(symbol string) map[string]string {
 	quote := extractQuoteCurrency(symbol)
-	return map[string]string{quote: "10000"}
+	base := strings.TrimSuffix(symbol, quote)
+	return map[string]string{quote: "10000", base: "10"}
 }
 
 func filterTradingPairs(symbols []string) []string {

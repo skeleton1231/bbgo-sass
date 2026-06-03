@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ type API struct {
 	btExec     *BacktestExecutor
 	btJobs     *BacktestJobStore
 	btSyncSem  chan struct{}
+	storage    *StorageClient
 
 	stopCtx    context.Context
 	stopCancel context.CancelFunc
@@ -46,7 +48,7 @@ type API struct {
 	verifyCredFn     func(exchange, apiKey, apiSecret, passphrase string, isTestnet bool) VerifyResult
 }
 
-func NewAPI(cfg *Config, strategies *StrategyStore, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, testnetHub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore) *API {
+func NewAPI(cfg *Config, strategies *StrategyStore, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, testnetHub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore, storage *StorageClient) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &API{
 		cfg:           cfg,
@@ -63,6 +65,7 @@ func NewAPI(cfg *Config, strategies *StrategyStore, cm *ContainerManager, proxy 
 		btExec:        btExec,
 		btJobs:        btJobs,
 		btSyncSem:     make(chan struct{}, 2),
+		storage:       storage,
 		newBBGoClient: NewBBGoClient,
 		stopCtx:       ctx,
 		stopCancel:    cancel,
@@ -147,6 +150,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 
 		r.Get("/api/backtest/jobs", api.ListBacktestJobs)
 		r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)
+		r.Get("/api/backtest/jobs/{jobID}/download", api.DownloadBacktestReport)
 		r.Get("/api/backtest/status", api.BacktestSyncStatus)
 		r.Get("/api/credentials", api.ListCredentials)
 	})
@@ -1596,10 +1600,10 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.StartTime == "" {
-		req.StartTime = "2024-01-01"
+		req.StartTime = time.Now().AddDate(0, -3, 0).Format("2006-01-02")
 	}
 	if req.EndTime == "" {
-		req.EndTime = "2024-06-01"
+		req.EndTime = time.Now().Format("2006-01-02")
 	}
 
 	needSync := !api.hasDataForRange(req.Exchange, req.Symbol, req.StartTime, req.EndTime)
@@ -1659,7 +1663,188 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 	if jobs == nil {
 		jobs = []*BacktestJob{}
 	}
-	writeJSON(w, http.StatusOK, backtestJobsResponse{Jobs: jobs})
+	summaries := make([]backtestJobSummary, len(jobs))
+	for i, j := range jobs {
+		summaries[i] = backtestJobSummary{
+			ID:          j.ID,
+			UserID:      j.UserID,
+			Strategy:    j.Strategy,
+			Exchange:    j.Exchange,
+			Symbol:      j.Symbol,
+			StartTime:   j.StartTime,
+			EndTime:     j.EndTime,
+			Status:      j.Status,
+			Progress:    j.Progress,
+			Error:       j.Error,
+			CreatedAt:   j.CreatedAt,
+			StartedAt:   j.StartedAt,
+			CompletedAt: j.CompletedAt,
+			NeedSync:    j.NeedSync,
+			HasReport:   len(j.Report) > 0,
+		}
+	}
+	writeJSON(w, http.StatusOK, backtestJobsResponse{Jobs: summaries})
+}
+
+func (api *API) DownloadBacktestReport(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+
+	jobID := chi.URLParam(r, "jobID")
+	job, found := api.btJobs.Get(jobID)
+	if !found {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+	if job.UserID != userID {
+		writeError(w, http.StatusForbidden, "access denied")
+		return
+	}
+	if job.Status != JobCompleted {
+		writeError(w, http.StatusBadRequest, "job not completed")
+		return
+	}
+
+	// If storage is available and client requests a signed URL, return that instead
+	if api.storage != nil && r.URL.Query().Get("signed") == "1" {
+		file := r.URL.Query().Get("file")
+		if file == "" {
+			file = "summary.json"
+		}
+		if !allowedStorageFiles[file] {
+			writeError(w, http.StatusBadRequest, "unsupported file type")
+			return
+		}
+		signedURL, err := api.storage.CreateSignedURL(userID, jobID, file, 3600)
+		if err != nil {
+			if uploaded := api.uploadLocalToStorage(job, file); uploaded {
+				signedURL, err = api.storage.CreateSignedURL(userID, jobID, file, 3600)
+			}
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to create download link")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"url": signedURL})
+		return
+	}
+
+	api.downloadCSV(w, r, job)
+}
+
+var allowedStorageFiles = map[string]bool{
+	"summary.json": true, "trades.tsv": true, "orders.tsv": true, "equity_curve.tsv": true,
+}
+
+func tsvToCsv(data []byte) []byte {
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	out := make([]byte, 0, len(data))
+	for _, line := range lines {
+		fields := strings.Split(line, "\t")
+		for i, f := range fields {
+			if i > 0 {
+				out = append(out, ',')
+			}
+			if strings.ContainsAny(f, ",\"\r\n") {
+				out = append(out, '"')
+				out = append(out, strings.ReplaceAll(f, `"`, `""`)...)
+				out = append(out, '"')
+			} else {
+				out = append(out, f...)
+			}
+		}
+		out = append(out, '\n')
+	}
+	return out
+}
+
+func writeCSV(w http.ResponseWriter, jobID, name string, data []byte) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="backtest-%s-%s.csv"`, jobID, name))
+	w.Write(tsvToCsv(data))
+}
+
+func (api *API) downloadCSV(w http.ResponseWriter, r *http.Request, job *BacktestJob) {
+	reportDir := api.container.BacktestReportDir(job.UserID, job.ID)
+	if reportDir == "" {
+		writeError(w, http.StatusInternalServerError, "cannot locate report files")
+		return
+	}
+
+	file := r.URL.Query().Get("file")
+	switch file {
+	case "trades", "":
+		data, err := os.ReadFile(filepath.Join(reportDir, "trades.tsv"))
+		if err != nil {
+			writeError(w, http.StatusNotFound, "trades file not found")
+			return
+		}
+		writeCSV(w, job.ID, "trades", data)
+	case "orders":
+		data, err := os.ReadFile(filepath.Join(reportDir, "orders.tsv"))
+		if err != nil {
+			writeError(w, http.StatusNotFound, "orders file not found")
+			return
+		}
+		writeCSV(w, job.ID, "orders", data)
+	case "equity":
+		if job.EquityCurve == "" {
+			writeError(w, http.StatusNotFound, "equity curve not available")
+			return
+		}
+		writeCSV(w, job.ID, "equity", []byte(job.EquityCurve))
+	case "kline":
+		entries, err := os.ReadDir(reportDir)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "report directory not found")
+			return
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			if strings.Contains(name, job.Symbol) && strings.HasSuffix(name, ".tsv") &&
+				name != "trades.tsv" && name != "orders.tsv" && name != "equity_curve.tsv" {
+				data, err := os.ReadFile(filepath.Join(reportDir, name))
+				if err != nil {
+					continue
+				}
+				w.Header().Set("Content-Type", "text/tab-separated-values; charset=utf-8")
+				w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="backtest-%s-%s"`, job.ID, name))
+				w.Write(data)
+				return
+			}
+		}
+		writeError(w, http.StatusNotFound, "kline file not found")
+	default:
+		writeError(w, http.StatusBadRequest, "unsupported file type, use trades, orders, equity, or kline")
+	}
+}
+
+func (api *API) uploadLocalToStorage(job *BacktestJob, filename string) bool {
+	if !allowedStorageFiles[filename] {
+		return false
+	}
+	reportDir := api.container.BacktestReportDir(job.UserID, job.ID)
+	if reportDir == "" {
+		return false
+	}
+
+	localPath := filepath.Join(reportDir, filename)
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return false
+	}
+
+	if err := api.storage.Upload(job.UserID, job.ID, filename, data); err != nil {
+		log.Printf("on-demand upload %s for job %s: %v", filename, job.ID, err)
+		return false
+	}
+	return true
 }
 
 func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) bool {

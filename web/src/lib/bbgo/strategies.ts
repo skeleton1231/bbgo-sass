@@ -261,6 +261,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'baseQuantity', label: 'Base Quantity', type: 'number', default: 0.001, step: 0.0001, required: true },
       { key: 'minChange', label: 'Min Change', type: 'number', default: 0.01, step: 0.001, description: 'Minimum price change to trigger trade' },
       { key: 'movingAverageType', label: 'MA Type', type: 'select', default: 'SMA', options: ['SMA', 'EWMA'] },
+      { key: 'movingAverageInterval', label: 'MA Interval', type: 'select', default: '1h', options: ['1m', '5m', '15m', '1h', '4h', '1d'], description: 'Interval for moving average calculation' },
       { key: 'movingAverageWindow', label: 'MA Window', type: 'number', default: 20, min: 1, max: 500 },
     ],
   },
@@ -502,7 +503,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
       { key: 'interval', label: 'Interval', type: 'select', default: '1h', options: ['5m', '15m', '1h', '4h', '1d'] },
       { key: 'stoploss', label: 'Stop Loss', type: 'number', default: 0.02, step: 0.001 },
-      { key: 'minInterval', label: 'Min Interval', type: 'select', default: '5m', options: ['1m', '5m', '15m', '30m'], description: 'Minimum interval for stop-loss and trailing exits' },
+      { key: 'MinInterval', label: 'Min Interval', type: 'select', default: '5m', options: ['1m', '5m', '15m', '30m'], description: 'Minimum interval for stop-loss and trailing exits' },
       { key: 'windowATR', label: 'ATR Window', type: 'number', default: 14, min: 1 },
       { key: 'windowQuick', label: 'Quick Window', type: 'number', default: 5, min: 1, description: 'Fast EWO window' },
       { key: 'windowSlow', label: 'Slow Window', type: 'number', default: 35, min: 1, description: 'Slow EWO window' },
@@ -548,6 +549,7 @@ const STRATEGY_SCHEMAS: StrategySchema[] = [
     label: 'Harmonic',
     description: 'SHARK harmonic pattern detection with quantity-based entries',
     category: 'mean-reversion',
+    liveOnly: true,
     supportedExchanges: ['binance', 'okex', 'bybit', 'bitget', 'kucoin'],
     fields: [
       { key: 'symbol', label: 'Symbol', type: 'text', default: 'BTCUSDT', required: true },
@@ -865,10 +867,14 @@ export function ensureNumbers(schema: StrategySchema | undefined, config: Record
   if (!schema) return config
   const result = { ...config }
   for (const field of schema.fields) {
-    if (field.type === 'number' && result[field.key] !== undefined && result[field.key] !== '') {
-      const num = Number(result[field.key])
-      if (Number.isFinite(num)) result[field.key] = num
+    if (field.type !== 'number') continue
+    const v = result[field.key]
+    if (v === '' || v === undefined || v === null) {
+      delete result[field.key]
+      continue
     }
+    const num = Number(v)
+    if (Number.isFinite(num)) result[field.key] = num
   }
   return result
 }

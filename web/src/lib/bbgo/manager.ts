@@ -94,11 +94,59 @@ export interface BacktestJob {
   status: 'pending' | 'downloading' | 'running' | 'completed' | 'failed'
   progress?: string
   output?: string
+  report?: BacktestReport | null
+  equity_curve?: string
   error?: string
   created_at: string
   started_at?: string
   completed_at?: string
   need_sync: boolean
+  has_report?: boolean
+}
+
+export interface BacktestReport {
+  startTime: string
+  endTime: string
+  sessions: string[]
+  symbols: string[]
+  initialEquityValue: number
+  finalEquityValue: number
+  totalProfit: number
+  totalUnrealizedProfit: number
+  totalGrossProfit: number
+  totalGrossLoss: number
+  symbolReports: BacktestSymbolReport[]
+}
+
+export interface BacktestSymbolReport {
+  exchange: string
+  symbol: string
+  lastPrice: number
+  startPrice: number
+  tradeCount: number
+  roundTurnCount: number
+  totalNetProfit: number
+  avgNetProfit: number
+  grossProfit: number
+  grossLoss: number
+  prr: number
+  percentProfitable: number
+  maxDrawdown: number
+  avgDrawdown: number
+  maxProfit: number
+  maxLoss: number
+  avgProfit: number
+  avgLoss: number
+  winningCount: number
+  losingCount: number
+  maxLossStreak: number
+  sharpeRatio: number
+  sortinoRatio: number
+  profitFactor: number
+  winningRatio: number
+  cagr: number
+  calmar: number
+  kelly: number
 }
 
 // --- BBGo bot data types (from bbgo container REST API) ---
@@ -417,10 +465,12 @@ export interface MarketKline {
   closed: boolean
 }
 
-export function fetchMarketKlines(exchange: string, symbol: string, interval?: string, limit?: number) {
+export function fetchMarketKlines(exchange: string, symbol: string, interval?: string, limit?: number, startTime?: number, endTime?: number) {
   const params = new URLSearchParams({ symbol })
   if (interval) params.set('interval', interval)
   if (limit) params.set('limit', String(limit))
+  if (startTime) params.set('start_time', String(startTime))
+  if (endTime) params.set('end_time', String(endTime))
   return request<{ klines: MarketKline[] }>(`/markets/${encodeURIComponent(exchange)}/klines?${params}`)
 }
 

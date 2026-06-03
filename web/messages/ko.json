@@ -359,6 +359,7 @@
     "minChange": "최소 변동",
     "movingAverageType": "이동평균 유형",
     "movingAverageWindow": "이동평균 기간",
+    "movingAverageInterval": "이동평균 간격",
     "investmentInterval": "투자 간격",
     "budget": "예산 금액",
     "budgetPeriod": "예산 기간",

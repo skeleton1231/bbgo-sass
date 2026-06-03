@@ -2,12 +2,11 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { useSubmitBacktest, useBacktestJob, useBacktestJobs, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
-import type { BacktestJob } from '@/lib/bbgo/queries'
+import { useSubmitBacktest, useBacktestJob, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
 import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureNumbers } from '@/lib/bbgo/strategies'
 import { EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
-import { BacktestEquityChart } from '@/components/backtest/BacktestEquityChart'
+import { BacktestResultDisplay } from '@/components/backtest/BacktestEquityChart'
 
 const QUOTE_CURRENCIES = ['USDT', 'BUSD', 'USDC', 'TUSD', 'FDUSD', 'BTC', 'ETH', 'BNB']
 
@@ -26,22 +25,32 @@ function toLocalDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+function formatParamValue(val: unknown): string {
+  if (typeof val === 'boolean') return val ? '✓' : '✗'
+  if (val === undefined || val === null || val === '') return ''
+  return String(val)
+}
+
 export function BacktestPanel() {
   const t = useTranslations('Backtest')
   const ct = useTranslations('Categories')
   const submitBacktest = useSubmitBacktest()
-  const { data: jobsData } = useBacktestJobs()
 
   const [strategy, setStrategy] = useState('grid2')
   const [exchange, setExchange] = useState('binance')
   const [rawSymbol, setRawSymbol] = useState('BTCUSDT')
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
-  const [startTime, setStartTime] = useState('2024-01-01')
-  const [endTime, setEndTime] = useState('2024-03-01')
+  const [startTime, setStartTime] = useState(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 3)
+    return toLocalDate(d)
+  })
+  const [endTime, setEndTime] = useState(() => toLocalDate(new Date()))
   const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true, excludeCrossExchange: true })
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
-  const [manualResult, setManualResult] = useState<BacktestJob | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const [mode, setMode] = useState<'idle' | 'active'>('idle')
 
   const { data: symbolsData } = useMarketSymbols(exchange)
 
@@ -55,20 +64,16 @@ export function BacktestPanel() {
   const { data: tickerData } = useMarketTicker(exchange, symbol)
 
   const { data: activeJob } = useBacktestJob(activeJobId)
-
-  const recentJobs = (jobsData?.jobs ?? [])
-    .filter((j) => j.status === 'completed' || j.status === 'failed')
-    .slice(0, 5)
-
   const completedJob = activeJob && (activeJob.status === 'completed' || activeJob.status === 'failed') ? activeJob : null
-  const lastResult = completedJob ?? manualResult ?? recentJobs[0] ?? null
+  const lastResult = completedJob
+
+  const isRunning = !!activeJobId && (activeJob?.status === 'pending' || activeJob?.status === 'downloading' || activeJob?.status === 'running')
 
   const handleSymbolChange = useCallback((newSymbol: string) => {
     setRawSymbol(newSymbol)
     setConfig((prev) => ({ ...prev, symbol: newSymbol }))
   }, [])
 
-  // Auto-fill upperPrice/lowerPrice when ticker data arrives for the current symbol
   useEffect(() => {
     if (!symbol || !tickerData?.ticker?.close) return
     if (!schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')) return
@@ -86,6 +91,28 @@ export function BacktestPanel() {
     setConfig(getStrategyDefaults(newStrategy))
   }, [])
 
+  const handleDownload = async (file: string) => {
+    if (!lastResult || downloading) return
+    setDownloading(file)
+    try {
+      const res = await fetch(`/api/manager/backtest/jobs/${lastResult.id}/download?file=${file}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `backtest-${lastResult.id}-${file}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setSubmitError(t('downloadFailed'))
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError(null)
@@ -100,157 +127,219 @@ export function BacktestPanel() {
         end_time: endTime,
       })
       setActiveJobId(result.job_id)
+      setMode('active')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setSubmitError(message)
     }
   }
 
-  const isRunning = !!activeJobId && (activeJob?.status === 'pending' || activeJob?.status === 'downloading' || activeJob?.status === 'running')
+  const handleRerun = () => {
+    setMode('idle')
+    setActiveJobId(null)
+    setSubmitError(null)
+  }
 
-  return (
-    <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border bg-card p-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('strategy')}</label>
-            <select
-              value={strategy}
-              onChange={(e) => handleStrategyChange(e.target.value)}
-              disabled={isRunning}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-            >
-              {Object.entries(strategiesByCategory).map(([cat, items]) => (
-                <optgroup key={cat} label={ct(cat)}>
-                  {items.map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            {schema && (
-              <p className="mt-1 text-xs text-muted-foreground">{schema.description}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('exchange')}</label>
-            <select
-              value={exchange}
-              onChange={(e) => {
-                setExchange(e.target.value)
-                setRawSymbol('')
-                setConfig(getStrategyDefaults(strategy))
-              }}
-              disabled={isRunning}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-            >
-              {EXCHANGE_OPTIONS.map((ex) => (
-                <option key={ex.id} value={ex.id}>{ex.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('symbol')}</label>
-            <select
-              value={displaySymbol}
-              onChange={(e) => handleSymbolChange(e.target.value)}
-              disabled={isRunning || !filteredSymbols.length}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-            >
-              {filteredSymbols.length ? (
-                filteredSymbols.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))
-              ) : (
-                <option value="">{t('loading')}</option>
+  // -- Render: idle mode = full form --
+  if (mode === 'idle' && !activeJobId) {
+    return (
+      <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 rounded-lg border bg-card p-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('strategy')}</label>
+              <select
+                value={strategy}
+                onChange={(e) => handleStrategyChange(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {Object.entries(strategiesByCategory).map(([cat, items]) => (
+                  <optgroup key={cat} label={ct(cat)}>
+                    {items.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              {schema && (
+                <p className="mt-1 text-xs text-muted-foreground">{schema.description}</p>
               )}
-            </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('exchange')}</label>
+              <select
+                value={exchange}
+                onChange={(e) => {
+                  setExchange(e.target.value)
+                  setRawSymbol('')
+                  setConfig(getStrategyDefaults(strategy))
+                }}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {EXCHANGE_OPTIONS.map((ex) => (
+                  <option key={ex.id} value={ex.id}>{ex.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('symbol')}</label>
+              <select
+                value={displaySymbol}
+                onChange={(e) => handleSymbolChange(e.target.value)}
+                disabled={!filteredSymbols.length}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {filteredSymbols.length ? (
+                  filteredSymbols.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))
+                ) : (
+                  <option value="">{t('loading')}</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('startDate')}</label>
+              <input
+                type="date"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('endDate')}</label>
+              <input
+                type="date"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('startDate')}</label>
-            <input
-              type="date"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              disabled={isRunning}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('endDate')}</label>
-            <input
-              type="date"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              disabled={isRunning}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t('quickRange')}</span>
-          {([
-            { label: '1M', months: 1 },
-            { label: '3M', months: 3 },
-            { label: '6M', months: 6 },
-            { label: '1Y', months: 12 },
-          ] as const).map(({ label, months }) => (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t('quickRange')}</span>
+            {([
+              { label: '1M', months: 1 },
+              { label: '3M', months: 3 },
+              { label: '6M', months: 6 },
+              { label: '1Y', months: 12 },
+            ] as const).map(({ label, months }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  const end = new Date()
+                  const start = new Date()
+                  start.setMonth(start.getMonth() - months)
+                  setEndTime(toLocalDate(end))
+                  setStartTime(toLocalDate(start))
+                }}
+                className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50"
+              >
+                {label}
+              </button>
+            ))}
             <button
-              key={label}
               type="button"
               onClick={() => {
-                const end = new Date()
-                const start = new Date()
-                start.setMonth(start.getMonth() - months)
-                setEndTime(toLocalDate(end))
-                setStartTime(toLocalDate(start))
+                const now = new Date()
+                const ytd = new Date(now.getFullYear(), 0, 1)
+                setEndTime(toLocalDate(now))
+                setStartTime(toLocalDate(ytd))
               }}
-              disabled={isRunning}
-              className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50 disabled:opacity-50"
+              className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50"
             >
-              {label}
+              YTD
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              const now = new Date()
-              const ytd = new Date(now.getFullYear(), 0, 1)
-              setEndTime(toLocalDate(now))
-              setStartTime(toLocalDate(ytd))
-            }}
-            disabled={isRunning}
-            className="rounded border border-input px-2 py-0.5 text-xs hover:bg-muted/50 disabled:opacity-50"
-          >
-            YTD
-          </button>
-        </div>
+          </div>
 
-        {formFields.length > 0 && (
-          <div className="border-t pt-4">
-            <StrategyConfigForm
-              fields={formFields}
-              values={config}
-              onChange={setConfig}
-            />
+          {formFields.length > 0 && (
+            <div className="border-t pt-4">
+              <StrategyConfigForm
+                fields={formFields}
+                values={config}
+                onChange={setConfig}
+              />
+            </div>
+          )}
+
+          <div className="flex items-center gap-4">
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              {t('run')}
+            </button>
+          </div>
+        </form>
+
+        {submitError && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <p className="text-sm text-destructive">{submitError}</p>
           </div>
         )}
+      </div>
+    )
+  }
 
-        <div className="flex items-center gap-4">
-          <button
-            type="submit"
-            disabled={isRunning}
-            className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {isRunning ? t('running') : t('run')}
-          </button>
+  // -- Render: active mode = summary + status/results --
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-sm font-semibold">{schema?.label ?? strategy}</span>
+          <span className="text-xs text-muted-foreground">{exchange}</span>
+          <span className="text-xs font-medium">{displaySymbol}</span>
+          <span className="text-xs text-muted-foreground">{startTime} → {endTime}</span>
         </div>
-      </form>
+        {formFields.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {formFields.map((f) => (
+              <span key={f.key} className="text-xs text-muted-foreground">
+                {f.key}: <span className="text-xs font-medium text-foreground">{formatParamValue(config[f.key])}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={handleRerun}
+            className="rounded border border-input px-3 py-1 text-xs hover:bg-muted/50"
+          >
+            {t('rerun')}
+          </button>
+          {lastResult?.status === 'completed' && (
+            <>
+              <button
+                onClick={() => handleDownload('trades')}
+                disabled={!!downloading}
+                className="rounded border border-input px-3 py-1 text-xs hover:bg-muted/50 disabled:opacity-50"
+              >
+                {downloading === 'trades' ? '...' : t('downloadTrades')}
+              </button>
+              <button
+                onClick={() => handleDownload('equity')}
+                disabled={!!downloading}
+                className="rounded border border-input px-3 py-1 text-xs hover:bg-muted/50 disabled:opacity-50"
+              >
+                {downloading === 'equity' ? '...' : t('downloadEquity')}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {submitError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{submitError}</p>
+        </div>
+      )}
 
       {isRunning && activeJob && (
         <div className="rounded-lg border bg-card p-4">
@@ -268,53 +357,24 @@ export function BacktestPanel() {
         </div>
       )}
 
-      {submitError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p className="text-sm text-destructive">{submitError}</p>
-        </div>
-      )}
-
-      {submitBacktest.isError && !submitError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p className="text-sm text-destructive">{submitBacktest.error instanceof Error ? submitBacktest.error.message : t('error')}</p>
-        </div>
-      )}
-
-      {lastResult && lastResult.status === 'completed' && lastResult.output && (
-        <div className="rounded-lg border bg-card p-4 space-y-4">
-          <BacktestEquityChart output={lastResult.output} />
-          <details>
-            <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">{t('backtestOutput')}</summary>
-            <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground max-h-[500px] overflow-y-auto rounded bg-muted/50 p-3">
-              {lastResult.output.replace(/\x1b\[[0-9;]*m/g, '')}
-            </pre>
-          </details>
+      {lastResult && lastResult.status === 'completed' && (
+        <div className="rounded-lg border bg-card p-4">
+          <BacktestResultDisplay
+            output={lastResult.output}
+            report={lastResult.report ?? null}
+            equityCurveTSV={lastResult.equity_curve}
+            jobId={lastResult.id}
+            symbol={lastResult.symbol}
+            exchange={lastResult.exchange}
+            startTime={startTime}
+            endTime={endTime}
+          />
         </div>
       )}
 
       {lastResult && lastResult.status === 'failed' && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{lastResult.error || t('error')}</p>
-        </div>
-      )}
-
-      {recentJobs.length > 0 && (
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold mb-3">{t('recentJobs')}</h3>
-          <div className="space-y-2">
-            {recentJobs.map((job) => (
-              <button
-                key={job.id}
-                onClick={() => setManualResult(job)}
-                className="w-full text-left flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
-              >
-                <span className="truncate">
-                  {job.strategy} / {job.symbol} / {job.start_time}
-                </span>
-                <StatusBadge status={job.status} />
-              </button>
-            ))}
-          </div>
         </div>
       )}
     </div>

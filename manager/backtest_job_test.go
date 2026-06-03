@@ -198,7 +198,7 @@ func TestBacktestJobStore_Prune(t *testing.T) {
 	store.Create(&BacktestJob{ID: "bt-new", UserID: "u1", Strategy: "grid2", Config: json.RawMessage(`{}`)})
 	store.UpdateStatus("bt-new", JobCompleted, "done")
 
-	store.Prune(24 * time.Hour)
+	store.Prune(24 * time.Hour, nil)
 
 	_, found := store.Get("bt-old")
 	if found {

@@ -30,6 +30,8 @@ type BacktestJob struct {
 	Status      string          `json:"status"`
 	Progress    string          `json:"progress,omitempty"`
 	Output      string          `json:"output,omitempty"`
+	Report      json.RawMessage `json:"report,omitempty"`
+	EquityCurve string          `json:"equity_curve,omitempty"`
 	Error       string          `json:"error,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	StartedAt   *time.Time      `json:"started_at,omitempty"`
@@ -143,6 +145,16 @@ func (s *BacktestJobStore) SetError(jobID, err string) {
 	}
 }
 
+func (s *BacktestJobStore) SetReport(jobID string, report json.RawMessage, equityCurve string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if j, ok := s.jobs[jobID]; ok {
+		j.Report = report
+		j.EquityCurve = equityCurve
+		s.persist(j)
+	}
+}
+
 func (s *BacktestJobStore) AcquireSlot() bool {
 	select {
 	case s.sem <- struct{}{}:
@@ -200,15 +212,20 @@ func (s *BacktestJobStore) loadPersisted() {
 		s.jobs[job.ID] = &job
 	}
 	log.Printf("loaded %d persisted backtest jobs", len(s.jobs))
+	s.Prune(24*time.Hour, nil)
+	log.Printf("after prune: %d backtest jobs remaining", len(s.jobs))
 }
 
-func (s *BacktestJobStore) Prune(olderThan time.Duration) {
+func (s *BacktestJobStore) Prune(olderThan time.Duration, storage *StorageClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cutoff := time.Now().Add(-olderThan)
 	for id, j := range s.jobs {
 		if j.Status == JobCompleted || j.Status == JobFailed {
 			if j.CompletedAt != nil && j.CompletedAt.Before(cutoff) {
+				if storage != nil {
+					storage.RemoveFolder(j.UserID, id)
+				}
 				delete(s.jobs, id)
 				os.Remove(s.jobPath(id))
 			}
@@ -220,17 +237,20 @@ type BacktestExecutor struct {
 	store     *BacktestJobStore
 	container *ContainerManager
 	notifier  *Notifier
+	storage   *StorageClient
 
 	// Test hooks — override in tests to mock Docker operations.
-	syncFn func(userID, exchange, symbol, startTime, endTime string) (string, error)
-	runFn  func(userID string, jobID string, yamlContent []byte) ([]byte, error)
+	syncFn    func(userID, exchange, symbol, startTime, endTime string) (string, error)
+	runFn     func(userID string, jobID string, yamlContent []byte) ([]byte, error)
+	reportFn  func(userID, jobID string) (json.RawMessage, []byte, error)
 }
 
-func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier *Notifier) *BacktestExecutor {
+func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier *Notifier, storage *StorageClient) *BacktestExecutor {
 	return &BacktestExecutor{
 		store:     store,
 		container: cm,
 		notifier:  notifier,
+		storage:   storage,
 	}
 }
 
@@ -284,15 +304,25 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	result, err := ex.runBacktest(job.UserID, job.ID, yamlContent)
 	if err != nil {
+		if ex.storage != nil {
 		ex.container.CleanupBacktest(job.UserID, job.ID)
+	}
 		ex.store.FailJob(job.ID, "backtest failed", err.Error())
 		ex.notify(job, "Backtest Failed", fmt.Sprintf("Strategy %s: %s", job.Strategy, err.Error()))
 		return
 	}
 
 	ex.store.SetOutput(job.ID, string(result))
+
+	report, equityCurve, reportErr := ex.readReport(job.UserID, job.ID)
+	if reportErr != nil {
+		log.Printf("backtest report read for job %s: %v (non-fatal)", job.ID, reportErr)
+	} else {
+		ex.store.SetReport(job.ID, report, string(equityCurve))
+		ex.uploadToStorage(job.UserID, job.ID, report, equityCurve)
+	}
+
 	ex.store.UpdateStatus(job.ID, JobCompleted, "done")
-	ex.container.CleanupBacktest(job.UserID, job.ID)
 	ex.notify(job, "Backtest Completed", fmt.Sprintf("Strategy %s on %s/%s completed successfully", job.Strategy, job.Exchange, job.Symbol))
 }
 
@@ -305,4 +335,54 @@ func (ex *BacktestExecutor) notify(job *BacktestJob, title, message string) {
 		Title:   title,
 		Message: message,
 	})
+}
+
+func (ex *BacktestExecutor) readReport(userID, jobID string) (json.RawMessage, []byte, error) {
+	if ex.reportFn != nil {
+		return ex.reportFn(userID, jobID)
+	}
+	if ex.container == nil {
+		return nil, nil, fmt.Errorf("no container manager")
+	}
+	return ex.container.ReadBacktestReport(userID, jobID)
+}
+
+func (ex *BacktestExecutor) uploadToStorage(userID, jobID string, report json.RawMessage, equityCurve []byte) {
+	if ex.storage == nil {
+		return
+	}
+	if err := ex.storage.Upload(userID, jobID, "summary.json", report); err != nil {
+		log.Printf("storage upload summary for job %s: %v", jobID, err)
+	}
+	if len(equityCurve) > 0 {
+		if err := ex.storage.Upload(userID, jobID, "equity_curve.tsv", equityCurve); err != nil {
+			log.Printf("storage upload equity for job %s: %v", jobID, err)
+		}
+	}
+	reportDir := ex.container.BacktestReportDir(userID, jobID)
+	for _, name := range []string{"trades.tsv", "orders.tsv"} {
+		data, err := os.ReadFile(filepath.Join(reportDir, name))
+		if err != nil {
+			continue
+		}
+		if err := ex.storage.Upload(userID, jobID, name, data); err != nil {
+			log.Printf("storage upload %s for job %s: %v", name, jobID, err)
+		}
+	}
+	// Upload kline files (e.g., BTCUSDT-1h.tsv)
+	if matches, err := filepath.Glob(filepath.Join(reportDir, "*-*.tsv")); err == nil {
+		for _, match := range matches {
+			name := filepath.Base(match)
+			if name == "trades.tsv" || name == "orders.tsv" || name == "equity_curve.tsv" {
+				continue
+			}
+			data, err := os.ReadFile(match)
+			if err != nil {
+				continue
+			}
+			if err := ex.storage.Upload(userID, jobID, name, data); err != nil {
+				log.Printf("storage upload %s for job %s: %v", name, jobID, err)
+			}
+		}
+	}
 }

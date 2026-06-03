@@ -12,7 +12,7 @@ func TestBacktestExecutor_FullFlow_SyncAndRun(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	var syncCalled, runCalled bool
 	var mu sync.Mutex
@@ -78,7 +78,7 @@ func TestBacktestExecutor_SkipSync(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	var syncCalled bool
 	var mu sync.Mutex
@@ -118,7 +118,7 @@ func TestBacktestExecutor_SyncFailure(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	var runCalled bool
 	var mu sync.Mutex
@@ -163,7 +163,7 @@ func TestBacktestExecutor_RunFailure(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
@@ -200,7 +200,7 @@ func TestBacktestExecutor_SlotReleasedOnFailure(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "", fmt.Errorf("sync error")
@@ -242,7 +242,7 @@ func TestBacktestExecutor_StatusTransitions(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	var statuses []string
 	var mu sync.Mutex
@@ -314,7 +314,7 @@ func TestBacktestExecutor_InvalidConfig(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	var runCalled bool
 	var mu sync.Mutex
@@ -369,7 +369,7 @@ func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
 	cm := &ContainerManager{cfg: &Config{DataDir: dir}, checkRunningFn: func(string, string) (bool, error) { return false, fmt.Errorf("no docker") }}
-	exec := NewBacktestExecutor(store, cm, nil)
+	exec := NewBacktestExecutor(store, cm, nil, nil)
 
 	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		time.Sleep(200 * time.Millisecond) // simulate work

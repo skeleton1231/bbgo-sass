@@ -359,6 +359,7 @@
     "minChange": "最小変動",
     "movingAverageType": "移動平均タイプ",
     "movingAverageWindow": "移動平均期間",
+    "movingAverageInterval": "移動平均間隔",
     "investmentInterval": "投資間隔",
     "budget": "予算額",
     "budgetPeriod": "予算期間",

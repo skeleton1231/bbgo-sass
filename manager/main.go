@@ -118,7 +118,8 @@ func main() {
 	}
 
 	btJobStore := NewBacktestJobStore(cfg.DataDir)
-	btExecutor := NewBacktestExecutor(btJobStore, containerMgr, notifier)
+	storageClient := NewStorageClient(cfg.SupabaseURL, cfg.SupabaseKey)
+	btExecutor := NewBacktestExecutor(btJobStore, containerMgr, notifier, storageClient)
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
@@ -128,12 +129,12 @@ func main() {
 			case <-done:
 				return
 			case <-ticker.C:
-				btJobStore.Prune(24 * time.Hour)
+				btJobStore.Prune(24*time.Hour, storageClient)
 			}
 		}
 	}()
 
-	api := NewAPI(cfg, strategies, containerMgr, proxy, credStore, enc, syncer, hub, testnetHub, notifier, btExecutor, btJobStore)
+	api := NewAPI(cfg, strategies, containerMgr, proxy, credStore, enc, syncer, hub, testnetHub, notifier, btExecutor, btJobStore, storageClient)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

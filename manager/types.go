@@ -1,6 +1,9 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // --- API response envelopes ---
 
@@ -79,8 +82,26 @@ type backtestSyncStatusResponse struct {
 	Modified  string `json:"modified,omitempty"`
 }
 
+type backtestJobSummary struct {
+	ID          string     `json:"id"`
+	UserID      string     `json:"user_id"`
+	Strategy    string     `json:"strategy"`
+	Exchange    string     `json:"exchange"`
+	Symbol      string     `json:"symbol"`
+	StartTime   string     `json:"start_time"`
+	EndTime     string     `json:"end_time"`
+	Status      string     `json:"status"`
+	Progress    string     `json:"progress,omitempty"`
+	Error       string     `json:"error,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	NeedSync    bool       `json:"need_sync"`
+	HasReport   bool       `json:"has_report"`
+}
+
 type backtestJobsResponse struct {
-	Jobs []*BacktestJob `json:"jobs"`
+	Jobs []backtestJobSummary `json:"jobs"`
 }
 
 type backtestSubmitResponse struct {

@@ -21,6 +21,20 @@ func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 		{"pivotshort", `{"symbol":"BTCUSDT"}`, "interval", "1h"},
 		{"swing", `{"symbol":"ETHUSDT"}`, "interval", "1h"},
 		{"flashcrash", `{"symbol":"BTCUSDT"}`, "interval", "1h"},
+		{"fixedmaker", `{"symbol":"BTCUSDT"}`, "halfSpread", "0.001"},
+		{"fmaker", `{"symbol":"BTCUSDT"}`, "spread", "0.001"},
+		{"swing", `{"symbol":"BTCUSDT"}`, "movingAverageType", "SMA"},
+		{"ewo_dgtrd", `{"symbol":"BTCUSDT"}`, "sigWin", "5"},
+		{"harmonic", `{"symbol":"BTCUSDT"}`, "window", "20"},
+		{"irr", `{"symbol":"BTCUSDT"}`, "window", "20"},
+		{"schedule", `{"symbol":"BTCUSDT"}`, "side", "buy"},
+		{"random", `{"symbol":"BTCUSDT"}`, "schedule", "*/30 * * * *"},
+		{"xhedgegrid", `{"symbol":"BTCUSDT"}`, "gridNumber", "10"},
+		{"atrpin", `{"symbol":"BTCUSDT"}`, "interval", "1h"},
+		{"techsignal", `{"symbol":"BTCUSDT"}`, "interval", "1h"},
+		{"grid", `{"symbol":"BTCUSDT"}`, "gridNumber", "10"},
+		{"grid2", `{"symbol":"BTCUSDT"}`, "quoteInvestment", "1000"},
+		{"dca", `{"symbol":"BTCUSDT"}`, "budget", "100"},
 	}
 
 	for _, tt := range tests {
@@ -69,4 +83,32 @@ func TestBacktestDefaults_BollgridProfitSpread(t *testing.T) {
 
 func strContains(s, sub string) bool {
 	return strings.Contains(s, sub)
+}
+
+func TestBacktestYAML_NumbersNotQuoted(t *testing.T) {
+	tests := []struct {
+		strategy string
+		config   string
+		field    string
+	}{
+		{"fixedmaker", `{"symbol":"BTCUSDT"}`, "quantity"},
+		{"fixedmaker", `{"symbol":"BTCUSDT"}`, "halfSpread"},
+		{"swing", `{"symbol":"BTCUSDT"}`, "baseQuantity"},
+		{"ewo_dgtrd", `{"symbol":"BTCUSDT"}`, "stoploss"},
+		{"grid", `{"symbol":"BTCUSDT"}`, "profitSpread"},
+		{"grid2", `{"symbol":"BTCUSDT"}`, "quoteInvestment"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.strategy+"_"+tt.field, func(t *testing.T) {
+			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := string(yaml)
+			quoted := tt.field + `: "`
+			if strings.Contains(s, quoted) {
+				t.Errorf("%s field %s should not be a quoted string in YAML:\n%s", tt.strategy, tt.field, s)
+			}
+		})
+	}
 }
