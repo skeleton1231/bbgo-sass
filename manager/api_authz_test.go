@@ -38,7 +38,7 @@ func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouterWithUser(api, "11111111-2222-3333-4444-555555555555")
@@ -63,7 +63,7 @@ func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
@@ -85,7 +85,7 @@ func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := testRouter(api)
@@ -107,7 +107,7 @@ func TestResolveUserID_InvalidUUID_Rejected(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/not-a-uuid/status", nil)
@@ -129,7 +129,7 @@ func TestResolveUserID_CreateStrategy_MismatchBlocked(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, "11111111-2222-3333-4444-555555555555")
 
@@ -172,7 +172,7 @@ func TestCredentialEndpoint_UsesHeaderUserID(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
@@ -219,7 +219,7 @@ func TestCredentialEndpoint_MissingUserID_Rejected(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 

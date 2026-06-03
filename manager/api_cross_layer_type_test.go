@@ -257,7 +257,7 @@ func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 		"drift": true, "elliottwave": true, "factorzoo": true,
 		"xvs": true, "autoborrow": true, "convert": true,
 		"deposit2transfer": true, "autobuy": true, "rebalance": true,
-		"support": true, "xpremium": true, "xnav": true,
+		"support": true, "xpremium": true, "xnav": true, "harmonic": true,
 	}
 
 	for alias, canonical := range legacyStrategyAliases {

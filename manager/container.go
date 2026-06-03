@@ -305,12 +305,18 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
+
+	syncFrom := startTime
+	if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+		syncFrom = t.Format("2006-01-02")
+	}
+
 	args = append(args,
 		containerName,
 		"bbgo", "backtest",
 		"--sync",
 		"--sync-only",
-		"--sync-from", startTime,
+		"--sync-from", syncFrom,
 		"--config", containerConfigPath,
 	)
 

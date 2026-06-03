@@ -243,7 +243,7 @@ func TestLiveOnlyStrategiesBackendFrontendConsistency(t *testing.T) {
 		"audacitymaker": true, "liquiditymaker": true,
 		"drift": true, "elliottwave": true, "factorzoo": true, "xvs": true,
 		"autoborrow": true, "convert": true, "deposit2transfer": true,
-		"support": true, "xpremium": true, "xnav": true,
+		"support": true, "xpremium": true, "xnav": true, "harmonic": true,
 	}
 
 	// Normalize frontend IDs to bbgo IDs and check against backend
@@ -317,7 +317,7 @@ func TestMixedModePrevention(t *testing.T) {
 	})
 
 	store := NewStrategyStore(dir)
-	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	// Create first strategy as live
@@ -348,7 +348,7 @@ func TestLiveModeRequiresCredentials(t *testing.T) {
 	credStore := NewCredentialStore(dir, enc)
 
 	store := NewStrategyStore(dir)
-	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	createBody := `{"name":"Live Grid","strategy":"grid2","exchange":"binance","config":{"symbol":"BTCUSDT"},"mode":"live"}`
@@ -372,7 +372,7 @@ func TestPaperModeWithLiveOnlyStrategy(t *testing.T) {
 	credStore := NewCredentialStore(dir, enc)
 
 	store := NewStrategyStore(dir)
-	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	liveOnlyTests := []string{"bollmaker", "supertrend", "dca2", "wall", "drift"}
@@ -398,7 +398,7 @@ func TestLegacyAliasPaperRejection(t *testing.T) {
 	credStore := NewCredentialStore(dir, enc)
 
 	store := NewStrategyStore(dir)
-	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	tests := []struct {
@@ -639,7 +639,7 @@ func TestPaperModeFullLifecycle(t *testing.T) {
 	proxy := NewBotProxy(cm)
 	supaClient, _ := NewSupabaseClient("http://localhost:1", "test")
 	syncer := NewSyncer(supaClient)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	// Insert testnet credential so paper mode start is allowed

@@ -50,17 +50,29 @@ async function handleRequest(
 
   const { path } = await params
   const res = await forwardRequest(method, request, path, userId)
-  const text = await res.text()
+  const contentType = res.headers.get('content-type') || ''
 
-  try {
-    const data = JSON.parse(text)
-    return NextResponse.json(data, { status: res.status })
-  } catch {
-    return NextResponse.json(
-      { error: `Manager returned non-JSON: ${text.slice(0, 200)}` },
-      { status: res.status }
-    )
+  if (contentType.includes('application/json')) {
+    const text = await res.text()
+    try {
+      const data = JSON.parse(text)
+      return NextResponse.json(data, { status: res.status })
+    } catch {
+      return NextResponse.json(
+        { error: `Manager returned invalid JSON: ${text.slice(0, 200)}` },
+        { status: res.status }
+      )
+    }
   }
+
+  const headers = new Headers()
+  headers.set('Content-Type', contentType)
+  for (const key of ['Content-Length', 'Content-Disposition', 'Cache-Control'] as const) {
+    const val = res.headers.get(key)
+    if (val) headers.set(key, val)
+  }
+
+  return new NextResponse(res.body, { status: res.status, headers })
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {

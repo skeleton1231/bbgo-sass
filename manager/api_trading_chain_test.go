@@ -28,7 +28,7 @@ func TestAPI_CreateStrategy_LiveRequiresCredentials(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 
@@ -71,7 +71,7 @@ func TestAPI_CreateStrategy_LiveWithCredentials_Accepted(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 
@@ -111,7 +111,7 @@ func TestAPI_CreateStrategy_LiveCrossExchange_MissingOneCredential(t *testing.T)
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 

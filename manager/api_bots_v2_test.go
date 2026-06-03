@@ -230,7 +230,7 @@ func setupRealFormatBotsTestAPI(t *testing.T) (*API, *chi.Mux) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)

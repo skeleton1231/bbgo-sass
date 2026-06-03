@@ -101,7 +101,7 @@ func TestBBGoTrades_FallbackToSessionTrades(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	cm.apiURLFn = func(_, _ string) string { return srv.URL }
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		return &BBGoClient{baseURL: baseURL, client: &http.Client{}}
 	}
@@ -171,7 +171,7 @@ func TestPnL_PaperMode_SkipsSupabase(t *testing.T) {
 	proxy := NewBotProxy(cm)
 	supa, _ := NewSupabaseClient(supaSrv.URL, "test")
 	syncer := NewSyncer(supa)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, syncer, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, syncer, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		return &BBGoClient{baseURL: baseURL, client: &http.Client{}}
 	}

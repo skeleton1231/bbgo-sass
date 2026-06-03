@@ -250,7 +250,7 @@ func TestTradingChain_PaperMode_FullFlow(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	var capturedArgs []string
@@ -358,7 +358,7 @@ func TestTradingChain_LiveMode_FullFlow(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
 	var capturedArgs []string
@@ -462,7 +462,7 @@ func TestCreateCredential_NilEncryptor_Returns503(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
 	// No encryptor, no creds
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, _ string) bool { return false }
 
 	r := testRouter(api)

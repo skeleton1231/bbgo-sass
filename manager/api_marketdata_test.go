@@ -26,7 +26,7 @@ func setupMarketDataAPIWithTestnet(hub *MarketDataHub, testnetHub *MarketDataHub
 	store := NewStrategyStore("")
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, hub, testnetHub, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, hub, testnetHub, nil, nil, nil, nil)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

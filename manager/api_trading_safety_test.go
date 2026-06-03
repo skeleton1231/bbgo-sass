@@ -27,7 +27,7 @@ func TestListCredentials_DoesNotLeakEncryptedData(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	insertTestCredential(t, creds, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "binance", "my-api-key", "my-api-secret")
 
@@ -72,7 +72,7 @@ func TestBBGoData_NonRunningContainer_Returns503(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := chi.NewRouter()
@@ -132,7 +132,7 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -252,7 +252,7 @@ func TestLiveTrading_HappyPath(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	api.containerStart = func(userID, mode string) error { return nil }
 	api.containerRunning = func(_, _ string) bool { return false }
@@ -324,7 +324,7 @@ func TestLiveOnlyStrategy_PaperModeBlocked(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 
 	insertTestCredential(t, creds, userID, "binance", "key", "secret")
@@ -361,7 +361,7 @@ func TestLiveOnlyStrategy_LiveModeAccepted(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 
 	insertTestCredential(t, creds, userID, "binance", "key", "secret")
@@ -396,7 +396,7 @@ func TestDeleteCredential_StoppedContainer_NoRestart(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 
 	insertTestCredential(t, creds, userID, "binance", "k", "s")
@@ -440,7 +440,7 @@ func TestCreateCredential_PassphraseEncrypted(t *testing.T) {
 	store, _ := newTestStore(t)
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, userID)
 	body := `{"exchange":"okex","api_key":"okx-key","api_secret":"okx-secret","passphrase":"my-pass"}`

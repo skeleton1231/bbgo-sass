@@ -302,7 +302,7 @@ func TestStartUserContainer_UnverifiedCredential_Rejected(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return false }
 	api.containerStart = func(userID, mode string) error { return nil }
 
@@ -343,7 +343,7 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return true }
 	api.containerStart = func(userID, mode string) error { return nil }
 
@@ -375,7 +375,7 @@ func TestStartUserContainer_NoCredsStore_NoVerificationCheck(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return true }
 	api.containerStart = func(userID, mode string) error { return nil }
 
@@ -518,7 +518,7 @@ func TestStartUserContainer_UnsupportedExchange_SkipsVerification(t *testing.T) 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(string, string) bool { return true }
 	api.containerStart = func(userID, mode string) error { return nil }
 

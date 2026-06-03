@@ -63,7 +63,7 @@ func setupBotsTestAPI(t *testing.T) (*API, *chi.Mux) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
@@ -193,7 +193,7 @@ func TestListBots_EmptyResult_ReturnsEmptyArray(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 	r := testRouter(api)
 
@@ -219,7 +219,7 @@ func TestListBots_NoContainers_ReturnsEmptyArray(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots", nil)
@@ -424,7 +424,7 @@ func TestGetBot_CrossExchangeStrategy(t *testing.T) {
 		}))
 	t.Cleanup(bbgoSrv.Close)
 
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)

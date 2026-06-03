@@ -48,7 +48,7 @@ func setupPnLTest(t *testing.T, containerRunning bool, supabaseHandler, bbgoHand
 	}
 	syncer := NewSyncer(supaClient)
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, syncer, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, syncer, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return containerRunning }
 	if bbgoURL != "" {
 		api.newBBGoClient = func(_ string) *BBGoClient { return NewBBGoClient(bbgoURL) }

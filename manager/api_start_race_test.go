@@ -23,7 +23,7 @@ func TestAPI_StartUser_IdempotentWhenStarting(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 	api.containerRunning = func(_, _ string) bool { return false }
 
@@ -77,7 +77,7 @@ func TestAPI_StartUser_ConcurrentRequests(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 	defer api.Close()
 
@@ -134,7 +134,7 @@ func TestAPI_CreateStrategy_RunningUser_SetsStarting(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 	defer api.Close()
 

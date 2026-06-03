@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -98,12 +99,15 @@ func TestBacktestExecutor_NotificationOnComplete(t *testing.T) {
 	}}
 
 	store := NewBacktestJobStore(tmpDir)
-	exec := NewBacktestExecutor(store, nil, notifier)
+	exec := NewBacktestExecutor(store, nil, notifier, nil)
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "synced", nil
 	}
 	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 		return []byte("backtest output"), nil
+	}
+	exec.reportFn = func(userID, jobID string) (json.RawMessage, []byte, error) {
+		return nil, nil, fmt.Errorf("no report")
 	}
 
 	job := &BacktestJob{
@@ -137,7 +141,7 @@ func TestBacktestExecutor_NotificationOnFailure(t *testing.T) {
 	}}
 
 	store := NewBacktestJobStore(tmpDir)
-	exec := NewBacktestExecutor(store, nil, notifier)
+	exec := NewBacktestExecutor(store, nil, notifier, nil)
 	exec.syncFn = func(userID, exchange, symbol, startTime, endTime string) (string, error) {
 		return "", errTestSyncFail
 	}
@@ -173,7 +177,7 @@ func setupTestAPIWithCreds(t *testing.T) (*API, func()) {
 	proxy := NewBotProxy(cm)
 	supaClient, _ := NewSupabaseClient("http://localhost:1", "test")
 	syncer := NewSyncer(supaClient)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(userID, mode string) error { return nil }
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }

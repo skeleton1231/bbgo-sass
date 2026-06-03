@@ -58,7 +58,7 @@ func TestAPI_StartUserAsync_NoStrategies(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -92,7 +92,7 @@ func TestAPI_StartUser_BackgroundHealthCheck(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
 	}
@@ -158,7 +158,7 @@ func setupTestAPIWithMockCM(t *testing.T, bbgoHandler http.HandlerFunc, isRunnin
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return isRunning }
 	api.containerStart = func(userID, mode string) error { return nil }
 	if bbgoHandler != nil {

@@ -26,7 +26,7 @@ func setupTestAPI(t *testing.T, bbgoHandler http.HandlerFunc) (*API, *httptest.S
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 	api.newBBGoClient = func(_ string) *BBGoClient {
 		return NewBBGoClient(bbgoSrv.URL)
@@ -153,7 +153,7 @@ func TestAPI_BBGo_UserNotFound(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := testRouter(api)
@@ -172,7 +172,7 @@ func TestAPI_BBGo_InvalidUserID(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/not-a-uuid/bbgo/ping", nil)
@@ -193,7 +193,7 @@ func TestAPI_BBGo_ContainerStopped(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return false }
 
 	r := testRouter(api)

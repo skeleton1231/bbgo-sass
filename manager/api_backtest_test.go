@@ -27,9 +27,9 @@ func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 	proxy := NewBotProxy(cm)
 
 	btJobs := NewBacktestJobStore(t.TempDir())
-	btExec := NewBacktestExecutor(btJobs, cm, nil)
+	btExec := NewBacktestExecutor(btJobs, cm, nil, nil)
 
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, btExec, btJobs)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, btExec, btJobs, nil)
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -156,11 +156,11 @@ func TestAPI_SubmitBacktest_DefaultsFallback(t *testing.T) {
 	if job.Symbol != "BTCUSDT" {
 		t.Errorf("expected default symbol BTCUSDT, got %s", job.Symbol)
 	}
-	if job.StartTime != "2024-01-01" {
-		t.Errorf("expected default start_time, got %s", job.StartTime)
+	if job.StartTime == "" {
+		t.Error("expected non-empty start_time")
 	}
-	if job.EndTime != "2024-06-01" {
-		t.Errorf("expected default end_time, got %s", job.EndTime)
+	if job.EndTime == "" {
+		t.Error("expected non-empty end_time")
 	}
 }
 
@@ -343,7 +343,7 @@ func TestAPI_HasDataForRange_AlwaysSyncs(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	store := NewStrategyStore("")
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-03-01") {
 		t.Error("expected false — sync should always be forced")

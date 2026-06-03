@@ -27,7 +27,7 @@ func newTradingChainSetup(t *testing.T) *tradingChainSetup {
 		DataVolume: "bbgo-data", BBGOPort: 8080, BBGOGRPCPort: 9090,
 	}, creds: creds}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(&Config{Port: 8090, ManagerToken: "test"}, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(&Config{Port: 8090, ManagerToken: "test"}, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerStart = func(userID, mode string) error { return nil }
 	api.containerStop = func(string, _ string) {}
 	api.containerRunning = func(string, _ string) bool { return false }

@@ -26,7 +26,7 @@ func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var startCalled bool
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerStart = func(userID, mode string) error {
 		startCalled = true
 		return nil
@@ -74,7 +74,7 @@ func TestCreateStrategy_ErrorContainer_NoAutoStart(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var startCalled bool
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerStart = func(userID, mode string) error {
 		startCalled = true
 		return nil
@@ -122,7 +122,7 @@ func TestCreateStrategy_RunningContainer_TriggersRestart(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	var startCalled bool
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerStart = func(userID, mode string) error {
 		startCalled = true
 		return nil
@@ -177,7 +177,7 @@ func TestContainerLogs_UserIDMismatch_Rejected(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := chi.NewRouter()
@@ -219,7 +219,7 @@ func TestCredentialCreate_StoppedContainer_NoRestart(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var restartCalled bool
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.containerStart = func(userID, mode string) error {
 		restartCalled = true
 		return nil
@@ -268,7 +268,7 @@ func TestProxyToBot_StripsAuthHeaders(t *testing.T) {
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	proxy.resolveAddr = func(_, _ string) string { return bbgoSrv.URL }
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	r := chi.NewRouter()

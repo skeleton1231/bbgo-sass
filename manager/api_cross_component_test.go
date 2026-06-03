@@ -17,7 +17,7 @@ func TestIssueWSTicket_RequiresAuth(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 
 	r := chi.NewRouter()
@@ -43,7 +43,7 @@ func TestIssueWSTicket_ReturnsTicket(t *testing.T) {
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	defer api.Close()
 
 	r := chi.NewRouter()
@@ -79,7 +79,7 @@ func TestStartUser_NoStrategies_Returns400(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("POST", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/start", nil)
@@ -101,7 +101,7 @@ func TestStopUser_SetsStatusStopped(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	var stopCalled bool
 	api.containerStop = func(_, _ string) {
@@ -140,7 +140,7 @@ func TestStartUser_AlreadyRunning_Returns200(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = func(_, _ string) bool { return true }
 
 	var startCalls int
@@ -181,7 +181,7 @@ func TestCreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	// Simulate "starting" state — not running, but already in the starting map
 	api.starting.Store(containerKey(userID, ModePaper), true)
@@ -224,7 +224,7 @@ func TestUserStatus_UnknownUser_ReturnsStopped(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/status", nil)
@@ -252,7 +252,7 @@ func TestListStrategies_UnknownUser_ReturnsEmpty(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/strategies", nil)
@@ -285,7 +285,7 @@ func TestCreateCredential_UnsupportedExchange(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouterWithUser(api, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	body := `{"exchange":"unknown_ex","api_key":"k","api_secret":"s"}`
@@ -313,7 +313,7 @@ func TestCreateCredential_MissingFields(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, creds: creds, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name string
@@ -350,7 +350,7 @@ func TestCreateStrategy_CrossExchange_RequiresSessions(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := testRouter(api)
 	body := `{"name":"XMaker","strategy":"xmaker","crossExchange":true,"config":{},"mode":"paper"}`
@@ -386,7 +386,7 @@ func TestDeleteStrategy_NotFound(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = containerRunningFor(map[string]bool{
 		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + ModeLive: true,
 	})
@@ -417,7 +417,7 @@ func TestHealthEndpoint_ReturnsCounts(t *testing.T) {
 	})
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.containerRunning = containerRunningFor(map[string]bool{
 		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + ModeLive: true,
 	})
@@ -449,7 +449,7 @@ func TestBacktestSync_TooManySymbols(t *testing.T) {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, NewStrategyStore(t.TempDir()), cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {

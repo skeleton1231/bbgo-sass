@@ -24,7 +24,7 @@ func setupModeTestAPI(t *testing.T, existingMode string) *API {
 	}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
-	return NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	return NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 func TestAPI_CreateStrategy_LiveOnlyRejectsPaper(t *testing.T) {
@@ -166,7 +166,7 @@ var frontendLiveOnlyStrategies = map[string]bool{
 	"drift": true, "elliottwave": true, "factorzoo": true, "xvs": true,
 	"autoborrow": true, "convert": true, "deposit2transfer": true,
 	"autobuy_scheduled": true, "rebalance_portfolio": true, "support": true,
-	"xpremium": true, "xnav": true,
+	"xpremium": true, "xnav": true, "harmonic": true,
 }
 
 func TestLiveOnlyLists_FrontendBackendSync(t *testing.T) {

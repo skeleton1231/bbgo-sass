@@ -23,7 +23,7 @@ func setupCredsAPI(t *testing.T) (*API, func()) {
 	cfg := &Config{ManagerToken: "test-token", DataDir: tmpDir}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(userID, mode string) error { return nil }
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
@@ -264,7 +264,7 @@ func TestAPI_PnL_ContainerFallback_Running(t *testing.T) {
 	creds := NewCredentialStore(tmpDir, enc)
 	proxy := NewBotProxy(cm)
 
-	api := NewAPI(&Config{DataDir: tmpDir, ManagerToken: "t"}, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(&Config{DataDir: tmpDir, ManagerToken: "t"}, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.containerRunning = func(string, _ string) bool { return true }
 	api.containerStart = func(userID, mode string) error { return nil }
 	api.newBBGoClient = func(baseURL string) *BBGoClient {

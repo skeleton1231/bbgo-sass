@@ -70,7 +70,7 @@ func chain10Setup(t *testing.T) (*API, *chi.Mux, *httptest.Server) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 
 	creds := NewCredentialStore(t.TempDir(), enc)
-	api := NewAPI(cfg, store, cm, &BotProxy{}, creds, enc, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, &BotProxy{}, creds, enc, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		return NewBBGoClient(baseURL)
 	}

@@ -244,7 +244,7 @@ func TestMarketSymbols_PaperMode_UsesTestnetRESTAddr(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var capturedBaseURL string
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		capturedBaseURL = baseURL
 		return &BBGoClient{baseURL: baseURL}
@@ -283,7 +283,7 @@ func TestMarketSymbols_LiveMode_UsesLiveRESTAddr(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var capturedBaseURL string
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		capturedBaseURL = baseURL
 		return &BBGoClient{baseURL: baseURL}
@@ -322,7 +322,7 @@ func TestMarketSymbols_NoMode_DefaultsToLiveRESTAddr(t *testing.T) {
 	proxy := NewBotProxy(cm)
 
 	var capturedBaseURL string
-	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil)
+	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	api.newBBGoClient = func(baseURL string) *BBGoClient {
 		capturedBaseURL = baseURL
 		return &BBGoClient{baseURL: baseURL}

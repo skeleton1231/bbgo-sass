@@ -19,7 +19,7 @@ func setupTestAPIWithNotifier(t *testing.T) (*API, func()) {
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
 	notifier := NewNotifier(tmpDir, enc)
-	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, notifier, nil, NewBacktestJobStore(tmpDir))
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, notifier, nil, NewBacktestJobStore(tmpDir), nil)
 	api.containerRunning = func(string, _ string) bool { return false }
 	api.containerStart = func(userID, mode string) error { return nil }
 	return api, func() { api.Close() }

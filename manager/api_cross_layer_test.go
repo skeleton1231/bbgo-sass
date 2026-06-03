@@ -12,7 +12,7 @@ import (
 // TestCrossLayerLiveOnlyAlignment verifies the backend liveOnlyStrategies map
 // covers all strategy IDs that the frontend marks as liveOnly.
 func TestCrossLayerLiveOnlyAlignment(t *testing.T) {
-	require.Len(t, liveOnlyStrategies, 23, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
+	require.Len(t, liveOnlyStrategies, 24, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
 
 	// Core maker strategies
 	assert.True(t, liveOnlyStrategies["bollmaker"])

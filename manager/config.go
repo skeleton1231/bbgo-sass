@@ -91,8 +91,8 @@ func LoadConfig() (*Config, error) {
 			LogMaxFile: getEnvInt("CONTAINER_LOG_MAX_FILE", 3),
 		},
 		PaperResources: ContainerResources{
-			Memory:     getEnv("CONTAINER_PAPER_MEMORY", getEnv("CONTAINER_MEMORY", "256m")),
-			MemorySwap: getEnv("CONTAINER_PAPER_MEMORY_SWAP", getEnv("CONTAINER_MEMORY_SWAP", "256m")),
+			Memory:     getEnv("CONTAINER_PAPER_MEMORY", getEnv("CONTAINER_MEMORY", "512m")),
+			MemorySwap: getEnv("CONTAINER_PAPER_MEMORY_SWAP", getEnv("CONTAINER_MEMORY_SWAP", "512m")),
 			CPUs:       getEnv("CONTAINER_PAPER_CPUS", getEnv("CONTAINER_CPUS", "0.25")),
 			PidsLimit:  getEnvInt("CONTAINER_PAPER_PIDS_LIMIT", getEnvInt("CONTAINER_PIDS_LIMIT", 64)),
 			LogMaxSize: getEnv("CONTAINER_PAPER_LOG_MAX_SIZE", getEnv("CONTAINER_LOG_MAX_SIZE", "10m")),
