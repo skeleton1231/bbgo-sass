@@ -149,13 +149,6 @@ func TestDualContainer_CredentialIsolation(t *testing.T) {
 		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false, IsVerified: true,
 	})
 
-	tnKey, _ := enc.Encrypt("tn-key")
-	tnSec, _ := enc.Encrypt("tn-secret")
-	creds.Upsert(ExchangeCredential{
-		UserID: userID, Exchange: "binance",
-		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true, IsVerified: true,
-	})
-
 	cfg := &Config{
 		DataDir: tmpDir, ManagerToken: "test-token",
 		SupabaseURL: "http://localhost:1", SupabaseKey: "test",
@@ -175,8 +168,8 @@ func TestDualContainer_CredentialIsolation(t *testing.T) {
 	assertNoEnv(t, liveArgs, "BINANCE_TESTNET=1", "live container should NOT have TESTNET")
 	assertNoEnv(t, liveArgs, "PAPER_TRADE=1", "live container should NOT have PAPER_TRADE")
 
-	assertEnv(t, paperArgs, "BINANCE_API_KEY=tn-key", "paper container should have testnet API key")
-	assertEnv(t, paperArgs, "BINANCE_TESTNET=1", "paper container should have TESTNET")
+	assertNoEnv(t, paperArgs, "BINANCE_API_KEY=live-key", "paper container should NOT have API keys (uses shared market data)")
+	assertNoEnv(t, paperArgs, "BINANCE_TESTNET=1", "paper container should NOT have TESTNET (uses mainnet)")
 	assertEnv(t, paperArgs, "PAPER_TRADE=1", "paper container should have PAPER_TRADE")
 }
 

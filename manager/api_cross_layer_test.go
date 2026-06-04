@@ -137,15 +137,10 @@ func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 	assert.Contains(t, s, "DB_DRIVER=supabase")
 }
 
-// TestCrossLayerDockerEnvArgsPaper verifies paper mode has PAPER_TRADE=1 + credentials.
+// TestCrossLayerDockerEnvArgsPaper verifies paper mode has PAPER_TRADE=1 and NO credentials.
 func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
-	enc, _ := NewEncryptor(testEncryptionKey)
-	creds := NewCredentialStore(t.TempDir(), enc)
-	storeTestnetCred(t, creds, enc, testUUID, "binance", "mykey", "mysecret")
-
 	cm := &ContainerManager{
-		cfg:   &Config{DataVolume: "bbgo-data"},
-		creds: creds,
+		cfg: &Config{DataVolume: "bbgo-data"},
 	}
 
 	args := cm.envArgs(testUUID, ModePaper, []StrategyEntry{
@@ -154,8 +149,8 @@ func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
 	s := strings.Join(args, " ")
 
 	assert.Contains(t, s, "PAPER_TRADE=1")
-	assert.Contains(t, s, "BINANCE_API_KEY=mykey")
-	assert.Contains(t, s, "BINANCE_TESTNET=1")
+	assert.NotContains(t, s, "BINANCE_API_KEY")
+	assert.NotContains(t, s, "BINANCE_TESTNET=1")
 }
 
 // TestCrossLayerDockerEnvArgsCrossExchange verifies multi-exchange credential injection.

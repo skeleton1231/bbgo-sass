@@ -18,6 +18,10 @@ const (
 	StatusStarting = "starting"
 )
 
+var defaultPaperBalances = map[string]float64{
+	"USDT": 10000,
+}
+
 const (
 	ModeLive  = "live"
 	ModePaper = "paper"
@@ -399,10 +403,11 @@ type bbgoConfig struct {
 }
 
 type sessionConfig struct {
-	Exchange     string `yaml:"exchange"`
-	EnvVarPrefix string `yaml:"envVarPrefix"`
-	Futures      bool   `yaml:"futures,omitempty"`
-	PublicOnly   bool   `yaml:"publicOnly,omitempty"`
+	Exchange      string             `yaml:"exchange"`
+	EnvVarPrefix  string             `yaml:"envVarPrefix"`
+	Futures       bool               `yaml:"futures,omitempty"`
+	PublicOnly    bool               `yaml:"publicOnly,omitempty"`
+	PaperBalances map[string]float64 `yaml:"paperBalances,omitempty"`
 }
 
 type exchangeConfig struct {
@@ -456,11 +461,15 @@ func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentia
 		if _, exists := exchanges[s.Exchange]; !exists {
 			exchanges[s.Exchange] = exchangeConfig{Symbol: symbol}
 			prefix := exchangeEnvPrefix(s.Exchange)
-			sessions[s.Exchange] = sessionConfig{
+			sc := sessionConfig{
 				Exchange:     s.Exchange,
 				EnvVarPrefix: prefix,
 				PublicOnly:   !hasCredentials(s.Exchange),
 			}
+			if mode == ModePaper {
+				sc.PaperBalances = defaultPaperBalances
+			}
+			sessions[s.Exchange] = sc
 		}
 
 		entry := map[string]any{
@@ -491,10 +500,9 @@ func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentia
 		CrossExchangeStrategies: crossStrategies,
 	}
 	cfg.Environment = &environmentConfig{}
+	cfg.Environment.DisableStartupBalanceQuery = true
 	if mode == ModePaper {
 		cfg.Environment.PaperTrade = "1"
-	} else {
-		cfg.Environment.DisableStartupBalanceQuery = true
 	}
 
 	out, err := yaml.Marshal(cfg)
@@ -511,12 +519,16 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions
 			prefix = exchangeEnvPrefix(sr.Exchange)
 		}
 		if _, exists := sessions[sr.Name]; !exists {
-			sessions[sr.Name] = sessionConfig{
+			sc := sessionConfig{
 				Exchange:     sr.Exchange,
 				EnvVarPrefix: prefix,
 				Futures:      sr.Futures,
 				PublicOnly:   !hasCredentials(sr.Exchange),
 			}
+			if mode == ModePaper {
+				sc.PaperBalances = defaultPaperBalances
+			}
+			sessions[sr.Name] = sc
 		}
 		symbol := "BTCUSDT"
 		if v, ok := params["symbol"].(string); ok && v != "" {

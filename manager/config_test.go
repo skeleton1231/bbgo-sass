@@ -217,8 +217,8 @@ func TestLoadConfig_ResourceDefaults(t *testing.T) {
 	}
 
 	// Paper defaults (lower than live)
-	if cfg.PaperResources.Memory != "128m" {
-		t.Errorf("paper memory: got %q, want 128m", cfg.PaperResources.Memory)
+	if cfg.PaperResources.Memory != "512m" {
+		t.Errorf("paper memory: got %q, want 512m", cfg.PaperResources.Memory)
 	}
 	if cfg.PaperResources.CPUs != "0.25" {
 		t.Errorf("paper cpus: got %q, want 0.25", cfg.PaperResources.CPUs)
@@ -280,7 +280,7 @@ func TestResourcesForMode(t *testing.T) {
 
 	paper := cfg.ResourcesForMode(ModePaper)
 	if paper.Memory != "128m" {
-		t.Errorf("paper: got %q, want 128m", paper.Memory)
+		t.Errorf("paper: got %q, want 512m", paper.Memory)
 	}
 
 	// Unknown mode falls back to live

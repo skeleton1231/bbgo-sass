@@ -700,7 +700,7 @@ func TestTradingChain_CreateStrategy_LiveWithCreds_Accepted(t *testing.T) {
 	}
 }
 
-func TestTradingChain_CreateStrategy_PaperNoCreds_Rejected(t *testing.T) {
+func TestTradingChain_CreateStrategy_PaperNoCreds_Accepted(t *testing.T) {
 	_, r, _ := chain10Setup(t)
 
 	body, _ := json.Marshal(map[string]any{
@@ -714,8 +714,8 @@ func TestTradingChain_CreateStrategy_PaperNoCreds_Rejected(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("paper no testnet creds = %d, want 400; body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("paper no creds should be accepted = %d, want 201; body: %s", w.Code, w.Body.String())
 	}
 }
 

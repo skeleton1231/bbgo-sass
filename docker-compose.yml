@@ -24,29 +24,8 @@ services:
       retries: 3
       start_period: 15s
 
-  marketdata-testnet:
-    image: bbgo-base:latest
-    container_name: bbgo-marketdata-testnet
-    volumes:
-      - bbgo-data:/data
-      - ./docker/configs/marketdata-testnet.yaml:/config/bbgo.yaml:ro
-    networks:
-      - bbgo-net
-    environment:
-      - BINANCE_TESTNET=1
-    command: ["run", "--config", "/config/bbgo.yaml", "--no-sync", "--enable-webserver", "--enable-grpc", "--grpc-bind", ":9090"]
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+  # marketdata-testnet: disabled — paper mode now uses mainnet data
+  # To re-enable, uncomment and add back depends_on entry below
 
   manager:
     build:
@@ -77,8 +56,6 @@ services:
       - MARKETDATA_TESTNET_REST_ADDR=bbgo-marketdata-testnet:8080
     depends_on:
       marketdata:
-        condition: service_healthy
-      marketdata-testnet:
         condition: service_healthy
     networks:
       - bbgo-net

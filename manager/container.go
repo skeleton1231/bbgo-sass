@@ -381,7 +381,7 @@ func (cm *ContainerManager) resourceArgs(mode string) []string {
 func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEntry) []string {
 	args := []string{}
 
-	// Paper containers get PAPER_TRADE=1 (bbgo uses this to enable testnet mode)
+	// Paper containers get PAPER_TRADE=1 (bbgo simulates fills locally with real mainnet data)
 	if mode == ModePaper {
 		args = append(args, "-e", "PAPER_TRADE=1")
 	}
@@ -403,17 +403,12 @@ func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEn
 	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
 
 	if cm.cfg.MarketDataAddr != "" {
-		addr := cm.cfg.MarketDataAddr
-		if mode == ModePaper && cm.cfg.MarketDataTestnetAddr != "" {
-			addr = cm.cfg.MarketDataTestnetAddr
-		}
-		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+addr)
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
 
-	// Inject credentials: paper mode only injects Binance testnet creds
-	if cm.creds != nil {
+	// Inject credentials: only for live mode (paper mode uses shared market data, no keys needed)
+	if cm.creds != nil && mode != ModePaper {
 		injected := map[string]bool{}
-		wantTestnet := mode == ModePaper
 		for _, s := range strategies {
 			exchanges := []string{}
 			if s.CrossExchange {
@@ -427,12 +422,7 @@ func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEn
 				if injected[ex] {
 					continue
 				}
-				// Paper mode: only inject Binance testnet credentials
-				if mode == ModePaper && ex != paperExchange {
-					injected[ex] = true
-					continue
-				}
-				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(userID, ex, wantTestnet)
+				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(userID, ex, false)
 				if err == nil {
 					prefix := exchangeEnvPrefix(ex)
 					args = append(args,
@@ -441,9 +431,6 @@ func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEn
 					)
 					if passphrase != "" {
 						args = append(args, "-e", prefix+"_API_PASSPHRASE="+passphrase)
-					}
-					if mode == ModePaper {
-						args = append(args, "-e", prefix+"_TESTNET=1")
 					}
 				}
 				injected[ex] = true

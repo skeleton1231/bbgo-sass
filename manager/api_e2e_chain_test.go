@@ -309,11 +309,11 @@ func TestMixedModePrevention(t *testing.T) {
 		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc,
 	})
 
-	tnKeyEnc, _ := enc.Encrypt("tn-key")
-	tnSecretEnc, _ := enc.Encrypt("tn-secret")
+	liveKeyEnc, _ := enc.Encrypt("live-key")
+	liveSecretEnc, _ := enc.Encrypt("live-secret")
 	credStore.Upsert(ExchangeCredential{
 		ID: "c2", UserID: testUUID, Exchange: "binance",
-		APIKeyEncrypted: tnKeyEnc, APISecretEncrypted: tnSecretEnc, IsTestnet: true,
+		APIKeyEncrypted: liveKeyEnc, APISecretEncrypted: liveSecretEnc, IsTestnet: false,
 	})
 
 	store := NewStrategyStore(dir)
@@ -642,12 +642,12 @@ func TestPaperModeFullLifecycle(t *testing.T) {
 	api := NewAPI(cfg, store, cm, proxy, creds, enc, syncer, nil, nil, nil, nil, NewBacktestJobStore(tmpDir), nil)
 	api.verifyCredFn = func(_, _, _, _ string, _ bool) VerifyResult { return VerifyResult{Verified: true} }
 
-	// Insert testnet credential so paper mode start is allowed
-	tnKey, _ := enc.Encrypt("tn-key")
-	tnSec, _ := enc.Encrypt("tn-secret")
+	// Insert live credential so paper mode start is allowed
+	liveKey, _ := enc.Encrypt("live-key")
+	liveSec, _ := enc.Encrypt("live-secret")
 	creds.Upsert(ExchangeCredential{
 		UserID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", Exchange: "binance",
-		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true, IsVerified: true,
+		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false, IsVerified: true,
 	})
 
 	var bbgoRequests []string

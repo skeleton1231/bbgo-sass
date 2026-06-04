@@ -117,11 +117,11 @@ func TestPaperTrading_HappyPath(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
 
-	tnKey, _ := enc.Encrypt("tn-key")
-	tnSec, _ := enc.Encrypt("tn-secret")
+	liveKey, _ := enc.Encrypt("live-key")
+	liveSec, _ := enc.Encrypt("live-secret")
 	creds.Upsert(ExchangeCredential{
 		UserID: userID, Exchange: "binance",
-		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false,
 	})
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",

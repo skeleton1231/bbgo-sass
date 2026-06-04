@@ -82,9 +82,6 @@ func (api *API) Close() {
 }
 
 func (api *API) hubForMode(mode string) *MarketDataHub {
-	if mode == ModePaper && api.testnetHub != nil {
-		return api.testnetHub
-	}
 	return api.hub
 }
 
@@ -335,12 +332,11 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if api.creds != nil {
-		wantTestnet := req.Mode == ModePaper
+	if api.creds != nil && req.Mode != ModePaper {
 		for _, ex := range collectExchanges([]StrategyEntry{{
 			Exchange: req.Exchange, CrossExchange: req.CrossExchange, Sessions: req.Sessions,
 		}}) {
-			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, wantTestnet); err != nil {
+			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, false); err != nil {
 				writeError(w, http.StatusBadRequest, credModeError(req.Mode, ex))
 				return
 			}
@@ -362,10 +358,10 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasCredFn := func(exchange string) bool {
-		if api.creds == nil {
+		if api.creds == nil || req.Mode == ModePaper {
 			return false
 		}
-		_, err := api.creds.GetByMode(userID, exchange, req.Mode == ModePaper)
+		_, err := api.creds.GetByMode(userID, exchange, false)
 		return err == nil
 	}
 
@@ -451,10 +447,10 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasCredFn := func(exchange string) bool {
-		if api.creds == nil {
+		if api.creds == nil || mode == ModePaper {
 			return false
 		}
-		_, err := api.creds.GetByMode(userID, exchange, mode == ModePaper)
+		_, err := api.creds.GetByMode(userID, exchange, false)
 		return err == nil
 	}
 
@@ -505,21 +501,17 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate credentials
+	// Validate credentials (live mode only â paper mode needs no credentials)
 	strategies, _ := api.strategies.ListStrategies(userID, mode)
-	if api.creds != nil {
-		wantTestnet := mode == ModePaper
+	if api.creds != nil && mode != ModePaper {
 		for _, ex := range collectExchanges(strategies) {
-			if mode == ModePaper && ex != paperExchange {
-				continue
-			}
-			cred, err := api.creds.GetByMode(userID, ex, wantTestnet)
+			cred, err := api.creds.GetByMode(userID, ex, false)
 			if err != nil {
 				writeError(w, http.StatusBadRequest, credModeError(mode, ex))
 				return
 			}
 			if !cred.IsVerified && exchangeHasVerifier(ex) {
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("API key for %s (%s) is not verified — verification failed or has not been attempted", ex, modeLabel(wantTestnet)))
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("API key for %s (%s) is not verified — verification failed or has not been attempted", ex, modeLabel(false)))
 				return
 			}
 		}
@@ -829,13 +821,7 @@ func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "exchange is required")
 		return
 	}
-	mode := r.URL.Query().Get("mode")
-	var restAddr string
-	if mode == ModePaper && api.cfg.MarketDataTestnetRESTAddr != "" {
-		restAddr = api.cfg.MarketDataTestnetRESTAddr
-	} else {
-		restAddr = api.cfg.MarketDataRESTAddr
-	}
+	var restAddr string = api.cfg.MarketDataRESTAddr
 	base := "http://" + restAddr
 	client := api.newBBGoClient(base)
 	symbols, err := client.GetSessionSymbols(exchange)
@@ -1406,10 +1392,10 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 		mode = ModePaper
 	}
 	hasCredFn := func(exchange string) bool {
-		if api.creds == nil {
+		if api.creds == nil || mode == ModePaper {
 			return false
 		}
-		_, err := api.creds.GetByMode(userID, exchange, mode == ModePaper)
+		_, err := api.creds.GetByMode(userID, exchange, false)
 		return err == nil
 	}
 	api.strategies.RefreshYAML(userID, mode, hasCredFn)
@@ -1870,7 +1856,7 @@ func credModeError(mode, ex string) string {
 	if mode == ModeLive {
 		return fmt.Sprintf("live mode requires API credentials for %s — add them in Settings first", ex)
 	}
-	return "paper mode requires Binance testnet API credentials — add them in Settings first"
+	return "paper mode requires Binance API credentials (live keys) — add them in Settings first"
 }
 
 func collectExchanges(strategies []StrategyEntry) []string {

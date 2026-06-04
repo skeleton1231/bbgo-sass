@@ -30,14 +30,14 @@ func TestHubForMode_EmptyMode(t *testing.T) {
 	}
 }
 
-func TestHubForMode_PaperMode_WithTestnetHub(t *testing.T) {
+func TestHubForMode_PaperMode_AlwaysUsesMainnet(t *testing.T) {
 	liveHub := &MarketDataHub{}
 	testnetHub := &MarketDataHub{}
 	api := &API{hub: liveHub, testnetHub: testnetHub}
 
 	got := api.hubForMode(ModePaper)
-	if got != testnetHub {
-		t.Error("expected testnet hub for paper mode when testnetHub is set")
+	if got != liveHub {
+		t.Error("paper mode should always use mainnet hub")
 	}
 }
 
@@ -62,7 +62,7 @@ func TestHubForMode_BothHubs_Nil(t *testing.T) {
 
 // --- Container env args: market data routing ---
 
-func TestEnvArgs_PaperMode_TestnetMarketDataAddr(t *testing.T) {
+func TestEnvArgs_PaperMode_MainnetMarketDataAddr(t *testing.T) {
 	dir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
@@ -90,8 +90,11 @@ func TestEnvArgs_PaperMode_TestnetMarketDataAddr(t *testing.T) {
 		}
 		return false
 	}
-	if !findEnv("MARKET_DATA_SERVICE_URL=bbgo-marketdata-testnet:9090") {
-		t.Errorf("paper container should use testnet marketdata addr, got %v", args)
+	if !findEnv("MARKET_DATA_SERVICE_URL=bbgo-marketdata:9090") {
+		t.Errorf("paper container should use mainnet marketdata addr, got %v", args)
+	}
+	if findEnv("MARKET_DATA_SERVICE_URL=bbgo-marketdata-testnet:9090") {
+		t.Error("paper container should NOT use testnet marketdata addr")
 	}
 }
 
@@ -229,7 +232,7 @@ func TestMarketTicker_NoModeParam_DefaultsToLive(t *testing.T) {
 	}
 }
 
-func TestMarketSymbols_PaperMode_UsesTestnetRESTAddr(t *testing.T) {
+func TestMarketSymbols_PaperMode_UsesMainnetRESTAddr(t *testing.T) {
 	cfg := &Config{
 		SupabaseURL:               "http://localhost:1",
 		SupabaseKey:               "test",
@@ -263,8 +266,8 @@ func TestMarketSymbols_PaperMode_UsesTestnetRESTAddr(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if capturedBaseURL != "http://bbgo-marketdata-testnet:8080" {
-		t.Errorf("paper mode should use testnet REST addr, got %s", capturedBaseURL)
+	if capturedBaseURL != "http://bbgo-marketdata:8080" {
+		t.Errorf("paper mode should use mainnet REST addr, got %s", capturedBaseURL)
 	}
 }
 

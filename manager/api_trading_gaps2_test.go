@@ -80,11 +80,11 @@ func TestAPI_CreateStrategy_StartingContainer_NoExtraStart(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	tnKey, _ := api.encryptor.Encrypt("tn-key")
-	tnSec, _ := api.encryptor.Encrypt("tn-secret")
+	liveKey, _ := api.encryptor.Encrypt("live-key")
+	liveSec, _ := api.encryptor.Encrypt("live-secret")
 	api.creds.Upsert(ExchangeCredential{
 		UserID: userID, Exchange: "binance",
-		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false,
 	})
 
 	writeTestStrategies(t, api.strategies, userID, ModePaper, []StrategyEntry{
@@ -124,11 +124,11 @@ func TestAPI_CreateStrategy_ModeInheritsFromExisting(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	tnKey, _ := api.encryptor.Encrypt("tn-key")
-	tnSec, _ := api.encryptor.Encrypt("tn-secret")
+	liveKey, _ := api.encryptor.Encrypt("live-key")
+	liveSec, _ := api.encryptor.Encrypt("live-secret")
 	api.creds.Upsert(ExchangeCredential{
 		UserID: userID, Exchange: "binance",
-		APIKeyEncrypted: tnKey, APISecretEncrypted: tnSec, IsTestnet: true,
+		APIKeyEncrypted: liveKey, APISecretEncrypted: liveSec, IsTestnet: false,
 	})
 
 	r := testRouter(api)

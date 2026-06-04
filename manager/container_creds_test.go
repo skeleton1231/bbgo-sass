@@ -192,9 +192,9 @@ func TestEnvArgs_PaperMode_NonBinanceCredentials_NotInjected(t *testing.T) {
 	}
 }
 
-func TestEnvArgs_PaperMode_OnlyInjectsBinanceTestnet(t *testing.T) {
+func TestEnvArgs_PaperMode_NoCredentialsInjected(t *testing.T) {
 	cm, creds := setupContainerManager(t)
-	insertTestnetCredential(t, creds, "test-user", "binance", "testnet-key", "testnet-secret")
+	insertTestCredential(t, creds, "test-user", "binance", "live-key", "live-secret")
 
 	args := cm.envArgs("test-user", ModePaper, []StrategyEntry{
 		{Exchange: "binance", Strategy: "grid2", Mode: "paper"},
@@ -208,17 +208,17 @@ func TestEnvArgs_PaperMode_OnlyInjectsBinanceTestnet(t *testing.T) {
 		}
 		return false
 	}
-	if !findEnv("BINANCE_API_KEY=testnet-key") {
-		t.Error("paper mode should inject Binance testnet credentials")
+	if findEnv("BINANCE_API_KEY=live-key") {
+		t.Error("paper mode should NOT inject any credentials")
 	}
-	if !findEnv("BINANCE_TESTNET=1") {
-		t.Error("paper mode should set BINANCE_TESTNET=1")
+	if findEnv("BINANCE_TESTNET=1") {
+		t.Error("paper mode should NOT set BINANCE_TESTNET=1")
 	}
 }
 
-func TestEnvArgs_PaperMode_CrossExchange_NonBinanceNotInjected(t *testing.T) {
+func TestEnvArgs_PaperMode_CrossExchange_NoCredentialsInjected(t *testing.T) {
 	cm, creds := setupContainerManager(t)
-	insertTestnetCredential(t, creds, "test-user", "binance", "binance-testnet-key", "binance-testnet-secret")
+	insertTestCredential(t, creds, "test-user", "binance", "binance-key", "binance-secret")
 	insertTestCredential(t, creds, "test-user", "bybit", "bybit-key", "bybit-secret")
 
 	strategies := []StrategyEntry{
@@ -235,11 +235,11 @@ func TestEnvArgs_PaperMode_CrossExchange_NonBinanceNotInjected(t *testing.T) {
 	args := cm.envArgs("test-user", ModePaper, strategies)
 
 	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "BINANCE_API_KEY=binance-testnet-key") {
-		t.Error("paper mode should inject Binance testnet credentials for cross-exchange")
+	if strings.Contains(joined, "BINANCE_API_KEY") {
+		t.Error("paper mode should NOT inject any credentials")
 	}
 	if strings.Contains(joined, "BYBIT_API_KEY") {
-		t.Error("paper mode should NOT inject non-Binance credentials even in cross-exchange")
+		t.Error("paper mode should NOT inject any credentials")
 	}
 }
 
