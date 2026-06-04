@@ -161,6 +161,7 @@
     "noStrategiesTab": "No strategies",
     "pnl": {
       "realized": "Realized P&L",
+      "unrealized": "Unrealized P&L",
       "totalFees": "Total Fees",
       "winRate": "Win Rate",
       "totalTrades": "Total Trades",

@@ -230,16 +230,31 @@ export interface SymbolPnL {
   avgSellPrice: number
   openPosition: number
   openPositionCost: number
+  unrealizedPnl: number
+  currentPrice: number
+}
+
+export interface DailyPnl {
+  date: string
+  pnl: number
+}
+
+export interface PnlCurvePoint {
+  time: number
+  value: number
 }
 
 export interface PnLReport {
   totalRealizedPnl: number
+  totalUnrealizedPnl: number
   totalFees: number
   totalTrades: number
   winningTrades: number
   losingTrades: number
   winRate: number
   symbols: SymbolPnL[]
+  dailyBreakdown: DailyPnl[]
+  pnlCurve: PnlCurvePoint[]
 }
 
 // --- Strategy CRUD ---

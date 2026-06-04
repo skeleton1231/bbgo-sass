@@ -1,6 +1,5 @@
 'use client'
 
-import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   BarChart,
@@ -13,11 +12,10 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts'
-import type { BBGoTrade } from '@/lib/bbgo/queries'
-import { computeRealizedPnlByDay } from '@/lib/bbgo/fifo-pnl'
+import type { DailyPnl } from '@/lib/bbgo/queries'
 
 interface PnlChartProps {
-  trades: BBGoTrade[]
+  dailyBreakdown: DailyPnl[]
 }
 
 interface PnlTooltipProps {
@@ -39,12 +37,10 @@ function PnlTooltip({ active, payload, label }: PnlTooltipProps) {
   )
 }
 
-export function PnlChart({ trades }: PnlChartProps) {
+export function PnlChart({ dailyBreakdown }: PnlChartProps) {
   const t = useTranslations('Dashboard')
 
-  const data = useMemo(() => computeRealizedPnlByDay(trades), [trades])
-
-  if (data.length === 0) {
+  if (dailyBreakdown.length === 0) {
     return (
       <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
         {t('noPnlData')}
@@ -54,7 +50,7 @@ export function PnlChart({ trades }: PnlChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data}>
+      <BarChart data={dailyBreakdown}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis
           dataKey="date"
@@ -70,7 +66,7 @@ export function PnlChart({ trades }: PnlChartProps) {
         <Tooltip content={<PnlTooltip />} />
         <ReferenceLine y={0} stroke="hsl(var(--border))" />
         <Bar dataKey="pnl" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-          {data.map((entry, i) => (
+          {dailyBreakdown.map((entry, i) => (
             <Cell key={i} fill={entry.pnl >= 0 ? '#22c55e' : '#ef4444'} />
           ))}
         </Bar>

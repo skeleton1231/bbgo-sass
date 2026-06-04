@@ -12,11 +12,17 @@ export function PnlSummary({ report }: PnlSummaryProps) {
   const isPositive = report.totalRealizedPnl >= 0
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">{t('realized')}</p>
         <p className={isPositive ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
           {isPositive ? '+' : ''}${report.totalRealizedPnl.toFixed(2)}
+        </p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">{t('unrealized')}</p>
+        <p className={report.totalUnrealizedPnl >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+          {report.totalUnrealizedPnl >= 0 ? '+' : ''}${report.totalUnrealizedPnl.toFixed(2)}
         </p>
       </div>
       <div className="space-y-1">

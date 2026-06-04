@@ -175,7 +175,7 @@ export default function DashboardPage() {
         </ErrorBoundary>
       )}
 
-      {isActive && trades.length > 0 && (
+      {isActive && pnlData && pnlData.totalTrades > 0 && (
         <ErrorBoundary>
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="rounded-xl">
@@ -183,7 +183,7 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium">{t('pnlChart')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <PnlChart trades={trades} />
+                <PnlChart dailyBreakdown={pnlData.dailyBreakdown} />
               </CardContent>
             </Card>
 
@@ -192,7 +192,7 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium">{t('equityCurve')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <EquityChart trades={trades} />
+                <EquityChart pnlCurve={pnlData.pnlCurve} />
               </CardContent>
             </Card>
           </div>

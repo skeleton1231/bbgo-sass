@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"time"
 )
 
 type PnLTrade struct {
@@ -32,16 +33,31 @@ type SymbolPnL struct {
 	AvgSellPrice     float64 `json:"avgSellPrice"`
 	OpenPosition     float64 `json:"openPosition"`
 	OpenPositionCost float64 `json:"openPositionCost"`
+	UnrealizedPnL    float64 `json:"unrealizedPnl"`
+	CurrentPrice     float64 `json:"currentPrice"`
+}
+
+type DailyPnl struct {
+	Date string  `json:"date"`
+	PnL  float64 `json:"pnl"`
+}
+
+type PnlCurvePoint struct {
+	Time  int64   `json:"time"`
+	Value float64 `json:"value"`
 }
 
 type PnLReport struct {
-	TotalRealizedPnL float64     `json:"totalRealizedPnl"`
-	TotalFees        float64     `json:"totalFees"`
-	TotalTrades      int         `json:"totalTrades"`
-	WinningTrades    int         `json:"winningTrades"`
-	LosingTrades     int         `json:"losingTrades"`
-	WinRate          float64     `json:"winRate"`
-	Symbols          []SymbolPnL `json:"symbols"`
+	TotalRealizedPnL   float64         `json:"totalRealizedPnl"`
+	TotalUnrealizedPnL float64         `json:"totalUnrealizedPnl"`
+	TotalFees          float64         `json:"totalFees"`
+	TotalTrades        int             `json:"totalTrades"`
+	WinningTrades      int             `json:"winningTrades"`
+	LosingTrades       int             `json:"losingTrades"`
+	WinRate            float64         `json:"winRate"`
+	Symbols            []SymbolPnL     `json:"symbols"`
+	DailyBreakdown     []DailyPnl      `json:"dailyBreakdown"`
+	PnlCurve           []PnlCurvePoint `json:"pnlCurve"`
 }
 
 type fifoQueue struct {
@@ -105,18 +121,21 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 			continue
 		}
 		grouped[t.Symbol] = append(grouped[t.Symbol], PnLTrade{
-			Symbol:   t.Symbol,
-			Side:     t.Side,
-			Price:    price,
-			Quantity: qty,
+			Symbol:      t.Symbol,
+			Side:        t.Side,
+			Price:       price,
+			Quantity:    qty,
 			Fee:         fee,
 			FeeCurrency: t.FeeCurrency,
-			TradedAt: t.TradedAt,
+			TradedAt:    t.TradedAt,
 		})
 	}
 
 	report := PnLReport{}
 	var symbols []SymbolPnL
+
+	// Track per-day realized P&L across all symbols
+	dailyMap := make(map[string]float64)
 
 	for sym, symTrades := range grouped {
 		sort.Slice(symTrades, func(i, j int) bool {
@@ -128,12 +147,21 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 
 		for _, t := range symTrades {
 			symPnL.TradeCount++
-			symPnL.TotalFees += feeInQuoteCurrency(t.Fee, t.FeeCurrency, t.Price)
+			feeQuote := feeInQuoteCurrency(t.Fee, t.FeeCurrency, t.Price)
+			symPnL.TotalFees += feeQuote
+
+			day := ""
+			if len(t.TradedAt) >= 10 {
+				day = t.TradedAt[:10]
+			}
 
 			if t.Side == "BUY" {
 				symPnL.TotalBuys += t.Quantity
 				symPnL.BuyVolume += t.Price * t.Quantity
 				buyQueue.push(t.Price, t.Quantity)
+				if day != "" {
+					dailyMap[day] -= feeQuote
+				}
 			} else {
 				symPnL.TotalSells += t.Quantity
 				symPnL.SellVolume += t.Price * t.Quantity
@@ -149,6 +177,10 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 					symPnL.WinningTrades++
 				} else if realized < 0 {
 					symPnL.LosingTrades++
+				}
+
+				if day != "" {
+					dailyMap[day] += realized - feeQuote
 				}
 			}
 		}
@@ -183,7 +215,61 @@ func calculatePnL(trades []BBGoTrade) PnLReport {
 	}
 
 	report.Symbols = symbols
+
+	// Build daily breakdown sorted by date
+	days := make([]DailyPnl, 0, len(dailyMap))
+	for d, pnl := range dailyMap {
+		days = append(days, DailyPnl{Date: d, PnL: math.Round(pnl*100) / 100})
+	}
+	sort.Slice(days, func(i, j int) bool {
+		return days[i].Date < days[j].Date
+	})
+	report.DailyBreakdown = days
+
+	// Build cumulative P&L curve from daily breakdown
+	cum := 0.0
+	for _, d := range days {
+		cum += d.PnL
+		ts := dateToTimestamp(d.Date)
+		report.PnlCurve = append(report.PnlCurve, PnlCurvePoint{
+			Time:  ts,
+			Value: math.Round(cum*100) / 100,
+		})
+	}
+
 	return report
+}
+
+// enrichUnrealizedPnl fills in UnrealizedPnL for each symbol with open positions
+// using the provided price lookup function.
+func enrichUnrealizedPnl(report *PnLReport, priceLookup func(symbol string) (float64, error)) {
+	if priceLookup == nil {
+		return
+	}
+	totalUnrealized := 0.0
+	for i := range report.Symbols {
+		sym := &report.Symbols[i]
+		if sym.OpenPosition <= 0 {
+			continue
+		}
+		price, err := priceLookup(sym.Symbol)
+		if err != nil || price <= 0 {
+			continue
+		}
+		sym.CurrentPrice = price
+		marketValue := price * sym.OpenPosition
+		sym.UnrealizedPnL = marketValue - sym.OpenPositionCost
+		totalUnrealized += sym.UnrealizedPnL
+	}
+	report.TotalUnrealizedPnL = totalUnrealized
+}
+
+func dateToTimestamp(date string) int64 {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return 0
+	}
+	return t.Unix()
 }
 
 func fmtFloat(v float64, prec int) string {

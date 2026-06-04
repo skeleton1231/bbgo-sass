@@ -198,6 +198,7 @@
     "avgCost": "平均原価 {price}",
     "pnl": {
       "realized": "実現損益",
+      "unrealized": "未実現損益",
       "totalFees": "合計手数料",
       "winRate": "勝率",
       "totalTrades": "総取引数",

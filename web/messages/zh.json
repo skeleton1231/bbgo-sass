@@ -199,6 +199,7 @@
     "avgCost": "均价 {price}",
     "pnl": {
       "realized": "已实现盈亏",
+      "unrealized": "未实现盈亏",
       "totalFees": "总手续费",
       "winRate": "胜率",
       "totalTrades": "总交易数",

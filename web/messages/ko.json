@@ -198,6 +198,7 @@
     "avgCost": "평균 단가 {price}",
     "pnl": {
       "realized": "실현 손익",
+      "unrealized": "미실현 손익",
       "totalFees": "총 수수료",
       "winRate": "승률",
       "totalTrades": "총 거래 수",

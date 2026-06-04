@@ -47,6 +47,8 @@ import {
   type BBGoAsset,
   type BBGoStrategyState,
   type PnLReport,
+  type DailyPnl,
+  type PnlCurvePoint,
   type MarketTicker,
   type Bot,
 } from './manager'
@@ -321,6 +323,7 @@ export function useBotPnL(userId: string, exchange?: string, symbol?: string, mo
       const raw = await fetchBotPnL(userId, exchange, symbol, mode)
       return {
         totalRealizedPnl: raw.totalRealizedPnl ?? 0,
+        totalUnrealizedPnl: raw.totalUnrealizedPnl ?? 0,
         totalFees: raw.totalFees ?? 0,
         totalTrades: raw.totalTrades ?? 0,
         winningTrades: raw.winningTrades ?? 0,
@@ -341,7 +344,11 @@ export function useBotPnL(userId: string, exchange?: string, symbol?: string, mo
           avgSellPrice: sym.avgSellPrice ?? 0,
           openPosition: sym.openPosition ?? 0,
           openPositionCost: sym.openPositionCost ?? 0,
+          unrealizedPnl: sym.unrealizedPnl ?? 0,
+          currentPrice: sym.currentPrice ?? 0,
         })),
+        dailyBreakdown: raw.dailyBreakdown ?? [],
+        pnlCurve: raw.pnlCurve ?? [],
       }
     },
     enabled: !!userId && (containerRunning ?? false),
@@ -394,5 +401,7 @@ export type {
   BBGoAsset,
   BBGoStrategyState,
   PnLReport,
+  DailyPnl,
+  PnlCurvePoint,
   TradingVolumeEntry,
 }

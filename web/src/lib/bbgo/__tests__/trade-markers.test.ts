@@ -67,10 +67,13 @@ describe('buildTradeMarkers', () => {
     expect(result[0]!.price).toBe(72000)
   })
 
-  it('deduplicates trades with same time+side+price', () => {
+  it('keeps duplicate trades with same time+side+price (no dedup)', () => {
     const dup: BBGoTrade = { ...baseTrade }
     const result = buildTradeMarkers([baseTrade, dup], null, 'BTCUSDT')
-    expect(result).toHaveLength(1)
+    expect(result).toHaveLength(2)
+    // Same timestamp → b-a tie-break reverses: index 1 first (open), index 0 second (add)
+    expect(result[1]!.positionAction).toBe('open')
+    expect(result[0]!.positionAction).toBe('add')
   })
 
   it('keeps trades with same price but different side', () => {

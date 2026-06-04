@@ -1054,61 +1054,96 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var trades []BBGoTrade
+
 	// Paper mode stores data in container SQLite, not Supabase
 	if api.syncer != nil && mode != ModePaper {
-		trades, err := api.syncer.GetTradesForPnL(userID)
+		supabaseTrades, err := api.syncer.GetTradesForPnL(userID)
 		if err != nil {
 			log.Printf("pnl supabase fallback for user %s: %v", userID, err)
 		}
-		if err == nil && len(trades) > 0 {
-			report := calculatePnL(trades)
-			writeJSON(w, http.StatusOK, report)
+		if err == nil && len(supabaseTrades) > 0 {
+			trades = supabaseTrades
+		}
+	}
+
+	if len(trades) == 0 {
+		if !api.isContainerRunning(userID, mode) {
+			writeError(w, http.StatusServiceUnavailable, "container is not running")
+			return
+		}
+		if api.container == nil {
+			writeError(w, http.StatusInternalServerError, "container manager not available")
+			return
+		}
+		client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
+
+		exchange := r.URL.Query().Get("exchange")
+		symbol := r.URL.Query().Get("symbol")
+
+		var lastGID int64
+		if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
+			if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
+				lastGID = v
+			}
+		}
+
+		var err error
+		trades, err = client.GetAllTradesFrom(exchange, symbol, lastGID)
+		if err != nil {
+			session := exchange
+			if session == "" {
+				if sessions, serr := client.GetSessions(); serr == nil && len(sessions) > 0 {
+					session = sessions[0].Name
+				}
+			}
+			if session != "" {
+				if st, serr := client.GetSessionTrades(session); serr == nil {
+					trades = st
+					err = nil
+				}
+			}
+		}
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 	}
 
-	if !api.isContainerRunning(userID, mode) {
-		writeError(w, http.StatusServiceUnavailable, "container is not running")
-		return
-	}
-	if api.container == nil {
-		writeError(w, http.StatusInternalServerError, "container manager not available")
-		return
-	}
-	client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
-
-	exchange := r.URL.Query().Get("exchange")
-	symbol := r.URL.Query().Get("symbol")
-
-	var lastGID int64
-	if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
-		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-			lastGID = v
-		}
-	}
-
-	trades, err := client.GetAllTradesFrom(exchange, symbol, lastGID)
-	if err != nil {
-		session := exchange
-		if session == "" {
-			if sessions, serr := client.GetSessions(); serr == nil && len(sessions) > 0 {
-				session = sessions[0].Name
-			}
-		}
-		if session != "" {
-			if st, serr := client.GetSessionTrades(session); serr == nil {
-				trades = st
-				err = nil
-			}
-		}
-	}
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-
 	report := calculatePnL(trades)
+
+	// Enrich with unrealized P&L using market data hub
+	enrichUnrealizedPnl(&report, api.symbolPriceLookup(r.Context()))
+
 	writeJSON(w, http.StatusOK, report)
+}
+
+// symbolPriceLookup returns a function that fetches the current price for a symbol
+// via the gRPC market data service.
+func (api *API) symbolPriceLookup(ctx context.Context) func(symbol string) (float64, error) {
+	return func(symbol string) (float64, error) {
+		hub := api.hub
+		if hub == nil || hub.conn == nil {
+			return 0, fmt.Errorf("market data not available")
+		}
+		queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		client := pb.NewMarketDataQueryClient(hub.conn)
+		resp, err := client.QueryTicker(queryCtx, &pb.QueryTickerRequest{
+			Exchange: "binance",
+			Symbol:   symbol,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if resp.Ticker == nil {
+			return 0, fmt.Errorf("ticker not found for %s", symbol)
+		}
+		if resp.Ticker.Close <= 0 {
+			return 0, fmt.Errorf("invalid price for %s", symbol)
+		}
+		return resp.Ticker.Close, nil
+	}
 }
 
 func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {

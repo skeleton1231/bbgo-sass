@@ -41,7 +41,6 @@ import { BotChartPanel } from '@/components/chart/BotChartPanel'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
-import { computePnlCurve } from '@/lib/bbgo/pnl-curve'
 import { computePositionTags } from '@/lib/bbgo/position-tags'
 import {
   ArrowLeft,
@@ -203,24 +202,13 @@ export default function BotDetailPage() {
   }, [candles, indicators])
 
   const pnlLine = useMemo(() => {
-    if (!tradesData?.trades || tradesData.trades.length === 0) return null
-    const curve = computePnlCurve(
-      tradesData.trades.map((t) => ({
-        time: t.tradedAt,
-        side: t.side,
-        price: t.price,
-        quantity: t.quantity,
-        fee: t.fee,
-        feeCurrency: t.feeCurrency,
-      }))
-    )
-    if (curve.length < 2) return null
+    if (!pnlData?.pnlCurve || pnlData.pnlCurve.length < 2) return null
     return {
       id: 'pnl-curve', name: t('pnl.realized'), color: '#a855f7', lineWidth: 2,
       priceScaleId: 'pnl', scaleMargins: { top: 0.75, bottom: 0 },
-      data: curve,
+      data: pnlData.pnlCurve.map((p) => ({ time: p.time as import('lightweight-charts').Time, value: p.value })),
     }
-  }, [tradesData, t])
+  }, [pnlData?.pnlCurve, t])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
@@ -414,7 +402,7 @@ export default function BotDetailPage() {
       )}
 
       {botReachable && pnlData && pnlData.totalTrades > 0 && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card className="rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -433,6 +421,28 @@ export default function BotDetailPage() {
                 pnlData.totalRealizedPnl > 0 ? 'text-trade-up' : pnlData.totalRealizedPnl < 0 ? 'text-trade-down' : ''
               )}>
                 {pnlData.totalRealizedPnl >= 0 ? '+' : ''}{pnlData.totalRealizedPnl.toFixed(4)} USDT
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.unrealized')}</p>
+                <div className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-full',
+                  pnlData.totalUnrealizedPnl >= 0 ? 'bg-trade-up' : 'bg-trade-down'
+                )}>
+                  {pnlData.totalUnrealizedPnl >= 0
+                    ? <TrendingUp className="h-3.5 w-3.5 text-trade-up" />
+                    : <TrendingDown className="h-3.5 w-3.5 text-trade-down" />}
+                </div>
+              </div>
+              <p className={cn(
+                'mt-2 text-xl font-semibold font-mono',
+                pnlData.totalUnrealizedPnl > 0 ? 'text-trade-up' : pnlData.totalUnrealizedPnl < 0 ? 'text-trade-down' : ''
+              )}>
+                {pnlData.totalUnrealizedPnl >= 0 ? '+' : ''}{pnlData.totalUnrealizedPnl.toFixed(4)} USDT
               </p>
             </CardContent>
           </Card>
@@ -489,6 +499,14 @@ export default function BotDetailPage() {
                   {s.openPosition > 0 && (
                     <span className="text-xs text-muted-foreground">
                       {t('pnl.openPositionNoPrice', { amount: s.openPosition.toFixed(6) })}
+                    </span>
+                  )}
+                  {s.unrealizedPnl !== 0 && (
+                    <span className={cn(
+                      'text-xs font-mono',
+                      s.unrealizedPnl > 0 ? 'text-trade-up' : 'text-trade-down'
+                    )}>
+                      {t('pnl.unrealized')}: {s.unrealizedPnl >= 0 ? '+' : ''}{s.unrealizedPnl.toFixed(4)}
                     </span>
                   )}
                   <span className={cn(

@@ -1,6 +1,5 @@
 'use client'
 
-import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   AreaChart,
@@ -12,11 +11,10 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts'
-import type { BBGoTrade } from '@/lib/bbgo/queries'
-import { computeCumulativePnl } from '@/lib/bbgo/fifo-pnl'
+import type { PnlCurvePoint } from '@/lib/bbgo/queries'
 
 interface EquityChartProps {
-  trades: BBGoTrade[]
+  pnlCurve: PnlCurvePoint[]
 }
 
 interface EquityTooltipProps {
@@ -38,18 +36,21 @@ function EquityTooltip({ active, payload, label }: EquityTooltipProps) {
   )
 }
 
-export function EquityChart({ trades }: EquityChartProps) {
+export function EquityChart({ pnlCurve }: EquityChartProps) {
   const t = useTranslations('Dashboard')
 
-  const data = useMemo(() => computeCumulativePnl(trades), [trades])
-
-  if (data.length === 0) {
+  if (pnlCurve.length === 0) {
     return (
       <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
         {t('noEquityData')}
       </div>
     )
   }
+
+  const data = pnlCurve.map((p) => ({
+    date: new Date(p.time * 1000).toISOString().slice(0, 10),
+    cumulativePnl: p.value,
+  }))
 
   return (
     <ResponsiveContainer width="100%" height={280}>
