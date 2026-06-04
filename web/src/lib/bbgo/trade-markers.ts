@@ -1,4 +1,4 @@
-import type { BBGoOrder, BBGoTrade } from './queries'
+import type { BBGoOrder, BBGoTrade, TradeMarkersResponse } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
 import { computePositionTags } from './position-tags'
 
@@ -9,8 +9,6 @@ export function buildTradeMarkers(
 ): TradeMarker[] {
   const markers: TradeMarker[] = []
 
-  // Only use trades for chart markers — closed orders use creationTime (order
-  // placement) not fill time, which places markers at wrong chart positions.
   if (trades) {
     markers.push(
       ...trades
@@ -27,12 +25,32 @@ export function buildTradeMarkers(
 
   const sorted = markers.sort((a, b) => (a.time as number) - (b.time as number))
 
-  const tags = computePositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))
-  for (let i = 0; i < sorted.length; i++) {
-    sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'
+  const hasServerTags = trades?.some((t) => t.positionAction)
+  if (hasServerTags) {
+    for (let i = 0; i < sorted.length; i++) {
+      sorted[i]!.positionAction = trades!.find(
+        (t) => Math.floor(new Date(t.tradedAt).getTime() / 1000) === (sorted[i]!.time as number) && t.side === sorted[i]!.side
+      )?.positionAction ?? 'trade'
+    }
+  } else {
+    const tags = computePositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))
+    for (let i = 0; i < sorted.length; i++) {
+      sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'
+    }
   }
 
   return sorted
+}
+
+export function buildTradeMarkersFromServer(data: TradeMarkersResponse | undefined): TradeMarker[] {
+  if (!data?.markers?.length) return null as unknown as TradeMarker[]
+  return data.markers.map((m) => ({
+    time: m.time as TradeMarker['time'],
+    side: m.side as 'BUY' | 'SELL',
+    price: m.price,
+    quantity: m.quantity,
+    positionAction: (m.positionAction || 'trade') as TradeMarker['positionAction'],
+  }))
 }
 
 export function buildOrderLevels(

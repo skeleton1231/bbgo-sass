@@ -13,6 +13,7 @@ import {
   useBotOpenOrders,
   useBotClosedOrders,
   useBotTrades,
+  useBotTradeMarkers,
   useBotSessionBalances,
   useBotStrategiesState,
   useBotPing,
@@ -39,9 +40,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
-import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
-import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
+import { buildTradeMarkers, buildTradeMarkersFromServer, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computePositionTags } from '@/lib/bbgo/position-tags'
+import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
+
 import {
   ArrowLeft,
   Play,
@@ -100,6 +102,7 @@ export default function BotDetailPage() {
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode, isRunning)
   const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode, isRunning)
   const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning)
+  const { data: tradeMarkersData } = useBotTradeMarkers(userId, symbol || '', { exchange: undefined, mode, limit: 200 }, isRunning)
   const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode, isRunning)
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
   const { data: pingData } = useBotPing(userId, mode, isRunning)
@@ -118,8 +121,8 @@ export default function BotDetailPage() {
   })
 
   const tradeMarkers: TradeMarker[] = useMemo(
-    () => buildTradeMarkers(tradesData?.trades ?? null, closedOrdersData?.orders ?? null, symbol),
-    [tradesData?.trades, closedOrdersData?.orders, symbol]
+    () => { const server = buildTradeMarkersFromServer(tradeMarkersData); return server?.length ? server : buildTradeMarkers(tradesData?.trades ?? null, closedOrdersData?.orders ?? null, symbol) },
+    [tradeMarkersData, tradesData?.trades, closedOrdersData?.orders, symbol]
   )
 
   const orderLevels: OrderLevel[] = useMemo(
@@ -260,10 +263,10 @@ export default function BotDetailPage() {
   const stopUser = useStopUser()
 
   const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
-  const tradePositionTags = useMemo(
-    () => computePositionTags(trades),
-    [trades]
-  )
+  const tradePositionTags = useMemo(() => {
+    if (trades.some((t) => t.positionAction)) return null
+    return computePositionTags(trades)
+  }, [trades])
 
   if (botLoading || !userId) {
     return (
@@ -637,9 +640,12 @@ export default function BotDetailPage() {
             {trades.length > 0 ? (
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
-                  {trades.map((trade: BBGoTrade, tradeIdx: number) => {
+                  {trades.map((trade: BBGoTrade) => {
                     const isBuy = trade.side === 'BUY'
-                    const { tag, netPos } = tradePositionTags[tradeIdx] ?? { tag: null, netPos: 0 }
+                    const serverTag = trade.positionAction
+                    const localTag = tradePositionTags?.[trades.indexOf(trade)]
+                    const tag = serverTag ?? localTag?.tag ?? null
+                    const netPos = trade.netPosition ?? localTag?.netPos ?? 0
                     return (
                       <div key={trade.id} className={cn(
                         'flex items-center justify-between px-6 py-3 border-l-2',

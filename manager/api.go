@@ -135,6 +135,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 		r.Get("/api/users/{userID}/bbgo/assets", api.BBGoAssets)
 		r.Get("/api/users/{userID}/bbgo/strategies", api.BBGoStrategies)
 		r.Get("/api/users/{userID}/bbgo/trades", api.BBGoTrades)
+		r.Get("/api/users/{userID}/bbgo/trades/markers", api.BBGoTradeMarkers)
 		r.Get("/api/users/{userID}/bbgo/orders/closed", api.BBGoClosedOrders)
 		r.Get("/api/users/{userID}/bbgo/trading-volume", api.BBGoTradingVolume)
 		r.Get("/api/users/{userID}/bbgo/pnl", api.BBGoPnL)
@@ -975,22 +976,65 @@ func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
-	client, _, ok := api.bbgoClientForUser(w, r)
+	client, mode, ok := api.bbgoClientForUser(w, r)
 	if !ok {
 		return
 	}
+
 	exchange := r.URL.Query().Get("exchange")
 	symbol := r.URL.Query().Get("symbol")
-	gidStr := r.URL.Query().Get("gid")
-	var lastGID int64
-	if gidStr != "" {
-		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-			lastGID = v
+	ordering := r.URL.Query().Get("ordering")
+	if ordering == "" {
+		ordering = "DESC"
+	}
+
+	var since, until *time.Time
+	if s := r.URL.Query().Get("since"); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid since format")
+			return
+		}
+		since = &t
+	}
+	if u := r.URL.Query().Get("until"); u != "" {
+		t, err := time.Parse(time.RFC3339, u)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid until format")
+			return
+		}
+		until = &t
+	}
+
+	limit := 500
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 1000 {
+			limit = v
 		}
 	}
 
-	trades, err := client.GetTrades(exchange, symbol, lastGID)
+	// For live mode with Supabase, fetch from Supabase
+	if api.syncer != nil && mode != ModePaper {
+		trades, err := api.fetchSupabaseTrades(r, exchange, symbol, since, until, ordering, limit)
+		if err == nil && len(trades) > 0 {
+			writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
+			return
+		}
+	}
+
+	// Paper mode or Supabase fallback: fetch from bbgo container
+	trades, err := api.fetchContainerTrades(client, exchange, symbol, since, until, ordering, limit)
 	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
+}
+
+func (api *API) fetchContainerTrades(client *BBGoClient, exchange, symbol string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
+	trades, err := client.GetTradesRange(exchange, symbol, since, until, limit, ordering)
+	if err != nil {
+		// Fallback to session-based query
 		session := exchange
 		if session == "" {
 			if sessions, serr := client.GetSessions(); serr == nil && len(sessions) > 0 {
@@ -1005,10 +1049,157 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil {
+		return nil, err
+	}
+
+	// Compute position tags
+	trades = computeTradesWithPositionTags(trades, client, exchange, symbol)
+	return trades, nil
+}
+
+func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
+	userID, _, _ := api.userFromURL(nil, r)
+	allTrades, err := api.syncer.GetTradesForPnL(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter
+	var filtered []BBGoTrade
+	for _, t := range allTrades {
+		if exchange != "" && t.Exchange != exchange {
+			continue
+		}
+		if symbol != "" && t.Symbol != symbol {
+			continue
+		}
+		if since != nil && t.TradedAt < since.Format(time.RFC3339) {
+			continue
+		}
+		if until != nil && t.TradedAt >= until.Format(time.RFC3339) {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+
+	// Compute position tags on full filtered set
+	sortTradesASC(filtered)
+	computePositionTags(filtered, 0)
+
+	// Reverse for DESC
+	if ordering == "DESC" {
+		for i, j := 0, len(filtered)-1; i < j; i, j = i+1, j-1 {
+			filtered[i], filtered[j] = filtered[j], filtered[i]
+		}
+	}
+
+	// Apply limit
+	if limit > 0 && len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+
+	return filtered, nil
+}
+
+// computeTradesWithPositionTags sorts trades ASC, computes position tags using
+// the position-summary endpoint for the initial net position, then returns
+// trades in the requested order with positionAction fields populated.
+func computeTradesWithPositionTags(trades []BBGoTrade, client *BBGoClient, exchange, symbol string) []BBGoTrade {
+	if len(trades) == 0 {
+		return trades
+	}
+
+	// Sort ASC for tag computation
+	sortTradesASC(trades)
+
+	// Get cumulative position before the earliest trade
+	var initialNet float64
+	if earliest := trades[0].TradedAt; earliest != "" {
+		t, err := time.Parse(time.RFC3339, earliest)
+		if err == nil {
+			if summary, serr := client.GetTradePositionSummary(exchange, symbol, &t); serr == nil {
+				initialNet = summary.NetPosition
+			}
+		}
+	}
+
+	computePositionTags(trades, initialNet)
+	return trades
+}
+
+// BBGoTradeMarkers returns chart markers with position tags for a given time range.
+func (api *API) BBGoTradeMarkers(w http.ResponseWriter, r *http.Request) {
+	client, mode, ok := api.bbgoClientForUser(w, r)
+	if !ok {
+		return
+	}
+
+	symbol := r.URL.Query().Get("symbol")
+	if symbol == "" {
+		writeError(w, http.StatusBadRequest, "symbol is required")
+		return
+	}
+
+	var since, until *time.Time
+	if s := r.URL.Query().Get("since"); s != "" {
+		t, _ := time.Parse(time.RFC3339, s)
+		since = &t
+	}
+	if u := r.URL.Query().Get("until"); u != "" {
+		t, _ := time.Parse(time.RFC3339, u)
+		until = &t
+	}
+
+	limit := 200
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 500 {
+			limit = v
+		}
+	}
+
+	var trades []BBGoTrade
+	var err error
+
+	if api.syncer != nil && mode != ModePaper {
+		exchange := r.URL.Query().Get("exchange")
+		trades, err = api.fetchSupabaseTrades(r, exchange, symbol, since, until, "ASC", limit)
+	} else {
+		exchange := r.URL.Query().Get("exchange")
+		trades, err = api.fetchContainerTrades(client, exchange, symbol, since, until, "ASC", limit)
+	}
+
+	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
+
+	type tradeMarker struct {
+		Time           int64   `json:"time"`
+		Side           string  `json:"side"`
+		Price          float64 `json:"price"`
+		Quantity       float64 `json:"quantity"`
+		PositionAction string  `json:"positionAction"`
+	}
+
+	markers := make([]tradeMarker, 0, len(trades))
+	for _, t := range trades {
+		if t.TradedAt == "" {
+			continue
+		}
+		parsed, err := time.Parse(time.RFC3339, t.TradedAt)
+		if err != nil {
+			continue
+		}
+		markers = append(markers, tradeMarker{
+			Time:           parsed.Unix(),
+			Side:           t.Side,
+			Price:          parseFloat(t.Price),
+			Quantity:       parseFloat(t.Quantity),
+			PositionAction: t.PositionAction,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"markers": markers})
 }
 
 func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {

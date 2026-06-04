@@ -30,7 +30,9 @@ import {
   fetchBotList,
   fetchBotDetail,
   fetchMarketTicker,
+  fetchBotTradeMarkers,
   type TradingVolumeEntry,
+  type TradeMarkersResponse,
   type StrategyEntry,
   type UserContainer,
   type UserContainersResponse,
@@ -276,6 +278,16 @@ export function useBotClosedOrders(userId: string, exchange?: string, symbol?: s
   })
 }
 
+export function useBotTradeMarkers(userId: string, symbol: string, opts?: { exchange?: string; since?: string; until?: string; limit?: number; mode?: 'live' | 'paper' }, containerRunning?: boolean) {
+  return useQuery<TradeMarkersResponse>({
+    queryKey: ['bot-trade-markers', userId, symbol, opts],
+    queryFn: () => fetchBotTradeMarkers(userId, symbol, { ...opts, mode: opts?.mode }),
+    enabled: !!userId && !!symbol && (containerRunning ?? false),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+  })
+}
+
 export function useBotTradingVolume(userId: string, period?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
   return useQuery<{ tradingVolumes: TradingVolumeEntry[] }>({
     queryKey: ['bot-trading-volume', userId, period, mode],
@@ -404,4 +416,5 @@ export type {
   DailyPnl,
   PnlCurvePoint,
   TradingVolumeEntry,
+  TradeMarkersResponse,
 }

@@ -172,6 +172,8 @@ export interface BBGoTrade {
   tradedAt: string
   fee: string
   feeCurrency: string
+  positionAction?: 'open' | 'close' | 'add' | 'reduce' | 'trade'
+  netPosition?: number
 }
 
 export interface BBGoOrder {
@@ -397,14 +399,40 @@ export function fetchBotStrategies(userId: string, mode?: 'live' | 'paper') {
   return request<{ strategies: BBGoStrategyState[] }>(`/users/${userId}/bbgo/strategies?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotTrades(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper') {
+export interface TradeMarkersResponse {
+  markers: Array<{
+    time: number
+    side: 'BUY' | 'SELL'
+    price: number
+    quantity: number
+    positionAction: string
+  }>
+}
+
+export function fetchBotTrades(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper', opts?: { since?: string; until?: string; limit?: number; ordering?: string }) {
   const params = new URLSearchParams()
   params.set('mode', mode ?? 'live')
   if (exchange) params.set('exchange', exchange)
   if (symbol) params.set('symbol', symbol)
   if (gid) params.set('gid', String(gid))
+  if (opts?.since) params.set('since', opts.since)
+  if (opts?.until) params.set('until', opts.until)
+  if (opts?.limit) params.set('limit', String(opts.limit))
+  if (opts?.ordering) params.set('ordering', opts.ordering)
   const qs = params.toString()
   return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/trades?${qs}`)
+}
+
+export function fetchBotTradeMarkers(userId: string, symbol: string, opts?: { exchange?: string; since?: string; until?: string; limit?: number; mode?: 'live' | 'paper' }) {
+  const params = new URLSearchParams()
+  params.set('symbol', symbol)
+  if (opts?.mode) params.set('mode', opts.mode)
+  if (opts?.exchange) params.set('exchange', opts.exchange)
+  if (opts?.since) params.set('since', opts.since)
+  if (opts?.until) params.set('until', opts.until)
+  if (opts?.limit) params.set('limit', String(opts.limit))
+  const qs = params.toString()
+  return request<TradeMarkersResponse>(`/users/${userId}/bbgo/trades/markers?${qs}`)
 }
 
 export function fetchBotClosedOrders(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper') {

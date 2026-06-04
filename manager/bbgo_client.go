@@ -73,21 +73,23 @@ func (f *flexString) UnmarshalJSON(data []byte) error {
 }
 
 type BBGoTrade struct {
-	GID           int64      `json:"gid"`
-	ID            uint64     `json:"id"`
-	OrderID       uint64     `json:"orderID"`
-	OrderUUID     string     `json:"orderUUID,omitempty"`
-	Exchange      string     `json:"exchange"`
-	Symbol        string     `json:"symbol"`
-	Side          string     `json:"side"`
-	Price         flexString `json:"price"`
-	Quantity      flexString `json:"quantity"`
-	QuoteQuantity flexString `json:"quoteQuantity"`
-	IsBuyer       bool       `json:"isBuyer"`
-	IsMaker       bool       `json:"isMaker"`
-	TradedAt      string     `json:"tradedAt"`
-	Fee           flexString `json:"fee"`
-	FeeCurrency   string     `json:"feeCurrency"`
+	GID             int64      `json:"gid"`
+	ID              uint64     `json:"id"`
+	OrderID         uint64     `json:"orderID"`
+	OrderUUID       string     `json:"orderUUID,omitempty"`
+	Exchange        string     `json:"exchange"`
+	Symbol          string     `json:"symbol"`
+	Side            string     `json:"side"`
+	Price           flexString `json:"price"`
+	Quantity        flexString `json:"quantity"`
+	QuoteQuantity   flexString `json:"quoteQuantity"`
+	IsBuyer         bool       `json:"isBuyer"`
+	IsMaker         bool       `json:"isMaker"`
+	TradedAt        string     `json:"tradedAt"`
+	Fee             flexString `json:"fee"`
+	FeeCurrency     string     `json:"feeCurrency"`
+	PositionAction  string     `json:"positionAction,omitempty"`
+	NetPosition     float64    `json:"netPosition,omitempty"`
 }
 
 type BBGoTradesResponse struct {
@@ -179,6 +181,59 @@ func (c *BBGoClient) GetClosedOrders(exchange, symbol string, lastGID int64) ([]
 		return nil, err
 	}
 	return resp.Orders, nil
+}
+
+
+type PositionSummary struct {
+	NetPosition float64 `json:"netPosition"`
+	Symbol      string  `json:"symbol"`
+}
+
+func (c *BBGoClient) GetTradesRange(exchange, symbol string, since, until *time.Time, limit int, ordering string) ([]BBGoTrade, error) {
+	q := url.Values{}
+	if exchange != "" {
+		q.Set("exchange", exchange)
+	}
+	if symbol != "" {
+		q.Set("symbol", symbol)
+	}
+	if since != nil {
+		q.Set("since", since.Format(time.RFC3339))
+	}
+	if until != nil {
+		q.Set("until", until.Format(time.RFC3339))
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	if ordering != "" {
+		q.Set("ordering", ordering)
+	}
+
+	var resp BBGoTradesResponse
+	if err := c.get("/api/trades?"+q.Encode(), &resp); err != nil {
+		return nil, err
+	}
+	return resp.Trades, nil
+}
+
+func (c *BBGoClient) GetTradePositionSummary(exchange, symbol string, before *time.Time) (*PositionSummary, error) {
+	q := url.Values{}
+	if exchange != "" {
+		q.Set("exchange", exchange)
+	}
+	if symbol != "" {
+		q.Set("symbol", symbol)
+	}
+	if before != nil {
+		q.Set("before", before.Format(time.RFC3339))
+	}
+
+	var resp PositionSummary
+	if err := c.get("/api/trades/position-summary?"+q.Encode(), &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 type BBGoSession struct {
