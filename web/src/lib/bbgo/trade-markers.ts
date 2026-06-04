@@ -54,6 +54,6 @@ export function buildOrderLevels(
     .map((o) => ({
       price: parseFloat(o.price),
       side: o.side as 'BUY' | 'SELL',
-      quantity: o.executedQuantity || o.quantity,
+      quantity: o.quantity,
     }))
 }

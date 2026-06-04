@@ -192,7 +192,7 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium">{t('equityCurve')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <EquityChart assets={assets} />
+                <EquityChart trades={trades} />
               </CardContent>
             </Card>
           </div>

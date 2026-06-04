@@ -14,31 +14,10 @@ import {
   Cell,
 } from 'recharts'
 import type { BBGoTrade } from '@/lib/bbgo/queries'
+import { computeRealizedPnlByDay } from '@/lib/bbgo/fifo-pnl'
 
 interface PnlChartProps {
   trades: BBGoTrade[]
-}
-
-interface DailyPnl {
-  date: string
-  pnl: number
-}
-
-function computeDailyPnl(trades: BBGoTrade[]): DailyPnl[] {
-  const byDate = new Map<string, number>()
-  for (const trade of trades) {
-    if (!trade.tradedAt) continue
-    const day = trade.tradedAt.slice(0, 10)
-    const qty = parseFloat(trade.quantity)
-    const price = parseFloat(trade.price)
-    const fee = parseFloat(trade.fee || '0')
-    const sign = trade.side === 'SELL' ? 1 : -1
-    const value = sign * qty * price - fee
-    byDate.set(day, (byDate.get(day) ?? 0) + value)
-  }
-  return Array.from(byDate.entries())
-    .map(([date, pnl]) => ({ date, pnl: Math.round(pnl * 100) / 100 }))
-    .sort((a, b) => a.date.localeCompare(b.date))
 }
 
 interface PnlTooltipProps {
@@ -63,7 +42,7 @@ function PnlTooltip({ active, payload, label }: PnlTooltipProps) {
 export function PnlChart({ trades }: PnlChartProps) {
   const t = useTranslations('Dashboard')
 
-  const data = useMemo(() => computeDailyPnl(trades), [trades])
+  const data = useMemo(() => computeRealizedPnlByDay(trades), [trades])
 
   if (data.length === 0) {
     return (

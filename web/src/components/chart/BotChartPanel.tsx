@@ -10,6 +10,7 @@ import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import type { TradeMarker, OrderLevel, GridLine, IndicatorLine, KlineCandle } from '@/components/chart/CandlestickChart'
 import type { IndicatorConfig } from '@/lib/bbgo/indicators'
 import type { StrategyStats } from '@/lib/bbgo/strategy-state'
+import { extractBaseCurrency } from '@/lib/bbgo/fifo-pnl'
 
 const CandlestickChart = dynamic(
   () => import('@/components/chart/CandlestickChart').then((m) => ({ default: m.CandlestickChart })),
@@ -134,11 +135,11 @@ export function BotChartPanel({
           {strategyStats && strategyStats.base > 0 && currentPrice && (
             <div className="flex items-center gap-4 mt-1.5 pt-2 border-t text-xs font-mono">
               <span className="text-muted-foreground">
-                {sp('pos')}: <span className="text-trade-up font-medium">{strategyStats.base.toFixed(6)}</span>
+                {sp('holding')}: <span className="text-trade-up font-medium">{strategyStats.base.toFixed(6)} {extractBaseCurrency(strategyStats.symbol)}</span>
               </span>
               {strategyStats.averageCost > 0 && (
                 <span className="text-muted-foreground">
-                  {sp('entry')}: <span className="text-foreground font-medium">{strategyStats.averageCost.toLocaleString()}</span>
+                  {sp('entry')}: <span className="text-foreground font-medium">${strategyStats.averageCost.toLocaleString()}</span>
                 </span>
               )}
               <span className={cn(
@@ -149,7 +150,7 @@ export function BotChartPanel({
                 {((currentPrice - strategyStats.averageCost) * strategyStats.base).toFixed(2)} USDT
               </span>
               <span className="text-muted-foreground">
-                ≈ {(currentPrice * strategyStats.base).toFixed(2)} USDT
+                ≈ ${(currentPrice * strategyStats.base).toFixed(2)}
               </span>
             </div>
           )}
@@ -205,8 +206,18 @@ function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
 }) {
   const sp = useTranslations('Bots.chartSidePanel')
 
+  const unrealizedPnl = currentPrice && strategyStats.averageCost > 0
+    ? (currentPrice - strategyStats.averageCost) * strategyStats.base
+    : 0
+  const investedCost = Math.abs(strategyStats.quote)
+  const currentValue = currentPrice ? currentPrice * strategyStats.base : 0
+  const pnlPercent = strategyStats.averageCost > 0 && currentPrice
+    ? ((currentPrice - strategyStats.averageCost) / strategyStats.averageCost) * 100
+    : 0
+  const baseSymbol = extractBaseCurrency(strategyStats.symbol)
+
   return (
-    <div className="hidden lg:flex flex-col gap-2 w-48 shrink-0 text-xs">
+    <div className="hidden lg:flex flex-col gap-2 w-52 shrink-0 text-xs">
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
         <p className="font-medium text-sm">{strategyStats.strategy}</p>
         <div className="space-y-1.5 font-mono text-muted-foreground">
@@ -240,40 +251,47 @@ function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
         <p className="font-medium text-sm">{sp('position')}</p>
         <div className="space-y-1.5 font-mono text-muted-foreground">
-          <div className="flex justify-between">
-            <span>{sp('base')}</span>
-            <span className={cn('text-foreground', strategyStats.base > 0 && 'text-trade-up')}>
-              {strategyStats.base.toFixed(6)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span>{sp('quote')}</span>
-            <span className={cn('text-foreground', strategyStats.quote > 0 && 'text-trade-up')}>
-              {strategyStats.quote.toFixed(2)}
+          <div className="flex justify-between items-center">
+            <span>{sp('holding')}</span>
+            <span className="text-trade-up font-medium">
+              {strategyStats.base.toFixed(6)} {baseSymbol}
             </span>
           </div>
           {strategyStats.averageCost > 0 && (
             <div className="flex justify-between">
-              <span>{sp('avgCost')}</span>
-              <span className="text-foreground">{strategyStats.averageCost.toLocaleString()}</span>
+              <span>{sp('entryPrice')}</span>
+              <span className="text-foreground">${strategyStats.averageCost.toLocaleString()}</span>
+            </div>
+          )}
+          {investedCost > 0 && (
+            <div className="flex justify-between">
+              <span>{sp('invested')}</span>
+              <span className="text-foreground">${investedCost.toFixed(2)}</span>
             </div>
           )}
           {currentPrice && strategyStats.base > 0 && strategyStats.averageCost > 0 && (
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span>{sp('unrealized')}</span>
-              <span className={cn(
-                'font-medium',
-                currentPrice > strategyStats.averageCost ? 'text-trade-up' : 'text-trade-down'
-              )}>
-                {currentPrice > strategyStats.averageCost ? '+' : ''}
-                {((currentPrice - strategyStats.averageCost) * strategyStats.base).toFixed(2)} USDT
-              </span>
+              <div className="text-right">
+                <span className={cn(
+                  'font-medium',
+                  unrealizedPnl >= 0 ? 'text-trade-up' : 'text-trade-down'
+                )}>
+                  {unrealizedPnl >= 0 ? '+' : ''}{unrealizedPnl.toFixed(2)}
+                </span>
+                <span className={cn(
+                  'ml-1 text-[10px]',
+                  pnlPercent >= 0 ? 'text-trade-up/70' : 'text-trade-down/70'
+                )}>
+                  ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
+                </span>
+              </div>
             </div>
           )}
           {currentPrice && strategyStats.base > 0 && (
             <div className="flex justify-between">
-              <span>{sp('value')}</span>
-              <span className="text-foreground">{(currentPrice * strategyStats.base).toFixed(2)}</span>
+              <span>{sp('currentValue')}</span>
+              <span className="text-foreground">${currentValue.toFixed(2)}</span>
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import type { Time } from 'lightweight-charts'
+import { FifoQueue } from './fifo-pnl'
 
 export interface PnlPoint {
   time: Time
@@ -14,11 +15,6 @@ export interface PnlTrade {
   feeCurrency?: string
 }
 
-/**
- * Compute cumulative realized P&L from trades using FIFO matching.
- * Each SELL is matched against previous BUYs to compute profit.
- * Returns an array of cumulative P&L points suitable for LineSeries overlay.
- */
 const QUOTE_CURRENCIES = new Set(['USDT', 'USDC', 'BUSD', 'TUSD', 'DAI', 'FDUSD'])
 
 function feeInQuote(fee: number, feeCurrency?: string, tradePrice?: number): number {
@@ -33,7 +29,7 @@ export function computePnlCurve(trades: PnlTrade[]): PnlPoint[] {
     (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
   )
 
-  const longQueue: Array<{ price: number; qty: number }> = []
+  const queue = new FifoQueue()
   let cumulative = 0
   const points: PnlPoint[] = []
 
@@ -43,18 +39,11 @@ export function computePnlCurve(trades: PnlTrade[]): PnlPoint[] {
     const fee = parseFloat(trade.fee || '0')
 
     if (trade.side === 'BUY') {
-      longQueue.push({ price, qty })
+      queue.push(price, qty)
     } else {
-      let remaining = qty
-      let matchedCost = 0
-      while (remaining > 0 && longQueue.length > 0) {
-        const head = longQueue[0]!
-        const filled = Math.min(remaining, head.qty)
-        matchedCost += filled * head.price
-        head.qty -= filled
-        remaining -= filled
-        if (head.qty <= 1e-12) longQueue.shift()
-      }
+      const { costBasis, remaining } = queue.match(qty)
+      let matchedCost = costBasis
+      if (remaining > 0) matchedCost += remaining * price
       cumulative += price * qty - matchedCost
     }
 

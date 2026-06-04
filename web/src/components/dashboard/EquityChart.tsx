@@ -10,11 +10,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ReferenceLine,
 } from 'recharts'
-import type { BBGoAsset } from '@/lib/bbgo/queries'
+import type { BBGoTrade } from '@/lib/bbgo/queries'
+import { computeCumulativePnl } from '@/lib/bbgo/fifo-pnl'
 
 interface EquityChartProps {
-  assets: Record<string, BBGoAsset>
+  trades: BBGoTrade[]
 }
 
 interface EquityTooltipProps {
@@ -29,26 +31,17 @@ function EquityTooltip({ active, payload, label }: EquityTooltipProps) {
   return (
     <div className="rounded-lg border bg-card px-3 py-2 shadow-md">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium font-mono">
-        ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      <p className={`text-sm font-medium font-mono ${val >= 0 ? 'text-trade-up' : 'text-trade-down'}`}>
+        {val >= 0 ? '+' : ''}{val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </p>
     </div>
   )
 }
 
-export function EquityChart({ assets }: EquityChartProps) {
+export function EquityChart({ trades }: EquityChartProps) {
   const t = useTranslations('Dashboard')
 
-  const data = useMemo(() => {
-    return Object.values(assets)
-      .filter((a) => parseFloat(a.netAssetInUSD || '0') > 0)
-      .map((a) => ({
-        currency: a.currency,
-        total: parseFloat(a.total || '0'),
-        netAssetInUSD: parseFloat(a.netAssetInUSD || '0'),
-      }))
-      .sort((a, b) => b.netAssetInUSD - a.netAssetInUSD)
-  }, [assets])
+  const data = useMemo(() => computeCumulativePnl(trades), [trades])
 
   if (data.length === 0) {
     return (
@@ -63,19 +56,21 @@ export function EquityChart({ assets }: EquityChartProps) {
       <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis
-          dataKey="currency"
+          dataKey="date"
           tick={{ fontSize: 11 }}
           className="fill-muted-foreground"
+          tickFormatter={(v: string) => v.slice(5)}
         />
         <YAxis
           tick={{ fontSize: 11 }}
           className="fill-muted-foreground"
-          tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
+          tickFormatter={(v: number) => `$${v.toFixed(2)}`}
         />
         <Tooltip content={<EquityTooltip />} />
+        <ReferenceLine y={0} stroke="hsl(var(--border))" />
         <Area
-          type="monotone"
-          dataKey="netAssetInUSD"
+          type="stepAfter"
+          dataKey="cumulativePnl"
           stroke="hsl(221, 83%, 53%)"
           fill="hsl(221, 83%, 53%, 0.15)"
           strokeWidth={2}

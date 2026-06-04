@@ -141,14 +141,8 @@ describe('buildOrderLevels', () => {
     expect(buildOrderLevels([order], 'BTCUSDT')).toHaveLength(0)
   })
 
-  it('uses executedQuantity if present, falls back to quantity', () => {
+  it('uses order quantity for chart labels', () => {
     const order: BBGoOrder = { ...baseOrder, executedQuantity: '0.5' }
-    const result = buildOrderLevels([order], 'BTCUSDT')
-    expect(result[0]!.quantity).toBe('0.5')
-  })
-
-  it('falls back to quantity when executedQuantity is empty', () => {
-    const order: BBGoOrder = { ...baseOrder, executedQuantity: '' }
     const result = buildOrderLevels([order], 'BTCUSDT')
     expect(result[0]!.quantity).toBe('0.001')
   })
