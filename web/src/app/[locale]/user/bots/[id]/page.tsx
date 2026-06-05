@@ -101,8 +101,8 @@ export default function BotDetailPage() {
 
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode, isRunning)
   const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode, isRunning)
-  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning, bot?.id)
-  const { data: tradeMarkersData } = useBotTradeMarkers(userId, symbol || '', { exchange: undefined, mode, limit: 200, strategy: bot?.id }, isRunning)
+  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning, bot?.strategy)
+  const { data: tradeMarkersData } = useBotTradeMarkers(userId, symbol || '', { exchange: undefined, mode, limit: 200, strategy: bot?.strategy }, isRunning)
   const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode, isRunning)
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
   const { data: pingData } = useBotPing(userId, mode, isRunning)
@@ -120,14 +120,35 @@ export default function BotDetailPage() {
     enabled: !!exchange && !!symbol,
   })
 
+  const strategyMatch = useCallback(
+    (tag: string | undefined) => !!bot && (tag === bot.strategy || tag === bot.id),
+    [bot?.strategy, bot?.id]
+  )
+
+  // OrderIDs from strategy-filtered trades → used to cross-reference closed orders
+  const tradeOrderIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const t of tradesData?.trades ?? []) {
+      if (t.orderID) ids.add(t.orderID)
+    }
+    return ids
+  }, [tradesData?.trades])
+
+  const allOpenOrders = openOrdersData?.orders ?? []
+  const allClosedOrders = closedOrdersData?.orders ?? []
+  const openOrders = allOpenOrders.filter((o) => strategyMatch(o.tag))
+  const closedOrders = allClosedOrders.filter(
+    (o) => strategyMatch(o.tag) || tradeOrderIds.has(o.orderID)
+  )
+
   const tradeMarkers: TradeMarker[] = useMemo(
-    () => { const server = buildTradeMarkersFromServer(tradeMarkersData); return server?.length ? server : buildTradeMarkers(tradesData?.trades ?? null, closedOrdersData?.orders ?? null, symbol) },
-    [tradeMarkersData, tradesData?.trades, closedOrdersData?.orders, symbol]
+    () => { const server = buildTradeMarkersFromServer(tradeMarkersData); return server?.length ? server : buildTradeMarkers(tradesData?.trades ?? null, closedOrders, symbol) },
+    [tradeMarkersData, tradesData?.trades, closedOrders, symbol]
   )
 
   const orderLevels: OrderLevel[] = useMemo(
-    () => buildOrderLevels(openOrdersData?.orders ?? null, symbol),
-    [openOrdersData?.orders, symbol]
+    () => buildOrderLevels(openOrders, symbol),
+    [openOrders, symbol]
   )
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
@@ -292,10 +313,6 @@ export default function BotDetailPage() {
 
   const status = bot.container_status
   const botReachable = isRunning && pingData?.status === 'ok'
-  const openOrders = (openOrdersData?.orders ?? []).filter(
-    (o) => !bot?.id || !o.tag || o.tag === bot.id
-  )
-  const closedOrders = closedOrdersData?.orders ?? []
   const balances = balancesData?.balances ?? {}
   const liveStrategies = strategyStatesData?.strategies ?? []
   const nonZeroBalances = Object.entries(balances).filter(
