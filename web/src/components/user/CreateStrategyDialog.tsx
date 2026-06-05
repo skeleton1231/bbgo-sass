@@ -3,7 +3,8 @@
 import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
-import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureNumbers, type SessionRole } from '@/lib/bbgo/strategies'
+import { useStrategyRegistry } from '@/components/providers/strategy-registry'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, type SessionRole } from '@/lib/bbgo/strategies'
 import { EXCHANGES } from '@/lib/bbgo/constants'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { StrategyConfigForm } from './StrategyConfigForm'
@@ -25,6 +26,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const ct = useTranslations('Categories')
   const createStrategy = useCreateStrategy()
   const { data: credentials } = useCredentials(userId)
+  const registry = useStrategyRegistry()
   const hasExchangeCreds = (ex: string, testnet = false) =>
     (credentials ?? []).some(c => c.exchange === ex && c.is_testnet === testnet)
 
@@ -33,16 +35,16 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const [strategy, setStrategy] = useState('grid2')
   const { mode: globalMode } = useTradingMode()
   const [mode, setMode] = useState<'live' | 'paper'>(globalMode)
-  const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2'))
+  const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2', registry))
   const [sessionExchanges, setSessionExchanges] = useState<Record<string, string>>({})
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
-    setConfig(getStrategyDefaults(newStrategy))
-    if (getStrategySchema(newStrategy)?.liveOnly) {
+    setConfig(getStrategyDefaults(newStrategy, registry))
+    if (getStrategySchema(newStrategy, registry)?.liveOnly) {
       setMode('live')
     }
-    const s = getStrategySchema(newStrategy)
+    const s = getStrategySchema(newStrategy, registry)
     if (s?.sessionRoles) {
       const defaults: Record<string, string> = {}
       for (const role of s.sessionRoles) {
@@ -52,19 +54,18 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
     } else {
       setSessionExchanges({})
     }
-  }, [])
+  }, [registry])
 
-  // Paper mode forces exchange to binance
-  const effectiveExchange = mode === 'paper' ? 'binance' : exchange
+  const effectiveExchange = exchange
 
-  const strategiesByCategory = getStrategiesByCategory()
-  const schema = getStrategySchema(strategy)
+  const strategiesByCategory = getStrategiesByCategory(undefined, registry)
+  const schema = getStrategySchema(strategy, registry)
   const isCrossExchange = schema?.crossExchange === true
   const isLiveOnly = schema?.liveOnly === true
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const numericConfig = ensureNumbers(schema, config)
+    const numericConfig = ensureTypes(schema, config)
     const onError = (err: Error) => {
       toast.error(err.message)
     }
@@ -130,14 +131,6 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
 
         <div>
           <label className="block text-sm font-medium mb-1">{t('exchange')}</label>
-          {mode === 'paper' && !isCrossExchange ? (
-            <input
-              type="text"
-              value="Binance (Testnet)"
-              readOnly
-              className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
-            />
-          ) : (
             <select
               value={exchange}
               onChange={(e) => setExchange(e.target.value)}
@@ -148,7 +141,6 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
                 <option key={ex} value={ex}>{ex}</option>
               ))}
             </select>
-          )}
         </div>
 
         <div>
@@ -174,25 +166,16 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
             {schema.sessionRoles.map((role) => (
               <div key={role.name} className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground w-32">{role.label}</span>
-                {mode === 'paper' ? (
-                  <input
-                    type="text"
-                    value={`Binance (Testnet)${role.futures ? ` (${t('futures')})` : ''}`}
-                    readOnly
-                    className="flex-1 rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
-                  />
-                ) : (
-                  <select
-                    value={sessionExchanges[role.name] || 'binance'}
-                    onChange={(e) => setSessionExchanges((prev) => ({ ...prev, [role.name]: e.target.value }))}
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {EXCHANGES.map((ex) => (
-                      <option key={ex} value={ex}>{ex}{role.futures ? ` (${t('futures')})` : ''}</option>
-                    ))}
-                  </select>
-                )}
-                {role.futures && mode !== 'paper' && (
+                <select
+                  value={sessionExchanges[role.name] || 'binance'}
+                  onChange={(e) => setSessionExchanges((prev) => ({ ...prev, [role.name]: e.target.value }))}
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {EXCHANGES.map((ex) => (
+                    <option key={ex} value={ex}>{ex}{role.futures ? ` (${t('futures')})` : ''}</option>
+                  ))}
+                </select>
+                {role.futures && (
                   <span className="text-xs text-muted-foreground">{t('futures')}</span>
                 )}
               </div>
@@ -228,11 +211,6 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
               {t('noCredsForExchange', { exchange })}
             </p>
           )}
-          {mode === 'paper' && !isCrossExchange && !hasExchangeCreds('binance', true) && (
-            <p className="mt-1 text-xs text-destructive">
-              {t('noBinanceTestnetCreds')}
-            </p>
-          )}
           {mode === 'live' && isCrossExchange && schema?.sessionRoles && (
             <div className="mt-1 space-y-0.5">
               {schema.sessionRoles.filter(r => !hasExchangeCreds(sessionExchanges[r.name] || 'binance', false)).map(r => (
@@ -241,11 +219,6 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
                 </p>
               ))}
             </div>
-          )}
-          {mode === 'paper' && isCrossExchange && !hasExchangeCreds('binance', true) && (
-            <p className="mt-1 text-xs text-destructive">
-              {t('noBinanceTestnetCreds')}
-            </p>
           )}
         </div>
 

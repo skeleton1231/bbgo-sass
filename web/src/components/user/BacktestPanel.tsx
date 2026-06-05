@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSubmitBacktest, useBacktestJob, useMarketSymbols, useMarketTicker } from '@/lib/bbgo/queries'
-import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureNumbers } from '@/lib/bbgo/strategies'
+import { useStrategyRegistry } from '@/components/providers/strategy-registry'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes } from '@/lib/bbgo/strategies'
 import { EXCHANGE_OPTIONS } from '@/lib/bbgo/constants'
 import { StrategyConfigForm } from './StrategyConfigForm'
 import { BacktestResultDisplay } from '@/components/backtest/BacktestEquityChart'
@@ -35,6 +36,7 @@ export function BacktestPanel() {
   const t = useTranslations('Backtest')
   const ct = useTranslations('Categories')
   const submitBacktest = useSubmitBacktest()
+  const registry = useStrategyRegistry()
 
   const [strategy, setStrategy] = useState('grid2')
   const [exchange, setExchange] = useState('binance')
@@ -46,7 +48,7 @@ export function BacktestPanel() {
     return toLocalDate(d)
   })
   const [endTime, setEndTime] = useState(() => toLocalDate(new Date()))
-  const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true, excludeCrossExchange: true })
+  const strategiesByCategory = getStrategiesByCategory({ excludeLiveOnly: true, excludeCrossExchange: true }, registry)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
@@ -54,7 +56,7 @@ export function BacktestPanel() {
 
   const { data: symbolsData } = useMarketSymbols(exchange)
 
-  const schema = getStrategySchema(strategy)
+  const schema = getStrategySchema(strategy, registry)
   const formFields = schema ? schema.fields.filter((f) => f.key !== 'symbol') : []
 
   const filteredSymbols = filterSymbols(symbolsData?.symbols ?? [])
@@ -74,22 +76,16 @@ export function BacktestPanel() {
     setConfig((prev) => ({ ...prev, symbol: newSymbol }))
   }, [])
 
-  useEffect(() => {
-    if (!symbol || !tickerData?.ticker?.close) return
-    if (!schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')) return
-    const price = tickerData.ticker.close
-    const range = price * 0.2
-    setConfig((prev) => ({
-      ...prev,
-      upperPrice: Math.round((price + range) * 100) / 100,
-      lowerPrice: Math.round((price - range) * 100) / 100,
-    }))
-  }, [symbol, tickerData?.ticker?.close, schema])
+  const close = tickerData?.ticker?.close
+  const hasGridBounds = schema?.fields.some((f) => f.key === 'upperPrice' || f.key === 'lowerPrice')
+  const effectiveConfig = (symbol && close && hasGridBounds)
+    ? { ...config, upperPrice: Math.round((close + close * 0.2) * 100) / 100, lowerPrice: Math.round((close - close * 0.2) * 100) / 100 }
+    : config
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
-    setConfig(getStrategyDefaults(newStrategy))
-  }, [])
+    setConfig(getStrategyDefaults(newStrategy, registry))
+  }, [registry])
 
   const handleDownload = async (file: string) => {
     if (!lastResult || downloading) return
@@ -116,7 +112,7 @@ export function BacktestPanel() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError(null)
-    const numericConfig = ensureNumbers(schema, config)
+    const numericConfig = ensureTypes(schema, effectiveConfig)
     try {
       const result = await submitBacktest.mutateAsync({
         strategy,
@@ -173,7 +169,7 @@ export function BacktestPanel() {
                 onChange={(e) => {
                   setExchange(e.target.value)
                   setRawSymbol('')
-                  setConfig(getStrategyDefaults(strategy))
+                  setConfig(getStrategyDefaults(strategy, registry))
                 }}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
@@ -263,7 +259,7 @@ export function BacktestPanel() {
             <div className="border-t pt-4">
               <StrategyConfigForm
                 fields={formFields}
-                values={config}
+                values={effectiveConfig}
                 onChange={setConfig}
               />
             </div>
@@ -302,7 +298,7 @@ export function BacktestPanel() {
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
             {formFields.map((f) => (
               <span key={f.key} className="text-xs text-muted-foreground">
-                {f.key}: <span className="text-xs font-medium text-foreground">{formatParamValue(config[f.key])}</span>
+                {f.key}: <span className="text-xs font-medium text-foreground">{formatParamValue(effectiveConfig[f.key])}</span>
               </span>
             ))}
           </div>
