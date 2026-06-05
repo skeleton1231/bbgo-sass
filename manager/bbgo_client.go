@@ -88,6 +88,7 @@ type BBGoTrade struct {
 	TradedAt        string     `json:"tradedAt"`
 	Fee             flexString `json:"fee"`
 	FeeCurrency     string     `json:"feeCurrency"`
+	StrategyID      string     `json:"strategyID,omitempty"`
 	PositionAction  string     `json:"positionAction,omitempty"`
 	NetPosition     float64    `json:"netPosition,omitempty"`
 }
@@ -161,6 +162,7 @@ type BBGoOrder struct {
 	StopPrice        flexString `json:"stopPrice,omitempty"`
 	CreationTime     string     `json:"creationTime"`
 	IsWorking        bool       `json:"isWorking"`
+	Tag              string     `json:"tag,omitempty"`
 }
 
 type BBGoOrdersResponse struct {
@@ -189,13 +191,16 @@ type PositionSummary struct {
 	Symbol      string  `json:"symbol"`
 }
 
-func (c *BBGoClient) GetTradesRange(exchange, symbol string, since, until *time.Time, limit int, ordering string) ([]BBGoTrade, error) {
+func (c *BBGoClient) GetTradesRange(exchange, symbol, strategy string, since, until *time.Time, limit int, ordering string) ([]BBGoTrade, error) {
 	q := url.Values{}
 	if exchange != "" {
 		q.Set("exchange", exchange)
 	}
 	if symbol != "" {
 		q.Set("symbol", symbol)
+	}
+	if strategy != "" {
+		q.Set("strategy", strategy)
 	}
 	if since != nil {
 		q.Set("since", since.Format(time.RFC3339))

@@ -97,7 +97,7 @@ func TestBBGoTrades_FallbackToSessionTrades(t *testing.T) {
 		ManagerToken:   "test-token",
 		MarketDataAddr: "bbgo-marketdata:9090",
 	}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	cm.apiURLFn = func(_, _ string) string { return srv.URL }
 	proxy := NewBotProxy(cm)
@@ -165,7 +165,7 @@ func TestPnL_PaperMode_SkipsSupabase(t *testing.T) {
 		ManagerToken:   "test-token",
 		MarketDataAddr: "bbgo-marketdata:9090",
 	}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	cm.apiURLFn = func(_, _ string) string { return containerSrv.URL }
 	proxy := NewBotProxy(cm)

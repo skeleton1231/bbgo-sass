@@ -232,18 +232,9 @@ func TestCrossExchangeEnvPrefixAutoFill(t *testing.T) {
 // TestLiveOnlyStrategiesBackendFrontendConsistency verifies that the backend's liveOnly set
 // matches the frontend's liveOnly definitions after legacy alias normalization.
 func TestLiveOnlyStrategiesBackendFrontendConsistency(t *testing.T) {
-	// Frontend liveOnly strategies (from strategies.ts).
-	// These are the IDs the frontend sends — some are legacy aliases that normalize to bbgo IDs.
 	frontendLiveOnly := map[string]bool{
-		"bollmaker": true, "linregmaker": true, "rsmaker": true, "scmaker": true,
-		"supertrend": true, "dca2": true, "dca3": true, "wall": true,
-		"sentinel": true, "sentinel_anomaly": true,
-		"autobuy": true, "autobuy_scheduled": true,
-		"rebalance": true, "rebalance_portfolio": true,
-		"audacitymaker": true, "liquiditymaker": true,
-		"drift": true, "elliottwave": true, "factorzoo": true, "xvs": true,
 		"autoborrow": true, "convert": true, "deposit2transfer": true,
-		"support": true, "xpremium": true, "xnav": true, "harmonic": true,
+		"sentinel": true,
 	}
 
 	// Normalize frontend IDs to bbgo IDs and check against backend
@@ -316,7 +307,7 @@ func TestMixedModePrevention(t *testing.T) {
 		APIKeyEncrypted: liveKeyEnc, APISecretEncrypted: liveSecretEnc, IsTestnet: false,
 	})
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -347,7 +338,7 @@ func TestLiveModeRequiresCredentials(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -371,11 +362,11 @@ func TestPaperModeWithLiveOnlyStrategy(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
-	liveOnlyTests := []string{"bollmaker", "supertrend", "dca2", "wall", "drift"}
+	liveOnlyTests := []string{"autoborrow", "convert", "deposit2transfer", "sentinel"}
 	for _, strategy := range liveOnlyTests {
 		t.Run(strategy, func(t *testing.T) {
 			body := `{"name":"Paper ` + strategy + `","strategy":"` + strategy + `","exchange":"binance","config":{"symbol":"BTCUSDT"},"mode":"paper"}`
@@ -397,7 +388,7 @@ func TestLegacyAliasPaperRejection(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	credStore := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	api := NewAPI(cfg, store, &ContainerManager{cfg: cfg}, nil, credStore, enc, nil, nil, nil, nil, nil, nil, nil)
 	r := testRouter(api)
 
@@ -406,8 +397,6 @@ func TestLegacyAliasPaperRejection(t *testing.T) {
 		target string
 	}{
 		{"sentinel_anomaly", "sentinel"},
-		{"autobuy_scheduled", "autobuy"},
-		{"rebalance_portfolio", "rebalance"},
 	}
 
 	for _, tt := range tests {

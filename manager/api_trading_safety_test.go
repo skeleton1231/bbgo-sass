@@ -330,7 +330,7 @@ func TestLiveOnlyStrategy_PaperModeBlocked(t *testing.T) {
 	insertTestCredential(t, creds, userID, "binance", "key", "secret")
 
 	r := testRouter(api)
-	body := `{"name":"BollMaker","exchange":"binance","strategy":"bollmaker","config":{"symbol":"BTCUSDT"},"mode":"paper"}`
+	body := `{"name":"AutoBorrow","exchange":"binance","strategy":"autoborrow","config":{"symbol":"BTCUSDT"},"mode":"paper"}`
 	req := httptest.NewRequest("POST", "/api/users/"+userID+"/strategies", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

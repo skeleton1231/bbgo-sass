@@ -30,7 +30,7 @@ func testRouterWithUser(api *API, userID string) *chi.Mux {
 }
 
 func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -55,7 +55,7 @@ func TestResolveUserID_Mismatch_Rejected(t *testing.T) {
 }
 
 func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -77,7 +77,7 @@ func TestResolveUserID_MatchingHeader_Accepted(t *testing.T) {
 }
 
 func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -99,7 +99,7 @@ func TestResolveUserID_NoHeader_UsesURL(t *testing.T) {
 }
 
 func TestResolveUserID_InvalidUUID_Rejected(t *testing.T) {
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -163,7 +163,7 @@ func TestCredentialEndpoint_UsesHeaderUserID(t *testing.T) {
 	}
 	creds := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",
@@ -210,7 +210,7 @@ func TestCredentialEndpoint_MissingUserID_Rejected(t *testing.T) {
 	}
 	creds := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
 		SupabaseKey:  "test",

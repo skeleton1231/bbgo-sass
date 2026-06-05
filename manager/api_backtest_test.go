@@ -15,7 +15,7 @@ import (
 
 func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 	t.Helper()
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -341,7 +341,7 @@ func TestAPI_ListBacktestJobs_Empty(t *testing.T) {
 func TestAPI_HasDataForRange_AlwaysSyncs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 

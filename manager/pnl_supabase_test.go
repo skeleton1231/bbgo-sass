@@ -34,7 +34,7 @@ func setupPnLTest(t *testing.T, containerRunning bool, supabaseHandler, bbgoHand
 		bbgoURL = bbgoSrv.URL
 	}
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 
 	cfg := &Config{
 		SupabaseURL:  supabaseSrv.URL,

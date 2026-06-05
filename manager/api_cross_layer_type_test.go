@@ -251,13 +251,8 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 // marked liveOnly in the frontend schema is also liveOnly in the backend.
 func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 	frontendLiveOnly := map[string]bool{
-		"bollmaker": true, "linregmaker": true, "rsmaker": true, "scmaker": true,
-		"supertrend": true, "dca2": true, "dca3": true, "wall": true,
-		"sentinel": true, "audacitymaker": true, "liquiditymaker": true,
-		"drift": true, "elliottwave": true, "factorzoo": true,
-		"xvs": true, "autoborrow": true, "convert": true,
-		"deposit2transfer": true, "autobuy": true, "rebalance": true,
-		"support": true, "xpremium": true, "xnav": true, "harmonic": true,
+		"autoborrow": true, "convert": true, "deposit2transfer": true,
+		"sentinel": true,
 	}
 
 	for alias, canonical := range legacyStrategyAliases {

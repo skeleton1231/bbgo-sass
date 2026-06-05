@@ -384,6 +384,57 @@ export type Database = {
           },
         ]
       }
+      strategy_registry: {
+        Row: {
+          category: string
+          created_at: string | null
+          cross_exchange: boolean | null
+          defaults: Json | null
+          description: string | null
+          display_name: string
+          enabled: boolean | null
+          exchanges: Json | null
+          fields: Json | null
+          id: string
+          live_only: boolean | null
+          session_roles: Json | null
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          cross_exchange?: boolean | null
+          defaults?: Json | null
+          description?: string | null
+          display_name: string
+          enabled?: boolean | null
+          exchanges?: Json | null
+          fields?: Json | null
+          id: string
+          live_only?: boolean | null
+          session_roles?: Json | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          cross_exchange?: boolean | null
+          defaults?: Json | null
+          description?: string | null
+          display_name?: string
+          enabled?: boolean | null
+          exchanges?: Json | null
+          fields?: Json | null
+          id?: string
+          live_only?: boolean | null
+          session_roles?: Json | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           exchange: string
@@ -457,41 +508,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sync_trades_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_containers: {
-        Row: {
-          created_at: string
-          mode: string
-          status: string
-          strategies: Json
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          mode?: string
-          status?: string
-          strategies?: Json
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          mode?: string
-          status?: string
-          strategies?: Json
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_containers_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"

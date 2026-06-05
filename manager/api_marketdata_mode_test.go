@@ -242,7 +242,7 @@ func TestMarketSymbols_PaperMode_UsesMainnetRESTAddr(t *testing.T) {
 		MarketDataTestnetAddr:     "bbgo-marketdata-testnet:9090",
 		MarketDataTestnetRESTAddr: "bbgo-marketdata-testnet:8080",
 	}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 
@@ -281,7 +281,7 @@ func TestMarketSymbols_LiveMode_UsesLiveRESTAddr(t *testing.T) {
 		MarketDataTestnetAddr:     "bbgo-marketdata-testnet:9090",
 		MarketDataTestnetRESTAddr: "bbgo-marketdata-testnet:8080",
 	}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 
@@ -320,7 +320,7 @@ func TestMarketSymbols_NoMode_DefaultsToLiveRESTAddr(t *testing.T) {
 		MarketDataTestnetAddr:     "bbgo-marketdata-testnet:9090",
 		MarketDataTestnetRESTAddr: "bbgo-marketdata-testnet:8080",
 	}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 

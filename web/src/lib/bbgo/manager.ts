@@ -192,6 +192,7 @@ export interface BBGoOrder {
   stopPrice?: string
   creationTime?: string
   isWorking?: boolean
+  tag?: string
 }
 
 export interface BBGoBalance {
@@ -409,7 +410,7 @@ export interface TradeMarkersResponse {
   }>
 }
 
-export function fetchBotTrades(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper', opts?: { since?: string; until?: string; limit?: number; ordering?: string }) {
+export function fetchBotTrades(userId: string, exchange?: string, symbol?: string, gid?: number, mode?: 'live' | 'paper', opts?: { since?: string; until?: string; limit?: number; ordering?: string; strategy?: string }) {
   const params = new URLSearchParams()
   params.set('mode', mode ?? 'live')
   if (exchange) params.set('exchange', exchange)
@@ -419,11 +420,12 @@ export function fetchBotTrades(userId: string, exchange?: string, symbol?: strin
   if (opts?.until) params.set('until', opts.until)
   if (opts?.limit) params.set('limit', String(opts.limit))
   if (opts?.ordering) params.set('ordering', opts.ordering)
+  if (opts?.strategy) params.set('strategy', opts.strategy)
   const qs = params.toString()
   return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/trades?${qs}`)
 }
 
-export function fetchBotTradeMarkers(userId: string, symbol: string, opts?: { exchange?: string; since?: string; until?: string; limit?: number; mode?: 'live' | 'paper' }) {
+export function fetchBotTradeMarkers(userId: string, symbol: string, opts?: { exchange?: string; since?: string; until?: string; limit?: number; mode?: 'live' | 'paper'; strategy?: string }) {
   const params = new URLSearchParams()
   params.set('symbol', symbol)
   if (opts?.mode) params.set('mode', opts.mode)
@@ -431,6 +433,7 @@ export function fetchBotTradeMarkers(userId: string, symbol: string, opts?: { ex
   if (opts?.since) params.set('since', opts.since)
   if (opts?.until) params.set('until', opts.until)
   if (opts?.limit) params.set('limit', String(opts.limit))
+  if (opts?.strategy) params.set('strategy', opts.strategy)
   const qs = params.toString()
   return request<TradeMarkersResponse>(`/users/${userId}/bbgo/trades/markers?${qs}`)
 }

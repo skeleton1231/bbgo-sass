@@ -23,7 +23,7 @@ func setupMarketDataAPIWithTestnet(hub *MarketDataHub, testnetHub *MarketDataHub
 		MarketDataTestnetAddr:     "bbgo-marketdata-testnet:9090",
 		MarketDataTestnetRESTAddr: "bbgo-marketdata-testnet:8080",
 	}
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, hub, testnetHub, nil, nil, nil, nil)

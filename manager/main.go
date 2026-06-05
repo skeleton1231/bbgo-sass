@@ -30,7 +30,6 @@ func main() {
 	}
 
 	credStore := NewCredentialStore(cfg.DataDir, enc)
-	strategies := NewStrategyStore(cfg.DataDir)
 
 	containerPool := pool.New(5)
 	defer containerPool.Release()
@@ -39,6 +38,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("supabase client error: %v", err)
 	}
+
+	defaultsCache := NewStrategyDefaultsCache(supaClient)
+	strategies := NewStrategyStore(cfg.DataDir, defaultsCache)
 
 	containerMgr := NewContainerManager(cfg, credStore, containerPool)
 
@@ -76,6 +78,7 @@ func main() {
 
 	// Periodic health check
 	done := make(chan struct{})
+	go defaultsCache.RefreshLoop(done)
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()

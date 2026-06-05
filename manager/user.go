@@ -40,30 +40,10 @@ var legacyStrategyAliases = map[string]string{
 
 // liveOnlyStrategies are strategies that only work in live mode.
 var liveOnlyStrategies = map[string]bool{
-	"bollmaker":        true,
-	"linregmaker":      true,
-	"rsmaker":          true,
-	"scmaker":          true,
-	"supertrend":       true,
-	"dca2":             true,
-	"dca3":             true,
-	"wall":             true,
-	"sentinel":         true,
-	"audacitymaker":    true,
-	"liquiditymaker":   true,
-	"drift":            true,
-	"elliottwave":      true,
-	"factorzoo":        true,
-	"xvs":              true,
 	"autoborrow":       true,
 	"convert":          true,
 	"deposit2transfer": true,
-	"autobuy":          true,
-	"rebalance":        true,
-	"support":          true,
-	"xpremium":         true,
-	"xnav":             true,
-	"harmonic":         true,
+	"sentinel":         true,
 }
 
 // legacyFieldAliases maps strategy IDs to old→new field renames.
@@ -123,12 +103,13 @@ type UserMode struct {
 // StrategyStore manages bbgo.yaml files on disk as the source of truth
 // for user strategy configurations. No in-memory state, no database sync.
 type StrategyStore struct {
-	mu      sync.Mutex
-	dataDir string
+	mu       sync.Mutex
+	dataDir  string
+	registry *StrategyDefaultsCache
 }
 
-func NewStrategyStore(dataDir string) *StrategyStore {
-	return &StrategyStore{dataDir: dataDir}
+func NewStrategyStore(dataDir string, registry *StrategyDefaultsCache) *StrategyStore {
+	return &StrategyStore{dataDir: dataDir, registry: registry}
 }
 
 // yamlPath returns the path to bbgo.yaml for a given user/mode.
@@ -249,11 +230,26 @@ func parseCrossStrategyEntry(m map[string]any, yamlSessions map[string]sessionCo
 	return StrategyEntry{}, false
 }
 
-// AddStrategy adds a new strategy, regenerates bbgo.yaml, and writes to disk.
-// Rejects duplicates: same strategy type + symbol is not allowed.
 func (s *StrategyStore) AddStrategy(userID, mode string, entry StrategyEntry, hasCredentials func(exchange string) bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.registry != nil {
+		if defaults := s.registry.GetDefaults(entry.Strategy); defaults != nil {
+			var config map[string]any
+			if err := json.Unmarshal(entry.Config, &config); err != nil {
+				config = map[string]any{}
+			}
+			for k, v := range defaults {
+				if _, exists := config[k]; !exists {
+					config[k] = v
+				}
+			}
+			if updated, err := json.Marshal(config); err == nil {
+				entry.Config = updated
+			}
+		}
+	}
 
 	var existing []StrategyEntry
 	if data, err := s.ReadYAML(userID, mode); err == nil {
@@ -306,6 +302,12 @@ func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol, exchange 
 	}
 
 	return true, s.writeYAML(userID, mode, filtered, hasCredentials)
+}
+
+func (s *StrategyStore) ClearStrategies(userID, mode string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return os.Remove(s.yamlPath(userID, mode))
 }
 
 // writeYAML regenerates bbgo.yaml from the given strategy entries.

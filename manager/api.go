@@ -108,6 +108,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 			r.Use(UserRateLimit(3*time.Second, 20))
 			r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
 			r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
+			r.Delete("/api/users/{userID}/strategies", api.ClearAllStrategies)
 			r.Post("/api/users/{userID}/start", api.StartUser)
 			r.Post("/api/users/{userID}/stop", api.StopUser)
 			r.Post("/api/credentials", api.CreateCredential)
@@ -489,6 +490,23 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ClearAllStrategies removes all strategies for a user+mode from YAML,
+// regardless of whether the container is running. Used for cleanup after crashes.
+func (api *API) ClearAllStrategies(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	mode := modeFromQuery(r)
+
+	if err := api.strategies.ClearStrategies(userID, mode); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+}
+
 func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
@@ -664,7 +682,7 @@ func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGo
 		return nil, "", false
 	}
 
-	return api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context()), userID, true
+	return api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context()), mode, true
 }
 
 func (api *API) ProxyToBot(w http.ResponseWriter, r *http.Request) {
@@ -1015,7 +1033,7 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 
 	// For live mode with Supabase, fetch from Supabase
 	if api.syncer != nil && mode != ModePaper {
-		trades, err := api.fetchSupabaseTrades(r, exchange, symbol, since, until, ordering, limit)
+		trades, err := api.fetchSupabaseTrades(r, exchange, symbol, r.URL.Query().Get("strategy"), since, until, ordering, limit)
 		if err == nil && len(trades) > 0 {
 			writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
 			return
@@ -1023,7 +1041,7 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Paper mode or Supabase fallback: fetch from bbgo container
-	trades, err := api.fetchContainerTrades(client, exchange, symbol, since, until, ordering, limit)
+	trades, err := api.fetchContainerTrades(client, exchange, symbol, r.URL.Query().Get("strategy"), since, until, ordering, limit)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -1031,8 +1049,8 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
 }
 
-func (api *API) fetchContainerTrades(client *BBGoClient, exchange, symbol string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
-	trades, err := client.GetTradesRange(exchange, symbol, since, until, limit, ordering)
+func (api *API) fetchContainerTrades(client *BBGoClient, exchange, symbol, strategy string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
+	trades, err := client.GetTradesRange(exchange, symbol, strategy, since, until, limit, ordering)
 	if err != nil {
 		// Fallback to session-based query
 		session := exchange
@@ -1057,7 +1075,7 @@ func (api *API) fetchContainerTrades(client *BBGoClient, exchange, symbol string
 	return trades, nil
 }
 
-func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
+func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol, strategy string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
 	userID, _, _ := api.userFromURL(nil, r)
 	allTrades, err := api.syncer.GetTradesForPnL(userID)
 	if err != nil {
@@ -1071,6 +1089,9 @@ func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol string, si
 			continue
 		}
 		if symbol != "" && t.Symbol != symbol {
+			continue
+		}
+		if strategy != "" && t.StrategyID != strategy {
 			continue
 		}
 		if since != nil && t.TradedAt < since.Format(time.RFC3339) {
@@ -1162,10 +1183,10 @@ func (api *API) BBGoTradeMarkers(w http.ResponseWriter, r *http.Request) {
 
 	if api.syncer != nil && mode != ModePaper {
 		exchange := r.URL.Query().Get("exchange")
-		trades, err = api.fetchSupabaseTrades(r, exchange, symbol, since, until, "ASC", limit)
+		trades, err = api.fetchSupabaseTrades(r, exchange, symbol, r.URL.Query().Get("strategy"), since, until, "ASC", limit)
 	} else {
 		exchange := r.URL.Query().Get("exchange")
-		trades, err = api.fetchContainerTrades(client, exchange, symbol, since, until, "ASC", limit)
+		trades, err = api.fetchContainerTrades(client, exchange, symbol, r.URL.Query().Get("strategy"), since, until, "ASC", limit)
 	}
 
 	if err != nil {

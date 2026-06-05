@@ -9,7 +9,7 @@ import (
 // StrategyStore don't cause data races.
 func TestStrategyStore_ConcurrentWrites(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 
 	var wg sync.WaitGroup
 	const goroutines = 20
@@ -47,7 +47,7 @@ func TestStrategyStore_ConcurrentWrites(t *testing.T) {
 // to the same user's strategies don't cause data races.
 func TestStrategyStore_ConcurrentReadWrite(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	userID := "shared-user"
 
 	// Seed with initial strategy

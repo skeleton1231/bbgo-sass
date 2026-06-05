@@ -12,57 +12,15 @@ import (
 // TestCrossLayerLiveOnlyAlignment verifies the backend liveOnlyStrategies map
 // covers all strategy IDs that the frontend marks as liveOnly.
 func TestCrossLayerLiveOnlyAlignment(t *testing.T) {
-	require.Len(t, liveOnlyStrategies, 24, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
+	require.Len(t, liveOnlyStrategies, 4, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
 
-	// Core maker strategies
-	assert.True(t, liveOnlyStrategies["bollmaker"])
-	assert.True(t, liveOnlyStrategies["linregmaker"])
-	assert.True(t, liveOnlyStrategies["rsmaker"])
-	assert.True(t, liveOnlyStrategies["scmaker"])
-	assert.True(t, liveOnlyStrategies["audacitymaker"])
-	assert.True(t, liveOnlyStrategies["liquiditymaker"])
-
-	// Trend strategies
-	assert.True(t, liveOnlyStrategies["supertrend"])
-	assert.True(t, liveOnlyStrategies["drift"])
-	assert.True(t, liveOnlyStrategies["elliottwave"])
-	assert.True(t, liveOnlyStrategies["factorzoo"])
-
-	// DCA strategies
-	assert.True(t, liveOnlyStrategies["dca2"])
-	assert.True(t, liveOnlyStrategies["dca3"])
-	assert.True(t, liveOnlyStrategies["autobuy"])
-
-	// Other strategies
-	assert.True(t, liveOnlyStrategies["wall"])
-	assert.True(t, liveOnlyStrategies["sentinel"])
-	assert.True(t, liveOnlyStrategies["rebalance"])
-	assert.True(t, liveOnlyStrategies["support"])
-
-	// Volatility
-	assert.True(t, liveOnlyStrategies["xvs"])
-
-	// Utility strategies
 	assert.True(t, liveOnlyStrategies["autoborrow"])
 	assert.True(t, liveOnlyStrategies["convert"])
 	assert.True(t, liveOnlyStrategies["deposit2transfer"])
-
-	// Cross-exchange liveOnly
-	assert.True(t, liveOnlyStrategies["xpremium"])
-	assert.True(t, liveOnlyStrategies["xnav"])
+	assert.True(t, liveOnlyStrategies["sentinel"])
 
 	// Legacy aliases should NOT be in liveOnlyStrategies — they get normalized
 	assert.False(t, liveOnlyStrategies["sentinel_anomaly"])
-	assert.False(t, liveOnlyStrategies["autobuy_scheduled"])
-	assert.False(t, liveOnlyStrategies["rebalance_portfolio"])
-
-	// But they should exist in legacyStrategyAliases and their targets must be liveOnly
-	require.Contains(t, legacyStrategyAliases, "sentinel_anomaly")
-	require.Contains(t, legacyStrategyAliases, "autobuy_scheduled")
-	require.Contains(t, legacyStrategyAliases, "rebalance_portfolio")
-	assert.True(t, liveOnlyStrategies[legacyStrategyAliases["sentinel_anomaly"]])
-	assert.True(t, liveOnlyStrategies[legacyStrategyAliases["autobuy_scheduled"]])
-	assert.True(t, liveOnlyStrategies[legacyStrategyAliases["rebalance_portfolio"]])
 }
 
 // TestCrossLayerExchangePrefixes verifies all 8 exchanges have env var prefixes.

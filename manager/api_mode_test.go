@@ -31,7 +31,7 @@ func TestAPI_CreateStrategy_LiveOnlyRejectsPaper(t *testing.T) {
 	api := setupModeTestAPI(t, "paper")
 	r := testRouter(api)
 
-	for _, strategy := range []string{"bollmaker", "supertrend", "dca2", "sentinel_anomaly"} {
+	for _, strategy := range []string{"autoborrow", "convert", "deposit2transfer", "sentinel"} {
 		t.Run(strategy, func(t *testing.T) {
 			body := map[string]any{
 				"name":     "test",
@@ -160,13 +160,8 @@ func TestAPI_CreateStrategy_LiveOnlyLegacyAlias(t *testing.T) {
 // frontendLiveOnlyStrategies mirrors the liveOnly flags from web/src/lib/bbgo/strategies.ts.
 // Keep this list in sync with the frontend. Test below validates consistency.
 var frontendLiveOnlyStrategies = map[string]bool{
-	"bollmaker": true, "linregmaker": true, "rsmaker": true, "scmaker": true,
-	"supertrend": true, "dca2": true, "dca3": true, "wall": true,
-	"sentinel_anomaly": true, "audacitymaker": true, "liquiditymaker": true,
-	"drift": true, "elliottwave": true, "factorzoo": true, "xvs": true,
 	"autoborrow": true, "convert": true, "deposit2transfer": true,
-	"autobuy_scheduled": true, "rebalance_portfolio": true, "support": true,
-	"xpremium": true, "xnav": true, "harmonic": true,
+	"sentinel": true,
 }
 
 func TestLiveOnlyLists_FrontendBackendSync(t *testing.T) {

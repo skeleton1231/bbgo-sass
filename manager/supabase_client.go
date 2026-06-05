@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,7 +68,7 @@ func (sc *SupabaseClient) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
 		from := offset
 		to := offset + pnlPageSize - 1
 		data, _, err := sc.client.From("trades").
-			Select("symbol,side,price,quantity,fee,traded_at", "", false).
+			Select("symbol,side,price,quantity,fee,traded_at,exchange,is_buyer,is_maker,is_futures,is_margin,order_id,trade_id,strategy", "", false).
 			Eq("user_id", userID).
 			Order("traded_at", &postgrest.OrderOpts{Ascending: true}).
 			Range(from, to, "").
@@ -89,6 +90,9 @@ func (sc *SupabaseClient) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
 			allTrades = append(allTrades, BBGoTrade{
 				Symbol: r.Symbol, Side: r.Side, Price: flexString(r.Price),
 				Quantity: flexString(r.Quantity), Fee: flexString(r.Fee), TradedAt: tradedAt,
+				Exchange: r.Exchange, IsBuyer: r.IsBuyer, IsMaker: r.IsMaker,
+				StrategyID: r.Strategy,
+				ID: parseUintOrZero(r.TradeId), OrderID: parseUintOrZero(r.OrderId),
 			})
 		}
 
@@ -101,3 +105,8 @@ func (sc *SupabaseClient) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
 }
 
 func ptrStr(s string) *string { return &s }
+
+func parseUintOrZero(s string) uint64 {
+	v, _ := strconv.ParseUint(s, 10, 64)
+	return v
+}

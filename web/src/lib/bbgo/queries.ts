@@ -258,10 +258,10 @@ export function useMarketKlines(exchange: string, symbol: string, interval?: str
   })
 }
 
-export function useBotTrades(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotTrades(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategyInstanceID?: string) {
   return useQuery<{ trades: BBGoTrade[] }>({
-    queryKey: ['bot-trades', userId, exchange, symbol, mode],
-    queryFn: () => fetchBotTrades(userId, exchange, symbol, undefined, mode),
+    queryKey: ['bot-trades', userId, exchange, symbol, mode, strategyInstanceID],
+    queryFn: () => fetchBotTrades(userId, exchange, symbol, undefined, mode, { strategy: strategyInstanceID }),
     enabled: !!userId && (containerRunning ?? false),
     staleTime: 20_000,
     refetchInterval: 20_000,
@@ -278,7 +278,7 @@ export function useBotClosedOrders(userId: string, exchange?: string, symbol?: s
   })
 }
 
-export function useBotTradeMarkers(userId: string, symbol: string, opts?: { exchange?: string; since?: string; until?: string; limit?: number; mode?: 'live' | 'paper' }, containerRunning?: boolean) {
+export function useBotTradeMarkers(userId: string, symbol: string, opts?: { exchange?: string; since?: string; until?: string; limit?: number; mode?: 'live' | 'paper'; strategy?: string }, containerRunning?: boolean) {
   return useQuery<TradeMarkersResponse>({
     queryKey: ['bot-trade-markers', userId, symbol, opts],
     queryFn: () => fetchBotTradeMarkers(userId, symbol, { ...opts, mode: opts?.mode }),

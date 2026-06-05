@@ -101,8 +101,8 @@ export default function BotDetailPage() {
 
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode, isRunning)
   const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode, isRunning)
-  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning)
-  const { data: tradeMarkersData } = useBotTradeMarkers(userId, symbol || '', { exchange: undefined, mode, limit: 200 }, isRunning)
+  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning, bot?.id)
+  const { data: tradeMarkersData } = useBotTradeMarkers(userId, symbol || '', { exchange: undefined, mode, limit: 200, strategy: bot?.id }, isRunning)
   const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode, isRunning)
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
   const { data: pingData } = useBotPing(userId, mode, isRunning)
@@ -292,7 +292,9 @@ export default function BotDetailPage() {
 
   const status = bot.container_status
   const botReachable = isRunning && pingData?.status === 'ok'
-  const openOrders = openOrdersData?.orders ?? []
+  const openOrders = (openOrdersData?.orders ?? []).filter(
+    (o) => !bot?.id || !o.tag || o.tag === bot.id
+  )
   const closedOrders = closedOrdersData?.orders ?? []
   const balances = balancesData?.balances ?? {}
   const liveStrategies = strategyStatesData?.strategies ?? []

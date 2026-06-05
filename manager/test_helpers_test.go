@@ -12,7 +12,7 @@ const testEncryptionKey = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 func newTestStore(t *testing.T) (*StrategyStore, string) {
 	t.Helper()
 	dir := t.TempDir()
-	return NewStrategyStore(dir), dir
+	return NewStrategyStore(dir, nil), dir
 }
 
 // writeTestStrategies creates a bbgo.yaml for the given user/mode with the specified strategies.

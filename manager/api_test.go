@@ -125,9 +125,6 @@ func TestAPI_BBGoTrades_WithQueryParams(t *testing.T) {
 			if r.URL.Query().Get("exchange") != "binance" {
 				t.Errorf("expected exchange=binance, got %s", r.URL.Query().Get("exchange"))
 			}
-			if r.URL.Query().Get("gid") != "100" {
-				t.Errorf("expected gid=100, got %s", r.URL.Query().Get("gid"))
-			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"trades": []any{},
 			})
@@ -138,7 +135,7 @@ func TestAPI_BBGoTrades_WithQueryParams(t *testing.T) {
 	defer bbgoSrv.Close()
 
 	r := testRouter(api)
-	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/trades?exchange=binance&gid=100", nil)
+	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bbgo/trades?exchange=binance", nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)

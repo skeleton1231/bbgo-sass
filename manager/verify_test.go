@@ -294,7 +294,7 @@ func TestStartUserContainer_UnverifiedCredential_Rejected(t *testing.T) {
 		IsVerified:         false,
 	})
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
 		{Exchange: "binance", Strategy: "grid2"},
 	})
@@ -335,7 +335,7 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 		IsVerified:         true,
 	})
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
 		{Exchange: "binance", Strategy: "grid2"},
 	})
@@ -367,7 +367,7 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 
 func TestStartUserContainer_NoCredsStore_NoVerificationCheck(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
 		{Exchange: "binance", Strategy: "grid2"},
 	})
@@ -510,7 +510,7 @@ func TestStartUserContainer_UnsupportedExchange_SkipsVerification(t *testing.T) 
 		IsVerified:         false,
 	})
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
 		{Exchange: "okex", Strategy: "grid2"},
 	})

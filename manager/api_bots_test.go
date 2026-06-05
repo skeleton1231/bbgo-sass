@@ -215,7 +215,7 @@ func TestListBots_EmptyResult_ReturnsEmptyArray(t *testing.T) {
 }
 
 func TestListBots_NoContainers_ReturnsEmptyArray(t *testing.T) {
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
 	proxy := NewBotProxy(cm)

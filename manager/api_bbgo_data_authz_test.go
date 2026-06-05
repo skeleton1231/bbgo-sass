@@ -18,7 +18,7 @@ func TestBBGoDataEndpoints_UserIDMismatch_Rejected(t *testing.T) {
 	victimID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	attackerID := "11111111-2222-3333-4444-555555555555"
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
@@ -84,7 +84,7 @@ func TestBBGoDataEndpoints_UserIDMismatch_Rejected(t *testing.T) {
 func TestBBGoDataEndpoints_MatchingUserID_Accepted(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
@@ -125,7 +125,7 @@ func TestPnLEndpoint_UserIDMismatch_Rejected(t *testing.T) {
 	victimID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	attackerID := "11111111-2222-3333-4444-555555555555"
 
-	store := NewStrategyStore("")
+	store := NewStrategyStore("", nil)
 
 	cfg := &Config{ManagerToken: "test-token"}
 	cm := &ContainerManager{cfg: cfg, pool: nil}
@@ -169,7 +169,7 @@ func TestCredentialCreate_TriggersContainerRestart(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",
@@ -227,7 +227,7 @@ func TestCredentialDelete_TriggersContainerRestart(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(dir, enc)
 
-	store := NewStrategyStore(dir)
+	store := NewStrategyStore(dir, nil)
 
 	cfg := &Config{
 		SupabaseURL:  "http://localhost:1",

@@ -72,7 +72,7 @@ func TestCreateStrategy_EmptyMode_LiveOnlyRejected(t *testing.T) {
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	r := testRouter(api)
 
-	for _, strategy := range []string{"bollmaker", "supertrend", "dca2"} {
+	for _, strategy := range []string{"autoborrow", "convert", "sentinel"} {
 		t.Run(strategy, func(t *testing.T) {
 			body := map[string]any{
 				"name":     "No Mode LiveOnly",

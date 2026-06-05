@@ -14,7 +14,7 @@ func setupTestAPIWithNotifier(t *testing.T) (*API, func()) {
 	tmpDir := t.TempDir()
 	enc, _ := NewEncryptor(testEncryptionKey)
 	creds := NewCredentialStore(tmpDir, enc)
-	store := NewStrategyStore(tmpDir)
+	store := NewStrategyStore(tmpDir, nil)
 	cfg := &Config{DataDir: tmpDir, ManagerToken: "test-token", SupabaseURL: "http://localhost:1", SupabaseKey: "test"}
 	cm := &ContainerManager{cfg: cfg}
 	proxy := NewBotProxy(cm)
