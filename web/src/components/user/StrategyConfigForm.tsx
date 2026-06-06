@@ -123,7 +123,7 @@ export function StrategyConfigForm({ fields, values, onChange }: StrategyConfigF
       {[...groups.entries()].map(([groupName, groupFields]) => (
         <div key={groupName} className="space-y-3 rounded-md border border-border p-3">
           <h4 className="text-sm font-semibold text-muted-foreground">
-            {ft(groupName as Parameters<typeof ft>[0])}
+            {ft(`group_${groupName}` as Parameters<typeof ft>[0])}
           </h4>
           {groupFields.map((field) => (
             <div key={field.key}>

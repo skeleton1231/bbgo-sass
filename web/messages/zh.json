@@ -428,6 +428,59 @@
     "autoRepayWhenDeposit": "充值自动还款",
     "useLimitOrder": "使用限价单",
     "maxBaseBalance": "最大基础余额",
-    "multiplier": "乘数"
+    "multiplier": "乘数",
+    "group_breakLow": "突破低点",
+    "group_trendLine": "趋势线",
+    "group_orderFlow": "订单流",
+    "group_defaultBollinger": "默认布林带",
+    "group_neutralBollinger": "中性布林带",
+    "group_reverseEMA": "反向EMA",
+    "group_fastLinReg": "快速线性回归",
+    "group_slowLinReg": "慢速线性回归",
+    "group_bollinger": "布林带",
+    "group_linear": "线性",
+    "breakLow": {
+      "interval": "突破低点周期",
+      "window": "突破低点窗口期",
+      "ratio": "突破低点比率"
+    },
+    "trendLine": {
+      "interval": "趋势线周期",
+      "quantity": "趋势线数量",
+      "pivotRightWindow": "枢轴右侧窗口期"
+    },
+    "orderFlow": {
+      "interval": "订单流周期",
+      "quantity": "订单流数量"
+    },
+    "defaultBollinger": {
+      "interval": "默认布林带周期",
+      "window": "默认布林带窗口期",
+      "bandWidth": "默认布林带带宽"
+    },
+    "neutralBollinger": {
+      "interval": "中性布林带周期",
+      "window": "中性布林带窗口期",
+      "bandWidth": "中性布林带带宽"
+    },
+    "reverseEMA": {
+      "interval": "反向EMA周期",
+      "window": "反向EMA窗口期"
+    },
+    "fastLinReg": {
+      "interval": "快速线性回归周期",
+      "window": "快速线性回归窗口期"
+    },
+    "slowLinReg": {
+      "interval": "慢速线性回归周期",
+      "window": "慢速线性回归窗口期"
+    },
+    "bollinger": {
+      "interval": "布林带周期",
+      "window": "布林带窗口期"
+    },
+    "linear": {
+      "interval": "线性周期"
+    }
   }
 }

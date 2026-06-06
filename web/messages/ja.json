@@ -416,6 +416,59 @@
     "autoRepayWhenDeposit": "入金時自動返済",
     "useLimitOrder": "指値注文使用",
     "maxBaseBalance": "最大ベース残高",
-    "multiplier": "乗数"
+    "multiplier": "乗数",
+    "group_breakLow": "ブレイクロー",
+    "group_trendLine": "トレンドライン",
+    "group_orderFlow": "オーダーフロー",
+    "group_defaultBollinger": "デフォルトボリンジャー",
+    "group_neutralBollinger": "ニュートラルボリンジャー",
+    "group_reverseEMA": "リバースEMA",
+    "group_fastLinReg": "高速線形回帰",
+    "group_slowLinReg": "低速線形回帰",
+    "group_bollinger": "ボリンジャー",
+    "group_linear": "リニア",
+    "breakLow": {
+      "interval": "ブレイクロー期間",
+      "window": "ブレイクローウィンドウ",
+      "ratio": "ブレイクロー比率"
+    },
+    "trendLine": {
+      "interval": "トレンドライン期間",
+      "quantity": "トレンドライン数量",
+      "pivotRightWindow": "ピボット右ウィンドウ"
+    },
+    "orderFlow": {
+      "interval": "オーダーフロー期間",
+      "quantity": "オーダーフロー数量"
+    },
+    "defaultBollinger": {
+      "interval": "デフォルトボリンジャー期間",
+      "window": "デフォルトボリンジャーウィンドウ",
+      "bandWidth": "デフォルトボリンジャーバンド幅"
+    },
+    "neutralBollinger": {
+      "interval": "ニュートラルボリンジャー期間",
+      "window": "ニュートラルボリンジャーウィンドウ",
+      "bandWidth": "ニュートラルボリンジャーバンド幅"
+    },
+    "reverseEMA": {
+      "interval": "リバースEMA期間",
+      "window": "リバースEMAウィンドウ"
+    },
+    "fastLinReg": {
+      "interval": "高速線形回帰期間",
+      "window": "高速線形回帰ウィンドウ"
+    },
+    "slowLinReg": {
+      "interval": "低速線形回帰期間",
+      "window": "低速線形回帰ウィンドウ"
+    },
+    "bollinger": {
+      "interval": "ボリンジャー期間",
+      "window": "ボリンジャーウィンドウ"
+    },
+    "linear": {
+      "interval": "リニア期間"
+    }
   }
 }

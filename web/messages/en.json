@@ -429,6 +429,59 @@
     "window": "Window",
     "windowATR": "Window ATR",
     "windowQuick": "Window Quick",
-    "windowSlow": "Window Slow"
+    "windowSlow": "Window Slow",
+    "group_breakLow": "Break Low",
+    "group_trendLine": "Trend Line",
+    "group_orderFlow": "Order Flow",
+    "group_defaultBollinger": "Default Bollinger",
+    "group_neutralBollinger": "Neutral Bollinger",
+    "group_reverseEMA": "Reverse EMA",
+    "group_fastLinReg": "Fast Linear Regression",
+    "group_slowLinReg": "Slow Linear Regression",
+    "group_bollinger": "Bollinger",
+    "group_linear": "Linear",
+    "breakLow": {
+      "interval": "Break Low Interval",
+      "window": "Break Low Window",
+      "ratio": "Break Low Ratio"
+    },
+    "trendLine": {
+      "interval": "Trend Line Interval",
+      "quantity": "Trend Line Quantity",
+      "pivotRightWindow": "Pivot Right Window"
+    },
+    "orderFlow": {
+      "interval": "Order Flow Interval",
+      "quantity": "Order Flow Quantity"
+    },
+    "defaultBollinger": {
+      "interval": "Default Bollinger Interval",
+      "window": "Default Bollinger Window",
+      "bandWidth": "Default Bollinger Band Width"
+    },
+    "neutralBollinger": {
+      "interval": "Neutral Bollinger Interval",
+      "window": "Neutral Bollinger Window",
+      "bandWidth": "Neutral Bollinger Band Width"
+    },
+    "reverseEMA": {
+      "interval": "Reverse EMA Interval",
+      "window": "Reverse EMA Window"
+    },
+    "fastLinReg": {
+      "interval": "Fast LinReg Interval",
+      "window": "Fast LinReg Window"
+    },
+    "slowLinReg": {
+      "interval": "Slow LinReg Interval",
+      "window": "Slow LinReg Window"
+    },
+    "bollinger": {
+      "interval": "Bollinger Interval",
+      "window": "Bollinger Window"
+    },
+    "linear": {
+      "interval": "Linear Interval"
+    }
   }
 }

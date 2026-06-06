@@ -416,6 +416,59 @@
     "autoRepayWhenDeposit": "입금 시 자동 상환",
     "useLimitOrder": "지정가 주문 사용",
     "maxBaseBalance": "최대 기초 잔액",
-    "multiplier": "승수"
+    "multiplier": "승수",
+    "group_breakLow": "돌파 저점",
+    "group_trendLine": "트렌드 라인",
+    "group_orderFlow": "오더 플로우",
+    "group_defaultBollinger": "기본 볼린저",
+    "group_neutralBollinger": "중성 볼린저",
+    "group_reverseEMA": "역방향 EMA",
+    "group_fastLinReg": "빠른 선형 회귀",
+    "group_slowLinReg": "느린 선형 회귀",
+    "group_bollinger": "볼린저",
+    "group_linear": "선형",
+    "breakLow": {
+      "interval": "돌파 저점 주기",
+      "window": "돌파 저점 윈도우",
+      "ratio": "돌파 저점 비율"
+    },
+    "trendLine": {
+      "interval": "트렌드 라인 주기",
+      "quantity": "트렌드 라인 수량",
+      "pivotRightWindow": "피벗 우측 윈도우"
+    },
+    "orderFlow": {
+      "interval": "오더 플로우 주기",
+      "quantity": "오더 플로우 수량"
+    },
+    "defaultBollinger": {
+      "interval": "기본 볼린저 주기",
+      "window": "기본 볼린저 윈도우",
+      "bandWidth": "기본 볼린저 밴드 폭"
+    },
+    "neutralBollinger": {
+      "interval": "중성 볼린저 주기",
+      "window": "중성 볼린저 윈도우",
+      "bandWidth": "중성 볼린저 밴드 폭"
+    },
+    "reverseEMA": {
+      "interval": "역방향 EMA 주기",
+      "window": "역방향 EMA 윈도우"
+    },
+    "fastLinReg": {
+      "interval": "빠른 선형 회귀 주기",
+      "window": "빠른 선형 회귀 윈도우"
+    },
+    "slowLinReg": {
+      "interval": "느린 선형 회귀 주기",
+      "window": "느린 선형 회귀 윈도우"
+    },
+    "bollinger": {
+      "interval": "볼린저 주기",
+      "window": "볼린저 윈도우"
+    },
+    "linear": {
+      "interval": "선형 주기"
+    }
   }
 }
