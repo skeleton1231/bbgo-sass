@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
 import { useStrategyRegistry } from '@/components/providers/strategy-registry'
-import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, type SessionRole } from '@/lib/bbgo/strategies'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, nestConfig, type SessionRole } from '@/lib/bbgo/strategies'
 import { EXCHANGES } from '@/lib/bbgo/constants'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { StrategyConfigForm } from './StrategyConfigForm'
@@ -65,7 +65,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const numericConfig = ensureTypes(schema, config)
+    const numericConfig = nestConfig(ensureTypes(schema, config))
     const onError = (err: Error) => {
       toast.error(err.message)
     }

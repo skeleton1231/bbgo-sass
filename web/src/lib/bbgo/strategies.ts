@@ -11,6 +11,7 @@ export interface FieldDef {
   step?: number
   required?: boolean
   description?: string
+  group?: string
 }
 
 export interface SessionRole {
@@ -65,9 +66,30 @@ export function getStrategyDefaults(id: string, registry?: StrategySchema[]): Re
   if (!schema) return {}
   const defaults: Record<string, unknown> = {}
   for (const field of schema.fields) {
-    defaults[field.key] = field.default
+    setNestedValue(defaults, field.key, field.default)
   }
   return defaults
+}
+
+function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown) {
+  const keys = path.split('.')
+  let current: Record<string, unknown> = obj
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!(keys[i]! in current) || typeof current[keys[i]!] !== 'object' || current[keys[i]!] === null) {
+      current[keys[i]!] = {}
+    }
+    current = current[keys[i]!] as Record<string, unknown>
+  }
+  current[keys[keys.length - 1]!] = value
+}
+
+export function nestConfig(config: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(config)) {
+    if (value === undefined || value === null || value === '') continue
+    setNestedValue(result, key, value)
+  }
+  return result
 }
 
 export function ensureTypes(schema: StrategySchema | undefined, config: Record<string, unknown>): Record<string, unknown> {
