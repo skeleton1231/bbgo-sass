@@ -122,7 +122,7 @@ func main() {
 
 	btJobStore := NewBacktestJobStore(cfg.DataDir)
 	storageClient := NewStorageClient(cfg.SupabaseURL, cfg.SupabaseKey)
-	btExecutor := NewBacktestExecutor(btJobStore, containerMgr, notifier, storageClient)
+	btExecutor := NewBacktestExecutor(btJobStore, containerMgr, notifier, storageClient, defaultsCache)
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)

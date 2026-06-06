@@ -98,12 +98,19 @@ type BBGoTradesResponse struct {
 }
 
 func (c *BBGoClient) GetTrades(exchange, symbol string, lastGID int64) ([]BBGoTrade, error) {
+	return c.GetTradesWithStrategy(exchange, symbol, lastGID, "")
+}
+
+func (c *BBGoClient) GetTradesWithStrategy(exchange, symbol string, lastGID int64, strategy string) ([]BBGoTrade, error) {
 	q := url.Values{"gid": {strconv.FormatInt(lastGID, 10)}}
 	if exchange != "" {
 		q.Set("exchange", exchange)
 	}
 	if symbol != "" {
 		q.Set("symbol", symbol)
+	}
+	if strategy != "" {
+		q.Set("strategy", strategy)
 	}
 
 	var resp BBGoTradesResponse
@@ -121,10 +128,14 @@ func (c *BBGoClient) GetAllTrades(exchange, symbol string) ([]BBGoTrade, error) 
 }
 
 func (c *BBGoClient) GetAllTradesFrom(exchange, symbol string, lastGID int64) ([]BBGoTrade, error) {
+	return c.GetAllTradesFromWithStrategy(exchange, symbol, lastGID, "")
+}
+
+func (c *BBGoClient) GetAllTradesFromWithStrategy(exchange, symbol string, lastGID int64, strategy string) ([]BBGoTrade, error) {
 	var all []BBGoTrade
 	cursor := lastGID
 	for {
-		trades, err := c.GetTrades(exchange, symbol, cursor)
+		trades, err := c.GetTradesWithStrategy(exchange, symbol, cursor, strategy)
 		if err != nil {
 			return nil, err
 		}

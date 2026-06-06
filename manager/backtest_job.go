@@ -238,6 +238,7 @@ type BacktestExecutor struct {
 	container *ContainerManager
 	notifier  *Notifier
 	storage   *StorageClient
+	defaults  DefaultsProvider
 
 	// Test hooks — override in tests to mock Docker operations.
 	syncFn    func(userID, exchange, symbol, startTime, endTime string) (string, error)
@@ -245,12 +246,13 @@ type BacktestExecutor struct {
 	reportFn  func(userID, jobID string) (json.RawMessage, []byte, error)
 }
 
-func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier *Notifier, storage *StorageClient) *BacktestExecutor {
+func NewBacktestExecutor(store *BacktestJobStore, cm *ContainerManager, notifier *Notifier, storage *StorageClient, defaults DefaultsProvider) *BacktestExecutor {
 	return &BacktestExecutor{
 		store:     store,
 		container: cm,
 		notifier:  notifier,
 		storage:   storage,
+		defaults:  defaults,
 	}
 }
 
@@ -296,7 +298,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	ex.store.UpdateStatus(job.ID, JobRunning, "running backtest...")
 
-	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime, job.Exchange, job.Symbol)
+	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime, job.Exchange, job.Symbol, ex.defaults)
 	if err != nil {
 		ex.store.FailJob(job.ID, "config error", fmt.Sprintf("invalid config: %v", err))
 		return

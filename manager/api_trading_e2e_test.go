@@ -192,7 +192,7 @@ func TestTradingChain_MultipleExchanges(t *testing.T) {
 func TestTradingChain_BacktestYAML(t *testing.T) {
 	yamlBytes, err := buildBacktestYAML("grid",
 		json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
-		"2024-01-01", "2024-06-01", "binance", "")
+		"2024-01-01", "2024-06-01", "binance", "", nil)
 	require.NoError(t, err)
 	yamlStr := string(yamlBytes)
 	assert.Contains(t, yamlStr, "backtest:")

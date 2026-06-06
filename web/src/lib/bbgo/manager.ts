@@ -473,11 +473,12 @@ export function fetchContainerLogs(userId: string, tail?: string, mode?: 'live' 
   return request<{ logs: string }>(`/users/${userId}/logs?${params}`)
 }
 
-export function fetchBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper') {
+export function fetchBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', strategy?: string) {
   const params = new URLSearchParams()
   params.set('mode', mode ?? 'live')
   if (exchange) params.set('exchange', exchange)
   if (symbol) params.set('symbol', symbol)
+  if (strategy) params.set('strategy', strategy)
   return request<PnLReport>(`/users/${userId}/bbgo/pnl?${params}`)
 }
 

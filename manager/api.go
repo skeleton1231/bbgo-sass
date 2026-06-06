@@ -376,10 +376,8 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if api.isContainerRunning(userID, req.Mode) {
-		if _, loaded := api.starting.LoadOrStore(containerKey(userID, req.Mode), true); !loaded {
-			go api.startUserContainer(userID, req.Mode)
-		}
+	if _, loaded := api.starting.LoadOrStore(containerKey(userID, req.Mode), true); !loaded {
+		go api.startUserContainer(userID, req.Mode)
 	}
 
 	writeJSON(w, http.StatusCreated, strategyCreatedResponse{
@@ -1408,7 +1406,7 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "")
+	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "", api.strategies.Defaults())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid config: %v", err))
 		return

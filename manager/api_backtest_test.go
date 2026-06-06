@@ -27,7 +27,7 @@ func setupBacktestTestAPI(t *testing.T) (*API, *BacktestJobStore, *chi.Mux) {
 	proxy := NewBotProxy(cm)
 
 	btJobs := NewBacktestJobStore(t.TempDir())
-	btExec := NewBacktestExecutor(btJobs, cm, nil, nil)
+	btExec := NewBacktestExecutor(btJobs, cm, nil, nil, nil)
 
 	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, btExec, btJobs, nil)
 

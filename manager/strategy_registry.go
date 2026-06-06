@@ -39,16 +39,12 @@ func (r *StrategyDefaultsCache) Load() error {
 
 	m := make(map[string]map[string]any, len(entries))
 	for _, e := range entries {
-		if len(e.Defaults) == 0 || string(e.Defaults) == "{}" {
-			m[e.ID] = nil
-			continue
+		if len(e.Defaults) > 0 && string(e.Defaults) != "{}" {
+			var defs map[string]any
+			if err := json.Unmarshal(e.Defaults, &defs); err == nil && len(defs) > 0 {
+				m[e.ID] = defs
+			}
 		}
-		var defs map[string]any
-		if err := json.Unmarshal(e.Defaults, &defs); err != nil {
-			log.Printf("strategy_registry: skipping %s: %v", e.ID, err)
-			continue
-		}
-		m[e.ID] = defs
 	}
 
 	r.mu.Lock()

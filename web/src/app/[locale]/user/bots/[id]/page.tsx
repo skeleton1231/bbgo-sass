@@ -107,7 +107,7 @@ export default function BotDetailPage() {
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
   const { data: pingData } = useBotPing(userId, mode, isRunning)
   const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
-  const { data: pnlData } = useBotPnL(userId, undefined, symbol || undefined, mode, isRunning)
+  const { data: pnlData } = useBotPnL(userId, undefined, symbol || undefined, mode, isRunning, bot?.strategy)
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
 
@@ -157,7 +157,12 @@ export default function BotDetailPage() {
     if (!strategies.length) return undefined
     // If only one strategy, use it
     if (strategies.length === 1) return strategies[0]
-    // Match by bot config (lowerPrice/upperPrice) to disambiguate multiple strategies on same symbol
+    // Match by strategy type first
+    if (bot?.strategy) {
+      const matched = strategies.find((s) => s.strategy === bot.strategy)
+      if (matched) return matched
+    }
+    // Match by bot config (lowerPrice/upperPrice) to disambiguate multiple same-type strategies
     const botLower = bot?.config?.lowerPrice as number | undefined
     const botUpper = bot?.config?.upperPrice as number | undefined
     if (botLower != null && botUpper != null) {
@@ -174,7 +179,7 @@ export default function BotDetailPage() {
       const inner = s[strategy] as Record<string, unknown> | undefined
       return inner?.symbol === symbol || (!symbol && inner?.symbol)
     })
-  }, [bot?.config?.lowerPrice, bot?.config?.upperPrice, symbol])
+  }, [bot?.strategy, bot?.config?.lowerPrice, bot?.config?.upperPrice, symbol])
 
   const gridLines: GridLine[] = useMemo(() => {
     if (!strategyStatesData?.strategies) return []

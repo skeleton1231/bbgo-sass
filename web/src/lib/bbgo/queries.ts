@@ -328,11 +328,11 @@ export function useContainerLogs(userId: string, tail?: string, mode?: 'live' | 
   })
 }
 
-export function useBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotPnL(userId: string, exchange?: string, symbol?: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategy?: string) {
   return useQuery<PnLReport>({
-    queryKey: ['bot-pnl', userId, exchange, symbol, mode],
+    queryKey: ['bot-pnl', userId, exchange, symbol, mode, strategy],
     queryFn: async (): Promise<PnLReport> => {
-      const raw = await fetchBotPnL(userId, exchange, symbol, mode)
+      const raw = await fetchBotPnL(userId, exchange, symbol, mode, strategy)
       return {
         totalRealizedPnl: raw.totalRealizedPnl ?? 0,
         totalUnrealizedPnl: raw.totalUnrealizedPnl ?? 0,

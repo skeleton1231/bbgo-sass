@@ -6,12 +6,46 @@ import (
 	"testing"
 )
 
+// staticDefaults provides the old backtestDefaults as a DefaultsProvider for tests.
+// Once the registry migration is applied, tests should use StrategyDefaultsCache instead.
+var staticDefaults = &staticDefaultsProvider{defaults: map[string]map[string]any{
+	"grid":        {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 50, "side": "both"},
+	"grid2":       {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
+	"xhedgegrid":  {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
+	"bollgrid":    {"interval": "1h", "profitSpread": 50, "gridPips": 50, "quantity": 0.001},
+	"emacross":    {"interval": "1h", "fastWindow": 7, "slowWindow": 25},
+	"trendtrader": {"interval": "1h", "trendLine": map[string]any{"interval": "1h", "quantity": 0.001, "pivotRightWindow": 5}},
+	"supertrend":  {"interval": "1h", "quantity": 0.001},
+	"atrpin":      {"interval": "1h", "quantity": 0.001, "multiplier": 2.0},
+	"pivotshort":  {"interval": "1h", "breakLow": map[string]any{"interval": "1h", "window": 7, "ratio": 0.01}},
+	"swing":       {"interval": "1h", "movingAverageType": "SMA", "movingAverageWindow": 20, "movingAverageInterval": "1h", "baseQuantity": 0.0001},
+	"ewo_dgtrd":   {"interval": "1h", "sigWin": 5, "stoploss": 0.02},
+	"irr":         {"interval": "1h", "window": 20, "quantity": 0.001},
+	"flashcrash":  {"interval": "1h", "baseQuantity": 0.001},
+	"fixedmaker":  {"interval": "1m", "quantity": 0.001, "halfSpread": 0.001},
+	"fmaker":      {"interval": "1h", "spread": 0.001, "quantity": 0.001},
+	"bollmaker":   {"interval": "1h"},
+	"harmonic":    {"interval": "1h", "window": 20, "quantity": 0.001},
+	"dca":         {"investmentInterval": "1h", "budget": 500, "budgetPeriod": "day"},
+	"schedule":    {"interval": "1h", "quantity": 0.001, "side": "buy"},
+	"random":      {"schedule": "*/30 * * * *", "dryRun": true, "quantity": 0.001},
+	"techsignal":  {"interval": "1h", "supportDetection": []map[string]any{{"interval": "1h", "movingAverageInterval": "1h", "movingAverageWindow": 20, "movingAverageType": "SMA"}}},
+}}
+
+type staticDefaultsProvider struct {
+	defaults map[string]map[string]any
+}
+
+func (s *staticDefaultsProvider) GetDefaults(strategyID string) map[string]any {
+	return s.defaults[strategyID]
+}
+
 func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 	tests := []struct {
-		strategy   string
-		config     string
-		wantField  string
-		wantValue  string
+		strategy  string
+		config    string
+		wantField string
+		wantValue string
 	}{
 		{"emacross", `{"symbol":"BTCUSDT","quantity":0.1}`, "interval", "1h"},
 		{"supertrend", `{"symbol":"ETHUSDT","factor":3}`, "interval", "1h"},
@@ -39,7 +73,7 @@ func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.strategy, func(t *testing.T) {
-			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "")
+			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -56,7 +90,7 @@ func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 
 func TestBacktestDefaults_NotOverriddenWhenPresent(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","interval":"4h","quantity":0.1}`
-	yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "")
+	yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +102,7 @@ func TestBacktestDefaults_NotOverriddenWhenPresent(t *testing.T) {
 
 func TestBacktestDefaults_BollgridProfitSpread(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","gridNumber":8,"quantity":0.001}`
-	yaml, err := buildBacktestYAML("bollgrid", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "")
+	yaml, err := buildBacktestYAML("bollgrid", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +134,7 @@ func TestBacktestYAML_NumbersNotQuoted(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.strategy+"_"+tt.field, func(t *testing.T) {
-			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "")
+			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
 			if err != nil {
 				t.Fatal(err)
 			}

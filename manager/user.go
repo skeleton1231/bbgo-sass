@@ -44,6 +44,10 @@ var liveOnlyStrategies = map[string]bool{
 	"convert":          true,
 	"deposit2transfer": true,
 	"sentinel":         true,
+	"dca2":             true,
+	"dca3":             true,
+	"liquiditymaker":   true,
+	"xhedgegrid":       true,
 }
 
 // legacyFieldAliases maps strategy IDs to old→new field renames.
@@ -55,6 +59,25 @@ var legacyFieldAliases = map[string]map[string]string{
 	"autobuy":     {"interval": "schedule", "buyQuantity": "quantity"},
 	"rebalance":   {"interval": "schedule"},
 	"drift":       {"drawGraph": "generateGraph"},
+}
+
+// deepMerge recursively merges overlay into base. Map values are merged recursively;
+// all other types (including slices) from overlay replace base values.
+func deepMerge(base, overlay map[string]any) map[string]any {
+	result := make(map[string]any, len(base))
+	for k, v := range base {
+		result[k] = v
+	}
+	for k, v := range overlay {
+		if baseMap, ok := base[k].(map[string]any); ok {
+			if overlayMap, ok := v.(map[string]any); ok {
+				result[k] = deepMerge(baseMap, overlayMap)
+				continue
+			}
+		}
+		result[k] = v
+	}
+	return result
 }
 
 // normalizeStrategyConfig fixes old strategy IDs and field names from legacy DB records.
@@ -110,6 +133,13 @@ type StrategyStore struct {
 
 func NewStrategyStore(dataDir string, registry *StrategyDefaultsCache) *StrategyStore {
 	return &StrategyStore{dataDir: dataDir, registry: registry}
+}
+
+func (s *StrategyStore) Defaults() DefaultsProvider {
+	if s.registry == nil {
+		return nil
+	}
+	return s.registry
 }
 
 // yamlPath returns the path to bbgo.yaml for a given user/mode.
@@ -245,11 +275,7 @@ func (s *StrategyStore) AddStrategy(userID, mode string, entry StrategyEntry, ha
 			if err := json.Unmarshal(entry.Config, &config); err != nil {
 				config = map[string]any{}
 			}
-			for k, v := range defaults {
-				if _, exists := config[k]; !exists {
-					config[k] = v
-				}
-			}
+			config = deepMerge(defaults, config)
 			if updated, err := json.Marshal(config); err == nil {
 				entry.Config = updated
 			}
@@ -557,33 +583,12 @@ func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions
 	}
 }
 
-// backtestDefaults contains default values for strategy fields that are required
-// by bbgo but may not be sent by the frontend (e.g. interval, profitSpread).
-var backtestDefaults = map[string]map[string]any{
-	"grid":        {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 50, "side": "both"},
-	"grid2":       {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
-	"xhedgegrid":  {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
-	"bollgrid":    {"interval": "1h", "profitSpread": 50, "gridPips": 50, "quantity": 0.001},
-	"emacross":    {"interval": "1h", "fastWindow": 7, "slowWindow": 25},
-	"trendtrader": {"interval": "1h", "trendLine": map[string]any{"interval": "1h", "quantity": 0.001, "pivotRightWindow": 5}},
-	"supertrend":  {"interval": "1h", "quantity": 0.001},
-	"atrpin":      {"interval": "1h", "quantity": 0.001, "multiplier": 2.0},
-	"pivotshort":  {"interval": "1h", "breakLow": map[string]any{"interval": "1h", "window": 7, "ratio": 0.01}},
-	"swing":       {"interval": "1h", "movingAverageType": "SMA", "movingAverageWindow": 20, "movingAverageInterval": "1h", "baseQuantity": 0.0001},
-	"ewo_dgtrd":   {"interval": "1h", "sigWin": 5, "stoploss": 0.02},
-	"irr":         {"interval": "1h", "window": 20, "quantity": 0.001},
-	"flashcrash":  {"interval": "1h", "baseQuantity": 0.001},
-	"fixedmaker":  {"interval": "1m", "quantity": 0.001, "halfSpread": 0.001},
-	"fmaker":      {"interval": "1h", "spread": 0.001, "quantity": 0.001},
-	"bollmaker":   {"interval": "1h"},
-	"harmonic":    {"interval": "1h", "window": 20, "quantity": 0.001},
-	"dca":         {"investmentInterval": "1h", "budget": 500, "budgetPeriod": "day"},
-	"schedule":    {"interval": "1h", "quantity": 0.001, "side": "buy"},
-	"random":      {"schedule": "*/30 * * * *", "dryRun": true, "quantity": 0.001},
-	"techsignal":  {"interval": "1h", "supportDetection": []map[string]any{{"interval": "1h", "movingAverageInterval": "1h", "movingAverageWindow": 20, "movingAverageType": "SMA"}}},
+// DefaultsProvider returns strategy defaults from the registry cache.
+type DefaultsProvider interface {
+	GetDefaults(strategyID string) map[string]any
 }
 
-func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string) ([]byte, error) {
+func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string, defaults DefaultsProvider) ([]byte, error) {
 	var allParams map[string]any
 	if len(rawConfig) == 0 || string(rawConfig) == "null" {
 		allParams = map[string]any{}
@@ -591,12 +596,10 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 		return nil, err
 	}
 
-	// Inject defaults for required fields missing from client config
-	if defaults, ok := backtestDefaults[strategy]; ok {
-		for k, v := range defaults {
-			if _, exists := allParams[k]; !exists {
-				allParams[k] = v
-			}
+	// Inject defaults from strategy_registry (complete template + deep merge)
+	if defaults != nil {
+		if tmpl := defaults.GetDefaults(strategy); tmpl != nil {
+			allParams = deepMerge(tmpl, allParams)
 		}
 	}
 
