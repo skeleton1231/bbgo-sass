@@ -477,7 +477,8 @@
     },
     "bollinger": {
       "interval": "布林带周期",
-      "window": "布林带窗口期"
+      "window": "布林带窗口期",
+      "bandWidth": "布林带宽度"
     },
     "linear": {
       "interval": "线性周期"

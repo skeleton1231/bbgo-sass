@@ -465,7 +465,8 @@
     },
     "bollinger": {
       "interval": "볼린저 주기",
-      "window": "볼린저 윈도우"
+      "window": "볼린저 윈도우",
+      "bandWidth": "볼린저 밴드 폭"
     },
     "linear": {
       "interval": "선형 주기"

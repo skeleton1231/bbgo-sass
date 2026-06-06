@@ -478,7 +478,8 @@
     },
     "bollinger": {
       "interval": "Bollinger Interval",
-      "window": "Bollinger Window"
+      "window": "Bollinger Window",
+      "bandWidth": "Bollinger Band Width"
     },
     "linear": {
       "interval": "Linear Interval"

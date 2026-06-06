@@ -465,7 +465,8 @@
     },
     "bollinger": {
       "interval": "ボリンジャー期間",
-      "window": "ボリンジャーウィンドウ"
+      "window": "ボリンジャーウィンドウ",
+      "bandWidth": "ボリンジャーバンド幅"
     },
     "linear": {
       "interval": "リニア期間"
