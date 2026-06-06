@@ -130,6 +130,11 @@ func (s *StrategyStore) hostDir(userID, mode string) string {
 	return dir
 }
 
+// dbPath returns the path to the SQLite database for a given user/mode.
+func (s *StrategyStore) dbPath(userID, mode string) string {
+	return filepath.Join(s.hostDir(userID, mode), "bbgo.db")
+}
+
 // ReadYAML reads the raw bbgo.yaml content for a user/mode.
 func (s *StrategyStore) ReadYAML(userID, mode string) ([]byte, error) {
 	return os.ReadFile(s.yamlPath(userID, mode))
@@ -251,6 +256,10 @@ func (s *StrategyStore) AddStrategy(userID, mode string, entry StrategyEntry, ha
 		}
 	}
 
+	if extractSymbolFromConfig(entry.Config) == "" && !entry.CrossExchange {
+		return fmt.Errorf("symbol is required for strategy %s", entry.Strategy)
+	}
+
 	var existing []StrategyEntry
 	if data, err := s.ReadYAML(userID, mode); err == nil {
 		existing, _ = parseStrategiesFromYAML(data)
@@ -298,6 +307,7 @@ func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol, exchange 
 
 	if len(filtered) == 0 {
 		os.Remove(s.yamlPath(userID, mode))
+		os.Remove(s.dbPath(userID, mode))
 		return true, nil
 	}
 
@@ -307,6 +317,7 @@ func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol, exchange 
 func (s *StrategyStore) ClearStrategies(userID, mode string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	os.Remove(s.dbPath(userID, mode))
 	return os.Remove(s.yamlPath(userID, mode))
 }
 

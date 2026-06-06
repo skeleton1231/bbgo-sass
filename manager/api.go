@@ -416,36 +416,66 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	strategyID := chi.URLParam(r, "strategyID")
 	mode := modeFromQuery(r)
 
-	if !api.isContainerRunning(userID, mode) {
-		writeError(w, http.StatusBadRequest, "container is not running — start it first to delete strategies")
-		return
-	}
+	// Resolve strategy type+symbol+exchange either from the running container
+	// or by parsing the YAML file on disk (for crashed containers).
+	var strategy, symbol, exchange string
 
-	// Query bbgo API to find the strategy by instanceID and get its type+symbol
-	client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
-	bbgoStrategies, err := client.GetStrategies()
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to query strategies: %v", err))
-		return
-	}
-
-	var target BBGoStrategyState
-	for _, s := range bbgoStrategies {
-		if id, _ := s["strategyInstanceID"].(string); id == strategyID {
-			target = s
-			break
+	if api.isContainerRunning(userID, mode) {
+		client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
+		bbgoStrategies, err := client.GetStrategies()
+		if err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to query strategies: %v", err))
+			return
 		}
-	}
-	if target == nil {
-		writeError(w, http.StatusNotFound, "strategy not found")
-		return
-	}
 
-	strategy, _ := target["strategy"].(string)
-	symbol, _ := target["symbol"].(string)
-	var exchange string
-	if on, ok := target["on"].([]any); ok && len(on) > 0 {
-		exchange, _ = on[0].(string)
+		var target BBGoStrategyState
+		for _, s := range bbgoStrategies {
+			if id, _ := s["strategyInstanceID"].(string); id == strategyID {
+				target = s
+				break
+			}
+		}
+		if target == nil {
+			writeError(w, http.StatusNotFound, "strategy not found")
+			return
+		}
+
+		strategy, _ = target["strategy"].(string)
+		symbol, _ = target["symbol"].(string)
+		if symbol == "" {
+			if cfg, ok := target[strategy]; ok {
+				if m, ok := cfg.(map[string]any); ok {
+					symbol, _ = m["symbol"].(string)
+				}
+			}
+		}
+		if on, ok := target["on"].([]any); ok && len(on) > 0 {
+			exchange, _ = on[0].(string)
+		}
+	} else {
+		// Container not running — parse YAML directly to find the strategy by ID.
+		// strategyID format from bbgo: "strategy:symbol:..." (e.g. "emacross:BTCUSDT:1h:9-21")
+		// We match by strategy type + symbol since the full ID contains runtime details.
+		entries, err := api.strategies.ListStrategies(userID, mode)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "no strategy config found")
+			return
+		}
+		for _, e := range entries {
+			eSymbol := extractSymbolFromConfig(e.Config)
+			// Match if the strategyID starts with "strategy:symbol:" or equals "strategy" for symbol-less strategies
+			prefix := e.Strategy + ":" + eSymbol
+			if strings.HasPrefix(strategyID, prefix+":") || (eSymbol == "" && strategyID == e.Strategy) {
+				strategy = e.Strategy
+				symbol = eSymbol
+				exchange = e.Exchange
+				break
+			}
+		}
+		if strategy == "" {
+			writeError(w, http.StatusNotFound, "strategy not found in bbgo.yaml")
+			return
+		}
 	}
 
 	hasCredFn := func(exchange string) bool {
@@ -1091,7 +1121,7 @@ func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol, strategy 
 		if symbol != "" && t.Symbol != symbol {
 			continue
 		}
-		if strategy != "" && t.StrategyID != strategy {
+		if strategy != "" && !strategyMatch(t.StrategyID, strategy) {
 			continue
 		}
 		if since != nil && t.TradedAt < since.Format(time.RFC3339) {
@@ -1292,6 +1322,7 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 
 		exchange := r.URL.Query().Get("exchange")
 		symbol := r.URL.Query().Get("symbol")
+		strategy := r.URL.Query().Get("strategy")
 
 		var lastGID int64
 		if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
@@ -1301,7 +1332,7 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var err error
-		trades, err = client.GetAllTradesFrom(exchange, symbol, lastGID)
+		trades, err = client.GetAllTradesFromWithStrategy(exchange, symbol, lastGID, strategy)
 		if err != nil {
 			session := exchange
 			if session == "" {
@@ -2123,4 +2154,13 @@ func collectExchanges(strategies []StrategyEntry) []string {
 		}
 	}
 	return result
+}
+
+// strategyMatch checks if a trade's strategyID matches the requested strategy type.
+// Supports both exact match (new format: "grid2") and prefix match (legacy: "grid2-BTCUSDT-size-5-...").
+func strategyMatch(tradeStrategy, filterStrategy string) bool {
+	if tradeStrategy == filterStrategy {
+		return true
+	}
+	return strings.HasPrefix(tradeStrategy, filterStrategy+"-") || strings.HasPrefix(tradeStrategy, filterStrategy+":")
 }
