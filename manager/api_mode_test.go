@@ -161,7 +161,8 @@ func TestAPI_CreateStrategy_LiveOnlyLegacyAlias(t *testing.T) {
 // Keep this list in sync with the frontend. Test below validates consistency.
 var frontendLiveOnlyStrategies = map[string]bool{
 	"autoborrow": true, "convert": true, "deposit2transfer": true,
-	"sentinel": true,
+	"sentinel": true, "dca2": true, "dca3": true,
+	"liquiditymaker": true, "xhedgegrid": true,
 }
 
 func TestLiveOnlyLists_FrontendBackendSync(t *testing.T) {

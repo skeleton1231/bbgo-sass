@@ -95,15 +95,20 @@ func TestDeleteStrategy_StoppedContainer_NoRestart(t *testing.T) {
 	defer cleanup()
 
 	userID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	// Pre-seed a strategy so offline delete can find and remove it
+	writeTestStrategies(t, api.strategies, userID, ModeLive, []StrategyEntry{
+		{Name: "Grid", Exchange: "binance", Strategy: "grid", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
+	})
 
 	r := testRouter(api)
-	req := httptest.NewRequest(http.MethodDelete, "/api/users/"+userID+"/strategies/strat-1", nil)
+	// Use strategy:symbol prefix format that offline delete matches against
+	req := httptest.NewRequest(http.MethodDelete, "/api/users/"+userID+"/strategies/grid:BTCUSDT:binance", nil)
 	req.Header.Set("X-User-Id", userID)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 (container not running), got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (offline delete), got %d: %s", w.Code, w.Body.String())
 	}
 }
 

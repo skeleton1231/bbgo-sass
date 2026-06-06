@@ -12,12 +12,16 @@ import (
 // TestCrossLayerLiveOnlyAlignment verifies the backend liveOnlyStrategies map
 // covers all strategy IDs that the frontend marks as liveOnly.
 func TestCrossLayerLiveOnlyAlignment(t *testing.T) {
-	require.Len(t, liveOnlyStrategies, 4, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
+	require.Len(t, liveOnlyStrategies, 8, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
 
 	assert.True(t, liveOnlyStrategies["autoborrow"])
 	assert.True(t, liveOnlyStrategies["convert"])
 	assert.True(t, liveOnlyStrategies["deposit2transfer"])
 	assert.True(t, liveOnlyStrategies["sentinel"])
+	assert.True(t, liveOnlyStrategies["dca2"])
+	assert.True(t, liveOnlyStrategies["dca3"])
+	assert.True(t, liveOnlyStrategies["liquiditymaker"])
+	assert.True(t, liveOnlyStrategies["xhedgegrid"])
 
 	// Legacy aliases should NOT be in liveOnlyStrategies — they get normalized
 	assert.False(t, liveOnlyStrategies["sentinel_anomaly"])

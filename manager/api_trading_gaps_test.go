@@ -223,7 +223,7 @@ func TestAPI_CredentialThenLiveStrategy_Chain(t *testing.T) {
 	}
 
 	// Step 2: Create live strategy — should succeed
-	stratBody := `{"name":"My Grid","exchange":"binance","strategy":"grid2","config":{},"mode":"live"}`
+	stratBody := `{"name":"My Grid","exchange":"binance","strategy":"grid2","config":{"symbol":"BTCUSDT"},"mode":"live"}`
 	req2 := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", strings.NewReader(stratBody))
 	req2.Header.Set("X-User-Id", userID)
 	w2 := httptest.NewRecorder()

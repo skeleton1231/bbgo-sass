@@ -252,7 +252,8 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 	frontendLiveOnly := map[string]bool{
 		"autoborrow": true, "convert": true, "deposit2transfer": true,
-		"sentinel": true,
+		"sentinel": true, "dca2": true, "dca3": true,
+		"liquiditymaker": true, "xhedgegrid": true,
 	}
 
 	for alias, canonical := range legacyStrategyAliases {

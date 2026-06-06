@@ -132,7 +132,7 @@ func TestAPI_CreateStrategy_ModeInheritsFromExisting(t *testing.T) {
 	})
 
 	r := testRouter(api)
-	stratBody := `{"name":"No Mode","exchange":"binance","strategy":"grid","config":{}}`
+	stratBody := `{"name":"No Mode","exchange":"binance","strategy":"grid","config":{"symbol":"BTCUSDT"}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/users/"+userID+"/strategies", strings.NewReader(stratBody))
 	req.Header.Set("X-User-Id", userID)
 	w := httptest.NewRecorder()

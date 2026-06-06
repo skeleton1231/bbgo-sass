@@ -234,7 +234,8 @@ func TestCrossExchangeEnvPrefixAutoFill(t *testing.T) {
 func TestLiveOnlyStrategiesBackendFrontendConsistency(t *testing.T) {
 	frontendLiveOnly := map[string]bool{
 		"autoborrow": true, "convert": true, "deposit2transfer": true,
-		"sentinel": true,
+		"sentinel": true, "dca2": true, "dca3": true,
+		"liquiditymaker": true, "xhedgegrid": true,
 	}
 
 	// Normalize frontend IDs to bbgo IDs and check against backend

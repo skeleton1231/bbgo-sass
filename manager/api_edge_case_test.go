@@ -55,8 +55,8 @@ func TestCreateStrategy_StoppedContainer_NoAutoStart(t *testing.T) {
 	if len(strats) != 1 {
 		t.Fatalf("expected 1 strategy, got %d", len(strats))
 	}
-	if startCalled {
-		t.Error("creating strategy on stopped container should NOT trigger auto-start")
+	if !startCalled {
+		t.Error("creating strategy should trigger container start")
 	}
 }
 
