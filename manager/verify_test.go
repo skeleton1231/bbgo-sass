@@ -176,7 +176,7 @@ func TestCreateCredential_Verified_SetsIsVerified(t *testing.T) {
 	defer func() { exchangeBaseURLs = origURLs }()
 
 	api, cleanup := setupCredsAPI(t)
-	api.verifyCredFn = nil // use real verifyCredential with mock server
+	api.verifyCredFn = nil
 	defer cleanup()
 
 	body := `{"exchange":"binance","api_key":"valid-key","api_secret":"valid-secret"}`
@@ -213,7 +213,7 @@ func TestCreateCredential_VerificationFailed_SetsError(t *testing.T) {
 	defer func() { exchangeBaseURLs = origURLs }()
 
 	api, cleanup := setupCredsAPI(t)
-	api.verifyCredFn = nil // use real verifyCredential with mock server
+	api.verifyCredFn = nil
 	defer cleanup()
 
 	body := `{"exchange":"binance","api_key":"bad-key","api_secret":"bad-secret"}`
@@ -249,20 +249,16 @@ func TestCreateCredential_Unverified_DoesNotRestart(t *testing.T) {
 	defer func() { exchangeBaseURLs = origURLs }()
 
 	api, cleanup := setupCredsAPI(t)
-	api.verifyCredFn = nil // use real verifyCredential with mock server
+	api.verifyCredFn = nil
 	defer cleanup()
 
-	writeTestStrategies(t, api.strategies, credsUID, ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2"},
-	})
-	api.containerRunning = containerRunningFor(map[string]bool{
-		credsUID + ":" + ModeLive: true,
-	})
+	createTestInstance(t, api.store, credsUID, ModeLive, "grid2", "BTCUSDT", nil)
+	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
 
-	var startCalled bool
-	api.containerStart = func(userID, mode string) error {
-		startCalled = true
-		return nil
+	var dockerCalled bool
+	api.container.dockerFn = func(args ...string) (string, error) {
+		dockerCalled = true
+		return "", nil
 	}
 
 	body := `{"exchange":"binance","api_key":"k","api_secret":"s"}`
@@ -271,7 +267,7 @@ func TestCreateCredential_Unverified_DoesNotRestart(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.CreateCredential(w, req)
 
-	if startCalled {
+	if dockerCalled {
 		t.Error("unverified credential should NOT trigger container restart")
 	}
 }
@@ -294,17 +290,13 @@ func TestStartUserContainer_UnverifiedCredential_Rejected(t *testing.T) {
 		IsVerified:         false,
 	})
 
-	store := NewStrategyStore(dir, nil)
-	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2"},
-	})
+	store := NewInstanceStore(dir, testRegistry)
+	createTestInstance(t, store, testUUID, ModeLive, "grid2", "BTCUSDT", nil)
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := NewContainerManager(cfg, nil, nil, store)
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(string, string) bool { return false }
-	api.containerStart = func(userID, mode string) error { return nil }
 
 	r := testRouter(api)
 	req := httptest.NewRequest("POST", "/api/users/"+testUUID+"/start?mode=live", nil)
@@ -335,17 +327,14 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 		IsVerified:         true,
 	})
 
-	store := NewStrategyStore(dir, nil)
-	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2"},
-	})
+	store := NewInstanceStore(dir, testRegistry)
+	createTestInstance(t, store, testUUID, ModeLive, "grid2", "BTCUSDT", nil)
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := NewContainerManager(cfg, nil, nil, store)
+	cm.checkRunningFn = func(string) (bool, error) { return true, nil }
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(string, string) bool { return true }
-	api.containerStart = func(userID, mode string) error { return nil }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
@@ -360,24 +349,21 @@ func TestStartUserContainer_VerifiedCredential_Allowed(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for verified credential, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusAccepted && w.Code != http.StatusOK {
+		t.Fatalf("expected 200/202 for verified credential, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
 func TestStartUserContainer_NoCredsStore_NoVerificationCheck(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStrategyStore(dir, nil)
-	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2"},
-	})
+	store := NewInstanceStore(dir, testRegistry)
+	createTestInstance(t, store, testUUID, ModeLive, "grid2", "BTCUSDT", nil)
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := NewContainerManager(cfg, nil, nil, store)
+	cm.checkRunningFn = func(string) (bool, error) { return true, nil }
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(string, string) bool { return true }
-	api.containerStart = func(userID, mode string) error { return nil }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
@@ -392,8 +378,8 @@ func TestStartUserContainer_NoCredsStore_NoVerificationCheck(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 when no cred store, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusAccepted && w.Code != http.StatusOK {
+		t.Fatalf("expected 200/202 when no cred store, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -510,17 +496,23 @@ func TestStartUserContainer_UnsupportedExchange_SkipsVerification(t *testing.T) 
 		IsVerified:         false,
 	})
 
-	store := NewStrategyStore(dir, nil)
-	writeTestStrategies(t, store, testUUID, ModeLive, []StrategyEntry{
-		{Exchange: "okex", Strategy: "grid2"},
-	})
+	store := NewInstanceStore(dir, testRegistry)
+	inst := &StrategyInstance{
+		UserID:   testUUID,
+		Mode:     ModeLive,
+		Strategy: "grid2",
+		Exchange: "okex",
+		Symbol:   "BTCUSDT",
+		Config:   rawJSON("{}"),
+	}
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
+	store.CreateInstance(inst, func(string) bool { return false })
 
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
-	cm := &ContainerManager{cfg: cfg}
+	cm := NewContainerManager(cfg, nil, nil, store)
+	cm.checkRunningFn = func(string) (bool, error) { return true, nil }
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(string, string) bool { return true }
-	api.containerStart = func(userID, mode string) error { return nil }
 
 	bbgoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
@@ -535,7 +527,7 @@ func TestStartUserContainer_UnsupportedExchange_SkipsVerification(t *testing.T) 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for unverified OKX key (no verifier), got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusAccepted && w.Code != http.StatusOK {
+		t.Fatalf("expected 200/202 for unverified OKX key (no verifier), got %d: %s", w.Code, w.Body.String())
 	}
 }

@@ -7,12 +7,24 @@ import (
 	"testing"
 )
 
-func TestCreateAndStart_PreservesDB(t *testing.T) {
+func TestCreateAndStartInstance_PreservesDB(t *testing.T) {
 	dir := t.TempDir()
-	userDir := filepath.Join(dir, "test-user")
-	os.MkdirAll(userDir, 0o755)
+	store := NewInstanceStore(dir, nil)
 
-	dbPath := filepath.Join(userDir, "bbgo.db")
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModeLive,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT"}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	store.CreateInstance(inst, func(string) bool { return false })
+
+	instanceDir := store.InstanceDir("test-user", ModeLive, "grid2-BTCUSDT")
+	dbPath := filepath.Join(instanceDir, "bbgo.db")
+	os.MkdirAll(instanceDir, 0o755)
 	os.WriteFile(dbPath, []byte("existing-db-state"), 0o644)
 
 	cfg := &Config{
@@ -23,18 +35,13 @@ func TestCreateAndStart_PreservesDB(t *testing.T) {
 		BBGOImage:     "bbgo-base:latest",
 		BBGOPort:      8080,
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, store)
 	cm.dockerFn = func(args ...string) (string, error) {
 		return "container-id", nil
 	}
 
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2", Mode: "live",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
-
-	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("CreateAndStartInstance: %v", err)
 	}
 
 	data, err := os.ReadFile(dbPath)
@@ -46,12 +53,24 @@ func TestCreateAndStart_PreservesDB(t *testing.T) {
 	}
 }
 
-func TestCreateAndStart_SecondRestart_KeepsDB(t *testing.T) {
+func TestCreateAndStartInstance_SecondRestart_KeepsDB(t *testing.T) {
 	dir := t.TempDir()
-	userDir := filepath.Join(dir, "test-user")
-	os.MkdirAll(userDir, 0o755)
+	store := NewInstanceStore(dir, nil)
 
-	dbPath := filepath.Join(userDir, "bbgo.db")
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModeLive,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT"}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	store.CreateInstance(inst, func(string) bool { return false })
+
+	instanceDir := store.InstanceDir("test-user", ModeLive, "grid2-BTCUSDT")
+	dbPath := filepath.Join(instanceDir, "bbgo.db")
+	os.MkdirAll(instanceDir, 0o755)
 	os.WriteFile(dbPath, []byte("first-state"), 0o644)
 
 	cfg := &Config{
@@ -62,20 +81,15 @@ func TestCreateAndStart_SecondRestart_KeepsDB(t *testing.T) {
 		BBGOImage:     "bbgo-base:latest",
 		BBGOPort:      8080,
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, store)
 	cm.dockerFn = func(args ...string) (string, error) {
 		return "container-id", nil
 	}
 
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2", Mode: "live",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
-
-	cm.CreateAndStart("test-user", ModeLive)
+	cm.CreateAndStartInstance(inst)
 	os.WriteFile(dbPath, []byte("second-state"), 0o644)
 
-	cm.CreateAndStart("test-user", ModeLive)
+	cm.CreateAndStartInstance(inst)
 
 	data, err := os.ReadFile(dbPath)
 	if err != nil {
@@ -86,10 +100,23 @@ func TestCreateAndStart_SecondRestart_KeepsDB(t *testing.T) {
 	}
 }
 
-func TestCreateAndStart_NoDB_NoBackup(t *testing.T) {
+func TestCreateAndStartInstance_NoDB_NoBackup(t *testing.T) {
 	dir := t.TempDir()
-	userDir := filepath.Join(dir, "test-user")
-	os.MkdirAll(userDir, 0o755)
+	store := NewInstanceStore(dir, nil)
+
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModeLive,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT"}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	store.CreateInstance(inst, func(string) bool { return false })
+
+	instanceDir := store.InstanceDir("test-user", ModeLive, "grid2-BTCUSDT")
+	os.MkdirAll(instanceDir, 0o755)
 
 	cfg := &Config{
 		ManagerToken:  "tok",
@@ -99,21 +126,16 @@ func TestCreateAndStart_NoDB_NoBackup(t *testing.T) {
 		BBGOImage:     "bbgo-base:latest",
 		BBGOPort:      8080,
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, store)
 	cm.dockerFn = func(args ...string) (string, error) {
 		return "container-id", nil
 	}
 
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2", Mode: "paper",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
-
-	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("CreateAndStartInstance: %v", err)
 	}
 
-	entries, _ := os.ReadDir(userDir)
+	entries, _ := os.ReadDir(instanceDir)
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), "bbgo.db.backup.") {
 			t.Errorf("no backup should be created when no DB exists, found %s", e.Name())

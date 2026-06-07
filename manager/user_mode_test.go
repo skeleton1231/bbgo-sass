@@ -5,15 +5,17 @@ import (
 	"testing"
 )
 
-func TestBuildUserYAML_PaperMode_SetsEnvironment(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
-		{
-			Strategy: "grid2",
-			Exchange: "binance",
-			Mode:     "paper",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-	}, func(exchange string) bool { return false })
+func TestBuildInstanceYAML_PaperMode_SetsEnvironment(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModePaper,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(exchange string) bool { return false }, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -27,15 +29,17 @@ func TestBuildUserYAML_PaperMode_SetsEnvironment(t *testing.T) {
 	}
 }
 
-func TestBuildUserYAML_LiveMode_NoPaperTrade(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
-		{
-			Strategy: "grid2",
-			Exchange: "binance",
-			Mode:     "live",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-	}, func(exchange string) bool { return true })
+func TestBuildInstanceYAML_LiveMode_NoPaperTrade(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModeLive,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(exchange string) bool { return true }, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,50 +50,21 @@ func TestBuildUserYAML_LiveMode_NoPaperTrade(t *testing.T) {
 	}
 }
 
-func TestBuildUserYAML_PaperContainer_MultipleStrategies(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
-		{
-			Strategy: "grid2",
-			Exchange: "binance",
-			Mode:     "paper",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+func TestBuildInstanceYAML_CrossExchangePaperMode(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID:        "test-user",
+		Mode:          ModePaper,
+		Strategy:      "xmaker",
+		CrossExchange: true,
+		Symbol:        "BTCUSDT",
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+			{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 		},
-		{
-			Strategy: "dca",
-			Exchange: "binance",
-			Mode:     "paper",
-			Config:   rawJSON(`{"symbol":"ETHUSDT"}`),
-		},
-	}, func(exchange string) bool { return false })
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		Config:     rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		InstanceID: "xmaker-BTCUSDT",
 	}
-	yaml := string(yamlBytes)
-
-	if !strings.Contains(yaml, "PAPER_TRADE:") {
-		t.Error("expected PAPER_TRADE for paper container with multiple strategies")
-	}
-	if !strings.Contains(yaml, "grid2:") {
-		t.Error("expected grid2 strategy")
-	}
-	if !strings.Contains(yaml, "dca:") {
-		t.Error("expected dca strategy")
-	}
-}
-
-func TestBuildUserYAML_CrossExchangePaperMode(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModePaper, []StrategyEntry{
-		{
-			Strategy:      "xmaker",
-			CrossExchange: true,
-			Mode:          "paper",
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-			},
-			Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-	}, func(exchange string) bool { return false })
+	yamlBytes, err := buildInstanceYAML(inst, func(exchange string) bool { return false }, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,19 +78,21 @@ func TestBuildUserYAML_CrossExchangePaperMode(t *testing.T) {
 	}
 }
 
-func TestBuildUserYAML_CrossExchangeLiveMode(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
-		{
-			Strategy:      "xmaker",
-			CrossExchange: true,
-			Mode:          "live",
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-			},
-			Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+func TestBuildInstanceYAML_CrossExchangeLiveMode(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID:        "test-user",
+		Mode:          ModeLive,
+		Strategy:      "xmaker",
+		CrossExchange: true,
+		Symbol:        "BTCUSDT",
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+			{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 		},
-	}, func(exchange string) bool { return true })
+		Config:     rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		InstanceID: "xmaker-BTCUSDT",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(exchange string) bool { return true }, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,36 +100,5 @@ func TestBuildUserYAML_CrossExchangeLiveMode(t *testing.T) {
 
 	if strings.Contains(yaml, "PAPER_TRADE") {
 		t.Error("PAPER_TRADE should NOT appear for live cross-exchange mode")
-	}
-}
-
-func TestBuildUserYAML_MultipleStrategies_AllLive(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
-		{
-			Strategy: "grid2",
-			Exchange: "binance",
-			Mode:     "live",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-		{
-			Strategy: "dca",
-			Exchange: "binance",
-			Mode:     "live",
-			Config:   rawJSON(`{"symbol":"ETHUSDT"}`),
-		},
-	}, func(exchange string) bool { return true })
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	yaml := string(yamlBytes)
-
-	if strings.Contains(yaml, "PAPER_TRADE") {
-		t.Error("PAPER_TRADE should NOT appear when all strategies are live")
-	}
-	if !strings.Contains(yaml, "grid2:") {
-		t.Error("expected grid2 strategy")
-	}
-	if !strings.Contains(yaml, "dca:") {
-		t.Error("expected dca strategy")
 	}
 }

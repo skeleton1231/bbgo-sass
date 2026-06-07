@@ -152,6 +152,7 @@ export type Database = {
           side: string
           status: string
           stop_price: string
+          strategy_instance_id: string
           symbol: string
           time_in_force: string
           updated_at: string
@@ -176,6 +177,7 @@ export type Database = {
           side: string
           status: string
           stop_price?: string
+          strategy_instance_id?: string
           symbol: string
           time_in_force?: string
           updated_at?: string
@@ -200,6 +202,7 @@ export type Database = {
           side?: string
           status?: string
           stop_price?: string
+          strategy_instance_id?: string
           symbol?: string
           time_in_force?: string
           updated_at?: string
@@ -384,6 +387,51 @@ export type Database = {
           },
         ]
       }
+      strategy_instances: {
+        Row: {
+          config: Json
+          created_at: string
+          cross_exchange: boolean
+          exchange: string
+          instance_id: string
+          mode: string
+          name: string
+          sessions: Json | null
+          strategy: string
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          cross_exchange?: boolean
+          exchange?: string
+          instance_id: string
+          mode: string
+          name?: string
+          sessions?: Json | null
+          strategy: string
+          symbol?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          cross_exchange?: boolean
+          exchange?: string
+          instance_id?: string
+          mode?: string
+          name?: string
+          sessions?: Json | null
+          strategy?: string
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       strategy_registry: {
         Row: {
           category: string
@@ -397,6 +445,7 @@ export type Database = {
           fields: Json | null
           id: string
           live_only: boolean | null
+          requires_futures: boolean | null
           session_roles: Json | null
           sort_order: number | null
           updated_at: string | null
@@ -413,6 +462,7 @@ export type Database = {
           fields?: Json | null
           id: string
           live_only?: boolean | null
+          requires_futures?: boolean | null
           session_roles?: Json | null
           sort_order?: number | null
           updated_at?: string | null
@@ -429,6 +479,7 @@ export type Database = {
           fields?: Json | null
           id?: string
           live_only?: boolean | null
+          requires_futures?: boolean | null
           session_roles?: Json | null
           sort_order?: number | null
           updated_at?: string | null
@@ -454,6 +505,7 @@ export type Database = {
           quote_quantity: string | null
           side: string
           strategy: string
+          strategy_instance_id: string
           symbol: string
           trade_id: string
           traded_at: string | null
@@ -477,6 +529,7 @@ export type Database = {
           quote_quantity?: string | null
           side: string
           strategy?: string
+          strategy_instance_id?: string
           symbol: string
           trade_id: string
           traded_at?: string | null
@@ -500,6 +553,7 @@ export type Database = {
           quote_quantity?: string | null
           side?: string
           strategy?: string
+          strategy_instance_id?: string
           symbol?: string
           trade_id?: string
           traded_at?: string | null

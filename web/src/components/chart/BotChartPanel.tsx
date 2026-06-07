@@ -40,6 +40,7 @@ interface BotChartPanelProps {
   loadEarlierKlines?: () => void
   strategyStats: StrategyStats | null
   currentPrice?: number
+  unrealizedPnlFromReport?: number
   noSymbolText: string
   startToSeeDataText: string
   klineInterval: string
@@ -62,6 +63,7 @@ export function BotChartPanel({
   loadEarlierKlines,
   strategyStats,
   currentPrice,
+  unrealizedPnlFromReport,
   noSymbolText,
   startToSeeDataText,
   klineInterval,
@@ -189,7 +191,7 @@ export function BotChartPanel({
                 />
               </div>
               {strategyStats && (
-                <StrategySidePanel strategyStats={strategyStats} currentPrice={currentPrice} gridLines={gridLines} />
+                <StrategySidePanel strategyStats={strategyStats} currentPrice={currentPrice} gridLines={gridLines} unrealizedPnlFromReport={unrealizedPnlFromReport} />
               )}
             </div>
           )}
@@ -199,16 +201,17 @@ export function BotChartPanel({
   )
 }
 
-function StrategySidePanel({ strategyStats, currentPrice, gridLines }: {
+function StrategySidePanel({ strategyStats, currentPrice, gridLines, unrealizedPnlFromReport }: {
   strategyStats: StrategyStats
   currentPrice?: number
   gridLines: GridLine[]
+  unrealizedPnlFromReport?: number
 }) {
   const sp = useTranslations('Bots.chartSidePanel')
 
-  const unrealizedPnl = currentPrice && strategyStats.averageCost > 0
+  const unrealizedPnl = unrealizedPnlFromReport ?? (currentPrice && strategyStats.averageCost > 0
     ? (currentPrice - strategyStats.averageCost) * strategyStats.base
-    : 0
+    : 0)
   const investedCost = Math.abs(strategyStats.quote)
   const currentValue = currentPrice ? currentPrice * strategyStats.base : 0
   const pnlPercent = strategyStats.averageCost > 0 && currentPrice

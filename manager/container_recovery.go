@@ -2,23 +2,18 @@ package main
 
 import (
 	"log"
-	"os"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
-// HealthCheckResult reports the outcome of checking a single container.
 type HealthCheckResult struct {
-	UserID    string
-	Mode      string
-	Alive     bool
-	Restarted bool
-	Error     string
+	UserID     string
+	Mode       string
+	InstanceID string
+	Alive      bool
+	Restarted  bool
+	Error      string
 }
 
 type RecoveryResult struct {
@@ -27,194 +22,155 @@ type RecoveryResult struct {
 	Status string
 }
 
-// ContainerStatus returns whether a container is running, its status string,
-// and any error. Used by TryStart to decide whether docker start is viable.
-func (cm *ContainerManager) ContainerStatus(userID, mode string) (bool, string, error) {
-	name := cm.containerName(userID, mode)
-	out, err := cm.docker("inspect", "-f", "{{.State.Status}}", name)
-	if err != nil {
-		return false, "", err
+// CheckAndRecover checks all running instance containers in parallel and restarts
+// any that have died. Uses a goroutine pool (max 5) for parallel docker inspect.
+func (cm *ContainerManager) CheckAndRecover(instances []StrategyInstance) []HealthCheckResult {
+	results := make([]HealthCheckResult, len(instances))
+	var mu sync.Mutex
+
+	for i, inst := range instances {
+		idx, inst := i, inst
+		if err := cm.pool.Submit(func() {
+			running, _ := cm.CheckInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID)
+			if running {
+				mu.Lock()
+				results[idx] = HealthCheckResult{
+					UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID, Alive: true,
+				}
+				mu.Unlock()
+				return
+			}
+
+			name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			log.Printf("health check: instance container %s died, attempting recovery", name)
+
+			if cm.tryRecoverViaDockerStart(&inst) {
+				mu.Lock()
+				results[idx] = HealthCheckResult{
+					UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID,
+					Alive: true, Restarted: true,
+				}
+				mu.Unlock()
+				return
+			}
+
+			log.Printf("recreating instance container %s", name)
+			if err := cm.CreateAndStartInstance(&inst); err != nil {
+				mu.Lock()
+				results[idx] = HealthCheckResult{
+					UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID,
+					Alive: false, Error: err.Error(),
+				}
+				mu.Unlock()
+				return
+			}
+			mu.Lock()
+			results[idx] = HealthCheckResult{
+				UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID,
+				Alive: true, Restarted: true,
+			}
+			mu.Unlock()
+		}); err != nil {
+			results[idx] = HealthCheckResult{
+				UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID,
+				Alive: false, Error: err.Error(),
+			}
+		}
 	}
-	status := strings.TrimSpace(out)
-	return status == "running", status, nil
+	cm.pool.Wait()
+	return results
 }
 
-// TryStart attempts to start an existing stopped container via "docker start".
-// Returns true if the container was already running or successfully started.
-func (cm *ContainerManager) TryStart(userID, mode string) bool {
-	name := cm.containerName(userID, mode)
-	_, status, err := cm.ContainerStatus(userID, mode)
+// RecoverUsers discovers all instances for tracked users and recovers their containers.
+func (cm *ContainerManager) RecoverUsers(users []UserMode) []RecoveryResult {
+	var allInstances []StrategyInstance
+	for _, um := range users {
+		instances, err := cm.store.ListInstances(um.UserID, um.Mode)
+		if err != nil {
+			continue
+		}
+		allInstances = append(allInstances, instances...)
+	}
+
+	results := make([]RecoveryResult, len(allInstances))
+	var mu sync.Mutex
+
+	for i, inst := range allInstances {
+		idx, inst := i, inst
+		if err := cm.pool.Submit(func() {
+			name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			running, _ := cm.CheckInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID)
+			if running {
+				log.Printf("recovered instance container %s (running)", name)
+				mu.Lock()
+				results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusRunning}
+				mu.Unlock()
+				return
+			}
+
+			log.Printf("recovering instance container %s", name)
+
+			if cm.tryRecoverViaDockerStart(&inst) {
+				mu.Lock()
+				results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusRunning}
+				mu.Unlock()
+				return
+			}
+
+			if err := cm.CreateAndStartInstance(&inst); err != nil {
+				log.Printf("recover instance %s failed: %v", name, err)
+				mu.Lock()
+				results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusError}
+				mu.Unlock()
+				return
+			}
+			mu.Lock()
+			results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusRunning}
+			mu.Unlock()
+		}); err != nil {
+			results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusError}
+		}
+	}
+	cm.pool.Wait()
+	return results
+}
+
+func (cm *ContainerManager) tryRecoverViaDockerStart(inst *StrategyInstance) bool {
+	name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+	out, err := cm.docker("inspect", "-f", "{{.State.Status}}", name)
 	if err != nil {
 		return false
 	}
+	status := strings.TrimSpace(out)
 	if status == "running" {
 		return true
 	}
-	if status == "exited" || status == "created" {
-		if _, err := cm.docker("start", name); err != nil {
-			log.Printf("docker start %s failed (was %s): %v", name, status, err)
-			return false
-		}
-		log.Printf("container %s restarted via docker start (was %s)", name, status)
-		return true
-	}
-	return false
-}
-
-// ConfigMatches checks if the on-disk bbgo.yaml matches what would be generated
-// from the current strategies. Compares parsed YAML structures to avoid false
-// negatives from map key ordering differences.
-func (cm *ContainerManager) ConfigMatches(userID, mode string) bool {
-	dataDir := filepath.Join(cm.cfg.DataDir, userID)
-	if mode == ModePaper {
-		dataDir = filepath.Join(cm.cfg.DataDir, userID+"-paper")
-	}
-	yamlPath := filepath.Join(dataDir, "bbgo.yaml")
-	existing, err := os.ReadFile(yamlPath)
-	if err != nil {
-		return false
-	}
-	strategies, _ := parseStrategiesFromYAML(existing)
-	expected, err := buildUserYAML(userID, mode, strategies, func(exchange string) bool {
-		_, err := cm.creds.GetByMode(userID, exchange, mode == ModePaper)
-		return err == nil
-	})
-	if err != nil {
+	if status != "exited" && status != "created" {
 		return false
 	}
 
-	var existingMap, expectedMap map[string]any
-	if err := yaml.Unmarshal(existing, &existingMap); err != nil {
+	if _, err := cm.docker("start", name); err != nil {
+		log.Printf("docker start %s failed (was %s): %v", name, status, err)
 		return false
 	}
-	if err := yaml.Unmarshal(expected, &expectedMap); err != nil {
-		return false
-	}
-	return reflect.DeepEqual(existingMap, expectedMap)
-}
-
-// tryRecoverViaDockerStart attempts lightweight recovery via "docker start".
-// Returns true if the container is up with matching config (caller can stop here).
-// Returns false if recovery failed or config is stale (caller should recreate).
-func (cm *ContainerManager) tryRecoverViaDockerStart(userID, mode string) bool {
-	if !cm.TryStart(userID, mode) {
-		return false
-	}
+	log.Printf("instance container %s restarted via docker start (was %s)", name, status)
 
 	var running bool
 	for i := 0; i < 5; i++ {
-		running, _ = cm.CheckRunning(userID, mode)
+		running, _ = cm.CheckInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID)
 		if running {
 			break
 		}
 		time.Sleep(time.Second)
 	}
-	if !running {
-		return false
-	}
-
-	if cm.ConfigMatches(userID, mode) {
-		log.Printf("container %s recovered via docker start", cm.containerName(userID, mode))
-		return true
-	}
-
-	log.Printf("container %s config stale, recreating", cm.containerName(userID, mode))
-	return false
-}
-
-// CheckAndRecover checks all running containers in parallel and restarts
-// any that have died. Uses a goroutine pool (max 5) for parallel docker inspect.
-func (cm *ContainerManager) CheckAndRecover(users []UserMode) []HealthCheckResult {
-	results := make([]HealthCheckResult, len(users))
-	var mu sync.Mutex
-
-	for i, um := range users {
-		idx, um := i, um
-		if err := cm.pool.Submit(func() {
-			running, _ := cm.CheckRunning(um.UserID, um.Mode)
-			if running {
-				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: um.UserID, Mode: um.Mode, Alive: true}
-				mu.Unlock()
-				return
-			}
-			log.Printf("health check: container %s died, attempting recovery", cm.containerName(um.UserID, um.Mode))
-
-			if cm.tryRecoverViaDockerStart(um.UserID, um.Mode) {
-				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: um.UserID, Mode: um.Mode, Alive: true, Restarted: true}
-				mu.Unlock()
-				return
-			}
-
-			log.Printf("recreating container %s", cm.containerName(um.UserID, um.Mode))
-			if err := cm.CreateAndStart(um.UserID, um.Mode); err != nil {
-				mu.Lock()
-				results[idx] = HealthCheckResult{UserID: um.UserID, Mode: um.Mode, Alive: false, Error: err.Error()}
-				mu.Unlock()
-				return
-			}
-			mu.Lock()
-			results[idx] = HealthCheckResult{UserID: um.UserID, Mode: um.Mode, Alive: true, Restarted: true}
-			mu.Unlock()
-		}); err != nil {
-			results[idx] = HealthCheckResult{UserID: um.UserID, Mode: um.Mode, Alive: false, Error: err.Error()}
-		}
-	}
-	cm.pool.Wait()
-	return results
-}
-
-func (cm *ContainerManager) RecoverUsers(users []UserMode) []RecoveryResult {
-	results := make([]RecoveryResult, len(users))
-	var mu sync.Mutex
-
-	for i, um := range users {
-		idx, um := i, um
-		if err := cm.pool.Submit(func() {
-			name := cm.containerName(um.UserID, um.Mode)
-			out, _ := cm.docker("inspect", "-f", "{{.State.Running}}", name)
-			if out == "true" {
-				log.Printf("recovered container %s (running)", name)
-				mu.Lock()
-				results[idx] = RecoveryResult{UserID: um.UserID, Mode: um.Mode, Status: StatusRunning}
-				mu.Unlock()
-				return
-			}
-
-			log.Printf("recovering container %s for user %s", name, um.UserID)
-
-			if cm.tryRecoverViaDockerStart(um.UserID, um.Mode) {
-				mu.Lock()
-				results[idx] = RecoveryResult{UserID: um.UserID, Mode: um.Mode, Status: StatusRunning}
-				mu.Unlock()
-				return
-			}
-
-			log.Printf("recreating container %s", name)
-			if err := cm.CreateAndStart(um.UserID, um.Mode); err != nil {
-				log.Printf("recover user %s failed: %v", um.UserID, err)
-				mu.Lock()
-				results[idx] = RecoveryResult{UserID: um.UserID, Mode: um.Mode, Status: StatusError}
-				mu.Unlock()
-				return
-			}
-			mu.Lock()
-			results[idx] = RecoveryResult{UserID: um.UserID, Mode: um.Mode, Status: StatusRunning}
-			mu.Unlock()
-		}); err != nil {
-			results[idx] = RecoveryResult{UserID: um.UserID, Mode: um.Mode, Status: StatusError}
-		}
-	}
-	cm.pool.Wait()
-	return results
+	return running
 }
 
 // CleanupStopped removes stopped bbgo containers that aren't tracked.
-func (cm *ContainerManager) CleanupStopped(tracked []UserMode) int {
-	trackedNames := make(map[string]bool, len(tracked))
-	for _, um := range tracked {
-		trackedNames[cm.containerName(um.UserID, um.Mode)] = true
+func (cm *ContainerManager) CleanupStopped(trackedInstances []StrategyInstance) int {
+	trackedNames := make(map[string]bool, len(trackedInstances))
+	for _, inst := range trackedInstances {
+		trackedNames[cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] = true
 	}
 
 	var names []string

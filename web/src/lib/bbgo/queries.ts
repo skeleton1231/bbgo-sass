@@ -5,6 +5,8 @@ import {
   deleteStrategy as apiDeleteStrategy,
   startUser as apiStartUser,
   stopUser as apiStopUser,
+  startInstance as apiStartInstance,
+  stopInstance as apiStopInstance,
   runBacktest as apiRunBacktest,
   submitBacktest as apiSubmitBacktest,
   getBacktestJob as apiGetBacktestJob,
@@ -33,9 +35,8 @@ import {
   fetchBotTradeMarkers,
   type TradingVolumeEntry,
   type TradeMarkersResponse,
-  type StrategyEntry,
-  type UserContainer,
-  type UserContainersResponse,
+  type InstanceInfo,
+  type InstanceListResponse,
   type BacktestResult,
   type BacktestJob,
   type BacktestReport,
@@ -58,7 +59,7 @@ import {
 // --- Strategy & container queries ---
 
 export function useUserStrategies(userId: string) {
-  return useQuery<UserContainersResponse>({
+  return useQuery<InstanceListResponse>({
     queryKey: ['user-strategies', userId],
     queryFn: () => fetchUserStrategies(userId),
     enabled: !!userId,
@@ -105,6 +106,24 @@ export function useStopUser() {
   return useMutation({
     mutationFn: ({ userId, mode }: { userId: string; mode?: 'live' | 'paper' }) =>
       apiStopUser(userId, mode),
+    onSuccess: (_data, { userId }) => invalidateUserQueries(qc, userId),
+  })
+}
+
+export function useStartInstance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, instanceId }: { userId: string; instanceId: string }) =>
+      apiStartInstance(userId, instanceId),
+    onSuccess: (_data, { userId }) => invalidateUserQueries(qc, userId),
+  })
+}
+
+export function useStopInstance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, instanceId }: { userId: string; instanceId: string }) =>
+      apiStopInstance(userId, instanceId),
     onSuccess: (_data, { userId }) => invalidateUserQueries(qc, userId),
   })
 }
@@ -397,9 +416,8 @@ export function useDeleteCredential() {
 
 export type {
   Bot,
-  StrategyEntry,
-  UserContainer,
-  UserContainersResponse,
+  InstanceInfo,
+  InstanceListResponse,
   CredentialInfo,
   BacktestResult,
   BacktestJob,

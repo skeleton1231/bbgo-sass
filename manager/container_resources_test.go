@@ -5,16 +5,16 @@ import (
 	"testing"
 )
 
-func TestResourceArgs_LiveMode(t *testing.T) {
+func TestInstanceResourceArgs_WithLimits(t *testing.T) {
 	cfg := &Config{
-		LiveResources: ContainerResources{
+		InstanceResources: ContainerResources{
 			Memory: "256m", MemorySwap: "512m", CPUs: "0.5",
 			PidsLimit: 128, LogMaxSize: "10m", LogMaxFile: 3,
 		},
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, nil)
 
-	args := cm.resourceArgs(ModeLive)
+	args := cm.instanceResourceArgs()
 	joined := strings.Join(args, " ")
 
 	if !strings.Contains(joined, "--memory 256m") {
@@ -37,38 +37,15 @@ func TestResourceArgs_LiveMode(t *testing.T) {
 	}
 }
 
-func TestResourceArgs_PaperMode(t *testing.T) {
+func TestInstanceResourceArgs_EmptyFields(t *testing.T) {
 	cfg := &Config{
-		PaperResources: ContainerResources{
-			Memory: "128m", MemorySwap: "256m", CPUs: "0.25",
-			PidsLimit: 64, LogMaxSize: "10m", LogMaxFile: 3,
-		},
-	}
-	cm := NewContainerManager(cfg, nil, nil)
-
-	args := cm.resourceArgs(ModePaper)
-	joined := strings.Join(args, " ")
-
-	if !strings.Contains(joined, "--memory 128m") {
-		t.Errorf("expected --memory 128m in %q", joined)
-	}
-	if !strings.Contains(joined, "--cpus 0.25") {
-		t.Errorf("expected --cpus 0.25 in %q", joined)
-	}
-	if !strings.Contains(joined, "--pids-limit 64") {
-		t.Errorf("expected --pids-limit 64 in %q", joined)
-	}
-}
-
-func TestResourceArgs_EmptyFields(t *testing.T) {
-	cfg := &Config{
-		LiveResources: ContainerResources{
+		InstanceResources: ContainerResources{
 			Memory: "256m",
 		},
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, nil)
 
-	args := cm.resourceArgs(ModeLive)
+	args := cm.instanceResourceArgs()
 	joined := strings.Join(args, " ")
 
 	if !strings.Contains(joined, "--memory 256m") {
@@ -88,7 +65,7 @@ func TestResourceArgs_EmptyFields(t *testing.T) {
 	}
 }
 
-func TestCreateAndStart_IncludeResourceLimits_Live(t *testing.T) {
+func TestCreateAndStartInstance_IncludeResourceLimits(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{
 		ManagerToken:  "tok",
@@ -98,12 +75,13 @@ func TestCreateAndStart_IncludeResourceLimits_Live(t *testing.T) {
 		BBGOImage:     "bbgo-base:latest",
 		BBGOPort:      8080,
 		BBGOGRPCPort:  9090,
-		LiveResources: ContainerResources{
+		InstanceResources: ContainerResources{
 			Memory: "256m", MemorySwap: "512m", CPUs: "0.5",
 			PidsLimit: 128, LogMaxSize: "10m", LogMaxFile: 3,
 		},
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	store := NewInstanceStore(dir, nil)
+	cm := NewContainerManager(cfg, nil, nil, store)
 
 	var capturedArgs []string
 	cm.dockerFn = func(args ...string) (string, error) {
@@ -111,79 +89,34 @@ func TestCreateAndStart_IncludeResourceLimits_Live(t *testing.T) {
 		return "container-id", nil
 	}
 
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid", Mode: "live",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
+	inst := &StrategyInstance{
+		UserID: "test-user", Mode: ModeLive, Strategy: "grid",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config: rawJSON(`{"symbol":"BTCUSDT"}`), InstanceID: "grid-BTCUSDT",
+	}
+	store.CreateInstance(inst, func(string) bool { return false })
 
-	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("CreateAndStartInstance: %v", err)
 	}
 
 	cmdStr := strings.Join(capturedArgs, " ")
 
 	if !strings.Contains(cmdStr, "--memory 256m") {
-		t.Error("expected --memory 256m in live docker run command")
+		t.Error("expected --memory 256m in docker run command")
 	}
 	if !strings.Contains(cmdStr, "--cpus 0.5") {
-		t.Error("expected --cpus 0.5 in live docker run command")
+		t.Error("expected --cpus 0.5 in docker run command")
 	}
 	if !strings.Contains(cmdStr, "--pids-limit 128") {
-		t.Error("expected --pids-limit 128 in live docker run command")
+		t.Error("expected --pids-limit 128 in docker run command")
 	}
 	if !strings.Contains(cmdStr, "max-size=10m") {
-		t.Error("expected log max-size=10m in live docker run command")
+		t.Error("expected log max-size=10m in docker run command")
 	}
 }
 
-func TestCreateAndStart_IncludeResourceLimits_Paper(t *testing.T) {
-	dir := t.TempDir()
-	cfg := &Config{
-		ManagerToken:   "tok",
-		DataDir:        dir,
-		DataVolume:     "bbgo-data",
-		DockerNetwork:  "bbgo-net",
-		BBGOImage:      "bbgo-base:latest",
-		BBGOPort:       8080,
-		BBGOGRPCPort:   9090,
-		PaperResources: ContainerResources{
-			Memory: "128m", CPUs: "0.25", PidsLimit: 64,
-		},
-	}
-	cm := NewContainerManager(cfg, nil, nil)
-
-	var capturedArgs []string
-	cm.dockerFn = func(args ...string) (string, error) {
-		capturedArgs = args
-		return "container-id", nil
-	}
-
-	writeTestUserYAML(t, dir, "test-user", ModePaper, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid", Mode: "paper",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
-
-	if err := cm.CreateAndStart("test-user", ModePaper); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
-	}
-
-	cmdStr := strings.Join(capturedArgs, " ")
-
-	if !strings.Contains(cmdStr, "--memory 128m") {
-		t.Error("expected --memory 128m in paper docker run command")
-	}
-	if !strings.Contains(cmdStr, "--cpus 0.25") {
-		t.Error("expected --cpus 0.25 in paper docker run command")
-	}
-	if !strings.Contains(cmdStr, "--pids-limit 64") {
-		t.Error("expected --pids-limit 64 in paper docker run command")
-	}
-	if strings.Contains(cmdStr, "--memory 256m") {
-		t.Error("live memory limit should not appear in paper container")
-	}
-}
-
-func TestCreateAndStart_NoResourceLimits_WhenEmpty(t *testing.T) {
+func TestCreateAndStartInstance_NoResourceLimits_WhenEmpty(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{
 		ManagerToken:  "tok",
@@ -194,7 +127,8 @@ func TestCreateAndStart_NoResourceLimits_WhenEmpty(t *testing.T) {
 		BBGOPort:      8080,
 		BBGOGRPCPort:  9090,
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	store := NewInstanceStore(dir, nil)
+	cm := NewContainerManager(cfg, nil, nil, store)
 
 	var capturedArgs []string
 	cm.dockerFn = func(args ...string) (string, error) {
@@ -202,13 +136,15 @@ func TestCreateAndStart_NoResourceLimits_WhenEmpty(t *testing.T) {
 		return "container-id", nil
 	}
 
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid", Mode: "live",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
+	inst := &StrategyInstance{
+		UserID: "test-user", Mode: ModeLive, Strategy: "grid",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config: rawJSON(`{"symbol":"BTCUSDT"}`), InstanceID: "grid-BTCUSDT",
+	}
+	store.CreateInstance(inst, func(string) bool { return false })
 
-	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("CreateAndStartInstance: %v", err)
 	}
 
 	cmdStr := strings.Join(capturedArgs, " ")

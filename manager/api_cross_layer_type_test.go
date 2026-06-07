@@ -7,29 +7,35 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TestCrossExchangeYAML_XMaker verifies the full YAML generation for an
-// xmaker cross-exchange strategy with maker+hedge sessions.
+var testRegistry = &StrategyDefaultsCache{
+	liveOnly: map[string]bool{
+		"autoborrow": true, "convert": true, "deposit2transfer": true,
+		"sentinel": true, "dca2": true, "dca3": true,
+		"liquiditymaker": true, "xhedgegrid": true,
+	},
+	requiresFutures: map[string]bool{
+		"pivotshort": true, "drift": true, "elliottwave": true,
+		"bollmaker": true, "linregmaker": true, "rsmaker": true,
+		"fixedmaker": true, "audacitymaker": true,
+	},
+}
+
 func TestCrossExchangeYAML_XMaker(t *testing.T) {
-	strategies := []StrategyEntry{
-		{
-			Strategy:      "xmaker",
-			Mode:          "live",
-			CrossExchange: true,
-			Config: rawJSON(`{
-				"symbol": "BTCUSDT",
-				"spread": 0.001,
-				"quantity": 0.01,
-				"updateInterval": "1m",
-				"hedgeInterval": "5m"
-			}`),
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-			},
+	inst := &StrategyInstance{
+		UserID:        "test-user",
+		Mode:          ModeLive,
+		Strategy:      "xmaker",
+		Symbol:        "BTCUSDT",
+		CrossExchange: true,
+		Config:        rawJSON(`{"symbol":"BTCUSDT","spread":0.001,"quantity":0.01,"updateInterval":"1m","hedgeInterval":"5m"}`),
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+			{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 		},
+		InstanceID: "xmaker-BTCUSDT",
 	}
 
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, strategies, func(ex string) bool { return true })
+	yamlBytes, err := buildInstanceYAML(inst, func(ex string) bool { return true }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +60,7 @@ func TestCrossExchangeYAML_XMaker(t *testing.T) {
 		t.Error("expected crossExchangeStrategies key")
 	}
 	if strings.Contains(yamlStr, "exchangeStrategies:") {
-		t.Error("should NOT have exchangeStrategies for cross-exchange-only config")
+		t.Error("should NOT have exchangeStrategies for cross-exchange config")
 	}
 	if strings.Contains(yamlStr, "PAPER_TRADE") {
 		t.Error("PAPER_TRADE should not be set for live cross-exchange strategy")
@@ -67,22 +73,22 @@ func TestCrossExchangeYAML_XMaker(t *testing.T) {
 	}
 }
 
-// TestCrossExchangeYAML_PaperMode verifies paper mode for cross-exchange.
 func TestCrossExchangeYAML_PaperMode(t *testing.T) {
-	strategies := []StrategyEntry{
-		{
-			Strategy:      "xmaker",
-			Mode:          "paper",
-			CrossExchange: true,
-			Config:        rawJSON(`{"symbol": "ETHUSDT", "quantity": 0.1}`),
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-				{Name: "hedge", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
-			},
+	inst := &StrategyInstance{
+		UserID:        "test-user",
+		Mode:          ModePaper,
+		Strategy:      "xmaker",
+		Symbol:        "ETHUSDT",
+		CrossExchange: true,
+		Config:        rawJSON(`{"symbol":"ETHUSDT","quantity":0.1}`),
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+			{Name: "hedge", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
 		},
+		InstanceID: "xmaker-ETHUSDT",
 	}
 
-	yamlBytes, err := buildUserYAML("test-user", ModePaper, strategies, func(ex string) bool { return false })
+	yamlBytes, err := buildInstanceYAML(inst, func(ex string) bool { return false }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,8 +102,6 @@ func TestCrossExchangeYAML_PaperMode(t *testing.T) {
 	}
 }
 
-// TestEnvArgs_MultiExchangeCredentials verifies that docker env args include
-// credentials for all exchanges used by a cross-exchange strategy.
 func TestEnvArgs_MultiExchangeCredentials(t *testing.T) {
 	dir := t.TempDir()
 	enc, err := NewEncryptor(testEncryptionKey)
@@ -109,22 +113,23 @@ func TestEnvArgs_MultiExchangeCredentials(t *testing.T) {
 	insertTestCredential(t, creds, "test-user", "bybit", "bybit-key", "bybit-secret")
 
 	cfg := &Config{DataVolume: "vol", DockerNetwork: "net", BBGOImage: "img"}
-	cm := NewContainerManager(cfg, creds, nil)
+	cm := NewContainerManager(cfg, creds, nil, nil)
 
-	strategies := []StrategyEntry{
-		{
-			Strategy:      "xmaker",
-			Mode:          "live",
-			CrossExchange: true,
-			Config:        rawJSON(`{"symbol":"BTCUSDT","quantity":0.01}`),
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance"},
-				{Name: "hedge", Exchange: "bybit", Futures: true},
-			},
+	inst := &StrategyInstance{
+		UserID:        "test-user",
+		Mode:          ModeLive,
+		Strategy:      "xmaker",
+		Symbol:        "BTCUSDT",
+		CrossExchange: true,
+		Config:        rawJSON(`{"symbol":"BTCUSDT","quantity":0.01}`),
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance"},
+			{Name: "hedge", Exchange: "bybit", Futures: true},
 		},
+		InstanceID: "xmaker-BTCUSDT",
 	}
 
-	args := cm.envArgs("test-user", ModeLive, strategies)
+	args := cm.instanceEnvArgs(inst)
 	cmdStr := strings.Join(args, " ")
 
 	if !strings.Contains(cmdStr, "BINANCE_API_KEY=binance-key") {
@@ -144,38 +149,11 @@ func TestEnvArgs_MultiExchangeCredentials(t *testing.T) {
 	}
 }
 
-// TestEnvArgs_CredentialDeduplication verifies that if multiple strategies
-// use the same exchange, credentials are only injected once.
-func TestEnvArgs_CredentialDeduplication(t *testing.T) {
-	dir := t.TempDir()
-	enc, err := NewEncryptor(testEncryptionKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	creds := NewCredentialStore(dir, enc)
-	insertTestCredential(t, creds, "test-user", "binance", "key", "secret")
-
-	cfg := &Config{DataVolume: "vol", DockerNetwork: "net", BBGOImage: "img"}
-	cm := NewContainerManager(cfg, creds, nil)
-
-	strategies := []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid", Mode: "live", Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-		{Exchange: "binance", Strategy: "grid2", Mode: "live", Config: rawJSON(`{"symbol":"ETHUSDT"}`)},
-	}
-
-	args := cm.envArgs("test-user", ModeLive, strategies)
-	count := strings.Count(strings.Join(args, " "), "BINANCE_API_KEY=key")
-	if count != 1 {
-		t.Errorf("expected BINANCE_API_KEY injected exactly once, got %d", count)
-	}
-}
-
-// TestYAMLGeneration_VariousStrategies verifies YAML generation for
-// multiple strategy types to ensure config field mapping works.
 func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 	tests := []struct {
 		name     string
 		strategy string
+		symbol   string
 		config   string
 		mode     string
 		want     []string
@@ -184,6 +162,7 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 		{
 			name:     "grid paper mode",
 			strategy: "grid",
+			symbol:   "BTCUSDT",
 			config:   `{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`,
 			mode:     "paper",
 			want:     []string{"grid:", "BTCUSDT", "gridNumber:", "PAPER_TRADE"},
@@ -191,6 +170,7 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 		{
 			name:     "supertrend live mode",
 			strategy: "supertrend",
+			symbol:   "ETHUSDT",
 			config:   `{"symbol":"ETHUSDT","interval":"4h","quantity":0.01,"supertrendMultiplier":3}`,
 			mode:     "live",
 			want:     []string{"supertrend:", "ETHUSDT", "supertrendMultiplier:"},
@@ -199,6 +179,7 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 		{
 			name:     "dca paper mode",
 			strategy: "dca",
+			symbol:   "BTCUSDT",
 			config:   `{"symbol":"BTCUSDT","investmentInterval":"1h","budget":100}`,
 			mode:     "paper",
 			want:     []string{"dca:", "BTCUSDT", "investmentInterval:", "PAPER_TRADE"},
@@ -206,6 +187,7 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 		{
 			name:     "bollgrid paper mode",
 			strategy: "bollgrid",
+			symbol:   "BTCUSDT",
 			config:   `{"symbol":"BTCUSDT","interval":"1h","gridNumber":8,"gridPips":50,"quantity":0.001}`,
 			mode:     "paper",
 			want:     []string{"bollgrid:", "BTCUSDT", "gridPips:"},
@@ -218,16 +200,17 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 			if tt.mode == "paper" {
 				containerMode = ModePaper
 			}
-			strategies := []StrategyEntry{
-				{
-					Strategy: tt.strategy,
-					Mode:     tt.mode,
-					Config:   rawJSON(tt.config),
-					Exchange: "binance",
-				},
+			inst := &StrategyInstance{
+				UserID:     "test-user",
+				Mode:       containerMode,
+				Strategy:   tt.strategy,
+				Exchange:   "binance",
+				Symbol:     tt.symbol,
+				Config:     rawJSON(tt.config),
+				InstanceID: tt.strategy + "-" + tt.symbol,
 			}
 
-			yamlBytes, err := buildUserYAML("test-user", containerMode, strategies, func(ex string) bool { return tt.mode == "live" })
+			yamlBytes, err := buildInstanceYAML(inst, func(ex string) bool { return tt.mode == "live" }, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -247,8 +230,6 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 	}
 }
 
-// TestLiveOnlyStrategies_FrontendBackendAlignment verifies that every strategy
-// marked liveOnly in the frontend schema is also liveOnly in the backend.
 func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 	frontendLiveOnly := map[string]bool{
 		"autoborrow": true, "convert": true, "deposit2transfer": true,
@@ -262,7 +243,7 @@ func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 		}
 	}
 
-	for strat := range liveOnlyStrategies {
+	for _, strat := range []string{"autoborrow", "convert", "deposit2transfer", "sentinel", "dca2", "dca3", "liquiditymaker", "xhedgegrid"} {
 		if !frontendLiveOnly[strat] {
 			t.Errorf("backend liveOnly strategy %q not in frontend liveOnly set", strat)
 		}
@@ -273,14 +254,12 @@ func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 		if alias, ok := legacyStrategyAliases[strat]; ok {
 			normalized = alias
 		}
-		if !liveOnlyStrategies[normalized] {
+		if !testRegistry.IsLiveOnly(normalized) {
 			t.Errorf("frontend liveOnly strategy %q (normalized: %q) not in backend liveOnly set", strat, normalized)
 		}
 	}
 }
 
-// TestExchangePrefixes_FrontendBackendAlignment verifies the env var prefix
-// mapping is identical between frontend and backend.
 func TestExchangePrefixes_FrontendBackendAlignment(t *testing.T) {
 	frontendPrefixes := map[string]string{
 		"binance":  "BINANCE",
@@ -301,18 +280,18 @@ func TestExchangePrefixes_FrontendBackendAlignment(t *testing.T) {
 	}
 }
 
-// TestYAMLStructure_ParsesCorrectly verifies generated YAML is valid bbgo config.
 func TestYAMLStructure_ParsesCorrectly(t *testing.T) {
-	strategies := []StrategyEntry{
-		{
-			Exchange: "binance",
-			Strategy: "grid2",
-			Mode:     "paper",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`),
-		},
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModePaper,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`),
+		InstanceID: "grid2-BTCUSDT",
 	}
 
-	yamlBytes, err := buildUserYAML("test-user", ModePaper, strategies, func(ex string) bool { return false })
+	yamlBytes, err := buildInstanceYAML(inst, func(ex string) bool { return false }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

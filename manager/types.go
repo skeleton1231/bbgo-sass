@@ -13,9 +13,15 @@ type healthResponse struct {
 	Running int    `json:"running"`
 }
 
-type containerStatusResponse struct {
-	UserID     string                    `json:"user_id"`
-	Containers map[string]*containerInfo `json:"containers"`
+type instanceInfo struct {
+	InstanceID string `json:"instance_id"`
+	UserID     string `json:"user_id"`
+	Mode       string `json:"mode"`
+	Strategy   string `json:"strategy"`
+	Symbol     string `json:"symbol"`
+	Exchange   string `json:"exchange"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
 }
 
 type strategyCreatedResponse struct {
@@ -160,13 +166,25 @@ type notifConfigResponse struct {
 	Rules   NotificationRule `json:"rules"`
 }
 
-// --- Container status ---
+// --- Bot ---
 
-type containerInfo struct {
-	UserID     string               `json:"user_id"`
-	Mode       string               `json:"mode"`
-	Status     string               `json:"status"`
-	Strategies []BBGoStrategyState  `json:"strategies,omitempty"`
+type Bot struct {
+	ID              string          `json:"id"`
+	Strategy        string          `json:"strategy"`
+	Symbol          string          `json:"symbol"`
+	Exchange        string          `json:"exchange"`
+	Name            string          `json:"name"`
+	Config          json.RawMessage `json:"config,omitempty"`
+	State           json.RawMessage `json:"state,omitempty"`
+	ContainerStatus string          `json:"container_status"`
+	ContainerName   string          `json:"container_name,omitempty"`
+	Mode            string          `json:"mode"`
+}
+
+// --- Bots list response ---
+
+type botsResponse struct {
+	Bots []Bot `json:"bots"`
 }
 
 // --- Trading volume passthrough ---
@@ -179,12 +197,6 @@ type tradingVolumeResponse struct {
 
 type accountResponse struct {
 	Account json.RawMessage `json:"account"`
-}
-
-// --- Bots ---
-
-type botsResponse struct {
-	Bots []Bot `json:"bots"`
 }
 
 // --- Status messages ---

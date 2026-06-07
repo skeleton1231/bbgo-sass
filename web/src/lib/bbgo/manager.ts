@@ -26,7 +26,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-// --- Strategy & User Container types ---
+// --- Strategy Instance types ---
 
 export interface SessionRoleConfig {
   name: string
@@ -35,29 +35,20 @@ export interface SessionRoleConfig {
   futures: boolean
 }
 
-export interface StrategyEntry {
-  id: string
-  name: string
-  exchange: string
+export interface InstanceInfo {
+  instance_id: string
+  user_id: string
+  mode: 'live' | 'paper'
   strategy: string
-  config: Record<string, unknown>
-  mode: 'live' | 'paper'
-  crossExchange: boolean
-  sessions: SessionRoleConfig[]
-}
-
-export interface UserContainer {
-  user_id: string
-  mode: 'live' | 'paper'
+  symbol: string
+  exchange: string
+  name: string
   status: 'running' | 'stopped' | 'error' | 'starting'
-  // When running: array of bbgo strategy state objects (strategyInstanceID, strategy, symbol, etc.)
-  // When stopped: null
-  strategies: Record<string, unknown>[] | null
 }
 
-export interface UserContainersResponse {
+export interface InstanceListResponse {
   user_id: string
-  containers: Partial<Record<'live' | 'paper', UserContainer>>
+  instances: InstanceInfo[]
 }
 
 // --- Bot (strategy instance in web UI) ---
@@ -67,10 +58,11 @@ export interface Bot {
   strategy: string
   symbol: string
   exchange: string
-  session: string
-  config: Record<string, unknown>
-  state: Record<string, unknown>
+  name: string
+  config?: Record<string, unknown>
+  state?: Record<string, unknown>
   container_status: 'running' | 'stopped' | 'error' | 'starting'
+  container_name?: string
   mode: 'live' | 'paper'
 }
 
@@ -263,7 +255,7 @@ export interface PnLReport {
 // --- Strategy CRUD ---
 
 export function fetchUserStrategies(userId: string) {
-  return request<UserContainersResponse>(`/users/${userId}/strategies`)
+  return request<InstanceListResponse>(`/users/${userId}/strategies`)
 }
 
 export function createStrategy(userId: string, data: {
@@ -275,14 +267,14 @@ export function createStrategy(userId: string, data: {
   crossExchange?: boolean
   sessions?: SessionRoleConfig[]
 }) {
-  return request<UserContainer>(`/users/${userId}/strategies`, {
+  return request<InstanceInfo>(`/users/${userId}/strategies`, {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export function deleteStrategy(userId: string, strategyId: string) {
-  return request<UserContainer>(`/users/${userId}/strategies/${strategyId}`, {
+  return request<{ status: string; instance_id: string; user_id: string; mode: string }>(`/users/${userId}/strategies/${strategyId}`, {
     method: 'DELETE',
   })
 }
@@ -303,15 +295,25 @@ export function fetchBotDetail(userId: string, botId: string) {
 // --- User lifecycle ---
 
 export function startUser(userId: string, mode: 'live' | 'paper' = 'live') {
-  return request<UserContainer>(`/users/${userId}/start?mode=${mode}`, { method: 'POST' })
+  return request<{ status: string; user_id: string; mode: string }>(`/users/${userId}/start?mode=${mode}`, { method: 'POST' })
 }
 
 export function stopUser(userId: string, mode: 'live' | 'paper' = 'live') {
-  return request<{ status: string; user_id: string }>(`/users/${userId}/stop?mode=${mode}`, { method: 'POST' })
+  return request<{ status: string; user_id: string; mode: string }>(`/users/${userId}/stop?mode=${mode}`, { method: 'POST' })
 }
 
 export function fetchUserStatus(userId: string) {
-  return request<UserContainersResponse>(`/users/${userId}/status`)
+  return request<InstanceListResponse>(`/users/${userId}/status`)
+}
+
+// --- Instance start/stop ---
+
+export function startInstance(userId: string, instanceId: string) {
+  return request<InstanceInfo>(`/users/${userId}/instances/${encodeURIComponent(instanceId)}/start`, { method: 'POST' })
+}
+
+export function stopInstance(userId: string, instanceId: string) {
+  return request<{ status: string; instance_id: string; user_id: string; mode: string }>(`/users/${userId}/instances/${encodeURIComponent(instanceId)}/stop`, { method: 'POST' })
 }
 
 // --- Backtest ---

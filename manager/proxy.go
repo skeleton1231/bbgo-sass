@@ -14,7 +14,7 @@ import (
 type BotProxy struct {
 	cm          *ContainerManager
 	client      *http.Client
-	resolveAddr func(userID, mode string) string
+	resolveAddr func(userID, mode, instanceID string) string
 }
 
 func NewBotProxy(cm *ContainerManager) *BotProxy {
@@ -25,8 +25,8 @@ func NewBotProxy(cm *ContainerManager) *BotProxy {
 	}
 	return &BotProxy{
 		cm: cm,
-		resolveAddr: func(userID, mode string) string {
-			return cm.APIURL(userID, mode)
+		resolveAddr: func(userID, mode, instanceID string) string {
+			return cm.InstanceAPIURL(userID, mode, instanceID)
 		},
 		client: &http.Client{
 			Timeout:   30 * time.Second,
@@ -35,13 +35,13 @@ func NewBotProxy(cm *ContainerManager) *BotProxy {
 	}
 }
 
-func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID, mode string) {
-	targetPath := strings.TrimPrefix(r.URL.Path, "/api/bbgo/"+userID)
+func (bp *BotProxy) ProxyToInstance(w http.ResponseWriter, r *http.Request, inst *StrategyInstance) {
+	targetPath := strings.TrimPrefix(r.URL.Path, "/api/bbgo/"+inst.UserID)
 	if targetPath == "" || targetPath == "/" {
 		targetPath = "/"
 	}
 
-	baseURL := bp.resolveAddr(userID, mode)
+	baseURL := bp.resolveAddr(inst.UserID, inst.Mode, inst.InstanceID)
 	targetURL := fmt.Sprintf("%s/api%s", baseURL, targetPath)
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery
@@ -63,9 +63,10 @@ func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID, m
 			code = http.StatusServiceUnavailable
 		}
 		writeJSON(w, code, map[string]any{
-			"error":   "bot api unavailable",
-			"user_id": userID,
-			"details": err.Error(),
+			"error":       "bot api unavailable",
+			"user_id":     inst.UserID,
+			"instance_id": inst.InstanceID,
+			"details":     err.Error(),
 		})
 		return
 	}
@@ -80,6 +81,6 @@ func (bp *BotProxy) ProxyToBot(w http.ResponseWriter, r *http.Request, userID, m
 
 	_, copyErr := io.Copy(w, io.LimitReader(resp.Body, 10<<20))
 	if copyErr != nil {
-		log.Printf("proxy copy to client for user %s: %v", userID, copyErr)
+		log.Printf("proxy copy to client for instance %s: %v", inst.InstanceID, copyErr)
 	}
 }

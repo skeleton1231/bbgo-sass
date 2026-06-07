@@ -5,98 +5,107 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/c9s/bbgo/saas/manager/pool"
 )
 
 var errTestNotFound = errors.New("container not found")
 
-func TestContainerStatus_Running(t *testing.T) {
+func TestCheckInstanceRunning_Running(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.dockerFn = func(args ...string) (string, error) {
-		if args[0] == "inspect" {
-			return "running", nil
-		}
-		return "", nil
+		return "true", nil
 	}
-	running, status, err := cm.ContainerStatus("user-1", ModeLive)
+	running, err := cm.CheckInstanceRunning("user-1", ModeLive, "grid2-BTCUSDT")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !running {
 		t.Error("expected running=true")
 	}
-	if status != "running" {
-		t.Errorf("status = %q, want %q", status, "running")
-	}
 }
 
-func TestContainerStatus_Exited(t *testing.T) {
+func TestCheckInstanceRunning_Exited(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.dockerFn = func(args ...string) (string, error) {
-		return "exited", nil
+		return "false", nil
 	}
-	running, status, err := cm.ContainerStatus("user-1", ModeLive)
+	running, err := cm.CheckInstanceRunning("user-1", ModeLive, "grid2-BTCUSDT")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if running {
-		t.Error("expected running=false for exited container")
-	}
-	if status != "exited" {
-		t.Errorf("status = %q, want %q", status, "exited")
+		t.Error("expected running=false for stopped container")
 	}
 }
 
-func TestContainerStatus_NotFound(t *testing.T) {
+func TestCheckInstanceRunning_NotFound(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.dockerFn = func(args ...string) (string, error) {
 		return "", errTestNotFound
 	}
-	_, _, err := cm.ContainerStatus("user-1", ModeLive)
+	running, err := cm.CheckInstanceRunning("user-1", ModeLive, "grid2-BTCUSDT")
 	if err == nil {
 		t.Error("expected error for missing container")
 	}
+	if running {
+		t.Error("expected running=false on error")
+	}
 }
 
-func TestTryStart_ExitedContainer(t *testing.T) {
+func TestTryRecoverViaDockerStart_ExitedContainer(t *testing.T) {
 	cm := testContainerManager(t)
 	var calls []string
+	started := false
 	cm.dockerFn = func(args ...string) (string, error) {
 		calls = append(calls, strings.Join(args, " "))
-		if args[0] == "inspect" {
+		if args[0] == "inspect" && len(args) >= 3 && args[2] == "{{.State.Status}}" {
 			return "exited", nil
 		}
-		return "", nil
+		if args[0] == "inspect" && len(args) >= 3 && args[2] == "{{.State.Running}}" {
+			if started {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		if args[0] == "start" {
+			started = true
+			return "", nil
+		}
+		return "true", nil
 	}
-	if !cm.TryStart("user-1", ModeLive) {
-		t.Fatal("TryStart should succeed for exited container")
+	inst := &StrategyInstance{UserID: "user-1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"}
+	if !cm.tryRecoverViaDockerStart(inst) {
+		t.Fatal("tryRecoverViaDockerStart should succeed for exited container")
 	}
-	var started bool
+	var didStart bool
 	for _, c := range calls {
 		if strings.HasPrefix(c, "start bbgo-user-1") {
-			started = true
+			didStart = true
 		}
 	}
-	if !started {
+	if !didStart {
 		t.Error("expected docker start to be called")
 	}
 }
 
-func TestTryStart_AlreadyRunning(t *testing.T) {
+func TestTryRecoverViaDockerStart_AlreadyRunning(t *testing.T) {
 	cm := testContainerManager(t)
 	var callCount int
 	cm.dockerFn = func(args ...string) (string, error) {
 		callCount++
 		return "running", nil
 	}
-	if !cm.TryStart("user-1", ModeLive) {
-		t.Fatal("TryStart should return true for running container")
+	inst := &StrategyInstance{UserID: "user-1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"}
+	if !cm.tryRecoverViaDockerStart(inst) {
+		t.Fatal("tryRecoverViaDockerStart should return true for running container")
 	}
 	if callCount != 1 {
 		t.Errorf("callCount = %d, want 1 (inspect only, no start)", callCount)
 	}
 }
 
-func TestTryStart_DockerStartFails(t *testing.T) {
+func TestTryRecoverViaDockerStart_DockerStartFails(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.dockerFn = func(args ...string) (string, error) {
 		if args[0] == "inspect" {
@@ -104,18 +113,20 @@ func TestTryStart_DockerStartFails(t *testing.T) {
 		}
 		return "error: container not found", errTestNotFound
 	}
-	if cm.TryStart("user-1", ModeLive) {
-		t.Error("TryStart should return false when docker start fails")
+	inst := &StrategyInstance{UserID: "user-1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"}
+	if cm.tryRecoverViaDockerStart(inst) {
+		t.Error("tryRecoverViaDockerStart should return false when docker start fails")
 	}
 }
 
-func TestTryStart_NoContainer(t *testing.T) {
+func TestTryRecoverViaDockerStart_NoContainer(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.dockerFn = func(args ...string) (string, error) {
 		return "", errTestNotFound
 	}
-	if cm.TryStart("user-1", ModeLive) {
-		t.Error("TryStart should return false when container doesn't exist")
+	inst := &StrategyInstance{UserID: "user-1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"}
+	if cm.tryRecoverViaDockerStart(inst) {
+		t.Error("tryRecoverViaDockerStart should return false when container doesn't exist")
 	}
 }
 
@@ -126,9 +137,9 @@ func TestCleanupStopped_RemovesExitedAndDead(t *testing.T) {
 		cmd := strings.Join(args, " ")
 		switch {
 		case strings.Contains(cmd, "status=exited"):
-			return "bbgo-user-stopped\nbbgo-user-restarting", nil
+			return "bbgo-user-sto-live-grid2-btcusdt\nbbgo-user-res-live-grid2-btcusdt", nil
 		case strings.Contains(cmd, "status=dead"):
-			return "bbgo-user-dead", nil
+			return "bbgo-user-dea-live-grid2-btcusdt", nil
 		case args[0] == "rm":
 			removed.Add(1)
 			return "", nil
@@ -136,11 +147,10 @@ func TestCleanupStopped_RemovesExitedAndDead(t *testing.T) {
 		return "", nil
 	}
 
-	// user-restarting is tracked, so bbgo-user-restarting is skipped
-	users := []UserMode{
-		{UserID: "user-restarting", Mode: ModeLive},
+	tracked := []StrategyInstance{
+		{UserID: "user-restarting", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"},
 	}
-	cleaned := cm.CleanupStopped(users)
+	cleaned := cm.CleanupStopped(tracked)
 
 	if cleaned != 2 {
 		t.Errorf("cleaned = %d, want 2", cleaned)
@@ -155,7 +165,7 @@ func TestCleanupStopped_SkipsRunningContainers(t *testing.T) {
 	cm.dockerFn = func(args ...string) (string, error) {
 		cmd := strings.Join(args, " ")
 		if strings.Contains(cmd, "status=exited") {
-			return "bbgo-user-1", nil
+			return "bbgo-user-1-live-grid2-btcusdt", nil
 		}
 		if strings.Contains(cmd, "status=dead") {
 			return "", nil
@@ -166,11 +176,10 @@ func TestCleanupStopped_SkipsRunningContainers(t *testing.T) {
 		return "", nil
 	}
 
-	// user-1 is tracked, so bbgo-user-1 should be skipped
-	users := []UserMode{
-		{UserID: "user-1", Mode: ModeLive},
+	tracked := []StrategyInstance{
+		{UserID: "user-1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"},
 	}
-	cleaned := cm.CleanupStopped(users)
+	cleaned := cm.CleanupStopped(tracked)
 	if cleaned != 0 {
 		t.Errorf("cleaned = %d, want 0", cleaned)
 	}
@@ -187,6 +196,87 @@ func TestCleanupStopped_EmptyDocker(t *testing.T) {
 	}
 }
 
+func TestCheckAndRecover_AllAlive(t *testing.T) {
+	cm := testContainerManager(t)
+	cm.dockerFn = func(args ...string) (string, error) {
+		return "true", nil
+	}
+
+	instances := []StrategyInstance{
+		{UserID: "u1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"},
+		{UserID: "u2", Mode: ModeLive, InstanceID: "grid2-ETHUSDT"},
+	}
+
+	results := cm.CheckAndRecover(instances)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for _, r := range results {
+		if !r.Alive {
+			t.Errorf("expected %s/%s alive", r.UserID, r.InstanceID)
+		}
+		if r.Restarted {
+			t.Errorf("expected %s/%s not restarted", r.UserID, r.InstanceID)
+		}
+	}
+}
+
+func TestCheckAndRecover_DeadThenRestarted(t *testing.T) {
+	cm := testContainerManager(t)
+	started := false
+	cm.dockerFn = func(args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		if strings.Contains(cmd, "State.Running") {
+			if started {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		if args[0] == "inspect" && len(args) >= 3 && args[2] == "{{.State.Status}}" {
+			return "exited", nil
+		}
+		if args[0] == "start" {
+			started = true
+			return "", nil
+		}
+		return "true", nil
+	}
+
+	instances := []StrategyInstance{
+		{UserID: "u1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"},
+	}
+	results := cm.CheckAndRecover(instances)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if !results[0].Alive {
+		t.Error("expected alive after restart")
+	}
+	if !results[0].Restarted {
+		t.Error("expected restarted=true")
+	}
+}
+
+func TestRecoverUsers_AllRunning(t *testing.T) {
+	cm := testContainerManager(t)
+	store, _ := newTestStore(t)
+	cm.store = store
+	cm.dockerFn = func(args ...string) (string, error) {
+		return "true", nil
+	}
+
+	createTestInstance(t, store, "u1", "live", "grid2", "BTCUSDT", nil)
+
+	users := []UserMode{{UserID: "u1", Mode: ModeLive}}
+	results := cm.RecoverUsers(users)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusRunning {
+		t.Errorf("expected running, got %s", results[0].Status)
+	}
+}
+
 func testContainerManager(t *testing.T) *ContainerManager {
 	t.Helper()
 	dir := t.TempDir()
@@ -198,5 +288,7 @@ func testContainerManager(t *testing.T) *ContainerManager {
 		BBGOPort:      8080,
 		BBGOGRPCPort:  9090,
 	}
-	return NewContainerManager(cfg, nil, nil)
+	p := pool.New(5)
+	t.Cleanup(func() { p.Release() })
+	return NewContainerManager(cfg, nil, p, nil)
 }

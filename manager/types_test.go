@@ -25,12 +25,11 @@ func TestTypedResponseJSON(t *testing.T) {
 		}
 	})
 
-	t.Run("containerStatusResponse", func(t *testing.T) {
-		resp := containerStatusResponse{
-			UserID: "user-1",
-			Containers: map[string]*containerInfo{
-				"live": {UserID: "user-1", Mode: "live", Status: "running"},
-			},
+	t.Run("instanceInfo", func(t *testing.T) {
+		resp := instanceInfo{
+			UserID: "user-1", Mode: "live",
+			Strategy: "grid2", Symbol: "BTCUSDT", Exchange: "binance",
+			Status: "running",
 		}
 		b, err := json.Marshal(resp)
 		if err != nil {
@@ -41,13 +40,11 @@ func TestTypedResponseJSON(t *testing.T) {
 		if m["user_id"] != "user-1" {
 			t.Errorf("user_id: got %v", m["user_id"])
 		}
-		containers, _ := m["containers"].(map[string]any)
-		if containers == nil {
-			t.Fatal("missing containers map")
+		if m["status"] != "running" {
+			t.Errorf("status: got %v", m["status"])
 		}
-		live, _ := containers["live"].(map[string]any)
-		if live["status"] != "running" {
-			t.Errorf("live.status: got %v", live["status"])
+		if m["strategy"] != "grid2" {
+			t.Errorf("strategy: got %v", m["strategy"])
 		}
 	})
 
@@ -119,7 +116,6 @@ func TestBotJSONRoundtrip(t *testing.T) {
 		Strategy:        "grid2",
 		Symbol:          "BTCUSDT",
 		Exchange:        "binance",
-		Session:         "binance",
 		Config:          json.RawMessage(configJSON),
 		State:           json.RawMessage(stateJSON),
 		ContainerStatus: "running",

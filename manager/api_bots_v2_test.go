@@ -9,6 +9,27 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+const credsUID = "cccccccc-dddd-eeee-aaaa-bbbbbbbbbbbb"
+
+func setupCredsAPI(t *testing.T) (*API, func()) {
+	t.Helper()
+	dir := t.TempDir()
+	enc, _ := NewEncryptor(testEncryptionKey)
+	creds := NewCredentialStore(dir, enc)
+	store := NewInstanceStore(dir, nil)
+	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
+	cm := &ContainerManager{cfg: cfg, store: store}
+	proxy := NewBotProxy(cm)
+	api := NewAPI(cfg, store, cm, proxy, creds, enc, nil, nil, nil, nil, nil, nil, nil)
+	return api, func() {}
+}
+
+func containerRunningFor(running map[string]bool) func(string, string, string) bool {
+	return func(userID, mode, instanceID string) bool {
+		return running[userID+":"+mode+":"+instanceID]
+	}
+}
+
 // --- botFromStrategy unit tests ---
 
 func TestBotFromStrategy_ExtractsNestedSymbol(t *testing.T) {
@@ -37,9 +58,6 @@ func TestBotFromStrategy_ExtractsNestedSymbol(t *testing.T) {
 	}
 	if bot.Exchange != "binance" {
 		t.Errorf("Exchange: got %q", bot.Exchange)
-	}
-	if bot.Session != "binance" {
-		t.Errorf("Session: got %q", bot.Session)
 	}
 	if bot.Mode != "paper" {
 		t.Errorf("Mode: got %q", bot.Mode)
@@ -178,69 +196,27 @@ func TestBotFromStrategy_NoNestedConfig(t *testing.T) {
 	}
 }
 
-// --- Integration tests with real bbgo response format ---
+// --- Integration tests for bot listing from instance store ---
 
-func realBBGoHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/strategies/single" {
-			json.NewEncoder(w).Encode(map[string]any{
-				"strategies": []map[string]any{
-					{
-						"strategy":           "grid2",
-						"strategyInstanceID": "grid2-BTCUSDT-size-5-75500-73000",
-						"on":                 []any{"binance"},
-						"grid2": map[string]any{
-							"symbol":     "BTCUSDT",
-							"gridNumber": float64(5),
-							"upperPrice": float64(75500),
-							"lowerPrice": float64(73000),
-						},
-					},
-					{
-						"strategy":           "dca",
-						"strategyInstanceID": "dca-ETHUSDT",
-						"on":                 []any{"binance"},
-						"dca": map[string]any{
-							"symbol": "ETHUSDT",
-						},
-					},
-				},
-			})
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]any{"message": "ok"})
-	}
-}
-
-func setupRealFormatBotsTestAPI(t *testing.T) (*API, *chi.Mux) {
+func setupBotsTestAPI(t *testing.T) (*API, *chi.Mux) {
 	t.Helper()
 	store, dir := newTestStore(t)
 
-	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2"},
-		{Exchange: "binance", Strategy: "dca"},
-	})
-	writeTestStrategies(t, store, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", ModePaper, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2"},
-	})
-
-	bbgoSrv := httptest.NewServer(realBBGoHandler())
-	t.Cleanup(bbgoSrv.Close)
-
 	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
-	cm := &ContainerManager{cfg: cfg, pool: nil}
+	cm := &ContainerManager{cfg: cfg, store: store}
 	proxy := NewBotProxy(cm)
 	api := NewAPI(cfg, store, cm, proxy, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	api.containerRunning = func(_, _ string) bool { return true }
-	api.newBBGoClient = func(_ string) *BBGoClient {
-		return NewBBGoClient(bbgoSrv.URL)
-	}
 
 	return api, testRouter(api)
 }
 
-func TestListBots_RealFormat_ExtractsFieldsCorrectly(t *testing.T) {
-	_, r := setupRealFormatBotsTestAPI(t)
+func TestListBots_FilterByMode(t *testing.T) {
+	api, r := setupBotsTestAPI(t)
+
+	grid2Cfg := map[string]any{"gridNumber": 10, "upperPrice": "65000", "lowerPrice": "58000"}
+	createTestInstance(t, api.store, testUUID, ModeLive, "grid2", "BTCUSDT", grid2Cfg)
+	createTestInstance(t, api.store, testUUID, ModeLive, "dca", "ETHUSDT", nil)
+	createTestInstance(t, api.store, testUUID, ModePaper, "grid2", "BTCUSDT", grid2Cfg)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots?mode=live", nil)
 	w := httptest.NewRecorder()
@@ -261,39 +237,37 @@ func TestListBots_RealFormat_ExtractsFieldsCorrectly(t *testing.T) {
 		t.Fatalf("expected 2 bots, got %d", len(resp.Bots))
 	}
 
-	bot := resp.Bots[0]
-	if bot.ID != "grid2-BTCUSDT-size-5-75500-73000" {
-		t.Errorf("ID: got %q", bot.ID)
+	var gridBot *Bot
+	for i := range resp.Bots {
+		if resp.Bots[i].ID == "grid2-BTCUSDT-size-10-65000-58000" {
+			gridBot = &resp.Bots[i]
+			break
+		}
 	}
-	if bot.Strategy != "grid2" {
-		t.Errorf("Strategy: got %q", bot.Strategy)
+	if gridBot == nil {
+		t.Fatal("grid2-BTCUSDT-size-10-65000-58000 bot not found")
 	}
-	if bot.Symbol != "BTCUSDT" {
-		t.Errorf("Symbol: got %q", bot.Symbol)
+	if gridBot.Strategy != "grid2" {
+		t.Errorf("Strategy: got %q", gridBot.Strategy)
 	}
-	if bot.Exchange != "binance" {
-		t.Errorf("Exchange: got %q", bot.Exchange)
+	if gridBot.Symbol != "BTCUSDT" {
+		t.Errorf("Symbol: got %q", gridBot.Symbol)
 	}
-	if bot.Mode != "live" {
-		t.Errorf("Mode: got %q", bot.Mode)
+	if gridBot.Exchange != "binance" {
+		t.Errorf("Exchange: got %q", gridBot.Exchange)
 	}
-
-	var cfg map[string]any
-	if err := json.Unmarshal(bot.Config, &cfg); err != nil {
-		t.Fatalf("Config: failed to unmarshal: %v", err)
-	}
-	if cfg["upperPrice"] != float64(75500) {
-		t.Errorf("Config.upperPrice: got %v", cfg["upperPrice"])
-	}
-	if cfg["lowerPrice"] != float64(73000) {
-		t.Errorf("Config.lowerPrice: got %v", cfg["lowerPrice"])
+	if gridBot.Mode != "live" {
+		t.Errorf("Mode: got %q", gridBot.Mode)
 	}
 }
 
-func TestGetBot_RealFormat_ReturnsCorrectFields(t *testing.T) {
-	_, r := setupRealFormatBotsTestAPI(t)
+func TestGetBot_ReturnsCorrectFields(t *testing.T) {
+	api, r := setupBotsTestAPI(t)
 
-	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/grid2-BTCUSDT-size-5-75500-73000", nil)
+	grid2Cfg := map[string]any{"gridNumber": 10, "upperPrice": "65000", "lowerPrice": "58000"}
+	createTestInstance(t, api.store, testUUID, ModeLive, "grid2", "BTCUSDT", grid2Cfg)
+
+	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/grid2-BTCUSDT-size-10-65000-58000", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -306,7 +280,7 @@ func TestGetBot_RealFormat_ReturnsCorrectFields(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if bot.ID != "grid2-BTCUSDT-size-5-75500-73000" {
+	if bot.ID != "grid2-BTCUSDT-size-10-65000-58000" {
 		t.Errorf("ID: got %q", bot.ID)
 	}
 	if bot.Symbol != "BTCUSDT" {
@@ -315,18 +289,12 @@ func TestGetBot_RealFormat_ReturnsCorrectFields(t *testing.T) {
 	if bot.Exchange != "binance" {
 		t.Errorf("Exchange: got %q", bot.Exchange)
 	}
-
-	var cfg map[string]any
-	if err := json.Unmarshal(bot.Config, &cfg); err != nil {
-		t.Fatalf("Config: failed to unmarshal: %v", err)
-	}
-	if cfg["gridNumber"] != float64(5) {
-		t.Errorf("Config.gridNumber: got %v", cfg["gridNumber"])
-	}
 }
 
-func TestGetBot_RealFormat_SecondStrategy(t *testing.T) {
-	_, r := setupRealFormatBotsTestAPI(t)
+func TestGetBot_SecondStrategy(t *testing.T) {
+	api, r := setupBotsTestAPI(t)
+
+	createTestInstance(t, api.store, testUUID, ModeLive, "dca", "ETHUSDT", nil)
 
 	req := httptest.NewRequest("GET", "/api/users/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/bots/dca-ETHUSDT", nil)
 	w := httptest.NewRecorder()

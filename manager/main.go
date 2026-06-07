@@ -40,9 +40,10 @@ func main() {
 	}
 
 	defaultsCache := NewStrategyDefaultsCache(supaClient)
-	strategies := NewStrategyStore(cfg.DataDir, defaultsCache)
+	instanceStore := NewInstanceStore(cfg.DataDir, defaultsCache)
+	instanceStore.SetSupabase(supaClient)
 
-	containerMgr := NewContainerManager(cfg, credStore, containerPool)
+	containerMgr := NewContainerManager(cfg, credStore, containerPool, instanceStore)
 
 	if err := containerMgr.EnsureNetwork(); err != nil {
 		log.Fatalf("network error: %v", err)
@@ -53,7 +54,7 @@ func main() {
 	syncer.SetNotifier(notifier)
 
 	// Recover running containers from Docker
-	allUsers := strategies.ScanUsers()
+	allUsers := instanceStore.ScanUsers()
 	recovered := containerMgr.RecoverUsers(allUsers)
 	for _, r := range recovered {
 		notifier.LoadUser(r.UserID)
@@ -62,19 +63,16 @@ func main() {
 
 	// Discover orphaned Docker containers not tracked in YAML
 	discovered := containerMgr.DiscoverContainers()
-	for uid, modes := range discovered {
-		if !isValidUUID(uid) {
+	for _, inst := range discovered {
+		if !isValidUUID(inst.UserID) {
 			continue
 		}
-		for _, m := range modes {
-			if strategies.YAMLExists(uid, m) {
-				continue
-			}
-			log.Printf("discovered orphaned container: %s (%s), no bbgo.yaml — stopping", uid, m)
-			containerMgr.Stop(uid, m)
+		if instanceStore.YAMLExists(inst.UserID, inst.Mode, inst.InstanceID) {
+			continue
 		}
+		log.Printf("discovered orphaned container: %s/%s/%s — stopping", inst.UserID, inst.Mode, inst.InstanceID)
+		containerMgr.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 	}
-
 
 	// Periodic health check
 	done := make(chan struct{})
@@ -88,17 +86,22 @@ func main() {
 				return
 			case <-ticker.C:
 			}
-			users := strategies.ScanUsers()
-			for _, r := range containerMgr.CheckAndRecover(users) {
+			users := instanceStore.ScanUsers()
+			var allInstances []StrategyInstance
+			for _, um := range users {
+				instances, _ := instanceStore.ListInstances(um.UserID, um.Mode)
+				allInstances = append(allInstances, instances...)
+			}
+			for _, r := range containerMgr.CheckAndRecover(allInstances) {
 				if r.Restarted {
 					notifier.Dispatch(r.UserID, NotificationEvent{
 						Type:    "container",
 						Title:   "Container Restarted",
-						Message: fmt.Sprintf("Container bbgo-%s was restarted after an unexpected stop.", safeShortID(r.UserID)),
+						Message: fmt.Sprintf("Container %s was restarted after an unexpected stop.", r.InstanceID),
 					})
 				}
 			}
-			containerMgr.CleanupStopped(users)
+			containerMgr.CleanupStopped(allInstances)
 		}
 	}()
 
@@ -137,7 +140,7 @@ func main() {
 		}
 	}()
 
-	api := NewAPI(cfg, strategies, containerMgr, proxy, credStore, enc, syncer, hub, testnetHub, notifier, btExecutor, btJobStore, storageClient)
+	api := NewAPI(cfg, instanceStore, containerMgr, proxy, credStore, enc, syncer, hub, testnetHub, notifier, btExecutor, btJobStore, storageClient)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

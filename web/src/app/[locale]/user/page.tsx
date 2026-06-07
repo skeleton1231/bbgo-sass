@@ -40,13 +40,12 @@ export default function DashboardPage() {
   const userId = useUserId()
   const { mode: globalMode } = useTradingMode()
 
-  const { data: containersResp } = useUserStrategies(userId)
-  const containers = containersResp?.containers ?? {}
-  const activeContainer = containers[globalMode]
-  const otherContainer = containers[globalMode === 'live' ? 'paper' : 'live']
-  const isActive = activeContainer?.status === 'running'
-  const anyActive = isActive || otherContainer?.status === 'running'
-  const strategyCount = activeContainer?.strategies?.length ?? 0
+  const { data: instancesResp } = useUserStrategies(userId)
+  const allInstances = instancesResp?.instances ?? []
+  const activeInstances = allInstances.filter((i) => i.mode === globalMode)
+  const isActive = activeInstances.some((i) => i.status === 'running')
+  const anyActive = allInstances.some((i) => i.status === 'running')
+  const strategyCount = activeInstances.length
 
   const { data: tradesData } = useBotTrades(userId, undefined, undefined, globalMode, isActive)
   const { data: assetsData } = useBotAssets(userId, globalMode, isActive)
@@ -210,32 +209,29 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <div className="divide-y">
-            {activeContainer?.strategies?.map((s) => {
-              const id = (s.strategyInstanceID as string) ?? ''
-              const strategy = (s.strategy as string) ?? ''
-              const symbol = (s.symbol as string) ?? ''
-              const session = (s.session as string) ?? ''
+            {activeInstances.map((inst) => {
+              const isRunning = inst.status === 'running'
               return (
-              <div key={id} className="flex items-center justify-between px-6 py-3.5">
+              <div key={inst.instance_id} className="flex items-center justify-between px-6 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
                     <Bot className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{strategy}</p>
+                    <p className="text-sm font-medium">{inst.name || inst.strategy}</p>
                     <p className="text-xs text-muted-foreground">
-                      {session} · {symbol}
+                      {inst.exchange} · {inst.symbol}
                     </p>
                   </div>
                 </div>
                 <Badge
-                  variant={isActive ? 'default' : 'secondary'}
+                  variant={isRunning ? 'default' : 'secondary'}
                   className={cn(
                     'rounded-full text-[11px] font-medium',
-                    isActive && 'bg-trade-up text-white hover:bg-trade-up'
+                    isRunning && 'bg-trade-up text-white hover:bg-trade-up'
                   )}
                 >
-                  {isActive ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
+                  {isRunning ? bt('strategyStatus.running') : bt('strategyStatus.idle')}
                 </Badge>
               </div>
             )})}

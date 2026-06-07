@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestBBGoClient_Ping(t *testing.T) {
@@ -306,6 +307,54 @@ func TestBBGoClient_GetTradingVolume(t *testing.T) {
 	_, err := client.GetTradingVolume("day", "")
 	if err != nil {
 		t.Fatalf("GetTradingVolume() returned error: %v", err)
+	}
+}
+
+func TestBBGoClient_GetTradePositionSummary(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/trades/position-summary" {
+			t.Errorf("expected /api/trades/position-summary, got %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("exchange") != "binance" {
+			t.Errorf("expected exchange=binance, got %s", r.URL.Query().Get("exchange"))
+		}
+		if r.URL.Query().Get("symbol") != "BTCUSDT" {
+			t.Errorf("expected symbol=BTCUSDT, got %s", r.URL.Query().Get("symbol"))
+		}
+		json.NewEncoder(w).Encode(PositionSummary{NetPosition: 1.5, Symbol: "BTCUSDT"})
+	}))
+	defer srv.Close()
+
+	client := NewBBGoClient(srv.URL)
+	before := time.Now().Add(-24 * time.Hour)
+	summary, err := client.GetTradePositionSummary("binance", "BTCUSDT", &before)
+	if err != nil {
+		t.Fatalf("GetTradePositionSummary() returned error: %v", err)
+	}
+	if summary.NetPosition != 1.5 {
+		t.Errorf("expected netPosition=1.5, got %f", summary.NetPosition)
+	}
+	if summary.Symbol != "BTCUSDT" {
+		t.Errorf("expected symbol=BTCUSDT, got %s", summary.Symbol)
+	}
+}
+
+func TestBBGoClient_GetTradePositionSummary_NoBefore(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("before") != "" {
+			t.Errorf("expected no before param, got %s", r.URL.Query().Get("before"))
+		}
+		json.NewEncoder(w).Encode(PositionSummary{NetPosition: 0, Symbol: "ETHUSDT"})
+	}))
+	defer srv.Close()
+
+	client := NewBBGoClient(srv.URL)
+	summary, err := client.GetTradePositionSummary("", "ETHUSDT", nil)
+	if err != nil {
+		t.Fatalf("GetTradePositionSummary() returned error: %v", err)
+	}
+	if summary.Symbol != "ETHUSDT" {
+		t.Errorf("expected ETHUSDT, got %s", summary.Symbol)
 	}
 }
 

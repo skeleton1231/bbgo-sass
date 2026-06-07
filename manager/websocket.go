@@ -143,24 +143,33 @@ func (api *API) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// The hub only manages the subscription channel; the actual gRPC connection dials
 	// the container directly via containerAddr, so the hub used here doesn't matter.
 	var userCh chan json.RawMessage
-	for _, mode := range []string{ModeLive, ModePaper} {
-		if wsMode != "" && mode != wsMode {
-			continue
+	modes := []string{ModeLive, ModePaper}
+	if wsMode != "" {
+		modes = []string{wsMode}
+	}
+	for _, mode := range modes {
+		instances, _ := api.store.ListInstances(userID, mode)
+		for _, inst := range instances {
+			if !api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+				continue
+			}
+			containerAddr := api.container.InstanceGRPCAddr(inst.UserID, inst.Mode, inst.InstanceID)
+			sessions := extractSessionNames([]StrategyEntry{{
+				Strategy: inst.Strategy, Exchange: inst.Exchange,
+				CrossExchange: inst.CrossExchange, Sessions: inst.Sessions,
+			}})
+			ch, err := hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
+			if err != nil {
+				log.Printf("ws user data subscribe error for %s/%s: %v", inst.InstanceID, mode, err)
+				continue
+			}
+			userCh = ch
+			defer hub.Unsubscribe("user:"+userID, userCh)
+			break
 		}
-		if !api.isContainerRunning(userID, mode) {
-			continue
+		if userCh != nil {
+			break
 		}
-		containerAddr := api.container.ContainerGRPCAddr(userID, mode)
-		strategies, _ := api.strategies.ListStrategies(userID, mode)
-		sessions := extractSessionNames(strategies)
-		ch, err := hub.SubscribeUserData(ctx, userID, containerAddr, sessions)
-		if err != nil {
-			log.Printf("ws user data subscribe error for %s (%s): %v", userID, mode, err)
-			continue
-		}
-		userCh = ch
-		defer hub.Unsubscribe("user:"+userID, userCh)
-		break
 	}
 
 	var writeMu sync.Mutex

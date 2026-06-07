@@ -22,7 +22,7 @@ import (
 
 type API struct {
 	cfg        *Config
-	strategies *StrategyStore
+	store      *InstanceStore
 	container  *ContainerManager
 	proxy      *BotProxy
 	creds      *CredentialStore
@@ -39,36 +39,24 @@ type API struct {
 
 	stopCtx    context.Context
 	stopCancel context.CancelFunc
-	starting   sync.Map
+	starting   sync.Map // key: instanceID
 
-	newBBGoClient    func(baseURL string) *BBGoClient
-	containerStart   func(userID, mode string) error
-	containerStop    func(userID, mode string)
-	containerRunning func(userID, mode string) bool
-	verifyCredFn     func(exchange, apiKey, apiSecret, passphrase string, isTestnet bool) VerifyResult
+	newBBGoClient func(baseURL string) *BBGoClient
+	verifyCredFn  func(exchange, apiKey, apiSecret, passphrase string, isTestnet bool) VerifyResult
+	queryKlinesFn func(ctx context.Context, req *pb.QueryKLinesRequest) (*pb.QueryKLinesResponse, error)
+	queryTickerFn func(ctx context.Context, req *pb.QueryTickerRequest) (*pb.QueryTickerResponse, error)
 }
 
-func NewAPI(cfg *Config, strategies *StrategyStore, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, testnetHub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore, storage *StorageClient) *API {
+func NewAPI(cfg *Config, store *InstanceStore, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, testnetHub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore, storage *StorageClient) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &API{
-		cfg:           cfg,
-		strategies:    strategies,
-		container:     cm,
-		proxy:         proxy,
-		creds:         creds,
-		encryptor:     enc,
-		syncer:        syncer,
-		hub:           hub,
-		testnetHub:    testnetHub,
-		notifier:      notifier,
-		wsTickets:     NewWSTicketStore(),
-		btExec:        btExec,
-		btJobs:        btJobs,
-		btSyncSem:     make(chan struct{}, 2),
-		storage:       storage,
+		cfg: cfg, store: store, container: cm, proxy: proxy,
+		creds: creds, encryptor: enc, syncer: syncer,
+		hub: hub, testnetHub: testnetHub, notifier: notifier,
+		wsTickets: NewWSTicketStore(), btExec: btExec, btJobs: btJobs,
+		btSyncSem: make(chan struct{}, 2), storage: storage,
 		newBBGoClient: NewBBGoClient,
-		stopCtx:       ctx,
-		stopCancel:    cancel,
+		stopCtx: ctx, stopCancel: cancel,
 	}
 }
 
@@ -86,25 +74,18 @@ func (api *API) hubForMode(mode string) *MarketDataHub {
 }
 
 func (api *API) RegisterRoutes(r chi.Router) {
-
-	// WS routes — no request timeout (long-lived connections)
 	r.Get("/api/ws/ticket", api.IssueWSTicket)
 	r.Get("/api/ws", api.HandleWebSocket)
-
-	// Long-running operations — no request timeout
 	r.Post("/api/backtest/sync", api.SyncBacktestData)
 
-	// Standard routes — 60s request timeout
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Timeout(60 * time.Second))
-
 		r.Get("/api/health", api.Health)
-
 		r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
 		r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
 		r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
 
-	r.Route("/", func(r chi.Router) {
+		r.Route("/", func(r chi.Router) {
 			r.Use(UserRateLimit(3*time.Second, 20))
 			r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
 			r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
@@ -118,13 +99,14 @@ func (api *API) RegisterRoutes(r chi.Router) {
 			r.Post("/api/notifications/test", api.TestNotification)
 			r.Post("/api/backtest", api.RunBacktest)
 			r.Post("/api/backtest/submit", api.SubmitBacktest)
+			r.Post("/api/users/{userID}/instances/{instanceID}/start", api.StartInstance)
+			r.Post("/api/users/{userID}/instances/{instanceID}/stop", api.StopInstance)
 		})
 
 		r.Get("/api/users/{userID}/bots", api.ListBots)
 		r.Get("/api/users/{userID}/bots/{botID}", api.GetBot)
 		r.Get("/api/users/{userID}/strategies", api.ListStrategies)
 		r.Get("/api/users/{userID}/status", api.UserStatus)
-
 		r.Get("/api/users/{userID}/bbgo/ping", api.BBGoPing)
 		r.Get("/api/users/{userID}/bbgo/sessions", api.BBGoSessions)
 		r.Get("/api/users/{userID}/bbgo/session/{session}", api.BBGoSessionDetail)
@@ -140,13 +122,9 @@ func (api *API) RegisterRoutes(r chi.Router) {
 		r.Get("/api/users/{userID}/bbgo/orders/closed", api.BBGoClosedOrders)
 		r.Get("/api/users/{userID}/bbgo/trading-volume", api.BBGoTradingVolume)
 		r.Get("/api/users/{userID}/bbgo/pnl", api.BBGoPnL)
-
 		r.Get("/api/users/{userID}/logs", api.ContainerLogs)
-
 		r.Get("/api/notifications/config", api.ListNotificationConfigs)
-
 		r.HandleFunc("/api/bbgo/{userID}/*", api.ProxyToBot)
-
 		r.Get("/api/backtest/jobs", api.ListBacktestJobs)
 		r.Get("/api/backtest/jobs/{jobID}", api.GetBacktestJob)
 		r.Get("/api/backtest/jobs/{jobID}/download", api.DownloadBacktestReport)
@@ -155,20 +133,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	})
 }
 
-func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
-	users := api.strategies.ScanUsers()
-	running := 0
-	for _, um := range users {
-		if api.isContainerRunning(um.UserID, um.Mode) {
-			running++
-		}
-	}
-	writeJSON(w, http.StatusOK, healthResponse{
-		Status:  "ok",
-		Users:   len(users),
-		Running: running,
-	})
-}
+// --- Helpers ---
 
 func (api *API) resolveUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	urlID := chi.URLParam(r, "userID")
@@ -199,74 +164,66 @@ func modeFromQuery(r *http.Request) string {
 	return ModeLive
 }
 
-func containerKey(userID, mode string) string {
-	return userID + ":" + mode
-}
-
-func (api *API) isContainerStarting(userID, mode string) bool {
-	_, ok := api.starting.Load(containerKey(userID, mode))
+func (api *API) isInstanceStarting(instanceID string) bool {
+	_, ok := api.starting.Load(instanceID)
 	return ok
 }
 
-func (api *API) isContainerRunning(userID, mode string) bool {
-	if api.containerRunning != nil {
-		return api.containerRunning(userID, mode)
-	}
-	return api.container.IsRunning(userID, mode)
+func (api *API) isInstanceRunning(userID, mode, instanceID string) bool {
+	return api.container.IsInstanceRunning(userID, mode, instanceID)
 }
 
-func (api *API) startContainer(userID, mode string) error {
-	if api.containerStart != nil {
-		return api.containerStart(userID, mode)
+func (api *API) resolveInstanceForRequest(w http.ResponseWriter, r *http.Request) (*StrategyInstance, bool) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return nil, false
 	}
-	if api.container == nil {
-		return fmt.Errorf("container manager not configured")
+	mode := modeFromQuery(r)
+
+	if instanceID := r.URL.Query().Get("instanceID"); instanceID != "" {
+		inst, err := api.store.GetInstance(userID, mode, instanceID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "instance not found")
+			return nil, false
+		}
+		return inst, true
 	}
-	return api.container.CreateAndStart(userID, mode)
+
+	instances, err := api.store.ListInstances(userID, mode)
+	if err != nil || len(instances) == 0 {
+		writeError(w, http.StatusNotFound, "no instances found")
+		return nil, false
+	}
+
+	if len(instances) == 1 {
+		return &instances[0], true
+	}
+
+	writeError(w, http.StatusBadRequest, "multiple instances found — specify instanceID parameter")
+	return nil, false
 }
 
-func (api *API) stopContainer(userID, mode string) {
-	if api.containerStop != nil {
-		api.containerStop(userID, mode)
-		return
-	}
-	api.container.Stop(userID, mode)
+func (api *API) bbgoClientForInstance(inst *StrategyInstance, ctx context.Context) *BBGoClient {
+	return api.newBBGoClient(api.container.InstanceAPIURL(inst.UserID, inst.Mode, inst.InstanceID)).WithContext(ctx)
 }
 
-// containerStatusForMode returns the status info for a single mode.
-// When running, queries bbgo API for strategy details.
-// When stopped, returns status only (no strategy data).
-func (api *API) containerStatusForMode(userID, mode string) *containerInfo {
-	if !api.strategies.YAMLExists(userID, mode) {
-		return nil
-	}
+// --- Health ---
 
-	info := &containerInfo{
-		UserID: userID,
-		Mode:   mode,
-		Status: StatusStopped,
+func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
+	users := api.store.ScanUsers()
+	running := 0
+	for _, um := range users {
+		instances, _ := api.store.ListInstances(um.UserID, um.Mode)
+		for i := range instances {
+			if api.isInstanceRunning(instances[i].UserID, instances[i].Mode, instances[i].InstanceID) {
+				running++
+			}
+		}
 	}
-
-	if api.isContainerStarting(userID, mode) {
-		info.Status = StatusStarting
-		return info
-	}
-
-	if !api.isContainerRunning(userID, mode) {
-		return info
-	}
-
-	info.Status = StatusRunning
-	client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(context.Background())
-	strategies, err := client.GetStrategies()
-	if err != nil {
-		log.Printf("list strategies from bbgo for %s (%s): %v", userID, mode, err)
-		info.Strategies = []BBGoStrategyState{}
-	} else {
-		info.Strategies = strategies
-	}
-	return info
+	writeJSON(w, http.StatusOK, healthResponse{Status: "ok", Users: len(users), Running: running})
 }
+
+// --- Strategy CRUD ---
 
 func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
@@ -315,7 +272,7 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "mode must be 'paper' or 'live'")
 		return
 	}
-	if req.Mode == ModePaper && liveOnlyStrategies[normalizedStrategy] {
+	if req.Mode == ModePaper && api.store.IsLiveOnly(normalizedStrategy) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("strategy %s only supports live mode", req.Strategy))
 		return
 	}
@@ -335,9 +292,14 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if api.creds != nil && req.Mode != ModePaper {
-		for _, ex := range collectExchanges([]StrategyEntry{{
-			Exchange: req.Exchange, CrossExchange: req.CrossExchange, Sessions: req.Sessions,
-		}}) {
+		exchanges := []string{req.Exchange}
+		if req.CrossExchange {
+			exchanges = nil
+			for _, sr := range req.Sessions {
+				exchanges = append(exchanges, sr.Exchange)
+			}
+		}
+		for _, ex := range exchanges {
 			if _, _, _, err := api.creds.GetDecryptedByMode(userID, ex, false); err != nil {
 				writeError(w, http.StatusBadRequest, credModeError(req.Mode, ex))
 				return
@@ -345,19 +307,18 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	normalizedID := req.Strategy
-	if alias, ok := legacyStrategyAliases[req.Strategy]; ok {
-		normalizedID = alias
+	inst := &StrategyInstance{
+		UserID: userID, Mode: req.Mode, Strategy: normalizedStrategy,
+		Exchange: req.Exchange, Config: req.Config, Name: req.Name,
+		CrossExchange: req.CrossExchange, Sessions: req.Sessions,
 	}
-	entry := StrategyEntry{
-		Name:          req.Name,
-		Exchange:      req.Exchange,
-		Strategy:      normalizedID,
-		Config:        req.Config,
-		Mode:          req.Mode,
-		CrossExchange: req.CrossExchange,
-		Sessions:      req.Sessions,
+
+	symbol := extractSymbolFromConfig(req.Config)
+	if symbol == "" {
+		symbol = "BTCUSDT"
 	}
+	inst.Symbol = symbol
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
 
 	hasCredFn := func(exchange string) bool {
 		if api.creds == nil || req.Mode == ModePaper {
@@ -367,7 +328,7 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		return err == nil
 	}
 
-	if err := api.strategies.AddStrategy(userID, req.Mode, entry, hasCredFn); err != nil {
+	if err := api.store.CreateInstance(inst, hasCredFn); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			writeError(w, http.StatusConflict, err.Error())
 		} else {
@@ -376,14 +337,14 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, loaded := api.starting.LoadOrStore(containerKey(userID, req.Mode), true); !loaded {
-		go api.startUserContainer(userID, req.Mode)
+	if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+		go api.startInstanceContainer(inst)
 	}
 
-	writeJSON(w, http.StatusCreated, strategyCreatedResponse{
-		Status: "created",
-		UserID: userID,
-		Mode:   req.Mode,
+	writeJSON(w, http.StatusCreated, instanceInfo{
+		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+		Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+		Name: inst.Name, Status: StatusStarting,
 	})
 }
 
@@ -392,147 +353,125 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	byMode := make(map[string]*containerInfo)
+	instances := make([]instanceInfo, 0)
 	for _, mode := range []string{ModeLive, ModePaper} {
-		if info := api.containerStatusForMode(userID, mode); info != nil {
-			byMode[mode] = info
+		insts, _ := api.store.ListInstances(userID, mode)
+		for _, inst := range insts {
+			info := instanceInfo{
+				InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+				Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+				Name: inst.Name, Status: StatusStopped,
+			}
+			if api.isInstanceStarting(inst.InstanceID) {
+				info.Status = StatusStarting
+			} else if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+				info.Status = StatusRunning
+			}
+			instances = append(instances, info)
 		}
 	}
-	writeJSON(w, http.StatusOK, containerStatusResponse{
-		UserID:     userID,
-		Containers: byMode,
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"user_id": userID, "instances": instances})
 }
 
-// DeleteStrategy removes a strategy by bbgo strategyInstanceID.
-// Only works when the container is running (we query bbgo API to resolve the ID).
 func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
 		return
 	}
-	strategyID := chi.URLParam(r, "strategyID")
+	instanceID := chi.URLParam(r, "strategyID")
 	mode := modeFromQuery(r)
 
-	// Resolve strategy type+symbol+exchange either from the running container
-	// or by parsing the YAML file on disk (for crashed containers).
-	var strategy, symbol, exchange string
-
-	if api.isContainerRunning(userID, mode) {
-		client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
-		bbgoStrategies, err := client.GetStrategies()
-		if err != nil {
-			writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to query strategies: %v", err))
-			return
-		}
-
-		var target BBGoStrategyState
-		for _, s := range bbgoStrategies {
-			if id, _ := s["strategyInstanceID"].(string); id == strategyID {
-				target = s
-				break
-			}
-		}
-		if target == nil {
-			writeError(w, http.StatusNotFound, "strategy not found")
-			return
-		}
-
-		strategy, _ = target["strategy"].(string)
-		symbol, _ = target["symbol"].(string)
-		if symbol == "" {
-			if cfg, ok := target[strategy]; ok {
-				if m, ok := cfg.(map[string]any); ok {
-					symbol, _ = m["symbol"].(string)
-				}
-			}
-		}
-		if on, ok := target["on"].([]any); ok && len(on) > 0 {
-			exchange, _ = on[0].(string)
-		}
-	} else {
-		// Container not running — parse YAML directly to find the strategy by ID.
-		// strategyID format from bbgo: "strategy:symbol:..." (e.g. "emacross:BTCUSDT:1h:9-21")
-		// We match by strategy type + symbol since the full ID contains runtime details.
-		entries, err := api.strategies.ListStrategies(userID, mode)
-		if err != nil {
-			writeError(w, http.StatusNotFound, "no strategy config found")
-			return
-		}
-		for _, e := range entries {
-			eSymbol := extractSymbolFromConfig(e.Config)
-			// Match if the strategyID starts with "strategy:symbol:" or equals "strategy" for symbol-less strategies
-			prefix := e.Strategy + ":" + eSymbol
-			if strings.HasPrefix(strategyID, prefix+":") || (eSymbol == "" && strategyID == e.Strategy) {
-				strategy = e.Strategy
-				symbol = eSymbol
-				exchange = e.Exchange
-				break
-			}
-		}
-		if strategy == "" {
-			writeError(w, http.StatusNotFound, "strategy not found in bbgo.yaml")
-			return
-		}
-	}
-
-	hasCredFn := func(exchange string) bool {
-		if api.creds == nil || mode == ModePaper {
-			return false
-		}
-		_, err := api.creds.GetByMode(userID, exchange, false)
-		return err == nil
-	}
-
-	found, err := api.strategies.RemoveStrategy(userID, mode, strategy, symbol, exchange, hasCredFn)
-	// Cross-exchange strategies have Exchange="" in the store but bbgo returns
-	// session names in "on". Retry with empty exchange if the first attempt failed.
-	if !found && err == nil && exchange != "" {
-		found, err = api.strategies.RemoveStrategy(userID, mode, strategy, symbol, "", hasCredFn)
-	}
+	inst, err := api.store.GetInstance(userID, mode, instanceID)
 	if err != nil {
+		writeError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+
+	if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+		api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+	}
+
+	if err := api.store.RemoveInstance(inst.UserID, inst.Mode, inst.InstanceID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if !found {
-		writeError(w, http.StatusNotFound, "strategy not found in bbgo.yaml")
-		return
-	}
-
-	// If no strategies left, stop the container
-	strategies, _ := api.strategies.ListStrategies(userID, mode)
-	if len(strategies) == 0 {
-		api.stopContainer(userID, mode)
-		writeJSON(w, http.StatusOK, statusStopped{Status: "stopped", Reason: "no strategies left"})
-		return
-	}
-
-	if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
-		go api.startUserContainer(userID, mode)
-	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
-		"status":  "restarting",
-		"user_id": userID,
-		"mode":    mode,
+		"status": "deleted", "instance_id": inst.InstanceID,
+		"user_id": userID, "mode": mode,
 	})
 }
 
-// ClearAllStrategies removes all strategies for a user+mode from YAML,
-// regardless of whether the container is running. Used for cleanup after crashes.
 func (api *API) ClearAllStrategies(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
 		return
 	}
 	mode := modeFromQuery(r)
+	instances, _ := api.store.ListInstances(userID, mode)
+	for _, inst := range instances {
+		api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		api.store.RemoveInstance(inst.UserID, inst.Mode, inst.InstanceID)
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+}
 
-	if err := api.strategies.ClearStrategies(userID, mode); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+// --- Instance start/stop ---
+
+func (api *API) StartInstance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
 		return
 	}
+	instanceID := chi.URLParam(r, "instanceID")
+	inst, err := api.store.GetInstance(userID, "", instanceID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+	if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+		writeJSON(w, http.StatusOK, instanceInfo{
+			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+			Name: inst.Name, Status: StatusRunning,
+		})
+		return
+	}
+	if api.isInstanceStarting(inst.InstanceID) {
+		writeJSON(w, http.StatusAccepted, instanceInfo{
+			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+			Name: inst.Name, Status: StatusStarting,
+		})
+		return
+	}
+	writeJSON(w, http.StatusAccepted, instanceInfo{
+		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+		Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+		Name: inst.Name, Status: StatusStarting,
+	})
+	if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+		go api.startInstanceContainer(inst)
+	}
+}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+func (api *API) StopInstance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	instanceID := chi.URLParam(r, "instanceID")
+	inst, err := api.store.GetInstance(userID, "", instanceID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+	api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+	api.starting.Delete(inst.InstanceID)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "stopped", "instance_id": inst.InstanceID,
+		"user_id": userID, "mode": inst.Mode,
+	})
 }
 
 func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
@@ -540,84 +479,114 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
 	mode := modeFromQuery(r)
-
-	if !api.strategies.YAMLExists(userID, mode) {
+	instances, err := api.store.ListInstances(userID, mode)
+	if err != nil || len(instances) == 0 {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("no strategies configured for %s mode", mode))
 		return
 	}
 
-	// Validate credentials (live mode only â paper mode needs no credentials)
-	strategies, _ := api.strategies.ListStrategies(userID, mode)
 	if api.creds != nil && mode != ModePaper {
-		for _, ex := range collectExchanges(strategies) {
-			cred, err := api.creds.GetByMode(userID, ex, false)
-			if err != nil {
-				writeError(w, http.StatusBadRequest, credModeError(mode, ex))
-				return
+		for _, inst := range instances {
+			exchanges := []string{inst.Exchange}
+			if inst.CrossExchange {
+				exchanges = nil
+				for _, sr := range inst.Sessions {
+					exchanges = append(exchanges, sr.Exchange)
+				}
 			}
-			if !cred.IsVerified && exchangeHasVerifier(ex) {
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("API key for %s (%s) is not verified — verification failed or has not been attempted", ex, modeLabel(false)))
-				return
+			for _, ex := range exchanges {
+				cred, err := api.creds.GetByMode(userID, ex, false)
+				if err != nil {
+					writeError(w, http.StatusBadRequest, credModeError(mode, ex))
+					return
+				}
+				if !cred.IsVerified && exchangeHasVerifier(ex) {
+					writeError(w, http.StatusBadRequest, fmt.Sprintf("API key for %s is not verified", ex))
+					return
+				}
 			}
 		}
 	}
 
-	if api.isContainerRunning(userID, mode) {
-		writeJSON(w, http.StatusOK, api.containerStatusForMode(userID, mode))
-		return
+	var infos []instanceInfo
+	for i := range instances {
+		inst := &instances[i]
+		info := instanceInfo{
+			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Name: inst.Name,
+		}
+		if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+			info.Status = StatusRunning
+		} else if api.isInstanceStarting(inst.InstanceID) {
+			info.Status = StatusStarting
+		} else {
+			info.Status = StatusStarting
+			if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+				go api.startInstanceContainer(inst)
+			}
+		}
+		infos = append(infos, info)
 	}
-
-	if api.isContainerStarting(userID, mode) {
-		writeJSON(w, http.StatusAccepted, api.containerStatusForMode(userID, mode))
-		return
-	}
-
-	// Return starting status immediately, start async
-	info := api.containerStatusForMode(userID, mode)
-	if info != nil {
-		info.Status = StatusStarting
-	} else {
-		info = &containerInfo{UserID: userID, Mode: mode, Status: StatusStarting}
-	}
-	writeJSON(w, http.StatusAccepted, info)
-
-	if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
-		go api.startUserContainer(userID, mode)
-	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"user_id": userID, "mode": mode, "instances": infos})
 }
 
-func (api *API) startUserContainer(userID, mode string) {
-	key := containerKey(userID, mode)
-	defer api.starting.Delete(key)
+func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	mode := modeFromQuery(r)
+	instances, _ := api.store.ListInstances(userID, mode)
+	for _, inst := range instances {
+		api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		api.starting.Delete(inst.InstanceID)
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID, "mode": mode})
+}
 
-	if err := api.startContainer(userID, mode); err != nil {
-		log.Printf("start %s container for user %s failed: %v", mode, userID, err)
+func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	var instances []instanceInfo
+	for _, mode := range []string{ModeLive, ModePaper} {
+		insts, _ := api.store.ListInstances(userID, mode)
+		for _, inst := range insts {
+			info := instanceInfo{
+				InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+				Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+				Name: inst.Name, Status: StatusStopped,
+			}
+			if api.isInstanceStarting(inst.InstanceID) {
+				info.Status = StatusStarting
+			} else if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+				info.Status = StatusRunning
+			}
+			instances = append(instances, info)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user_id": userID, "instances": instances})
+}
+
+func (api *API) startInstanceContainer(inst *StrategyInstance) {
+	defer api.starting.Delete(inst.InstanceID)
+
+	if err := api.container.CreateAndStartInstance(inst); err != nil {
+		log.Printf("start instance %s for user %s failed: %v", inst.InstanceID, inst.UserID, err)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(api.stopCtx, 30*time.Second)
 	defer cancel()
 
-	baseURL := ""
-	if api.container != nil {
-		baseURL = api.container.APIURL(userID, mode)
-	}
-	if baseURL == "" {
-		log.Printf("user %s %s: cannot determine container URL", userID, mode)
-		return
-	}
-	if api.newBBGoClient == nil {
-		log.Printf("user %s %s: bbgo client factory not configured", userID, mode)
-		return
-	}
+	baseURL := api.container.InstanceAPIURL(inst.UserID, inst.Mode, inst.InstanceID)
 	client := api.newBBGoClient(baseURL)
 	var reachable bool
 	for i := 0; i < 30; i++ {
 		select {
 		case <-ctx.Done():
-			log.Printf("user %s %s health check cancelled: %v", userID, mode, ctx.Err())
 			return
 		default:
 		}
@@ -627,21 +596,21 @@ func (api *API) startUserContainer(userID, mode string) {
 		}
 		time.Sleep(time.Second)
 	}
-
 	if !reachable {
-		log.Printf("user %s %s container started but health check failed", userID, mode)
+		log.Printf("instance %s container started but health check failed", inst.InstanceID)
 		return
 	}
+	log.Printf("instance %s container started and healthy", inst.InstanceID)
 
-	log.Printf("user %s %s container started and healthy", userID, mode)
-
-	if api.syncer != nil {
-		strategies, _ := api.strategies.ListStrategies(userID, mode)
-		go api.syncer.MarkCredentialsVerified(userID, mode, strategies)
+	if api.syncer != nil && inst.Mode != ModePaper {
+		go api.syncer.MarkCredentialsVerified(inst.UserID, inst.Mode, []StrategyEntry{{
+			Strategy: inst.Strategy, Exchange: inst.Exchange,
+			CrossExchange: inst.CrossExchange, Sessions: inst.Sessions,
+		}})
 	}
 
 	go func() {
-		grpcAddr := api.container.ContainerGRPCAddr(userID, mode)
+		grpcAddr := api.container.InstanceGRPCAddr(inst.UserID, inst.Mode, inst.InstanceID)
 		for i := 0; i < 10; i++ {
 			select {
 			case <-api.stopCtx.Done():
@@ -655,82 +624,21 @@ func (api *API) startUserContainer(userID, mode string) {
 			}
 			time.Sleep(time.Second)
 		}
-		log.Printf("grpc port %s not ready after 10s for user %s %s", grpcAddr, userID, mode)
 	}()
 }
 
-func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
-	userID, ok := api.resolveUserID(w, r)
-	if !ok {
-		return
-	}
-	mode := modeFromQuery(r)
-	api.stopContainer(userID, mode)
-	api.starting.Delete(containerKey(userID, mode))
-	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID, "mode": mode})
-}
-
-func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
-	userID, ok := api.resolveUserID(w, r)
-	if !ok {
-		return
-	}
-	byMode := make(map[string]*containerInfo)
-	for _, mode := range []string{ModeLive, ModePaper} {
-		if info := api.containerStatusForMode(userID, mode); info != nil {
-			byMode[mode] = info
-		}
-	}
-	writeJSON(w, http.StatusOK, containerStatusResponse{UserID: userID, Containers: byMode})
-}
-
-// userFromURL extracts userID and mode from URL parameters, validates access.
-func (api *API) userFromURL(w http.ResponseWriter, r *http.Request) (string, string, bool) {
-	userID := chi.URLParam(r, "userID")
-	if !isValidUUID(userID) {
-		writeError(w, http.StatusBadRequest, "invalid user ID format")
-		return "", "", false
-	}
-	if headerID, ok := userIDFromRequest(r); ok && headerID != userID {
-		writeError(w, http.StatusForbidden, "user ID mismatch")
-		return "", "", false
-	}
-	mode := modeFromQuery(r)
-	return userID, mode, true
-}
-
-func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
-	userID, mode, ok := api.userFromURL(w, r)
-	if !ok {
-		return nil, "", false
-	}
-
-	if !api.isContainerRunning(userID, mode) {
-		writeError(w, http.StatusServiceUnavailable, "container is not running")
-		return nil, "", false
-	}
-
-	return api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context()), mode, true
-}
+// --- Bot data endpoints ---
 
 func (api *API) ProxyToBot(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
-	if !isValidUUID(userID) {
-		writeError(w, http.StatusBadRequest, "invalid user ID format")
+	inst, ok := api.resolveInstanceForRequest(w, r)
+	if !ok {
 		return
 	}
-	if headerID, ok := userIDFromRequest(r); ok && headerID != userID {
-		writeError(w, http.StatusForbidden, "user ID mismatch")
+	if !api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+		writeError(w, http.StatusNotFound, "instance container not running")
 		return
 	}
-
-	mode := modeFromQuery(r)
-	if !api.strategies.YAMLExists(userID, mode) {
-		writeError(w, http.StatusNotFound, "user container not found")
-		return
-	}
-
-	api.proxy.ProxyToBot(w, r, userID, mode)
+	api.proxy.ProxyToInstance(w, r, inst)
 }
 
 func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
@@ -738,19 +646,44 @@ func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
 	mode := modeFromQuery(r)
+	instanceID := r.URL.Query().Get("instanceID")
 	tail := r.URL.Query().Get("tail")
 	if tail == "" {
 		tail = "200"
 	}
 
-	logs, err := api.container.Logs(userID, mode, tail)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+	if instanceID != "" {
+		logs, err := api.container.InstanceLogs(userID, mode, instanceID, tail)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, logsResponse{Logs: logs})
 		return
 	}
-	writeJSON(w, http.StatusOK, logsResponse{Logs: logs})
+
+	instances, _ := api.store.ListInstances(userID, mode)
+	var allLogs []string
+	for _, inst := range instances {
+		logs, err := api.container.InstanceLogs(inst.UserID, inst.Mode, inst.InstanceID, tail)
+		if err == nil && logs != "" {
+			allLogs = append(allLogs, fmt.Sprintf("--- %s ---\n%s", inst.InstanceID, logs))
+		}
+	}
+	writeJSON(w, http.StatusOK, logsResponse{Logs: strings.Join(allLogs, "\n")})
+}
+
+func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
+	inst, ok := api.resolveInstanceForRequest(w, r)
+	if !ok {
+		return nil, "", false
+	}
+	if !api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+		writeError(w, http.StatusServiceUnavailable, "instance container is not running")
+		return nil, "", false
+	}
+	return api.bbgoClientForInstance(inst, r.Context()), inst.Mode, true
 }
 
 func (api *API) BBGoPing(w http.ResponseWriter, r *http.Request) {
@@ -868,9 +801,7 @@ func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "exchange is required")
 		return
 	}
-	var restAddr string = api.cfg.MarketDataRESTAddr
-	base := "http://" + restAddr
-	client := api.newBBGoClient(base)
+	client := api.newBBGoClient("http://" + api.cfg.MarketDataRESTAddr)
 	symbols, err := client.GetSessionSymbols(exchange)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("marketdata symbols: %s", err))
@@ -886,16 +817,21 @@ func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
 		return
 	}
-	mode := r.URL.Query().Get("mode")
-	hub := api.hubForMode(mode)
-	if hub == nil || hub.conn == nil {
+	hub := api.hubForMode(r.URL.Query().Get("mode"))
+	if api.queryTickerFn == nil && (hub == nil || hub.conn == nil) {
 		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	client := pb.NewMarketDataQueryClient(hub.conn)
-	resp, err := client.QueryTicker(ctx, &pb.QueryTickerRequest{Exchange: exchange, Symbol: symbol})
+	req := &pb.QueryTickerRequest{Exchange: exchange, Symbol: symbol}
+	var err error
+	var resp *pb.QueryTickerResponse
+	if api.queryTickerFn != nil {
+		resp, err = api.queryTickerFn(ctx, req)
+	} else {
+		resp, err = pb.NewMarketDataQueryClient(hub.conn).QueryTicker(ctx, req)
+	}
 	if err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("query ticker: %s", err))
 		return
@@ -909,12 +845,8 @@ func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, tickerResponse{Ticker: tickerData{
-		Symbol: resp.Ticker.Symbol,
-		Open:   resp.Ticker.Open,
-		High:   resp.Ticker.High,
-		Low:    resp.Ticker.Low,
-		Close:  resp.Ticker.Close,
-		Volume: resp.Ticker.Volume,
+		Symbol: resp.Ticker.Symbol, Open: resp.Ticker.Open, High: resp.Ticker.High,
+		Low: resp.Ticker.Low, Close: resp.Ticker.Close, Volume: resp.Ticker.Volume,
 	}})
 }
 
@@ -925,51 +857,39 @@ func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
 		return
 	}
-	// Klines are public market data — always use the live hub regardless of mode.
-	// Testnet exchanges have very limited historical data.
 	hub := api.hub
-	if hub == nil || hub.conn == nil {
+	if api.queryKlinesFn == nil && (hub == nil || hub.conn == nil) {
 		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
 		return
 	}
-
 	interval := r.URL.Query().Get("interval")
 	if interval == "" {
 		interval = "1h"
 	}
-	limitStr := r.URL.Query().Get("limit")
 	limit := int64(500)
-	if limitStr != "" {
-		if l, err := strconv.ParseInt(limitStr, 10, 64); err == nil && l > 0 && l <= 1500 {
-			limit = l
-		}
+	if l, err := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 64); err == nil && l > 0 && l <= 1500 {
+		limit = l
 	}
-	startTimeStr := r.URL.Query().Get("start_time")
-	endTimeStr := r.URL.Query().Get("end_time")
 	var startTime, endTime int64
-	if startTimeStr != "" {
-		if t, err := strconv.ParseInt(startTimeStr, 10, 64); err == nil {
-			startTime = t
-		}
+	if t, err := strconv.ParseInt(r.URL.Query().Get("start_time"), 10, 64); err == nil {
+		startTime = t
 	}
-	if endTimeStr != "" {
-		if t, err := strconv.ParseInt(endTimeStr, 10, 64); err == nil {
-			endTime = t
-		}
+	if t, err := strconv.ParseInt(r.URL.Query().Get("end_time"), 10, 64); err == nil {
+		endTime = t
 	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-
-	client := pb.NewMarketDataQueryClient(hub.conn)
-	resp, err := client.QueryKLines(ctx, &pb.QueryKLinesRequest{
-		Exchange:  exchange,
-		Symbol:    symbol,
-		Interval:  interval,
-		StartTime: startTime,
-		EndTime:   endTime,
-		Limit:     limit,
-	})
+	var err error
+	req := &pb.QueryKLinesRequest{
+		Exchange: exchange, Symbol: symbol, Interval: interval,
+		StartTime: startTime, EndTime: endTime, Limit: limit,
+	}
+	var resp *pb.QueryKLinesResponse
+	if api.queryKlinesFn != nil {
+		resp, err = api.queryKlinesFn(ctx, req)
+	} else {
+		resp, err = pb.NewMarketDataQueryClient(hub.conn).QueryKLines(ctx, req)
+	}
 	if err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("query klines: %s", err))
 		return
@@ -978,18 +898,11 @@ func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, resp.Error.ErrorMessage)
 		return
 	}
-
 	klines := make([]klineEntry, 0, len(resp.Klines))
 	for _, k := range resp.Klines {
 		klines = append(klines, klineEntry{
-			Time:        k.StartTime,
-			Open:        k.Open,
-			High:        k.High,
-			Low:         k.Low,
-			Close:       k.Close,
-			Volume:      k.Volume,
-			QuoteVolume: k.QuoteVolume,
-			Closed:      k.Closed,
+			Time: k.StartTime, Open: k.Open, High: k.High, Low: k.Low,
+			Close: k.Close, Volume: k.Volume, QuoteVolume: k.QuoteVolume, Closed: k.Closed,
 		})
 	}
 	writeJSON(w, http.StatusOK, klinesResponse{Klines: klines})
@@ -1026,49 +939,35 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
 	exchange := r.URL.Query().Get("exchange")
 	symbol := r.URL.Query().Get("symbol")
 	ordering := r.URL.Query().Get("ordering")
 	if ordering == "" {
 		ordering = "DESC"
 	}
-
 	var since, until *time.Time
 	if s := r.URL.Query().Get("since"); s != "" {
-		t, err := time.Parse(time.RFC3339, s)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid since format")
-			return
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			since = &t
 		}
-		since = &t
 	}
 	if u := r.URL.Query().Get("until"); u != "" {
-		t, err := time.Parse(time.RFC3339, u)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid until format")
-			return
+		if t, err := time.Parse(time.RFC3339, u); err == nil {
+			until = &t
 		}
-		until = &t
 	}
-
 	limit := 500
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 1000 {
 			limit = v
 		}
 	}
-
-	// For live mode with Supabase, fetch from Supabase
 	if api.syncer != nil && mode != ModePaper {
-		trades, err := api.fetchSupabaseTrades(r, exchange, symbol, r.URL.Query().Get("strategy"), since, until, ordering, limit)
-		if err == nil && len(trades) > 0 {
+		if trades, err := api.fetchSupabaseTrades(r, exchange, symbol, r.URL.Query().Get("strategy"), since, until, ordering, limit); err == nil && len(trades) > 0 {
 			writeJSON(w, http.StatusOK, tradesResponse{Trades: trades})
 			return
 		}
 	}
-
-	// Paper mode or Supabase fallback: fetch from bbgo container
 	trades, err := api.fetchContainerTrades(client, exchange, symbol, r.URL.Query().Get("strategy"), since, until, ordering, limit)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -1080,7 +979,6 @@ func (api *API) BBGoTrades(w http.ResponseWriter, r *http.Request) {
 func (api *API) fetchContainerTrades(client *BBGoClient, exchange, symbol, strategy string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
 	trades, err := client.GetTradesRange(exchange, symbol, strategy, since, until, limit, ordering)
 	if err != nil {
-		// Fallback to session-based query
 		session := exchange
 		if session == "" {
 			if sessions, serr := client.GetSessions(); serr == nil && len(sessions) > 0 {
@@ -1097,20 +995,15 @@ func (api *API) fetchContainerTrades(client *BBGoClient, exchange, symbol, strat
 	if err != nil {
 		return nil, err
 	}
-
-	// Compute position tags
-	trades = computeTradesWithPositionTags(trades, client, exchange, symbol)
-	return trades, nil
+	return computeTradesWithPositionTags(trades, client, exchange, symbol), nil
 }
 
 func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol, strategy string, since, until *time.Time, ordering string, limit int) ([]BBGoTrade, error) {
-	userID, _, _ := api.userFromURL(nil, r)
+	userID, _ := userIDFromRequest(r)
 	allTrades, err := api.syncer.GetTradesForPnL(userID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Filter
 	var filtered []BBGoTrade
 	for _, t := range allTrades {
 		if exchange != "" && t.Exchange != exchange {
@@ -1130,65 +1023,46 @@ func (api *API) fetchSupabaseTrades(r *http.Request, exchange, symbol, strategy 
 		}
 		filtered = append(filtered, t)
 	}
-
-	// Compute position tags on full filtered set
 	sortTradesASC(filtered)
 	computePositionTags(filtered, 0)
-
-	// Reverse for DESC
 	if ordering == "DESC" {
 		for i, j := 0, len(filtered)-1; i < j; i, j = i+1, j-1 {
 			filtered[i], filtered[j] = filtered[j], filtered[i]
 		}
 	}
-
-	// Apply limit
 	if limit > 0 && len(filtered) > limit {
 		filtered = filtered[:limit]
 	}
-
 	return filtered, nil
 }
 
-// computeTradesWithPositionTags sorts trades ASC, computes position tags using
-// the position-summary endpoint for the initial net position, then returns
-// trades in the requested order with positionAction fields populated.
 func computeTradesWithPositionTags(trades []BBGoTrade, client *BBGoClient, exchange, symbol string) []BBGoTrade {
 	if len(trades) == 0 {
 		return trades
 	}
-
-	// Sort ASC for tag computation
 	sortTradesASC(trades)
-
-	// Get cumulative position before the earliest trade
 	var initialNet float64
 	if earliest := trades[0].TradedAt; earliest != "" {
-		t, err := time.Parse(time.RFC3339, earliest)
-		if err == nil {
+		if t, err := time.Parse(time.RFC3339, earliest); err == nil {
 			if summary, serr := client.GetTradePositionSummary(exchange, symbol, &t); serr == nil {
 				initialNet = summary.NetPosition
 			}
 		}
 	}
-
 	computePositionTags(trades, initialNet)
 	return trades
 }
 
-// BBGoTradeMarkers returns chart markers with position tags for a given time range.
 func (api *API) BBGoTradeMarkers(w http.ResponseWriter, r *http.Request) {
 	client, mode, ok := api.bbgoClientForUser(w, r)
 	if !ok {
 		return
 	}
-
 	symbol := r.URL.Query().Get("symbol")
 	if symbol == "" {
 		writeError(w, http.StatusBadRequest, "symbol is required")
 		return
 	}
-
 	var since, until *time.Time
 	if s := r.URL.Query().Get("since"); s != "" {
 		t, _ := time.Parse(time.RFC3339, s)
@@ -1198,30 +1072,24 @@ func (api *API) BBGoTradeMarkers(w http.ResponseWriter, r *http.Request) {
 		t, _ := time.Parse(time.RFC3339, u)
 		until = &t
 	}
-
 	limit := 200
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 500 {
 			limit = v
 		}
 	}
-
 	var trades []BBGoTrade
 	var err error
-
+	exchange := r.URL.Query().Get("exchange")
 	if api.syncer != nil && mode != ModePaper {
-		exchange := r.URL.Query().Get("exchange")
 		trades, err = api.fetchSupabaseTrades(r, exchange, symbol, r.URL.Query().Get("strategy"), since, until, "ASC", limit)
 	} else {
-		exchange := r.URL.Query().Get("exchange")
 		trades, err = api.fetchContainerTrades(client, exchange, symbol, r.URL.Query().Get("strategy"), since, until, "ASC", limit)
 	}
-
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-
 	type tradeMarker struct {
 		Time           int64   `json:"time"`
 		Side           string  `json:"side"`
@@ -1229,7 +1097,6 @@ func (api *API) BBGoTradeMarkers(w http.ResponseWriter, r *http.Request) {
 		Quantity       float64 `json:"quantity"`
 		PositionAction string  `json:"positionAction"`
 	}
-
 	markers := make([]tradeMarker, 0, len(trades))
 	for _, t := range trades {
 		if t.TradedAt == "" {
@@ -1240,15 +1107,11 @@ func (api *API) BBGoTradeMarkers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		markers = append(markers, tradeMarker{
-			Time:           parsed.Unix(),
-			Side:           t.Side,
-			Price:          parseFloat(t.Price),
-			Quantity:       parseFloat(t.Quantity),
-			PositionAction: t.PositionAction,
+			Time: parsed.Unix(), Side: t.Side, Price: parseFloat(t.Price),
+			Quantity: parseFloat(t.Quantity), PositionAction: t.PositionAction,
 		})
 	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{"markers": markers})
+	writeJSON(w, http.StatusOK, map[string]any{"markers": markers})
 }
 
 func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {
@@ -1258,12 +1121,9 @@ func (api *API) BBGoClosedOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	exchange := r.URL.Query().Get("exchange")
 	symbol := r.URL.Query().Get("symbol")
-	gidStr := r.URL.Query().Get("gid")
 	var lastGID int64
-	if gidStr != "" {
-		if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-			lastGID = v
-		}
+	if v, err := strconv.ParseInt(r.URL.Query().Get("gid"), 10, 64); err == nil {
+		lastGID = v
 	}
 	orders, err := client.GetClosedOrders(exchange, symbol, lastGID)
 	if err != nil {
@@ -1278,9 +1138,7 @@ func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	period := r.URL.Query().Get("period")
-	segment := r.URL.Query().Get("segment")
-	volumes, err := client.GetTradingVolume(period, segment)
+	volumes, err := client.GetTradingVolume(r.URL.Query().Get("period"), r.URL.Query().Get("segment"))
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -1289,46 +1147,29 @@ func (api *API) BBGoTradingVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
-	userID, mode, ok := api.userFromURL(w, r)
+	inst, ok := api.resolveInstanceForRequest(w, r)
 	if !ok {
 		return
 	}
-
 	var trades []BBGoTrade
-
-	// Paper mode stores data in container SQLite, not Supabase
-	if api.syncer != nil && mode != ModePaper {
-		supabaseTrades, err := api.syncer.GetTradesForPnL(userID)
-		if err != nil {
-			log.Printf("pnl supabase fallback for user %s: %v", userID, err)
-		}
-		if err == nil && len(supabaseTrades) > 0 {
+	if api.syncer != nil && inst.Mode != ModePaper {
+		if supabaseTrades, err := api.syncer.GetTradesForPnL(inst.UserID); err == nil && len(supabaseTrades) > 0 {
 			trades = supabaseTrades
 		}
 	}
-
 	if len(trades) == 0 {
-		if !api.isContainerRunning(userID, mode) {
-			writeError(w, http.StatusServiceUnavailable, "container is not running")
+		if !api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+			writeError(w, http.StatusServiceUnavailable, "instance container is not running")
 			return
 		}
-		if api.container == nil {
-			writeError(w, http.StatusInternalServerError, "container manager not available")
-			return
-		}
-		client := api.newBBGoClient(api.container.APIURL(userID, mode)).WithContext(r.Context())
-
+		client := api.bbgoClientForInstance(inst, r.Context())
 		exchange := r.URL.Query().Get("exchange")
 		symbol := r.URL.Query().Get("symbol")
 		strategy := r.URL.Query().Get("strategy")
-
 		var lastGID int64
-		if gidStr := r.URL.Query().Get("gid"); gidStr != "" {
-			if v, err := strconv.ParseInt(gidStr, 10, 64); err == nil {
-				lastGID = v
-			}
+		if v, err := strconv.ParseInt(r.URL.Query().Get("gid"), 10, 64); err == nil {
+			lastGID = v
 		}
-
 		var err error
 		trades, err = client.GetAllTradesFromWithStrategy(exchange, symbol, lastGID, strategy)
 		if err != nil {
@@ -1350,17 +1191,11 @@ func (api *API) BBGoPnL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	report := calculatePnL(trades)
-
-	// Enrich with unrealized P&L using market data hub
 	enrichUnrealizedPnl(&report, api.symbolPriceLookup(r.Context()))
-
 	writeJSON(w, http.StatusOK, report)
 }
 
-// symbolPriceLookup returns a function that fetches the current price for a symbol
-// via the gRPC market data service.
 func (api *API) symbolPriceLookup(ctx context.Context) func(symbol string) (float64, error) {
 	return func(symbol string) (float64, error) {
 		hub := api.hub
@@ -1369,23 +1204,18 @@ func (api *API) symbolPriceLookup(ctx context.Context) func(symbol string) (floa
 		}
 		queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
-		client := pb.NewMarketDataQueryClient(hub.conn)
-		resp, err := client.QueryTicker(queryCtx, &pb.QueryTickerRequest{
-			Exchange: "binance",
-			Symbol:   symbol,
-		})
+		resp, err := pb.NewMarketDataQueryClient(hub.conn).QueryTicker(queryCtx, &pb.QueryTickerRequest{Exchange: "binance", Symbol: symbol})
 		if err != nil {
 			return 0, err
 		}
-		if resp.Ticker == nil {
-			return 0, fmt.Errorf("ticker not found for %s", symbol)
-		}
-		if resp.Ticker.Close <= 0 {
+		if resp.Ticker == nil || resp.Ticker.Close <= 0 {
 			return 0, fmt.Errorf("invalid price for %s", symbol)
 		}
 		return resp.Ticker.Close, nil
 	}
 }
+
+// --- Backtest ---
 
 func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(r)
@@ -1393,7 +1223,6 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-
 	var req struct {
 		Strategy  string          `json:"strategy"`
 		Config    json.RawMessage `json:"config"`
@@ -1405,13 +1234,11 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-
-	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "", api.strategies.Defaults())
+	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "", api.store.Defaults())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid config: %v", err))
 		return
 	}
-
 	jobID := generateID("bt")
 	result, err := api.container.RunBacktest(userID, jobID, yamlContent)
 	if err != nil {
@@ -1420,7 +1247,6 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.container.CleanupBacktest(userID, jobID)
-
 	writeJSON(w, http.StatusOK, backtestResultResponse{Output: string(result)})
 }
 
@@ -1430,7 +1256,6 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-
 	var req struct {
 		Exchange  string   `json:"exchange"`
 		Symbols   []string `json:"symbols"`
@@ -1441,11 +1266,10 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-
 	select {
 	case api.btSyncSem <- struct{}{}:
 	default:
-		writeError(w, http.StatusTooManyRequests, "backtest sync already in progress, try again later")
+		writeError(w, http.StatusTooManyRequests, "backtest sync already in progress")
 		return
 	}
 	defer func() { <-api.btSyncSem }()
@@ -1465,8 +1289,6 @@ func (api *API) SyncBacktestData(w http.ResponseWriter, r *http.Request) {
 	if req.EndTime == "" {
 		req.EndTime = "2025-12-31"
 	}
-
-	log.Printf("backtest sync requested by user %s: %s %v %s-%s", userID, req.Exchange, req.Symbols, req.StartTime, req.EndTime)
 	results := make([]syncResult, len(req.Symbols))
 	var wg sync.WaitGroup
 	for i, sym := range req.Symbols {
@@ -1499,340 +1321,12 @@ func (api *API) BacktestSyncStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, backtestSyncStatusResponse{Available: true, Size: info.Size(), Modified: info.ModTime().Format(time.RFC3339)})
 }
 
-func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-
-	var req struct {
-		Exchange   string `json:"exchange"`
-		APIKey     string `json:"api_key"`
-		APISecret  string `json:"api_secret"`
-		Passphrase string `json:"passphrase"`
-		IsTestnet  bool   `json:"is_testnet"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.Exchange == "" || req.APIKey == "" || req.APISecret == "" {
-		writeError(w, http.StatusBadRequest, "exchange, api_key, api_secret are required")
-		return
-	}
-	if _, ok := exchangePrefixes[req.Exchange]; !ok {
-		writeError(w, http.StatusBadRequest, "unsupported exchange: "+req.Exchange)
-		return
-	}
-	if api.encryptor == nil || api.creds == nil {
-		writeError(w, http.StatusServiceUnavailable, "credential storage not configured")
-		return
-	}
-
-	keyEnc, err := api.encryptor.Encrypt(req.APIKey)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "encrypt api key failed")
-		return
-	}
-	secretEnc, err := api.encryptor.Encrypt(req.APISecret)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "encrypt api secret failed")
-		return
-	}
-	var passEnc string
-	if req.Passphrase != "" {
-		passEnc, err = api.encryptor.Encrypt(req.Passphrase)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "encrypt passphrase failed")
-			return
-		}
-	}
-
-	cred := ExchangeCredential{
-		ID:                  generateID("cred"),
-		UserID:              userID,
-		Exchange:            req.Exchange,
-		APIKeyEncrypted:     keyEnc,
-		APISecretEncrypted:  secretEnc,
-		PassphraseEncrypted: passEnc,
-		IsTestnet:           req.IsTestnet,
-	}
-
-	verifyFn := api.verifyCredFn
-	if verifyFn == nil {
-		verifyFn = verifyCredential
-	}
-	result := verifyFn(req.Exchange, req.APIKey, req.APISecret, req.Passphrase, req.IsTestnet)
-	cred.IsVerified = result.Verified
-
-	if err := api.creds.Upsert(cred); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	if api.syncer != nil {
-		go api.syncer.SyncCredential(cred)
-	}
-
-	// Restart container if running and credentials verified
-	if cred.IsVerified {
-		mode := ModeLive
-		if req.IsTestnet {
-			mode = ModePaper
-		}
-		hasCredFn := func(exchange string) bool {
-			if api.creds == nil {
-				return false
-			}
-			_, err := api.creds.GetByMode(userID, exchange, mode == ModePaper)
-			return err == nil
-		}
-		api.strategies.RefreshYAML(userID, mode, hasCredFn)
-		if api.isContainerRunning(userID, mode) {
-			if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
-				go api.startUserContainer(userID, mode)
-			}
-		}
-	}
-
-	resp := credentialResponse{
-		ID:         cred.ID,
-		UserID:     cred.UserID,
-		Exchange:   cred.Exchange,
-		IsTestnet:  cred.IsTestnet,
-		IsVerified: cred.IsVerified,
-	}
-	if !result.Verified {
-		resp.VerifyError = result.Error
-	}
-	writeJSON(w, http.StatusCreated, resp)
-}
-
-func (api *API) ListCredentials(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-	creds, err := api.creds.List(userID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	safe := make([]credentialResponse, len(creds))
-	for i, c := range creds {
-		safe[i] = credentialResponse{
-			ID:         c.ID,
-			UserID:     c.UserID,
-			Exchange:   c.Exchange,
-			IsTestnet:  c.IsTestnet,
-			IsVerified: c.IsVerified,
-		}
-	}
-	writeJSON(w, http.StatusOK, safe)
-}
-
-func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-	id := chi.URLParam(r, "id")
-
-	creds, _ := api.creds.List(userID)
-	var exchange string
-	var isTestnet bool
-	for _, c := range creds {
-		if c.ID == id {
-			exchange = c.Exchange
-			isTestnet = c.IsTestnet
-			break
-		}
-	}
-
-	if err := api.creds.Delete(userID, id); err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	if exchange != "" {
-		if api.syncer != nil {
-			go api.syncer.DeleteCredential(userID, exchange, isTestnet)
-		}
-	}
-
-	mode := ModeLive
-	if isTestnet {
-		mode = ModePaper
-	}
-	hasCredFn := func(exchange string) bool {
-		if api.creds == nil || mode == ModePaper {
-			return false
-		}
-		_, err := api.creds.GetByMode(userID, exchange, false)
-		return err == nil
-	}
-	api.strategies.RefreshYAML(userID, mode, hasCredFn)
-	if api.isContainerRunning(userID, mode) {
-		if _, loaded := api.starting.LoadOrStore(containerKey(userID, mode), true); !loaded {
-			go api.startUserContainer(userID, mode)
-		}
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
-
-func (api *API) CreateNotificationConfig(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-
-	var req struct {
-		Type       string `json:"type"`
-		Token      string `json:"token"`
-		ChatID     string `json:"chat_id"`
-		WebhookURL string `json:"webhook_url"`
-		Rules      struct {
-			TradeEvents     bool `json:"trade_events"`
-			OrderEvents     bool `json:"order_events"`
-			ContainerHealth bool `json:"container_health"`
-		} `json:"rules"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.Type != "telegram" && req.Type != "slack" {
-		writeError(w, http.StatusBadRequest, "type must be telegram or slack")
-		return
-	}
-
-	ch := NotificationChannel{
-		ID:      generateID("notif"),
-		UserID:  userID,
-		Type:    req.Type,
-		ChatID:  req.ChatID,
-		Enabled: true,
-	}
-
-	switch req.Type {
-	case "telegram":
-		if req.Token == "" || req.ChatID == "" {
-			writeError(w, http.StatusBadRequest, "token and chat_id are required for telegram")
-			return
-		}
-		enc, err := api.notifier.EncryptToken(req.Token)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "encryption failed")
-			return
-		}
-		ch.TokenEnc = enc
-	case "slack":
-		if req.WebhookURL == "" {
-			writeError(w, http.StatusBadRequest, "webhook_url is required for slack")
-			return
-		}
-		enc, err := api.notifier.EncryptToken(req.WebhookURL)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "encryption failed")
-			return
-		}
-		ch.WebhookURL = enc
-	}
-
-	cfg := NotificationConfig{
-		Channel: ch,
-		Rules: NotificationRule{
-			TradeEvents:     req.Rules.TradeEvents,
-			OrderEvents:     req.Rules.OrderEvents,
-			ContainerHealth: req.Rules.ContainerHealth,
-		},
-	}
-
-	if err := api.notifier.Create(userID, cfg); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, notifConfigResponse{ID: ch.ID, Type: ch.Type, Enabled: ch.Enabled, Rules: cfg.Rules})
-}
-
-func (api *API) ListNotificationConfigs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-	configs := api.notifier.List(userID)
-	safe := make([]notifConfigResponse, len(configs))
-	for i, c := range configs {
-		safe[i] = notifConfigResponse{
-			ID:      c.Channel.ID,
-			Type:    c.Channel.Type,
-			Enabled: c.Channel.Enabled,
-			Rules:   c.Rules,
-		}
-	}
-	writeJSON(w, http.StatusOK, safe)
-}
-
-func (api *API) DeleteNotificationConfig(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-	id := chi.URLParam(r, "id")
-	if err := api.notifier.Delete(userID, id); err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-}
-
-func (api *API) TestNotification(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
-		return
-	}
-	sent := api.notifier.Dispatch(userID, NotificationEvent{
-		Type:    "test",
-		Title:   "BBGO Test Notification",
-		Message: "If you see this, notifications are working!",
-	})
-	if !sent {
-		configs := api.notifier.List(userID)
-		if len(configs) == 0 {
-			writeError(w, http.StatusBadRequest, "no notification channels configured")
-		} else {
-			writeError(w, http.StatusTooManyRequests, "rate limited — try again in a minute")
-		}
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
-}
-
 func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(r)
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-
 	var req struct {
 		Strategy  string          `json:"strategy"`
 		Config    json.RawMessage `json:"config"`
@@ -1867,26 +1361,16 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 	if req.EndTime == "" {
 		req.EndTime = time.Now().Format("2006-01-02")
 	}
-
 	needSync := !api.hasDataForRange(req.Exchange, req.Symbol, req.StartTime, req.EndTime)
-
 	job := &BacktestJob{
-		ID:        generateID("bt"),
-		UserID:    userID,
-		Strategy:  req.Strategy,
-		Config:    req.Config,
-		Exchange:  req.Exchange,
-		Symbol:    req.Symbol,
-		StartTime: req.StartTime,
-		EndTime:   req.EndTime,
-		NeedSync:  needSync,
+		ID: generateID("bt"), UserID: userID, Strategy: req.Strategy, Config: req.Config,
+		Exchange: req.Exchange, Symbol: req.Symbol, StartTime: req.StartTime,
+		EndTime: req.EndTime, NeedSync: needSync,
 	}
-
 	if err := api.btExec.Submit(job); err != nil {
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-
 	refreshed, _ := api.btJobs.Get(job.ID)
 	status := JobPending
 	if refreshed != nil {
@@ -1901,7 +1385,6 @@ func (api *API) GetBacktestJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-
 	jobID := chi.URLParam(r, "jobID")
 	job, found := api.btJobs.Get(jobID)
 	if !found {
@@ -1928,21 +1411,11 @@ func (api *API) ListBacktestJobs(w http.ResponseWriter, r *http.Request) {
 	summaries := make([]backtestJobSummary, len(jobs))
 	for i, j := range jobs {
 		summaries[i] = backtestJobSummary{
-			ID:          j.ID,
-			UserID:      j.UserID,
-			Strategy:    j.Strategy,
-			Exchange:    j.Exchange,
-			Symbol:      j.Symbol,
-			StartTime:   j.StartTime,
-			EndTime:     j.EndTime,
-			Status:      j.Status,
-			Progress:    j.Progress,
-			Error:       j.Error,
-			CreatedAt:   j.CreatedAt,
-			StartedAt:   j.StartedAt,
-			CompletedAt: j.CompletedAt,
-			NeedSync:    j.NeedSync,
-			HasReport:   len(j.Report) > 0,
+			ID: j.ID, UserID: j.UserID, Strategy: j.Strategy, Exchange: j.Exchange,
+			Symbol: j.Symbol, StartTime: j.StartTime, EndTime: j.EndTime,
+			Status: j.Status, Progress: j.Progress, Error: j.Error,
+			CreatedAt: j.CreatedAt, StartedAt: j.StartedAt, CompletedAt: j.CompletedAt,
+			NeedSync: j.NeedSync, HasReport: len(j.Report) > 0,
 		}
 	}
 	writeJSON(w, http.StatusOK, backtestJobsResponse{Jobs: summaries})
@@ -1954,7 +1427,6 @@ func (api *API) DownloadBacktestReport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-
 	jobID := chi.URLParam(r, "jobID")
 	job, found := api.btJobs.Get(jobID)
 	if !found {
@@ -1969,8 +1441,6 @@ func (api *API) DownloadBacktestReport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "job not completed")
 		return
 	}
-
-	// If storage is available and client requests a signed URL, return that instead
 	if api.storage != nil && r.URL.Query().Get("signed") == "1" {
 		file := r.URL.Query().Get("file")
 		if file == "" {
@@ -1993,7 +1463,6 @@ func (api *API) DownloadBacktestReport(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"url": signedURL})
 		return
 	}
-
 	api.downloadCSV(w, r, job)
 }
 
@@ -2035,7 +1504,6 @@ func (api *API) downloadCSV(w http.ResponseWriter, r *http.Request, job *Backtes
 		writeError(w, http.StatusInternalServerError, "cannot locate report files")
 		return
 	}
-
 	file := r.URL.Query().Get("file")
 	switch file {
 	case "trades", "":
@@ -2095,13 +1563,10 @@ func (api *API) uploadLocalToStorage(job *BacktestJob, filename string) bool {
 	if reportDir == "" {
 		return false
 	}
-
-	localPath := filepath.Join(reportDir, filename)
-	data, err := os.ReadFile(localPath)
+	data, err := os.ReadFile(filepath.Join(reportDir, filename))
 	if err != nil {
 		return false
 	}
-
 	if err := api.storage.Upload(job.UserID, job.ID, filename, data); err != nil {
 		log.Printf("on-demand upload %s for job %s: %v", filename, job.ID, err)
 		return false
@@ -2128,6 +1593,330 @@ func (api *API) hasDataForRange(exchange, symbol, startTime, endTime string) boo
 	return !end.After(modTime) && modTime.Sub(start) > 0
 }
 
+// --- Credentials ---
+
+func (api *API) CreateCredential(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	var req struct {
+		Exchange   string `json:"exchange"`
+		APIKey     string `json:"api_key"`
+		APISecret  string `json:"api_secret"`
+		Passphrase string `json:"passphrase"`
+		IsTestnet  bool   `json:"is_testnet"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Exchange == "" || req.APIKey == "" || req.APISecret == "" {
+		writeError(w, http.StatusBadRequest, "exchange, api_key, api_secret are required")
+		return
+	}
+	if _, ok := exchangePrefixes[req.Exchange]; !ok {
+		writeError(w, http.StatusBadRequest, "unsupported exchange: "+req.Exchange)
+		return
+	}
+	if api.encryptor == nil || api.creds == nil {
+		writeError(w, http.StatusServiceUnavailable, "credential storage not configured")
+		return
+	}
+	keyEnc, err := api.encryptor.Encrypt(req.APIKey)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "encrypt api key failed")
+		return
+	}
+	secretEnc, err := api.encryptor.Encrypt(req.APISecret)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "encrypt api secret failed")
+		return
+	}
+	var passEnc string
+	if req.Passphrase != "" {
+		passEnc, err = api.encryptor.Encrypt(req.Passphrase)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "encrypt passphrase failed")
+			return
+		}
+	}
+	cred := ExchangeCredential{
+		ID: generateID("cred"), UserID: userID, Exchange: req.Exchange,
+		APIKeyEncrypted: keyEnc, APISecretEncrypted: secretEnc, PassphraseEncrypted: passEnc,
+		IsTestnet: req.IsTestnet,
+	}
+	verifyFn := api.verifyCredFn
+	if verifyFn == nil {
+		verifyFn = verifyCredential
+	}
+	result := verifyFn(req.Exchange, req.APIKey, req.APISecret, req.Passphrase, req.IsTestnet)
+	cred.IsVerified = result.Verified
+	if err := api.creds.Upsert(cred); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if api.syncer != nil {
+		go api.syncer.SyncCredential(cred)
+	}
+	if cred.IsVerified {
+		mode := ModeLive
+		if req.IsTestnet {
+			mode = ModePaper
+		}
+		instances, _ := api.store.ListInstances(userID, mode)
+		for i := range instances {
+			inst := &instances[i]
+			if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+				if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+					go api.startInstanceContainer(inst)
+				}
+			}
+		}
+	}
+	resp := credentialResponse{ID: cred.ID, UserID: cred.UserID, Exchange: cred.Exchange, IsTestnet: cred.IsTestnet, IsVerified: cred.IsVerified}
+	if !result.Verified {
+		resp.VerifyError = result.Error
+	}
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (api *API) ListCredentials(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	creds, err := api.creds.List(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	safe := make([]credentialResponse, len(creds))
+	for i, c := range creds {
+		safe[i] = credentialResponse{ID: c.ID, UserID: c.UserID, Exchange: c.Exchange, IsTestnet: c.IsTestnet, IsVerified: c.IsVerified}
+	}
+	writeJSON(w, http.StatusOK, safe)
+}
+
+func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	creds, _ := api.creds.List(userID)
+	var exchange string
+	var isTestnet bool
+	for _, c := range creds {
+		if c.ID == id {
+			exchange = c.Exchange
+			isTestnet = c.IsTestnet
+			break
+		}
+	}
+	if err := api.creds.Delete(userID, id); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if exchange != "" && api.syncer != nil {
+		go api.syncer.DeleteCredential(userID, exchange, isTestnet)
+	}
+	mode := ModeLive
+	if isTestnet {
+		mode = ModePaper
+	}
+	instances, _ := api.store.ListInstances(userID, mode)
+	for i := range instances {
+		inst := &instances[i]
+		if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+			if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+				go api.startInstanceContainer(inst)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// --- Notifications ---
+
+func (api *API) CreateNotificationConfig(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	var req struct {
+		Type       string `json:"type"`
+		Token      string `json:"token"`
+		ChatID     string `json:"chat_id"`
+		WebhookURL string `json:"webhook_url"`
+		Rules      struct {
+			TradeEvents     bool `json:"trade_events"`
+			OrderEvents     bool `json:"order_events"`
+			ContainerHealth bool `json:"container_health"`
+		} `json:"rules"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Type != "telegram" && req.Type != "slack" {
+		writeError(w, http.StatusBadRequest, "type must be telegram or slack")
+		return
+	}
+	ch := NotificationChannel{ID: generateID("notif"), UserID: userID, Type: req.Type, ChatID: req.ChatID, Enabled: true}
+	switch req.Type {
+	case "telegram":
+		if req.Token == "" || req.ChatID == "" {
+			writeError(w, http.StatusBadRequest, "token and chat_id are required for telegram")
+			return
+		}
+		enc, err := api.notifier.EncryptToken(req.Token)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "encryption failed")
+			return
+		}
+		ch.TokenEnc = enc
+	case "slack":
+		if req.WebhookURL == "" {
+			writeError(w, http.StatusBadRequest, "webhook_url is required for slack")
+			return
+		}
+		enc, err := api.notifier.EncryptToken(req.WebhookURL)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "encryption failed")
+			return
+		}
+		ch.WebhookURL = enc
+	}
+	cfg := NotificationConfig{Channel: ch, Rules: NotificationRule{TradeEvents: req.Rules.TradeEvents, OrderEvents: req.Rules.OrderEvents, ContainerHealth: req.Rules.ContainerHealth}}
+	if err := api.notifier.Create(userID, cfg); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, notifConfigResponse{ID: ch.ID, Type: ch.Type, Enabled: ch.Enabled, Rules: cfg.Rules})
+}
+
+func (api *API) ListNotificationConfigs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	configs := api.notifier.List(userID)
+	safe := make([]notifConfigResponse, len(configs))
+	for i, c := range configs {
+		safe[i] = notifConfigResponse{ID: c.Channel.ID, Type: c.Channel.Type, Enabled: c.Channel.Enabled, Rules: c.Rules}
+	}
+	writeJSON(w, http.StatusOK, safe)
+}
+
+func (api *API) DeleteNotificationConfig(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	if err := api.notifier.Delete(userID, chi.URLParam(r, "id")); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (api *API) TestNotification(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user identity")
+		return
+	}
+	sent := api.notifier.Dispatch(userID, NotificationEvent{Type: "test", Title: "BBGO Test Notification", Message: "If you see this, notifications are working!"})
+	if !sent {
+		configs := api.notifier.List(userID)
+		if len(configs) == 0 {
+			writeError(w, http.StatusBadRequest, "no notification channels configured")
+		} else {
+			writeError(w, http.StatusTooManyRequests, "rate limited — try again in a minute")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+// --- Bots ---
+
+func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	mode := r.URL.Query().Get("mode")
+	var modes []string
+	if mode == ModeLive || mode == ModePaper {
+		modes = []string{mode}
+	} else {
+		modes = []string{ModeLive, ModePaper}
+	}
+	var bots []Bot
+	for _, m := range modes {
+		instances, _ := api.store.ListInstances(userID, m)
+		for _, inst := range instances {
+			bot := Bot{ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name}
+			if api.isInstanceStarting(inst.InstanceID) {
+				bot.ContainerStatus = StatusStarting
+			} else if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+				bot.ContainerStatus = StatusRunning
+				bot.ContainerName = api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			} else {
+				bot.ContainerStatus = StatusStopped
+			}
+			bots = append(bots, bot)
+		}
+	}
+	if bots == nil {
+		bots = []Bot{}
+	}
+	writeJSON(w, http.StatusOK, botsResponse{Bots: bots})
+}
+
+func (api *API) GetBot(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	botID := chi.URLParam(r, "botID")
+	for _, mode := range []string{ModeLive, ModePaper} {
+		inst, err := api.store.GetInstance(userID, mode, botID)
+		if err == nil {
+			bot := Bot{ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name}
+			if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+				bot.ContainerStatus = StatusRunning
+				bot.ContainerName = api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			} else {
+				bot.ContainerStatus = StatusStopped
+			}
+			writeJSON(w, http.StatusOK, bot)
+			return
+		}
+	}
+	writeError(w, http.StatusNotFound, "bot not found")
+}
+
+// --- Utility ---
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
 func credModeError(mode, ex string) string {
 	if mode == ModeLive {
 		return fmt.Sprintf("live mode requires API credentials for %s — add them in Settings first", ex)
@@ -2135,27 +1924,6 @@ func credModeError(mode, ex string) string {
 	return "paper mode requires Binance API credentials (live keys) — add them in Settings first"
 }
 
-func collectExchanges(strategies []StrategyEntry) []string {
-	seen := map[string]bool{}
-	var result []string
-	for _, s := range strategies {
-		if s.CrossExchange {
-			for _, sr := range s.Sessions {
-				if !seen[sr.Exchange] {
-					seen[sr.Exchange] = true
-					result = append(result, sr.Exchange)
-				}
-			}
-		} else if s.Exchange != "" && !seen[s.Exchange] {
-			seen[s.Exchange] = true
-			result = append(result, s.Exchange)
-		}
-	}
-	return result
-}
-
-// strategyMatch checks if a trade's strategyID matches the requested strategy type.
-// Supports both exact match (new format: "grid2") and prefix match (legacy: "grid2-BTCUSDT-size-5-...").
 func strategyMatch(tradeStrategy, filterStrategy string) bool {
 	if tradeStrategy == filterStrategy {
 		return true

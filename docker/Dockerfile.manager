@@ -5,9 +5,13 @@ FROM golang:1.26-bookworm AS builder
 
 WORKDIR /src/manager
 COPY saas/manager/go.mod saas/manager/go.sum ./
+COPY go.mod go.sum /src/bbgo/
+COPY pkg/instanceid /src/bbgo/pkg/instanceid
+RUN sed -i 's|=> ../../|=> /src/bbgo|' go.mod
 RUN go mod download
 
 COPY saas/manager/ .
+RUN sed -i 's|=> ../../|=> /src/bbgo|' go.mod
 RUN CGO_ENABLED=0 go build -o /usr/local/bin/manager .
 
 FROM debian:bookworm-slim

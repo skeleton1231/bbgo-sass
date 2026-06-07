@@ -151,6 +151,105 @@ func TestRuleEnabled(t *testing.T) {
 	}
 }
 
+func TestSendTelegram_ConnectionError(t *testing.T) {
+	client := &http.Client{}
+	err := sendTelegram(client, "token", "chat", "t", "m")
+	if err == nil {
+		t.Fatal("expected connection error")
+	}
+}
+
+func TestSendSlack(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	client := srv.Client()
+	err := sendSlack(client, srv.URL, "Title", "Message")
+	if err != nil {
+		t.Fatalf("sendSlack: %v", err)
+	}
+}
+
+func TestSendSlack_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer srv.Close()
+
+	client := srv.Client()
+	err := sendSlack(client, srv.URL, "t", "m")
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}
+
+func TestNotifier_DecryptToken_Empty(t *testing.T) {
+	dir := t.TempDir()
+	enc := newTestEncryptor(t)
+	n := NewNotifier(dir, enc)
+	_, err := n.decryptToken("")
+	if err == nil {
+		t.Fatal("expected error for empty token")
+	}
+}
+
+func TestNotifier_Dispatch_SlackRuleNotEnabled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	enc := newTestEncryptor(t)
+	n := NewNotifier(dir, enc)
+	n.rateLimit = 0
+
+	webhook, _ := enc.Encrypt(srv.URL)
+	n.configs["user1"] = []NotificationConfig{
+		{
+			Channel: NotificationChannel{
+				Type:       "slack",
+				WebhookURL: webhook,
+				Enabled:    true,
+			},
+			Rules: NotificationRule{OrderEvents: true},
+		},
+	}
+
+	sent := n.Dispatch("user1", NotificationEvent{Type: "trade", Title: "t", Message: "m"})
+	if sent {
+		t.Error("should not send when rule not enabled for event type")
+	}
+}
+
+func TestNotifier_EncryptDecrypt(t *testing.T) {
+	dir := t.TempDir()
+	enc := newTestEncryptor(t)
+	n := NewNotifier(dir, enc)
+
+	plain := "my-secret-token"
+	encrypted, err := n.EncryptToken(plain)
+	if err != nil {
+		t.Fatalf("EncryptToken: %v", err)
+	}
+	if encrypted == plain {
+		t.Error("encrypted should differ from plain")
+	}
+
+	decrypted, err := n.decryptToken(encrypted)
+	if err != nil {
+		t.Fatalf("decryptToken: %v", err)
+	}
+	if decrypted != plain {
+		t.Errorf("decrypt = %q, want %q", decrypted, plain)
+	}
+}
+
 func newTestEncryptor(t *testing.T) *Encryptor {
 	t.Helper()
 	enc, err := NewEncryptor("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") // 32 bytes base64

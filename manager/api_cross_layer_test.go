@@ -9,22 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCrossLayerLiveOnlyAlignment verifies the backend liveOnlyStrategies map
+// TestCrossLayerLiveOnlyAlignment verifies the backend liveOnly strategies
 // covers all strategy IDs that the frontend marks as liveOnly.
 func TestCrossLayerLiveOnlyAlignment(t *testing.T) {
-	require.Len(t, liveOnlyStrategies, 8, "liveOnlyStrategies count changed — update frontend STRATEGY_SCHEMAS too")
+	for _, id := range []string{"autoborrow", "convert", "deposit2transfer", "sentinel", "dca2", "dca3", "liquiditymaker", "xhedgegrid"} {
+		assert.True(t, testRegistry.IsLiveOnly(id), "expected %s to be liveOnly", id)
+	}
 
-	assert.True(t, liveOnlyStrategies["autoborrow"])
-	assert.True(t, liveOnlyStrategies["convert"])
-	assert.True(t, liveOnlyStrategies["deposit2transfer"])
-	assert.True(t, liveOnlyStrategies["sentinel"])
-	assert.True(t, liveOnlyStrategies["dca2"])
-	assert.True(t, liveOnlyStrategies["dca3"])
-	assert.True(t, liveOnlyStrategies["liquiditymaker"])
-	assert.True(t, liveOnlyStrategies["xhedgegrid"])
-
-	// Legacy aliases should NOT be in liveOnlyStrategies — they get normalized
-	assert.False(t, liveOnlyStrategies["sentinel_anomaly"])
+	// Legacy aliases should NOT be liveOnly — they get normalized
+	assert.False(t, testRegistry.IsLiveOnly("sentinel_anomaly"))
 }
 
 // TestCrossLayerExchangePrefixes verifies all 8 exchanges have env var prefixes.
@@ -61,21 +54,6 @@ func storeCred(t *testing.T, creds *CredentialStore, enc *Encryptor, userID, exc
 	}))
 }
 
-func storeTestnetCred(t *testing.T, creds *CredentialStore, enc *Encryptor, userID, exchange, key, secret string) {
-	t.Helper()
-	keyEnc, err := enc.Encrypt(key)
-	require.NoError(t, err)
-	secEnc, err := enc.Encrypt(secret)
-	require.NoError(t, err)
-	require.NoError(t, creds.Upsert(ExchangeCredential{
-		UserID:             userID,
-		Exchange:           exchange,
-		APIKeyEncrypted:    keyEnc,
-		APISecretEncrypted: secEnc,
-		IsTestnet:          true,
-	}))
-}
-
 // TestCrossLayerDockerEnvArgsLive verifies live mode has credentials, no PAPER_TRADE.
 func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 	enc, _ := NewEncryptor(testEncryptionKey)
@@ -87,9 +65,12 @@ func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 		creds: creds,
 	}
 
-	args := cm.envArgs(testUUID, ModeLive, []StrategyEntry{
-		{Exchange: "binance", Mode: "live"},
-	})
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModeLive, Strategy: "grid2",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		InstanceID: "grid2-BTCUSDT",
+	}
+	args := cm.instanceEnvArgs(inst)
 	s := strings.Join(args, " ")
 
 	assert.NotContains(t, s, "PAPER_TRADE")
@@ -105,9 +86,12 @@ func TestCrossLayerDockerEnvArgsPaper(t *testing.T) {
 		cfg: &Config{DataVolume: "bbgo-data"},
 	}
 
-	args := cm.envArgs(testUUID, ModePaper, []StrategyEntry{
-		{Exchange: "binance", Mode: "paper"},
-	})
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModePaper, Strategy: "grid2",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		InstanceID: "grid2-BTCUSDT",
+	}
+	args := cm.instanceEnvArgs(inst)
 	s := strings.Join(args, " ")
 
 	assert.Contains(t, s, "PAPER_TRADE=1")
@@ -127,32 +111,22 @@ func TestCrossLayerDockerEnvArgsCrossExchange(t *testing.T) {
 		creds: creds,
 	}
 
-	args := cm.envArgs(testUUID, ModeLive, []StrategyEntry{
-		{
-			CrossExchange: true, Mode: "live",
-			Sessions: []SessionRoleConfig{
-				{Exchange: "binance", Name: "maker"},
-				{Exchange: "bybit", Name: "taker"},
-			},
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModeLive, Strategy: "xmaker",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		CrossExchange: true,
+		Sessions: []SessionRoleConfig{
+			{Exchange: "binance", Name: "maker"},
+			{Exchange: "bybit", Name: "taker"},
 		},
-	})
+		InstanceID: "xmaker-BTCUSDT",
+	}
+	args := cm.instanceEnvArgs(inst)
 	s := strings.Join(args, " ")
 
 	assert.Contains(t, s, "BINANCE_API_KEY=bkey")
 	assert.Contains(t, s, "BYBIT_API_KEY=ykey")
 	assert.NotContains(t, s, "PAPER_TRADE")
-}
-
-// TestCrossLayerPaperModeIsGlobal verifies PAPER_TRADE appears exactly once.
-func TestCrossLayerPaperModeIsGlobal(t *testing.T) {
-	cm := &ContainerManager{cfg: &Config{DataVolume: "bbgo-data"}}
-
-	args := cm.envArgs(testUUID, ModePaper, []StrategyEntry{
-		{Exchange: "binance", Mode: "paper"},
-		{Exchange: "okex", Mode: "paper"},
-	})
-	count := strings.Count(strings.Join(args, " "), "PAPER_TRADE=1")
-	assert.Equal(t, 1, count)
 }
 
 // TestCrossLayerMarketDataEnv verifies MARKET_DATA_SERVICE_URL injection.
@@ -162,38 +136,43 @@ func TestCrossLayerMarketDataEnv(t *testing.T) {
 		MarketDataAddr: "market-data:9090",
 	}}
 
-	args := cm.envArgs(testUUID, ModeLive, []StrategyEntry{
-		{Exchange: "binance", Mode: "live"},
-	})
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModeLive, Strategy: "grid2",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		InstanceID: "grid2-BTCUSDT",
+	}
+	args := cm.instanceEnvArgs(inst)
 	assert.Contains(t, strings.Join(args, " "), "MARKET_DATA_SERVICE_URL=market-data:9090")
 }
 
-// TestCrossLayerBuildYAMLLive verifies YAML generation for a live strategy.
-func TestCrossLayerBuildYAMLLive(t *testing.T) {
-	yamlBytes, err := buildUserYAML(testUUID, ModeLive, []StrategyEntry{
-		{
-			Strategy: "grid", Exchange: "binance", Mode: "live",
-			Config: json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10}`),
-		},
-	}, func(string) bool { return true })
+// TestCrossLayerBuildInstanceYAMLLive verifies YAML generation for a live instance.
+func TestCrossLayerBuildInstanceYAMLLive(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModeLive, Strategy: "grid2",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config:     json.RawMessage(`{"symbol":"BTCUSDT","quantity":0.001,"gridNumber":10}`),
+		InstanceID: "grid2-BTCUSDT-10",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, nil)
 	require.NoError(t, err)
 
 	yaml := string(yamlBytes)
 	assert.Contains(t, yaml, "binance:")
-	assert.Contains(t, yaml, "grid:")
+	assert.Contains(t, yaml, "grid2:")
 }
 
-// TestCrossLayerBuildYAMLPaper verifies YAML generation for a paper strategy.
-func TestCrossLayerBuildYAMLPaper(t *testing.T) {
-	yamlBytes, err := buildUserYAML(testUUID, ModeLive, []StrategyEntry{
-		{
-			Strategy: "grid", Exchange: "binance", Mode: "paper",
-			Config: json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
-		},
-	}, func(string) bool { return false })
+// TestCrossLayerBuildInstanceYAMLPaper verifies YAML generation for a paper instance.
+func TestCrossLayerBuildInstanceYAMLPaper(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModePaper, Strategy: "grid2",
+		Exchange: "binance", Symbol: "ETHUSDT",
+		Config:     json.RawMessage(`{"symbol":"ETHUSDT","quantity":0.01,"gridNumber":5}`),
+		InstanceID: "grid2-ETHUSDT-5",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return false }, nil)
 	require.NoError(t, err)
 
 	yaml := string(yamlBytes)
 	assert.Contains(t, yaml, "binance:")
-	assert.Contains(t, yaml, "grid:")
+	assert.Contains(t, yaml, "grid2:")
 }

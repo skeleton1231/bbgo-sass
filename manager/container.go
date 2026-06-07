@@ -26,26 +26,19 @@ type ContainerManager struct {
 	cfg   *Config
 	creds *CredentialStore
 	pool  *pool.Pool
+	store *InstanceStore
 
 	// test hooks
 	runBacktestFn  func(userID string, jobID string, yamlContent []byte) ([]byte, error)
 	syncBacktestFn func(userID, exchange, symbol, start, end string) (string, error)
-	logsFn         func(userID, mode string) (string, error)
-	apiURLFn       func(userID, mode string) string
-	checkRunningFn func(userID, mode string) (bool, error)
+	logsFn         func(containerName string) (string, error)
+	apiURLFn       func(containerName string) string
+	checkRunningFn func(containerName string) (bool, error)
 	dockerFn       func(args ...string) (string, error)
 }
 
-func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool) *ContainerManager {
-	return &ContainerManager{cfg: cfg, creds: creds, pool: p}
-}
-
-func (cm *ContainerManager) containerName(userID, mode string) string {
-	name := containerPrefix + userID
-	if mode == ModePaper {
-		name += "-paper"
-	}
-	return name
+func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool, store *InstanceStore) *ContainerManager {
+	return &ContainerManager{cfg: cfg, creds: creds, pool: p, store: store}
 }
 
 func (cm *ContainerManager) docker(args ...string) (string, error) {
@@ -78,57 +71,44 @@ func (cm *ContainerManager) EnsureNetwork() error {
 	return nil
 }
 
-func (cm *ContainerManager) userDir(userID, mode string) string {
-	dir := fmt.Sprintf("/data/%s", userID)
-	if mode == ModePaper {
-		dir += "-paper"
-	}
-	return dir
+func (cm *ContainerManager) InstanceContainerName(userID, mode, instanceID string) string {
+	return instanceSlug(userID, mode, instanceID)
 }
 
-func (cm *ContainerManager) hostDir(userID, mode string) string {
-	dir := cm.cfg.DataDir + "/" + userID
-	if mode == ModePaper {
-		dir += "-paper"
-	}
-	return dir
-}
-
-// APIURL returns the internal Docker DNS URL for the user's bbgo container.
-func (cm *ContainerManager) APIURL(userID, mode string) string {
+func (cm *ContainerManager) InstanceAPIURL(userID, mode, instanceID string) string {
+	name := cm.InstanceContainerName(userID, mode, instanceID)
 	if cm.apiURLFn != nil {
-		return cm.apiURLFn(userID, mode)
+		return cm.apiURLFn(name)
 	}
-	return fmt.Sprintf("http://%s:%d", cm.containerName(userID, mode), cm.cfg.BBGOPort)
+	return fmt.Sprintf("http://%s:%d", name, cm.cfg.BBGOPort)
 }
 
-func (cm *ContainerManager) CreateAndStart(userID, mode string) error {
-	name := cm.containerName(userID, mode)
-	cm.StopAndRemove(userID, mode)
+func (cm *ContainerManager) CreateAndStartInstance(inst *StrategyInstance) error {
+	name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+	cm.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 
-	hDir := cm.hostDir(userID, mode)
-	if err := os.MkdirAll(hDir, 0o755); err != nil {
+	hostDir := cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID)
+	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	// bbgo.yaml should already exist on disk (written by StrategyStore)
-	yamlPath := hDir + "/bbgo.yaml"
+	yamlPath := filepath.Join(hostDir, "bbgo.yaml")
 	if _, err := os.Stat(yamlPath); err != nil {
-		return fmt.Errorf("bbgo.yaml not found for user %s: %w", userID, err)
+		return fmt.Errorf("bbgo.yaml not found for instance %s: %w", inst.InstanceID, err)
 	}
 
-	containerDir := cm.userDir(userID, mode)
-	strategies, _ := parseStrategiesFromYAMLFile(yamlPath)
+	containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
 	args := []string{
 		"run", "-d",
 		"--name", name,
 		"--network", cm.cfg.DockerNetwork,
+		"--network-alias", name,
 		"-v", cm.cfg.DataVolume + ":/data",
 		"--workdir", containerDir,
 		"--restart", "unless-stopped",
 	}
-	args = append(args, cm.resourceArgs(mode)...)
-	args = append(args, cm.envArgs(userID, mode, strategies)...)
+	args = append(args, cm.instanceResourceArgs()...)
+	args = append(args, cm.instanceEnvArgs(inst)...)
 	args = append(args,
 		cm.cfg.BBGOImage,
 		"run",
@@ -145,33 +125,151 @@ func (cm *ContainerManager) CreateAndStart(userID, mode string) error {
 		return fmt.Errorf("docker run: %s: %w", out, err)
 	}
 
-	log.Printf("container %s started (image: %s)", name, cm.cfg.BBGOImage)
+	log.Printf("instance container %s started (image: %s)", name, cm.cfg.BBGOImage)
 	return nil
 }
 
-func (cm *ContainerManager) Restart(userID, mode string) error {
-	return cm.CreateAndStart(userID, mode)
+func (cm *ContainerManager) StopInstance(userID, mode, instanceID string) {
+	name := cm.InstanceContainerName(userID, mode, instanceID)
+	cm.docker("stop", name, "-t", "10")
+	cm.docker("rm", "-f", name)
 }
 
-func parseStrategiesFromYAMLFile(path string) ([]StrategyEntry, error) {
-	data, err := os.ReadFile(path)
+func (cm *ContainerManager) IsInstanceRunning(userID, mode, instanceID string) bool {
+	running, _ := cm.CheckInstanceRunning(userID, mode, instanceID)
+	return running
+}
+
+func (cm *ContainerManager) CheckInstanceRunning(userID, mode, instanceID string) (bool, error) {
+	name := cm.InstanceContainerName(userID, mode, instanceID)
+	if cm.checkRunningFn != nil {
+		return cm.checkRunningFn(name)
+	}
+	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
+	if err != nil {
+		return false, err
+	}
+	return out == "true", nil
+}
+
+func (cm *ContainerManager) InstanceLogs(userID, mode, instanceID, tail string) (string, error) {
+	if cm.logsFn != nil {
+		return cm.logsFn(cm.InstanceContainerName(userID, mode, instanceID))
+	}
+	name := cm.InstanceContainerName(userID, mode, instanceID)
+	out, err := cm.docker("logs", "--tail", tail, name)
+	if err != nil {
+		return "", fmt.Errorf("docker logs %s: %w", name, err)
+	}
+	return out, nil
+}
+
+func (cm *ContainerManager) InstanceGRPCAddr(userID, mode, instanceID string) string {
+	return fmt.Sprintf("%s:%d", cm.InstanceContainerName(userID, mode, instanceID), cm.cfg.BBGOGRPCPort)
+}
+
+func (cm *ContainerManager) instanceEnvArgs(inst *StrategyInstance) []string {
+	args := []string{}
+
+	if inst.Mode == ModePaper {
+		args = append(args, "-e", "PAPER_TRADE=1")
+	}
+
+	args = append(args, "-e", "BBGO_STRATEGY_INSTANCE_ID="+inst.InstanceID)
+
+	if inst.Mode == ModePaper {
+		containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
+		args = append(args,
+			"-e", "DB_DRIVER=sqlite3",
+			"-e", "DB_DSN="+containerDir+"/bbgo.db",
+		)
+	} else {
+		args = append(args,
+			"-e", "DB_DRIVER=supabase",
+			"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
+			"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
+			"-e", "BBGO_USER_ID="+inst.UserID,
+		)
+	}
+	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
+
+	if cm.cfg.MarketDataAddr != "" {
+		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
+	}
+
+	if cm.creds != nil && inst.Mode != ModePaper {
+		exchanges := []string{inst.Exchange}
+		if inst.CrossExchange {
+			exchanges = nil
+			for _, sr := range inst.Sessions {
+				exchanges = append(exchanges, sr.Exchange)
+			}
+		}
+		injected := map[string]bool{}
+		for _, ex := range exchanges {
+			if injected[ex] {
+				continue
+			}
+			apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(inst.UserID, ex, false)
+			if err == nil {
+				prefix := exchangeEnvPrefix(ex)
+				args = append(args,
+					"-e", prefix+"_API_KEY="+apiKey,
+					"-e", prefix+"_API_SECRET="+apiSecret,
+				)
+				if passphrase != "" {
+					args = append(args, "-e", prefix+"_API_PASSPHRASE="+passphrase)
+				}
+			}
+			injected[ex] = true
+		}
+	}
+
+	return args
+}
+
+func (cm *ContainerManager) instanceResourceArgs() []string {
+	r := cm.cfg.InstanceResources
+	var args []string
+	if r.Memory != "" {
+		args = append(args, "--memory", r.Memory)
+	}
+	if r.MemorySwap != "" {
+		args = append(args, "--memory-swap", r.MemorySwap)
+	}
+	if r.CPUs != "" {
+		args = append(args, "--cpus", r.CPUs)
+	}
+	if r.PidsLimit > 0 {
+		args = append(args, "--pids-limit", fmt.Sprintf("%d", r.PidsLimit))
+	}
+	if r.LogMaxSize != "" {
+		args = append(args, "--log-opt", "max-size="+r.LogMaxSize)
+	}
+	if r.LogMaxFile > 0 {
+		args = append(args, "--log-opt", fmt.Sprintf("max-file=%d", r.LogMaxFile))
+	}
+	return args
+}
+
+func (cm *ContainerManager) FindRunningInstance(userID string) (*StrategyInstance, error) {
+	if cm.store == nil {
+		return nil, fmt.Errorf("no running container found, please start a trading container first")
+	}
+	instances, err := cm.store.ListAllInstances(userID)
 	if err != nil {
 		return nil, err
 	}
-	return parseStrategiesFromYAML(data)
+	for i := range instances {
+		inst := &instances[i]
+		if cm.IsInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+			return inst, nil
+		}
+	}
+	return nil, fmt.Errorf("no running container found, please start a trading container first")
 }
 
-// backtestMode returns the mode of an available container for backtest operations.
-// It prefers the paper container but falls back to the live container.
-func (cm *ContainerManager) backtestMode(userID string) (string, error) {
-	if cm.IsRunning(userID, ModePaper) {
-		return ModePaper, nil
-	}
-	if cm.IsRunning(userID, ModeLive) {
-		return ModeLive, nil
-	}
-	return "", fmt.Errorf("no running container found, please start a trading container first")
-}
+// --- Backtest ---
 
 func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 	if cm.runBacktestFn != nil {
@@ -182,23 +280,23 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 		return nil, fmt.Errorf("invalid job ID: %s", jobID)
 	}
 
-	mode, err := cm.backtestMode(userID)
+	inst, err := cm.FindRunningInstance(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	hostBacktestDir := cm.hostDir(userID, mode) + "/backtest/" + jobID
+	hostBacktestDir := filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
 
-	configPath := hostBacktestDir + "/bbgo.yaml"
+	configPath := filepath.Join(hostBacktestDir, "bbgo.yaml")
 	if err := os.WriteFile(configPath, yamlContent, 0o644); err != nil {
 		return nil, fmt.Errorf("write backtest config: %w", err)
 	}
 
-	containerName := cm.containerName(userID, mode)
-	containerBacktestDir := cm.userDir(userID, mode) + "/backtest/" + jobID
+	containerName := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+	containerBacktestDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID) + "/backtest/" + jobID
 	containerConfigPath := containerBacktestDir + "/bbgo.yaml"
 	containerDbPath := containerBacktestDir + "/bbgo.db"
 	args := []string{
@@ -231,22 +329,22 @@ func (cm *ContainerManager) CleanupBacktest(userID, jobID string) {
 	if cm == nil {
 		return
 	}
-	mode, err := cm.backtestMode(userID)
+	inst, err := cm.FindRunningInstance(userID)
 	if err != nil {
 		return
 	}
-	dir := cm.hostDir(userID, mode) + "/backtest/" + jobID
+	dir := filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
 	if err := os.RemoveAll(dir); err != nil {
 		log.Printf("cleanup backtest %s for user %s: %v", jobID, userID, err)
 	}
 }
 
 func (cm *ContainerManager) BacktestReportDir(userID, jobID string) string {
-	mode, err := cm.backtestMode(userID)
+	inst, err := cm.FindRunningInstance(userID)
 	if err != nil {
 		return ""
 	}
-	return cm.hostDir(userID, mode) + "/backtest/" + jobID
+	return filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
 }
 
 func (cm *ContainerManager) ReadBacktestReport(userID, jobID string) (json.RawMessage, []byte, error) {
@@ -275,7 +373,7 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return cm.syncBacktestFn(userID, exchange, symbol, startTime, endTime)
 	}
 
-	mode, err := cm.backtestMode(userID)
+	inst, err := cm.FindRunningInstance(userID)
 	if err != nil {
 		return "", err
 	}
@@ -285,17 +383,17 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return "", err
 	}
 
-	hostBacktestDir := cm.hostDir(userID, mode) + "/backtest"
+	hostBacktestDir := filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest")
 	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir: %w", err)
 	}
-	configPath := hostBacktestDir + "/sync.yaml"
+	configPath := filepath.Join(hostBacktestDir, "sync.yaml")
 	if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
 		return "", fmt.Errorf("write config: %w", err)
 	}
 
-	containerName := cm.containerName(userID, mode)
-	containerConfigPath := cm.userDir(userID, mode) + "/backtest/sync.yaml"
+	containerName := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+	containerConfigPath := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID) + "/backtest/sync.yaml"
 	args := []string{
 		"exec",
 		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
@@ -354,176 +452,64 @@ func buildSyncConfig(exchange, symbol, startTime, endTime string) ([]byte, error
 	return yaml.Marshal(&cfg)
 }
 
-func (cm *ContainerManager) resourceArgs(mode string) []string {
-	r := cm.cfg.ResourcesForMode(mode)
-	var args []string
-	if r.Memory != "" {
-		args = append(args, "--memory", r.Memory)
-	}
-	if r.MemorySwap != "" {
-		args = append(args, "--memory-swap", r.MemorySwap)
-	}
-	if r.CPUs != "" {
-		args = append(args, "--cpus", r.CPUs)
-	}
-	if r.PidsLimit > 0 {
-		args = append(args, "--pids-limit", fmt.Sprintf("%d", r.PidsLimit))
-	}
-	if r.LogMaxSize != "" {
-		args = append(args, "--log-opt", "max-size="+r.LogMaxSize)
-	}
-	if r.LogMaxFile > 0 {
-		args = append(args, "--log-opt", fmt.Sprintf("max-file=%d", r.LogMaxFile))
-	}
-	return args
-}
-
-func (cm *ContainerManager) envArgs(userID, mode string, strategies []StrategyEntry) []string {
-	args := []string{}
-
-	// Paper containers get PAPER_TRADE=1 (bbgo simulates fills locally with real mainnet data)
-	if mode == ModePaper {
-		args = append(args, "-e", "PAPER_TRADE=1")
-	}
-
-	// Use "/" not filepath.Join — this path runs inside the Linux container.
-	if mode == ModePaper {
-		args = append(args,
-			"-e", "DB_DRIVER=sqlite3",
-			"-e", "DB_DSN="+cm.userDir(userID, ModePaper)+"/bbgo.db",
-		)
-	} else {
-		args = append(args,
-			"-e", "DB_DRIVER=supabase",
-			"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
-			"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
-			"-e", "BBGO_USER_ID="+userID,
-		)
-	}
-	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
-
-	if cm.cfg.MarketDataAddr != "" {
-		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
-	}
-
-	// Inject credentials: only for live mode (paper mode uses shared market data, no keys needed)
-	if cm.creds != nil && mode != ModePaper {
-		injected := map[string]bool{}
-		for _, s := range strategies {
-			exchanges := []string{}
-			if s.CrossExchange {
-				for _, sr := range s.Sessions {
-					exchanges = append(exchanges, sr.Exchange)
-				}
-			} else if s.Exchange != "" {
-				exchanges = append(exchanges, s.Exchange)
-			}
-			for _, ex := range exchanges {
-				if injected[ex] {
-					continue
-				}
-				apiKey, apiSecret, passphrase, err := cm.creds.GetDecryptedByMode(userID, ex, false)
-				if err == nil {
-					prefix := exchangeEnvPrefix(ex)
-					args = append(args,
-						"-e", prefix+"_API_KEY="+apiKey,
-						"-e", prefix+"_API_SECRET="+apiSecret,
-					)
-					if passphrase != "" {
-						args = append(args, "-e", prefix+"_API_PASSPHRASE="+passphrase)
-					}
-				}
-				injected[ex] = true
-			}
-		}
-	}
-
-	return args
-}
-
-func (cm *ContainerManager) Stop(userID, mode string) {
-	name := cm.containerName(userID, mode)
-	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
-	if err != nil || out != "true" {
-		return
-	}
-	cm.docker("stop", name, "-t", "10")
-	log.Printf("container %s stopped", name)
-}
-
-func (cm *ContainerManager) StopAndRemove(userID, mode string) {
-	name := cm.containerName(userID, mode)
-	cm.docker("stop", name, "-t", "10")
-	cm.docker("rm", "-f", name)
-}
-
-func (cm *ContainerManager) IsRunning(userID, mode string) bool {
-	running, _ := cm.CheckRunning(userID, mode)
-	return running
-}
-
-func (cm *ContainerManager) CheckRunning(userID, mode string) (bool, error) {
-	if cm.checkRunningFn != nil {
-		return cm.checkRunningFn(userID, mode)
-	}
-	name := cm.containerName(userID, mode)
-	out, err := cm.docker("inspect", "-f", "{{.State.Running}}", name)
-	if err != nil {
-		return false, err
-	}
-	return out == "true", nil
-}
-
-func (cm *ContainerManager) Logs(userID, mode, tail string) (string, error) {
-	if cm.logsFn != nil {
-		return cm.logsFn(userID, mode)
-	}
-	name := cm.containerName(userID, mode)
-	out, err := cm.docker("logs", "--tail", tail, name)
-	if err != nil {
-		return "", fmt.Errorf("docker logs %s: %w", name, err)
-	}
-	return out, nil
-}
-
-// ContainerGRPCAddr returns the gRPC address for a user's container.
-func (cm *ContainerManager) ContainerGRPCAddr(userID, mode string) string {
-	return fmt.Sprintf("%s:%d", cm.containerName(userID, mode), cm.cfg.BBGOGRPCPort)
-}
-
-
-// DiscoverContainers scans Docker for running bbgo-* containers and returns
-// the userIDs and modes found. Used during startup to detect orphaned containers
-// that don't have corresponding bbgo.yaml configs on disk.
-func (cm *ContainerManager) DiscoverContainers() map[string][]string {
+func (cm *ContainerManager) DiscoverContainers() []StrategyInstance {
 	out, err := cm.docker("ps", "--filter", "name="+containerPrefix, "--format", "{{.Names}}")
 	if err != nil {
 		log.Printf("discover containers: %v", err)
 		return nil
 	}
 
-	result := make(map[string][]string)
+	var instances []StrategyInstance
 	for _, name := range strings.Split(out, "\n") {
 		name = strings.TrimSpace(name)
 		if !strings.HasPrefix(name, containerPrefix) {
 			continue
 		}
 		suffix := strings.TrimPrefix(name, containerPrefix)
-
-		var userID, mode string
-		if strings.HasSuffix(suffix, "-paper") {
-			userID = strings.TrimSuffix(suffix, "-paper")
-			mode = ModePaper
-		} else {
-			userID = suffix
-			mode = ModeLive
+		parts := strings.SplitN(suffix, "-", 3)
+		if len(parts) < 3 {
+			continue
 		}
+		userID := parts[0]
+		mode := parts[1]
+		if mode != ModeLive && mode != ModePaper {
+			continue
+		}
+		instanceID := parts[2]
 		if userID == "" || userID == "marketdata" {
 			continue
 		}
-		result[userID] = append(result[userID], mode)
+		instances = append(instances, StrategyInstance{
+			InstanceID: instanceID,
+			UserID:     userID,
+			Mode:       mode,
+		})
 	}
-	return result
+	return instances
+}
+
+func (cm *ContainerManager) StopAllForUser(userID string) {
+	instances, err := cm.store.ListAllInstances(userID)
+	if err != nil {
+		return
+	}
+	for _, inst := range instances {
+		cm.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+	}
+}
+
+func (cm *ContainerManager) StartAllForUser(userID, mode string) []error {
+	instances, err := cm.store.ListInstances(userID, mode)
+	if err != nil {
+		return []error{err}
+	}
+	var errs []error
+	for i := range instances {
+		if err := cm.CreateAndStartInstance(&instances[i]); err != nil {
+			errs = append(errs, fmt.Errorf("instance %s: %w", instances[i].InstanceID, err))
+		}
+	}
+	return errs
 }
 
 var exchangePrefixes = map[string]string{
@@ -563,8 +549,6 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-// cleanupBackups keeps only the keepNewest most recent backup files matching
-// the given prefix pattern in dir. Older backups are deleted.
 func cleanupBackups(dir, prefix string, keepNewest int) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

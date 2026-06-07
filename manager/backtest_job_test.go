@@ -230,3 +230,36 @@ func TestBacktestJobStore_Semaphore(t *testing.T) {
 	store.ReleaseSlot()
 	store.ReleaseSlot()
 }
+
+func TestBacktestJobStore_SetReport(t *testing.T) {
+	dir := t.TempDir()
+	store := NewBacktestJobStore(dir)
+
+	job := &BacktestJob{ID: "bt-1", UserID: "u1", Strategy: "grid2", Config: json.RawMessage(`{}`)}
+	store.Create(job)
+
+	report := json.RawMessage(`{"total_trades": 42}`)
+	store.SetReport("bt-1", report, "1,100\n2,200\n")
+
+	got, _ := store.Get("bt-1")
+	if string(got.Report) != `{"total_trades": 42}` {
+		t.Errorf("expected report, got %s", got.Report)
+	}
+	if got.EquityCurve != "1,100\n2,200\n" {
+		t.Errorf("expected equity curve, got %s", got.EquityCurve)
+	}
+}
+
+func TestBacktestJobStore_SetReport_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	store := NewBacktestJobStore(dir)
+
+	store.SetReport("nonexistent", json.RawMessage(`{}`), "")
+}
+
+func TestBacktestJobStore_SetError_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	store := NewBacktestJobStore(dir)
+
+	store.SetError("nonexistent", "err")
+}

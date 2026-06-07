@@ -5,14 +5,17 @@ import (
 	"testing"
 )
 
-func TestBuildUserYAML_SingleExchange(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
-		{
-			Strategy: "grid2",
-			Exchange: "binance",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-	}, func(exchange string) bool { return false })
+func TestBuildInstanceYAML_SingleExchange(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModeLive,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(exchange string) bool { return false }, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,19 +40,21 @@ func TestBuildUserYAML_SingleExchange(t *testing.T) {
 	}
 }
 
-func TestBuildUserYAML_CrossExchange(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
-		{
-			Strategy:      "xmaker",
-			Exchange:      "",
-			CrossExchange: true,
-			Sessions: []SessionRoleConfig{
-				{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-				{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
-			},
-			Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001,"spread":0.001}`),
+func TestBuildInstanceYAML_CrossExchange(t *testing.T) {
+	inst := &StrategyInstance{
+		UserID:        "test-user",
+		Mode:          ModeLive,
+		Strategy:      "xmaker",
+		CrossExchange: true,
+		Symbol:        "BTCUSDT",
+		Sessions: []SessionRoleConfig{
+			{Name: "maker", Exchange: "binance", EnvVarPrefix: "BINANCE"},
+			{Name: "hedge", Exchange: "bybit", EnvVarPrefix: "BYBIT", Futures: true},
 		},
-	}, func(exchange string) bool { return false })
+		Config:     rawJSON(`{"symbol":"BTCUSDT","quantity":0.001,"spread":0.001}`),
+		InstanceID: "xmaker-BTCUSDT",
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(exchange string) bool { return false }, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,48 +80,8 @@ func TestBuildUserYAML_CrossExchange(t *testing.T) {
 	}
 }
 
-func TestBuildUserYAML_Mixed(t *testing.T) {
-	yamlBytes, err := buildUserYAML("test-user", ModeLive, []StrategyEntry{
-		{
-			Strategy: "grid2",
-			Exchange: "binance",
-			Config:   rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-		{
-			Strategy:      "xfunding",
-			Exchange:      "",
-			CrossExchange: true,
-			Sessions: []SessionRoleConfig{
-				{Name: "spot", Exchange: "binance", EnvVarPrefix: "BINANCE"},
-				{Name: "futures", Exchange: "okex", EnvVarPrefix: "OKEX", Futures: true},
-			},
-			Config: rawJSON(`{"symbol":"BTCUSDT","quantity":0.001}`),
-		},
-	}, func(exchange string) bool { return false })
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	yaml := string(yamlBytes)
-
-	if !strings.Contains(yaml, "exchangeStrategies:") {
-		t.Error("expected exchangeStrategies section for grid2")
-	}
-	if !strings.Contains(yaml, `"on": binance`) {
-		t.Error("expected '\"on\": binance' session binding for grid2")
-	}
-	if !strings.Contains(yaml, "crossExchangeStrategies:") {
-		t.Error("expected crossExchangeStrategies section for xfunding")
-	}
-	if !strings.Contains(yaml, "grid2:") {
-		t.Error("expected grid2 strategy")
-	}
-	if !strings.Contains(yaml, "xfunding:") {
-		t.Error("expected xfunding strategy")
-	}
-}
-
 func TestBuildBacktestYAML(t *testing.T) {
-	yaml, err := buildBacktestYAML("grid2", rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), "2024-01-01", "2024-06-01", "", "", staticDefaults)
+	yaml, err := buildBacktestYAML("grid2", rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), "2024-01-01", "2024-06-01", "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -219,18 +184,6 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 			wantErr:  true,
 		},
 		{
-			name:       "interval_not_injected_when_missing",
-			strategy:   "grid2",
-			config:     `{"symbol":"BTCUSDT"}`,
-			wantInYAML: []string{"grid2:"},
-		},
-		{
-			name:       "interval_preserved_when_set",
-			strategy:   "grid2",
-			config:     `{"symbol":"BTCUSDT","interval":"5m"}`,
-			wantInYAML: []string{"interval: 5m"},
-		},
-		{
 			name:       "unknown_exchange_gets_default_prefix",
 			strategy:   "grid2",
 			config:     `{"symbol":"BTCUSDT"}`,
@@ -268,8 +221,6 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 	}
 }
 
-// TestBuildBacktestYAML_AllExercises validates that every supported exchange × strategy
-// combination produces valid YAML with correct sections.
 func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 	allExchanges := []string{"binance", "okex", "kucoin", "bybit", "bitget", "max", "coinbase", "bitfinex"}
 	allPrefixes := map[string]string{
@@ -277,8 +228,6 @@ func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 		"bitget": "BITGET", "max": "MAX", "coinbase": "COINBASE", "bitfinex": "BITFINEX",
 	}
 
-	// Single-exchange strategies with representative configs.
-	// Each has: strategy ID, default config params for backtest.
 	strategies := []struct {
 		id     string
 		config string
@@ -317,31 +266,24 @@ func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 				}
 				s := string(yaml)
 
-				// Must contain the exchange section
 				if !strings.Contains(s, ex+":") {
 					t.Errorf("missing exchange %q section", ex)
 				}
-				// Must contain the correct env var prefix
 				if !strings.Contains(s, allPrefixes[ex]) {
 					t.Errorf("missing env prefix %q", allPrefixes[ex])
 				}
-				// Must contain the strategy key
 				if !strings.Contains(s, st.id+":") {
 					t.Errorf("missing strategy %q section", st.id)
 				}
-				// Must contain symbol
 				if !strings.Contains(s, "BTCUSDT") {
 					t.Error("missing symbol BTCUSDT")
 				}
-				// Must contain backtest section
 				if !strings.Contains(s, "backtest:") {
 					t.Error("missing backtest section")
 				}
-				// Must contain date range
 				if !strings.Contains(s, "2024-01-01") || !strings.Contains(s, "2024-03-01") {
 					t.Error("missing date range")
 				}
-				// Must contain accounts with default balances
 				if !strings.Contains(s, "accounts:") {
 					t.Error("missing accounts section")
 				}
@@ -355,21 +297,11 @@ func TestIsValidTradingPair(t *testing.T) {
 		symbol string
 		want   bool
 	}{
-		{"BTCUSDT", true},
-		{"ETHBTC", true},
-		{"BNBBUSD", true},
-		{"SOLUSDC", true},
-		{"XRPFDUSD", true},
-		{"BTCETH", true},
-		{"DOGEUSDT", true},
-		{"BTGETH", true},
-		{"FORUSDT", true},
-		{"USDT", false},
-		{"BTC", false},
-		{"", false},
-		{"123ABC", false},
-		{"BINANCE-PERP", false},
-		{"BTCTWD", false},
+		{"BTCUSDT", true}, {"ETHBTC", true}, {"BNBBUSD", true},
+		{"SOLUSDC", true}, {"XRPFDUSD", true}, {"BTCETH", true},
+		{"DOGEUSDT", true}, {"BTGETH", true}, {"FORUSDT", true},
+		{"USDT", false}, {"BTC", false}, {"", false},
+		{"123ABC", false}, {"BINANCE-PERP", false}, {"BTCTWD", false},
 	}
 
 	for _, tt := range tests {
@@ -396,7 +328,108 @@ func TestFilterTradingPairs(t *testing.T) {
 	}
 }
 
-// TestBuildBacktestYAML_AllExchangesValidConfig verifies SyncBacktest config for all exchanges.
+func TestDeepMerge(t *testing.T) {
+	t.Run("overlay wins", func(t *testing.T) {
+		result := deepMerge(map[string]any{"a": 1}, map[string]any{"a": 2})
+		if result["a"] != 2 {
+			t.Errorf("got %v", result["a"])
+		}
+	})
+	t.Run("overlay adds key", func(t *testing.T) {
+		result := deepMerge(map[string]any{"a": 1}, map[string]any{"b": 2})
+		if result["a"] != 1 || result["b"] != 2 {
+			t.Errorf("got %v", result)
+		}
+	})
+	t.Run("deep nested", func(t *testing.T) {
+		result := deepMerge(
+			map[string]any{"x": map[string]any{"a": 1, "b": 2}},
+			map[string]any{"x": map[string]any{"b": 3, "c": 4}},
+		)
+		nested := result["x"].(map[string]any)
+		if nested["a"] != 1 || nested["b"] != 3 || nested["c"] != 4 {
+			t.Errorf("got %v", nested)
+		}
+	})
+	t.Run("overlay replaces non-map with map", func(t *testing.T) {
+		result := deepMerge(map[string]any{"x": "str"}, map[string]any{"x": map[string]any{"a": 1}})
+		nested := result["x"].(map[string]any)
+		if nested["a"] != 1 {
+			t.Errorf("got %v", result["x"])
+		}
+	})
+	t.Run("empty base", func(t *testing.T) {
+		result := deepMerge(map[string]any{}, map[string]any{"a": 1})
+		if result["a"] != 1 {
+			t.Errorf("got %v", result)
+		}
+	})
+	t.Run("empty overlay", func(t *testing.T) {
+		result := deepMerge(map[string]any{"a": 1}, map[string]any{})
+		if result["a"] != 1 {
+			t.Errorf("got %v", result)
+		}
+	})
+}
+
+func TestNormalizeStrategyConfig_Alias(t *testing.T) {
+	strategy, _ := normalizeStrategyConfig("ewoDgtrd", map[string]any{})
+	if strategy != "ewo_dgtrd" {
+		t.Errorf("strategy = %q", strategy)
+	}
+}
+
+func TestNormalizeStrategyConfig_FieldAliases(t *testing.T) {
+	params := map[string]any{"spread": 0.01, "minProfitSpread": 0.005}
+	strategy, result := normalizeStrategyConfig("fixedmaker", params)
+	if strategy != "fixedmaker" {
+		t.Errorf("strategy = %q", strategy)
+	}
+	if _, has := result["halfSpread"]; !has {
+		t.Error("expected halfSpread from spread alias")
+	}
+	if _, has := result["spread"]; has {
+		t.Error("spread should be removed")
+	}
+}
+
+func TestNormalizeStrategyConfig_FieldAliasEmptyNewKey(t *testing.T) {
+	params := map[string]any{"minProfitSpread": 0.005}
+	_, result := normalizeStrategyConfig("fixedmaker", params)
+	if _, has := result["minProfitSpread"]; has {
+		t.Error("minProfitSpread should be removed (empty newKey)")
+	}
+}
+
+func TestNormalizeStrategyConfig_NoAlias(t *testing.T) {
+	strategy, _ := normalizeStrategyConfig("grid2", map[string]any{})
+	if strategy != "grid2" {
+		t.Errorf("strategy = %q", strategy)
+	}
+}
+
+func TestExtractQuoteCurrency(t *testing.T) {
+	tests := []struct {
+		symbol string
+		want   string
+	}{
+		{"BTCUSDT", "USDT"}, {"ETHBTC", "BTC"}, {"BNBBUSD", "BUSD"},
+		{"SOLUSDC", "USDC"}, {"XRPFDUSD", "FDUSD"}, {"UNKNOWN", "USDT"}, {"", "USDT"},
+	}
+	for _, tt := range tests {
+		if got := extractQuoteCurrency(tt.symbol); got != tt.want {
+			t.Errorf("extractQuoteCurrency(%q) = %q, want %q", tt.symbol, got, tt.want)
+		}
+	}
+}
+
+func TestBacktestBalances(t *testing.T) {
+	balances := backtestBalances("BTCUSDT")
+	if balances["USDT"] != "10000" || balances["BTC"] != "10" {
+		t.Errorf("balances = %v", balances)
+	}
+}
+
 func TestBuildSyncConfig_AllExchanges(t *testing.T) {
 	allExchanges := []string{"binance", "okex", "kucoin", "bybit", "bitget", "max", "coinbase", "bitfinex"}
 

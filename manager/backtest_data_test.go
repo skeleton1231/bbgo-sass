@@ -10,7 +10,7 @@ import (
 func TestHasDataForRange_AlwaysReturnsFalse(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, nil)
 	api := &API{container: cm}
 
 	if api.hasDataForRange("binance", "BTCUSDT", "2024-01-01", "2024-06-01") {

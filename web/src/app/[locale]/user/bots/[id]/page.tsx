@@ -7,8 +7,8 @@ import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import {
   useBotDetail,
-  useStartUser,
-  useStopUser,
+  useStartInstance,
+  useStopInstance,
   useBotSessions,
   useBotOpenOrders,
   useBotClosedOrders,
@@ -285,8 +285,8 @@ export default function BotDetailPage() {
     onMessage: handleWSMessage,
   })
 
-  const startUser = useStartUser()
-  const stopUser = useStopUser()
+  const startInstance = useStartInstance()
+  const stopInstance = useStopInstance()
 
   const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
   const tradePositionTags = useMemo(() => {
@@ -377,8 +377,8 @@ export default function BotDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => stopUser.mutate({ userId, mode }, { onError: (err) => toast.error(err.message) })}
-              disabled={stopUser.isPending}
+              onClick={() => stopInstance.mutate({ userId, instanceId: bot.id }, { onError: (err) => toast.error(err.message) })}
+              disabled={stopInstance.isPending}
               className="rounded-full"
             >
               <Square className="mr-1.5 h-3.5 w-3.5" />
@@ -387,8 +387,8 @@ export default function BotDetailPage() {
           ) : (
             <Button
               size="sm"
-              onClick={() => startUser.mutate({ userId, mode }, { onError: (err) => toast.error(err.message) })}
-              disabled={startUser.isPending || status === 'starting'}
+              onClick={() => startInstance.mutate({ userId, instanceId: bot.id }, { onError: (err) => toast.error(err.message) })}
+              disabled={startInstance.isPending || status === 'starting'}
               className="rounded-full"
             >
               <Play className="mr-1.5 h-3.5 w-3.5" />
@@ -576,6 +576,7 @@ export default function BotDetailPage() {
             loadEarlierKlines={loadEarlierKlines}
             strategyStats={strategyStats}
             currentPrice={currentPrice}
+            unrealizedPnlFromReport={pnlData?.totalUnrealizedPnl}
             noSymbolText={t('noSymbolForChart')}
             startToSeeDataText={t('startToSeeData')}
             klineInterval={klineInterval}

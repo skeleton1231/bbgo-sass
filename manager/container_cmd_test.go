@@ -1,15 +1,11 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// TestCreateAndStart_FullDockerCommand_LiveMode verifies the complete docker
-// run command for a live trading bot with real credentials.
-func TestCreateAndStart_FullDockerCommand_LiveMode(t *testing.T) {
+func TestCreateAndStartInstance_FullDockerCommand_LiveMode(t *testing.T) {
 	dir := t.TempDir()
 	enc, err := NewEncryptor(testEncryptionKey)
 	if err != nil {
@@ -28,7 +24,8 @@ func TestCreateAndStart_FullDockerCommand_LiveMode(t *testing.T) {
 		BBGOGRPCPort:   9090,
 		MarketDataAddr: "marketdata:9090",
 	}
-	cm := NewContainerManager(cfg, creds, nil)
+	store := NewInstanceStore(dir, nil)
+	cm := NewContainerManager(cfg, creds, nil, store)
 
 	var capturedArgs []string
 	cm.dockerFn = func(args ...string) (string, error) {
@@ -36,23 +33,27 @@ func TestCreateAndStart_FullDockerCommand_LiveMode(t *testing.T) {
 		return "container-id", nil
 	}
 
-	// Write YAML to disk so CreateAndStart can read it
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2", Mode: "live",
-			Config: rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`)},
-	})
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModeLive,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	if err := store.CreateInstance(inst, func(string) bool { return true }); err != nil {
+		t.Fatalf("create instance: %v", err)
+	}
 
-	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("CreateAndStartInstance: %v", err)
 	}
 
 	cmdStr := strings.Join(capturedArgs, " ")
 
 	if !strings.Contains(cmdStr, "run -d") {
 		t.Error("expected 'run -d'")
-	}
-	if !strings.Contains(cmdStr, "--name bbgo-test-user") {
-		t.Error("expected --name bbgo-test-user")
 	}
 	if !strings.Contains(cmdStr, "--network bbgo-net") {
 		t.Error("expected --network bbgo-net")
@@ -101,9 +102,7 @@ func TestCreateAndStart_FullDockerCommand_LiveMode(t *testing.T) {
 	}
 }
 
-// TestCreateAndStart_FullDockerCommand_PaperMode verifies paper mode has
-// PAPER_TRADE=1 and no credential injection.
-func TestCreateAndStart_FullDockerCommand_PaperMode(t *testing.T) {
+func TestCreateAndStartInstance_FullDockerCommand_PaperMode(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{
 		ManagerToken:  "tok",
@@ -114,7 +113,8 @@ func TestCreateAndStart_FullDockerCommand_PaperMode(t *testing.T) {
 		BBGOPort:      8080,
 		BBGOGRPCPort:  9090,
 	}
-	cm := NewContainerManager(cfg, nil, nil)
+	store := NewInstanceStore(dir, nil)
+	cm := NewContainerManager(cfg, nil, nil, store)
 
 	var capturedArgs []string
 	cm.dockerFn = func(args ...string) (string, error) {
@@ -122,13 +122,21 @@ func TestCreateAndStart_FullDockerCommand_PaperMode(t *testing.T) {
 		return "container-id", nil
 	}
 
-	writeTestUserYAML(t, dir, "test-user", ModePaper, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2", Mode: "paper",
-			Config: rawJSON(`{"symbol":"BTCUSDT"}`)},
-	})
+	inst := &StrategyInstance{
+		UserID:     "test-user",
+		Mode:       ModePaper,
+		Strategy:   "grid2",
+		Exchange:   "binance",
+		Symbol:     "BTCUSDT",
+		Config:     rawJSON(`{"symbol":"BTCUSDT"}`),
+		InstanceID: "grid2-BTCUSDT",
+	}
+	if err := store.CreateInstance(inst, func(string) bool { return false }); err != nil {
+		t.Fatalf("create instance: %v", err)
+	}
 
-	if err := cm.CreateAndStart("test-user", ModePaper); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("CreateAndStartInstance: %v", err)
 	}
 
 	cmdStr := strings.Join(capturedArgs, " ")
@@ -141,70 +149,5 @@ func TestCreateAndStart_FullDockerCommand_PaperMode(t *testing.T) {
 	}
 	if strings.Contains(cmdStr, "MARKET_DATA_SERVICE_URL") {
 		t.Error("MARKET_DATA_SERVICE_URL should not be set when not configured")
-	}
-}
-
-// TestCreateAndStart_YAMLWrittenForLive verifies the YAML file written to disk
-// for live mode does not contain PAPER_TRADE and has correct strategy config.
-func TestCreateAndStart_YAMLWrittenForLive(t *testing.T) {
-	dir := t.TempDir()
-	cfg := &Config{
-		ManagerToken:  "tok",
-		DataDir:       dir,
-		DataVolume:    "bbgo-data",
-		DockerNetwork: "bbgo-net",
-		BBGOImage:     "bbgo-base:latest",
-		BBGOPort:      8080,
-	}
-	cm := NewContainerManager(cfg, nil, nil)
-	cm.dockerFn = func(args ...string) (string, error) {
-		return "container-id", nil
-	}
-
-	writeTestUserYAML(t, dir, "test-user", ModeLive, []StrategyEntry{
-		{Exchange: "binance", Strategy: "grid2", Mode: "live",
-			Config: rawJSON(`{"symbol":"ETHUSDT","gridNumber":5}`)},
-	})
-
-	if err := cm.CreateAndStart("test-user", ModeLive); err != nil {
-		t.Fatalf("CreateAndStart: %v", err)
-	}
-
-	data, err := os.ReadFile(dir + "/test-user/bbgo.yaml")
-	if err != nil {
-		t.Fatalf("read yaml: %v", err)
-	}
-	yaml := string(data)
-
-	if strings.Contains(yaml, "PAPER_TRADE") {
-		t.Error("PAPER_TRADE should not appear in live mode YAML")
-	}
-	if !strings.Contains(yaml, "ETHUSDT") {
-		t.Error("expected ETHUSDT symbol in YAML")
-	}
-	if !strings.Contains(yaml, "grid2:") {
-		t.Error("expected grid2 strategy in YAML")
-	}
-	if !strings.Contains(yaml, "gridNumber:") {
-		t.Error("expected gridNumber config in YAML")
-	}
-}
-
-// writeTestUserYAML writes a bbgo.yaml for the given user/mode/strategies
-// into the data directory structure expected by CreateAndStart.
-func writeTestUserYAML(t *testing.T, dataDir, userID, mode string, strategies []StrategyEntry) {
-	t.Helper()
-	userDir := filepath.Join(dataDir, userID)
-	if mode == ModePaper {
-		userDir += "-paper"
-	}
-	os.MkdirAll(userDir, 0o755)
-
-	yaml, err := buildUserYAML(userID, mode, strategies, func(string) bool { return false })
-	if err != nil {
-		t.Fatalf("build yaml for %s/%s: %v", userID, mode, err)
-	}
-	if err := os.WriteFile(filepath.Join(userDir, "bbgo.yaml"), yaml, 0o644); err != nil {
-		t.Fatalf("write yaml: %v", err)
 	}
 }

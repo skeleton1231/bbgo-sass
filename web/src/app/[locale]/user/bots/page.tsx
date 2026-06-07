@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Play, Square, Trash2, Bot as BotIcon } from 'lucide-react'
 import { useUserId } from '@/components/providers/user-id'
 import { useTradingMode } from '@/components/providers/trading-mode'
-import { useBotList, useStartUser, useStopUser, useDeleteStrategy } from '@/lib/bbgo/queries'
+import { useBotList, useStartInstance, useStopInstance, useDeleteStrategy } from '@/lib/bbgo/queries'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -87,8 +87,8 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
 }) {
   const t = useTranslations('Bots')
   const { data: botsResp, isLoading, isError } = useBotList(userId, mode)
-  const startUser = useStartUser()
-  const stopUser = useStopUser()
+  const startInstance = useStartInstance()
+  const stopInstance = useStopInstance()
 
   if (isError) {
     return (
@@ -132,7 +132,7 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
         const status = bot.container_status
         const isRunning = status === 'running'
         const symbol = bot.symbol || (bot.config?.symbol as string) || ''
-        const exchange = bot.exchange || (bot.session ?? '')
+        const exchange = bot.exchange
 
         return (
           <div key={bot.id} className="flex items-center justify-between rounded-lg border bg-card p-4">
@@ -174,11 +174,11 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
               )}
               {status === 'running' ? (
                 <button
-                  onClick={() => stopUser.mutate(
-                    { userId, mode: bot.mode },
+                  onClick={() => stopInstance.mutate(
+                    { userId, instanceId: bot.id },
                     { onError: (err) => toast.error(err.message) },
                   )}
-                  disabled={stopUser.isPending}
+                  disabled={stopInstance.isPending}
                   aria-label={t('stop')}
                   className="rounded-md border px-3 py-1 text-sm hover:bg-muted disabled:opacity-50"
                 >
@@ -186,11 +186,11 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
                 </button>
               ) : (
                 <button
-                  onClick={() => startUser.mutate(
-                    { userId, mode: bot.mode },
+                  onClick={() => startInstance.mutate(
+                    { userId, instanceId: bot.id },
                     { onError: (err) => toast.error(err.message) },
                   )}
-                  disabled={startUser.isPending || status === 'starting'}
+                  disabled={startInstance.isPending || status === 'starting'}
                   aria-label={t('start')}
                   className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >

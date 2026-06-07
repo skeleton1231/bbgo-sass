@@ -9,7 +9,7 @@ import (
 func TestRunBacktest_RejectsPathTraversal(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
+	cm := NewContainerManager(cfg, nil, nil, nil)
 
 	t.Run("slash in jobID", func(t *testing.T) {
 		_, err := cm.RunBacktest("user-1", "evil/../../etc", []byte("yaml"))
@@ -28,13 +28,14 @@ func TestRunBacktest_RejectsPathTraversal(t *testing.T) {
 
 func TestCleanupBacktest_RemovesDirectory(t *testing.T) {
 	dir := t.TempDir()
+	store := NewInstanceStore(dir, testRegistry)
+	inst := createTestInstance(t, store, "user-1", ModeLive, "grid2", "BTCUSDT", nil)
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
-	cm.checkRunningFn = func(string, string) (bool, error) { return true, nil }
+	cm := NewContainerManager(cfg, nil, nil, store)
+	cm.checkRunningFn = func(string) (bool, error) { return true, nil }
 
 	jobID := "bt-test123"
-	// backtestMode prefers paper, so hostDir appends "-paper"
-	backtestDir := dir + "/user-1-paper/backtest/" + jobID
+	backtestDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
 	if err := os.MkdirAll(backtestDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -58,8 +59,8 @@ func TestCleanupBacktest_NilReceiver(t *testing.T) {
 func TestCleanupBacktest_NoContainerRunning(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil)
-	cm.checkRunningFn = func(string, string) (bool, error) { return false, nil }
+	cm := NewContainerManager(cfg, nil, nil, nil)
+	cm.checkRunningFn = func(string) (bool, error) { return false, nil }
 
 	backtestDir := dir + "/user-1/backtest/bt-123"
 	if err := os.MkdirAll(backtestDir, 0o755); err != nil {

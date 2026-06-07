@@ -368,7 +368,7 @@ func assertJobEventually(t *testing.T, store *BacktestJobStore, jobID, expectedS
 func TestBacktestExecutor_ConcurrentSubmit(t *testing.T) {
 	dir := t.TempDir()
 	store := NewBacktestJobStore(dir)
-	cm := &ContainerManager{cfg: &Config{DataDir: dir}, checkRunningFn: func(string, string) (bool, error) { return false, fmt.Errorf("no docker") }}
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, checkRunningFn: func(string) (bool, error) { return false, fmt.Errorf("no docker") }}
 	exec := NewBacktestExecutor(store, cm, nil, nil, nil)
 
 	exec.runFn = func(userID string, jobID string, yamlContent []byte) ([]byte, error) {

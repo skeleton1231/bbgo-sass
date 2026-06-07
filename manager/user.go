@@ -2,11 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +16,7 @@ const (
 
 var defaultPaperBalances = map[string]float64{
 	"USDT": 10000,
+	"BTC":  0.5,
 }
 
 const (
@@ -27,10 +24,8 @@ const (
 	ModePaper = "paper"
 )
 
-// paperExchange is the only exchange supported in paper mode.
 const paperExchange = "binance"
 
-// legacyStrategyAliases maps frontend strategy IDs to the correct bbgo registered IDs.
 var legacyStrategyAliases = map[string]string{
 	"ewoDgtrd":            "ewo_dgtrd",
 	"sentinel_anomaly":    "sentinel",
@@ -38,19 +33,6 @@ var legacyStrategyAliases = map[string]string{
 	"rebalance_portfolio": "rebalance",
 }
 
-// liveOnlyStrategies are strategies that only work in live mode.
-var liveOnlyStrategies = map[string]bool{
-	"autoborrow":       true,
-	"convert":          true,
-	"deposit2transfer": true,
-	"sentinel":         true,
-	"dca2":             true,
-	"dca3":             true,
-	"liquiditymaker":   true,
-	"xhedgegrid":       true,
-}
-
-// legacyFieldAliases maps strategy IDs to old→new field renames.
 var legacyFieldAliases = map[string]map[string]string{
 	"dca":         {"interval": "investmentInterval"},
 	"fixedmaker":  {"spread": "halfSpread", "minProfitSpread": ""},
@@ -61,8 +43,6 @@ var legacyFieldAliases = map[string]map[string]string{
 	"drift":       {"drawGraph": "generateGraph"},
 }
 
-// deepMerge recursively merges overlay into base. Map values are merged recursively;
-// all other types (including slices) from overlay replace base values.
 func deepMerge(base, overlay map[string]any) map[string]any {
 	result := make(map[string]any, len(base))
 	for k, v := range base {
@@ -80,7 +60,6 @@ func deepMerge(base, overlay map[string]any) map[string]any {
 	return result
 }
 
-// normalizeStrategyConfig fixes old strategy IDs and field names from legacy DB records.
 func normalizeStrategyConfig(strategy string, params map[string]any) (string, map[string]any) {
 	if alias, ok := legacyStrategyAliases[strategy]; ok {
 		strategy = alias
@@ -117,305 +96,16 @@ type StrategyEntry struct {
 	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
 }
 
-// UserMode identifies a user+mode pair for container tracking.
 type UserMode struct {
 	UserID string
 	Mode   string
 }
 
-// StrategyStore manages bbgo.yaml files on disk as the source of truth
-// for user strategy configurations. No in-memory state, no database sync.
-type StrategyStore struct {
-	mu       sync.Mutex
-	dataDir  string
-	registry *StrategyDefaultsCache
+type DefaultsProvider interface {
+	GetDefaults(strategyID string) map[string]any
 }
 
-func NewStrategyStore(dataDir string, registry *StrategyDefaultsCache) *StrategyStore {
-	return &StrategyStore{dataDir: dataDir, registry: registry}
-}
-
-func (s *StrategyStore) Defaults() DefaultsProvider {
-	if s.registry == nil {
-		return nil
-	}
-	return s.registry
-}
-
-// yamlPath returns the path to bbgo.yaml for a given user/mode.
-func (s *StrategyStore) yamlPath(userID, mode string) string {
-	dir := filepath.Join(s.dataDir, userID)
-	if mode == ModePaper {
-		dir += "-paper"
-	}
-	return filepath.Join(dir, "bbgo.yaml")
-}
-
-// hostDir returns the host directory for user/mode config files.
-func (s *StrategyStore) hostDir(userID, mode string) string {
-	dir := filepath.Join(s.dataDir, userID)
-	if mode == ModePaper {
-		dir += "-paper"
-	}
-	return dir
-}
-
-// dbPath returns the path to the SQLite database for a given user/mode.
-func (s *StrategyStore) dbPath(userID, mode string) string {
-	return filepath.Join(s.hostDir(userID, mode), "bbgo.db")
-}
-
-// ReadYAML reads the raw bbgo.yaml content for a user/mode.
-func (s *StrategyStore) ReadYAML(userID, mode string) ([]byte, error) {
-	return os.ReadFile(s.yamlPath(userID, mode))
-}
-
-// YAMLExists returns true if a bbgo.yaml exists for the user/mode.
-func (s *StrategyStore) YAMLExists(userID, mode string) bool {
-	_, err := os.Stat(s.yamlPath(userID, mode))
-	return err == nil
-}
-
-// ListStrategies parses bbgo.yaml and returns the configured strategy entries.
-func (s *StrategyStore) ListStrategies(userID, mode string) ([]StrategyEntry, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	data, err := s.ReadYAML(userID, mode)
-	if err != nil {
-		return nil, err
-	}
-	return parseStrategiesFromYAML(data)
-}
-
-// parseStrategiesFromYAML extracts StrategyEntry list from bbgo config YAML.
-func parseStrategiesFromYAML(data []byte) ([]StrategyEntry, error) {
-	var cfg bbgoConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parse bbgo.yaml: %w", err)
-	}
-
-	var entries []StrategyEntry
-
-	for _, es := range cfg.ExchangeStrategies {
-		entry, ok := parseExchangeStrategyEntry(es)
-		if ok {
-			entries = append(entries, entry)
-		}
-	}
-
-	for _, cs := range cfg.CrossExchangeStrategies {
-		entry, ok := parseCrossStrategyEntry(cs, cfg.Sessions)
-		if ok {
-			entries = append(entries, entry)
-		}
-	}
-
-	return entries, nil
-}
-
-// parseExchangeStrategyEntry extracts a StrategyEntry from an exchangeStrategy YAML map.
-// Format: {"on": "binance", "grid2": {symbol: "BTCUSDT", ...}}
-func parseExchangeStrategyEntry(m map[string]any) (StrategyEntry, bool) {
-	exchange, _ := m["on"].(string)
-	if exchange == "" {
-		return StrategyEntry{}, false
-	}
-
-	for key, val := range m {
-		if key == "on" {
-			continue
-		}
-		config, err := json.Marshal(val)
-		if err != nil {
-			continue
-		}
-		return StrategyEntry{
-			Exchange: exchange,
-			Strategy: key,
-			Config:   config,
-		}, true
-	}
-	return StrategyEntry{}, false
-}
-
-// parseCrossStrategyEntry extracts a StrategyEntry from a crossExchangeStrategy YAML map.
-// It reconstructs Sessions from the YAML sessions section for YAML roundtrip fidelity.
-func parseCrossStrategyEntry(m map[string]any, yamlSessions map[string]sessionConfig) (StrategyEntry, bool) {
-	for key, val := range m {
-		config, err := json.Marshal(val)
-		if err != nil {
-			continue
-		}
-		var sessions []SessionRoleConfig
-		for name, sc := range yamlSessions {
-			sessions = append(sessions, SessionRoleConfig{
-				Name:         name,
-				Exchange:     sc.Exchange,
-				EnvVarPrefix: sc.EnvVarPrefix,
-				Futures:      sc.Futures,
-			})
-		}
-		return StrategyEntry{
-			Strategy:      key,
-			Config:        config,
-			CrossExchange: true,
-			Sessions:      sessions,
-		}, true
-	}
-	return StrategyEntry{}, false
-}
-
-func (s *StrategyStore) AddStrategy(userID, mode string, entry StrategyEntry, hasCredentials func(exchange string) bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.registry != nil {
-		if defaults := s.registry.GetDefaults(entry.Strategy); defaults != nil {
-			var config map[string]any
-			if err := json.Unmarshal(entry.Config, &config); err != nil {
-				config = map[string]any{}
-			}
-			config = deepMerge(defaults, config)
-			if updated, err := json.Marshal(config); err == nil {
-				entry.Config = updated
-			}
-		}
-	}
-
-	if extractSymbolFromConfig(entry.Config) == "" && !entry.CrossExchange {
-		return fmt.Errorf("symbol is required for strategy %s", entry.Strategy)
-	}
-
-	var existing []StrategyEntry
-	if data, err := s.ReadYAML(userID, mode); err == nil {
-		existing, _ = parseStrategiesFromYAML(data)
-	}
-
-	newSymbol := extractSymbolFromConfig(entry.Config)
-	for _, e := range existing {
-		if e.Strategy == entry.Strategy && e.Exchange == entry.Exchange && extractSymbolFromConfig(e.Config) == newSymbol {
-			return fmt.Errorf("strategy %s with symbol %s on %s already exists", entry.Strategy, newSymbol, entry.Exchange)
-		}
-	}
-
-	existing = append(existing, entry)
-	return s.writeYAML(userID, mode, existing, hasCredentials)
-}
-
-// RemoveStrategy removes a strategy by type+symbol+exchange match, regenerates bbgo.yaml.
-// Returns (found bool, err error).
-func (s *StrategyStore) RemoveStrategy(userID, mode, strategy, symbol, exchange string, hasCredentials func(exchange string) bool) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	data, err := s.ReadYAML(userID, mode)
-	if err != nil {
-		return false, err
-	}
-	entries, err := parseStrategiesFromYAML(data)
-	if err != nil {
-		return false, err
-	}
-
-	filtered := make([]StrategyEntry, 0, len(entries))
-	found := false
-	for _, e := range entries {
-		eSymbol := extractSymbolFromConfig(e.Config)
-		if e.Strategy == strategy && eSymbol == symbol && e.Exchange == exchange && !found {
-			found = true
-			continue
-		}
-		filtered = append(filtered, e)
-	}
-	if !found {
-		return false, nil
-	}
-
-	if len(filtered) == 0 {
-		os.Remove(s.yamlPath(userID, mode))
-		os.Remove(s.dbPath(userID, mode))
-		return true, nil
-	}
-
-	return true, s.writeYAML(userID, mode, filtered, hasCredentials)
-}
-
-func (s *StrategyStore) ClearStrategies(userID, mode string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	os.Remove(s.dbPath(userID, mode))
-	return os.Remove(s.yamlPath(userID, mode))
-}
-
-// writeYAML regenerates bbgo.yaml from the given strategy entries.
-func (s *StrategyStore) writeYAML(userID, mode string, entries []StrategyEntry, hasCredentials func(exchange string) bool) error {
-	dir := s.hostDir(userID, mode)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
-	}
-
-	yamlContent, err := buildUserYAML(userID, mode, entries, hasCredentials)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(s.yamlPath(userID, mode), yamlContent, 0o644)
-}
-
-// RefreshYAML re-parses and rewrites bbgo.yaml with updated credential state.
-func (s *StrategyStore) RefreshYAML(userID, mode string, hasCredentials func(exchange string) bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	data, err := s.ReadYAML(userID, mode)
-	if err != nil {
-		return err
-	}
-	entries, err := parseStrategiesFromYAML(data)
-	if err != nil {
-		return err
-	}
-	return s.writeYAML(userID, mode, entries, hasCredentials)
-}
-
-// extractSymbolFromConfig returns the symbol from a strategy config JSON.
-func extractSymbolFromConfig(config json.RawMessage) string {
-	var m map[string]any
-	if err := json.Unmarshal(config, &m); err != nil {
-		return ""
-	}
-	s, _ := m["symbol"].(string)
-	return s
-}
-
-// ScanUsers scans DATA_DIR for bbgo.yaml files and returns discovered user/mode pairs.
-func (s *StrategyStore) ScanUsers() []UserMode {
-	var result []UserMode
-	entries, err := os.ReadDir(s.dataDir)
-	if err != nil {
-		return nil
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if strings.HasSuffix(name, "-paper") {
-			yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
-			if _, err := os.Stat(yamlPath); err == nil {
-				userID := strings.TrimSuffix(name, "-paper")
-				result = append(result, UserMode{UserID: userID, Mode: ModePaper})
-			}
-			continue
-		}
-		yamlPath := filepath.Join(s.dataDir, name, "bbgo.yaml")
-		if _, err := os.Stat(yamlPath); err == nil {
-			result = append(result, UserMode{UserID: name, Mode: ModeLive})
-		}
-	}
-	return result
-}
-
-// --- YAML config types ---
+// --- YAML config types (shared with instance_store.go) ---
 
 type databaseConfig struct {
 	Driver string `yaml:"driver"`
@@ -437,8 +127,8 @@ type bbgoConfig struct {
 	Exchange                map[string]exchangeConfig `yaml:"exchange"`
 	Environment             *environmentConfig        `yaml:"environment,omitempty"`
 	Sync                    *syncConfig               `yaml:"sync,omitempty"`
-	ExchangeStrategies      []map[string]any  `yaml:"exchangeStrategies,omitempty"`
-	CrossExchangeStrategies []map[string]any  `yaml:"crossExchangeStrategies,omitempty"`
+	ExchangeStrategies      []map[string]any          `yaml:"exchangeStrategies,omitempty"`
+	CrossExchangeStrategies []map[string]any          `yaml:"crossExchangeStrategies,omitempty"`
 }
 
 type sessionConfig struct {
@@ -458,136 +148,6 @@ type environmentConfig struct {
 	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery,omitempty"`
 }
 
-// buildUserYAML generates the bbgo YAML config from strategy entries.
-func buildUserYAML(userID, mode string, strategies []StrategyEntry, hasCredentials func(exchange string) bool) ([]byte, error) {
-	exchanges := map[string]exchangeConfig{}
-	sessions := map[string]sessionConfig{}
-	var exchangeStrategies []map[string]any
-	var crossStrategies []map[string]any
-
-	for _, s := range strategies {
-		var params map[string]any
-		if len(s.Config) == 0 {
-			params = map[string]any{}
-		} else if err := json.Unmarshal(s.Config, &params); err != nil {
-			var rawStr string
-			if err2 := json.Unmarshal(s.Config, &rawStr); err2 == nil {
-				strategyID := s.Strategy
-				if alias, ok := legacyStrategyAliases[strategyID]; ok {
-					strategyID = alias
-				}
-				entry := map[string]any{
-					"on":       s.Exchange,
-					strategyID: rawStr,
-				}
-				exchangeStrategies = append(exchangeStrategies, entry)
-			}
-			continue
-		}
-
-		s.Strategy, params = normalizeStrategyConfig(s.Strategy, params)
-
-		if s.CrossExchange {
-			csEntry := buildCrossExchangeStrategy(s, params, sessions, exchanges, hasCredentials, mode)
-			crossStrategies = append(crossStrategies, csEntry)
-			continue
-		}
-
-		symbol := "BTCUSDT"
-		if v, ok := params["symbol"].(string); ok && v != "" {
-			symbol = v
-		}
-		if _, exists := exchanges[s.Exchange]; !exists {
-			exchanges[s.Exchange] = exchangeConfig{Symbol: symbol}
-			prefix := exchangeEnvPrefix(s.Exchange)
-			sc := sessionConfig{
-				Exchange:     s.Exchange,
-				EnvVarPrefix: prefix,
-				PublicOnly:   !hasCredentials(s.Exchange),
-			}
-			if mode == ModePaper {
-				sc.PaperBalances = defaultPaperBalances
-			}
-			sessions[s.Exchange] = sc
-		}
-
-		entry := map[string]any{
-			"on":       s.Exchange,
-			s.Strategy: params,
-		}
-		exchangeStrategies = append(exchangeStrategies, entry)
-	}
-
-	dataDir := userID
-	if mode == ModePaper {
-		dataDir = userID + "-paper"
-	}
-	cfg := bbgoConfig{
-		Database: &databaseConfig{
-			Driver: "sqlite3",
-			DSN:    fmt.Sprintf("file:/data/%s/bbgo.db?cache=shared&_journal_mode=WAL", dataDir),
-		},
-		Sessions: sessions,
-		Exchange: exchanges,
-		Sync: &syncConfig{
-			UserDataStream: &syncUserDataStreamConfig{
-				Trades:       true,
-				FilledOrders: true,
-			},
-		},
-		ExchangeStrategies:      exchangeStrategies,
-		CrossExchangeStrategies: crossStrategies,
-	}
-	cfg.Environment = &environmentConfig{}
-	cfg.Environment.DisableStartupBalanceQuery = true
-	if mode == ModePaper {
-		cfg.Environment.PaperTrade = "1"
-	}
-
-	out, err := yaml.Marshal(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("marshal bbgo config for user %s: %w", userID, err)
-	}
-	return out, nil
-}
-
-func buildCrossExchangeStrategy(s StrategyEntry, params map[string]any, sessions map[string]sessionConfig, exchanges map[string]exchangeConfig, hasCredentials func(string) bool, mode string) map[string]any {
-	for _, sr := range s.Sessions {
-		prefix := sr.EnvVarPrefix
-		if prefix == "" {
-			prefix = exchangeEnvPrefix(sr.Exchange)
-		}
-		if _, exists := sessions[sr.Name]; !exists {
-			sc := sessionConfig{
-				Exchange:     sr.Exchange,
-				EnvVarPrefix: prefix,
-				Futures:      sr.Futures,
-				PublicOnly:   !hasCredentials(sr.Exchange),
-			}
-			if mode == ModePaper {
-				sc.PaperBalances = defaultPaperBalances
-			}
-			sessions[sr.Name] = sc
-		}
-		symbol := "BTCUSDT"
-		if v, ok := params["symbol"].(string); ok && v != "" {
-			symbol = v
-		}
-		if _, exists := exchanges[sr.Exchange]; !exists {
-			exchanges[sr.Exchange] = exchangeConfig{Symbol: symbol}
-		}
-	}
-
-	return map[string]any{
-		s.Strategy: params,
-	}
-}
-
-// DefaultsProvider returns strategy defaults from the registry cache.
-type DefaultsProvider interface {
-	GetDefaults(strategyID string) map[string]any
-}
-
 func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string, defaults DefaultsProvider) ([]byte, error) {
 	var allParams map[string]any
 	if len(rawConfig) == 0 || string(rawConfig) == "null" {
@@ -596,7 +156,6 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 		return nil, err
 	}
 
-	// Inject defaults from strategy_registry (complete template + deep merge)
 	if defaults != nil {
 		if tmpl := defaults.GetDefaults(strategy); tmpl != nil {
 			allParams = deepMerge(tmpl, allParams)
