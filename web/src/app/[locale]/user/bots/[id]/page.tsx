@@ -11,18 +11,19 @@ import {
   useStopInstance,
   useBotSessions,
   useBotOpenOrders,
-  useBotClosedOrders,
-  useBotTrades,
-  useBotTradeMarkers,
   useBotSessionBalances,
   useBotStrategiesState,
   useBotPing,
   useContainerLogs,
-  useBotPnL,
   type BBGoOrder,
   type BBGoTrade,
   type BBGoBalance,
 } from '@/lib/bbgo/queries'
+import {
+  useSupabaseTrades,
+  useSupabaseClosedOrders,
+  useSupabasePnL,
+} from '@/lib/bbgo/supabase-queries'
 import { useUserId } from '@/components/providers/user-id'
 import { OrderRow } from '@/components/user/OrderRow'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
@@ -40,7 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
 import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
-import { buildTradeMarkers, buildTradeMarkersFromServer, buildOrderLevels } from '@/lib/bbgo/trade-markers'
+import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computePositionTags } from '@/lib/bbgo/position-tags'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 
@@ -100,14 +101,13 @@ export default function BotDetailPage() {
   const activeSession = selectedSession || firstSession
 
   const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode, isRunning)
-  const { data: closedOrdersData } = useBotClosedOrders(userId, undefined, symbol || undefined, mode, isRunning)
-  const { data: tradesData } = useBotTrades(userId, undefined, symbol || undefined, mode, isRunning, bot?.strategy)
-  const { data: tradeMarkersData } = useBotTradeMarkers(userId, symbol || '', { exchange: undefined, mode, limit: 200, strategy: bot?.strategy }, isRunning)
+  const { data: closedOrdersData } = useSupabaseClosedOrders(userId, { symbol: symbol || undefined, mode })
+  const { data: tradesData } = useSupabaseTrades(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
   const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode, isRunning)
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
   const { data: pingData } = useBotPing(userId, mode, isRunning)
   const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
-  const { data: pnlData } = useBotPnL(userId, undefined, symbol || undefined, mode, isRunning, bot?.strategy)
+  const { data: pnlData } = useSupabasePnL(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
 
@@ -128,22 +128,22 @@ export default function BotDetailPage() {
   // OrderIDs from strategy-filtered trades → used to cross-reference closed orders
   const tradeOrderIds = useMemo(() => {
     const ids = new Set<number>()
-    for (const t of tradesData?.trades ?? []) {
+    for (const t of tradesData ?? []) {
       if (t.orderID) ids.add(t.orderID)
     }
     return ids
-  }, [tradesData?.trades])
+  }, [tradesData])
 
   const allOpenOrders = openOrdersData?.orders ?? []
-  const allClosedOrders = closedOrdersData?.orders ?? []
+  const allClosedOrders = closedOrdersData ?? []
   const openOrders = allOpenOrders.filter((o) => strategyMatch(o.tag))
   const closedOrders = allClosedOrders.filter(
     (o) => strategyMatch(o.tag) || tradeOrderIds.has(o.orderID)
   )
 
   const tradeMarkers: TradeMarker[] = useMemo(
-    () => { const server = buildTradeMarkersFromServer(tradeMarkersData); return server?.length ? server : buildTradeMarkers(tradesData?.trades ?? null, closedOrders, symbol) },
-    [tradeMarkersData, tradesData?.trades, closedOrders, symbol]
+    () => buildTradeMarkers(tradesData ?? null, closedOrders, symbol),
+    [tradesData, closedOrders, symbol]
   )
 
   const orderLevels: OrderLevel[] = useMemo(
@@ -288,7 +288,7 @@ export default function BotDetailPage() {
   const startInstance = useStartInstance()
   const stopInstance = useStopInstance()
 
-  const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
+  const trades = useMemo(() => tradesData ?? [], [tradesData])
   const tradePositionTags = useMemo(() => {
     if (trades.some((t) => t.positionAction)) return null
     return computePositionTags(trades)
@@ -428,7 +428,7 @@ export default function BotDetailPage() {
         </div>
       )}
 
-      {botReachable && pnlData && pnlData.totalTrades > 0 && (
+      {pnlData && pnlData.totalTrades > 0 && (
         <div className="grid gap-4 md:grid-cols-5">
           <Card className="rounded-xl">
             <CardContent className="p-5">
@@ -510,7 +510,7 @@ export default function BotDetailPage() {
         </div>
       )}
 
-      {botReachable && pnlData && pnlData.symbols?.length > 0 && (
+      {pnlData && pnlData.symbols?.length > 0 && (
         <Card className="rounded-xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">{t('pnl.bySymbol')}</CardTitle>

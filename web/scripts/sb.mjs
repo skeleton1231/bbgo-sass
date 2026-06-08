@@ -81,8 +81,11 @@ function cmdGoTypes() {
   console.log("Generating Go types from database schema...");
   const output = run(`npx supabase gen types --lang=go --db-url "${dbURL}" --schema public`, { capture: true });
 
-  const managerOutput = output.replace("package database", "package main");
-  const bbgoOutput = output.replace("package database", "package supabasetypes");
+  // Fix: nullable pointer fields in Insert structs serialize as null, overriding DB defaults.
+  // Add omitempty so nil pointers are omitted from JSON, letting the DB handle defaults.
+  const fixPointerOmitempty = (s) => s.replace(/(\*[a-zA-Z]+\s+`json:"[^"]+")"/g, '$1,omitempty"');
+  const managerOutput = fixPointerOmitempty(output.replace("package database", "package main"));
+  const bbgoOutput = fixPointerOmitempty(output.replace("package database", "package supabasetypes"));
 
   mkdirSync(dirname(GO_TYPES_PATH), { recursive: true });
   writeFileSync(GO_TYPES_PATH, managerOutput);

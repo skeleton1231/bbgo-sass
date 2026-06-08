@@ -28,6 +28,7 @@ services:
   # To re-enable, uncomment and add back depends_on entry below
 
   manager:
+    image: bbgo-manager:latest
     build:
       context: ..
       dockerfile: saas/docker/Dockerfile.manager

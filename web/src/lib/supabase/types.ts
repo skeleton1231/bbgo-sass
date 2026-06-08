@@ -218,6 +218,344 @@ export type Database = {
           },
         ]
       }
+      paper_orders: {
+        Row: {
+          actual_order_id: number
+          client_order_id: string
+          created_at: string
+          exchange: string
+          executed_quantity: string | null
+          id: string
+          is_futures: boolean
+          is_isolated: boolean
+          is_margin: boolean
+          is_working: boolean
+          order_id: string
+          order_type: string
+          order_uuid: string
+          price: string
+          quantity: string
+          side: string
+          status: string
+          stop_price: string
+          strategy_instance_id: string
+          symbol: string
+          time_in_force: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_order_id?: number
+          client_order_id?: string
+          created_at?: string
+          exchange?: string
+          executed_quantity?: string | null
+          id?: string
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_margin?: boolean
+          is_working?: boolean
+          order_id?: string
+          order_type?: string
+          order_uuid?: string
+          price?: string
+          quantity?: string
+          side?: string
+          status?: string
+          stop_price?: string
+          strategy_instance_id?: string
+          symbol?: string
+          time_in_force?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_order_id?: number
+          client_order_id?: string
+          created_at?: string
+          exchange?: string
+          executed_quantity?: string | null
+          id?: string
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_margin?: boolean
+          is_working?: boolean
+          order_id?: string
+          order_type?: string
+          order_uuid?: string
+          price?: string
+          quantity?: string
+          side?: string
+          status?: string
+          stop_price?: string
+          strategy_instance_id?: string
+          symbol?: string
+          time_in_force?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_positions: {
+        Row: {
+          average_cost: string
+          base: string
+          base_currency: string
+          created_at: string
+          exchange: string
+          id: string
+          net_profit: string | null
+          profit: string | null
+          quote: string
+          quote_currency: string
+          side: string
+          strategy: string
+          strategy_instance_id: string
+          symbol: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Insert: {
+          average_cost?: string
+          base?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          id?: string
+          net_profit?: string | null
+          profit?: string | null
+          quote?: string
+          quote_currency?: string
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Update: {
+          average_cost?: string
+          base?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          id?: string
+          net_profit?: string | null
+          profit?: string | null
+          quote?: string
+          quote_currency?: string
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id?: number
+          traded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_positions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_profits: {
+        Row: {
+          average_cost: string
+          base_currency: string
+          created_at: string
+          exchange: string
+          fee: string
+          fee_currency: string
+          fee_in_usd: string | null
+          id: string
+          is_buyer: boolean
+          is_futures: boolean
+          is_isolated: boolean
+          is_maker: boolean
+          is_margin: boolean
+          net_profit: string
+          net_profit_margin: string
+          price: string
+          profit: string
+          profit_margin: string
+          quantity: string
+          quote_currency: string
+          quote_quantity: string
+          side: string
+          strategy: string
+          strategy_instance_id: string
+          symbol: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Insert: {
+          average_cost?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          fee?: string
+          fee_currency?: string
+          fee_in_usd?: string | null
+          id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
+          net_profit?: string
+          net_profit_margin?: string
+          price?: string
+          profit?: string
+          profit_margin?: string
+          quantity?: string
+          quote_currency?: string
+          quote_quantity?: string
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id: number
+          traded_at: string
+          user_id: string
+        }
+        Update: {
+          average_cost?: string
+          base_currency?: string
+          created_at?: string
+          exchange?: string
+          fee?: string
+          fee_currency?: string
+          fee_in_usd?: string | null
+          id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
+          net_profit?: string
+          net_profit_margin?: string
+          price?: string
+          profit?: string
+          profit_margin?: string
+          quantity?: string
+          quote_currency?: string
+          quote_quantity?: string
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id?: number
+          traded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_profits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_trades: {
+        Row: {
+          exchange: string
+          fee: string
+          fee_currency: string
+          id: string
+          is_buyer: boolean
+          is_futures: boolean
+          is_isolated: boolean
+          is_maker: boolean
+          is_margin: boolean
+          order_id: string
+          order_uuid: string
+          pnl: string | null
+          price: string
+          quantity: string
+          quote_quantity: string | null
+          side: string
+          strategy: string
+          strategy_instance_id: string
+          symbol: string
+          trade_id: string
+          traded_at: string | null
+          user_id: string
+        }
+        Insert: {
+          exchange?: string
+          fee?: string
+          fee_currency?: string
+          id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
+          order_id?: string
+          order_uuid?: string
+          pnl?: string | null
+          price?: string
+          quantity?: string
+          quote_quantity?: string | null
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id?: string
+          traded_at?: string | null
+          user_id: string
+        }
+        Update: {
+          exchange?: string
+          fee?: string
+          fee_currency?: string
+          id?: string
+          is_buyer?: boolean
+          is_futures?: boolean
+          is_isolated?: boolean
+          is_maker?: boolean
+          is_margin?: boolean
+          order_id?: string
+          order_uuid?: string
+          pnl?: string | null
+          price?: string
+          quantity?: string
+          quote_quantity?: string | null
+          side?: string
+          strategy?: string
+          strategy_instance_id?: string
+          symbol?: string
+          trade_id?: string
+          traded_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_trades_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           average_cost: string

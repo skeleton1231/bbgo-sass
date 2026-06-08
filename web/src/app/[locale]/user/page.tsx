@@ -5,14 +5,12 @@ import { useTranslations } from 'next-intl'
 import { useUserId } from '@/components/providers/user-id'
 import {
   useUserStrategies,
-  useBotTrades,
   useBotAssets,
   useBotSessions,
-  useBotTradingVolume,
-  useBotPnL,
   type BBGoTrade,
   type BBGoAsset,
 } from '@/lib/bbgo/queries'
+import { useSupabaseTrades, useSupabasePnL, useSupabaseTradingVolume } from '@/lib/bbgo/supabase-queries'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,13 +45,13 @@ export default function DashboardPage() {
   const anyActive = allInstances.some((i) => i.status === 'running')
   const strategyCount = activeInstances.length
 
-  const { data: tradesData } = useBotTrades(userId, undefined, undefined, globalMode, isActive)
+  const { data: tradesData } = useSupabaseTrades(userId, { mode: globalMode })
   const { data: assetsData } = useBotAssets(userId, globalMode, isActive)
   const { data: sessionsData } = useBotSessions(userId, globalMode, isActive)
-  const { data: volumeData } = useBotTradingVolume(userId, undefined, globalMode, isActive)
-  const { data: pnlData } = useBotPnL(userId, undefined, undefined, globalMode, isActive)
+  const { data: volumeData } = useSupabaseTradingVolume(userId, { mode: globalMode })
+  const { data: pnlData } = useSupabasePnL(userId, { mode: globalMode })
 
-  const trades = isActive ? (tradesData?.trades ?? []) : []
+  const trades = tradesData ?? []
   const assets = isActive ? (assetsData?.assets ?? {}) : {}
   const sessionCount = isActive ? (sessionsData?.sessions?.length ?? 0) : 0
 
@@ -161,7 +159,7 @@ export default function DashboardPage() {
         </ErrorBoundary>
       )}
 
-      {isActive && pnlData && pnlData.totalTrades > 0 && (
+      {pnlData && pnlData.totalTrades > 0 && (
         <ErrorBoundary>
           <Card className="rounded-xl">
             <CardHeader className="pb-2">
@@ -174,7 +172,7 @@ export default function DashboardPage() {
         </ErrorBoundary>
       )}
 
-      {isActive && pnlData && pnlData.totalTrades > 0 && (
+      {pnlData && pnlData.totalTrades > 0 && (
         <ErrorBoundary>
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="rounded-xl">
