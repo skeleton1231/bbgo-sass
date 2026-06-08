@@ -207,7 +207,19 @@
       "openPosition": "포지션: {amount} @ ~{price}",
       "openPositionNoPrice": "포지션: {amount}",
       "avgBuy": "평균 매수 {price}",
-      "winLossFormat": "{wins}승 / {losses}패"
+      "winLossFormat": "{wins}승 / {losses}패",
+      "netProfit": "순이익",
+      "grossProfit": "총이익",
+      "grossLoss": "총손실",
+      "profitFactor": "프피팩터",
+      "avgCost": "평균단가",
+      "currentPosition": "현재 포지션",
+      "positionLong": "롱 {qty} @ {price}",
+      "positionShort": "숏 {qty} @ {price}",
+      "positionClosed": "포지션 없음",
+      "noData": "손익 데이터 없음",
+      "closeHistory": "청산 기록",
+      "profitMargin": "마진"
     },
     "crossExchange": "크로스 거래소",
     "live": {

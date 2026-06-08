@@ -152,6 +152,9 @@ func TestUserDataToJSON_AllFields(t *testing.T) {
 	if orders[0]["symbol"] != "BTCUSDT" {
 		t.Errorf("expected BTCUSDT, got %v", orders[0]["symbol"])
 	}
+		if orders[0]["orderType"] != "MARKET" {
+			t.Errorf("expected MARKET (zero value), got %v", orders[0]["orderType"])
+		}
 
 	trades, ok := result["trades"].([]map[string]any)
 	if !ok || len(trades) != 1 {

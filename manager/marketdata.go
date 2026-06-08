@@ -398,6 +398,7 @@ func userDataToJSON(ud *pb.UserData) map[string]any {
 				"id":               o.Id,
 				"symbol":           o.Symbol,
 				"side":             o.Side.String(),
+				"orderType":        o.OrderType.String(),
 				"price":            o.Price,
 				"quantity":         o.Quantity,
 				"executedQuantity": o.ExecutedQuantity,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -22,8 +22,13 @@ import {
 import {
   useSupabaseTrades,
   useSupabaseClosedOrders,
+  useSupabasePnLFromProfits,
+  useSupabaseLatestPosition,
+  useUnrealizedPnL,
+  useSupabaseProfits,
   useSupabasePnL,
 } from '@/lib/bbgo/supabase-queries'
+import { useRealtimeTable } from '@/lib/supabase/use-realtime'
 import { useUserId } from '@/components/providers/user-id'
 import { OrderRow } from '@/components/user/OrderRow'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
@@ -57,12 +62,22 @@ import {
   Activity,
   AlertCircle,
   WifiOff,
+  Target,
+  Crosshair,
 } from 'lucide-react'
 
 const DepthChart = dynamic(
   () => import('@/components/chart/DepthChart').then((m) => ({ default: m.DepthChart })),
   { ssr: false, loading: () => <div className="h-[300px] animate-pulse rounded-lg bg-muted" /> }
 )
+
+function pnlColor(v: number) {
+  return v > 0 ? 'text-trade-up' : v < 0 ? 'text-trade-down' : ''
+}
+
+function pnlSign(v: number) {
+  return v >= 0 ? '+' : ''
+}
 
 export default function BotDetailPage() {
   const t = useTranslations('Bots')
@@ -94,6 +109,8 @@ export default function BotDetailPage() {
     )
   }, [])
   const [depthData, setDepthData] = useState<{ bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }>({ bids: [], asks: [] })
+  const [wsBalances, setWsBalances] = useState<Record<string, BBGoBalance> | null>(null)
+  const [wsOpenOrders, setWsOpenOrders] = useState<BBGoOrder[] | null>(null)
 
   const { data: sessionsData } = useBotSessions(userId, mode, isRunning)
   const sessions = sessionsData?.sessions ?? []
@@ -107,9 +124,24 @@ export default function BotDetailPage() {
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
   const { data: pingData } = useBotPing(userId, mode, isRunning)
   const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
-  const { data: pnlData } = useSupabasePnL(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+
+  // Supabase Realtime: invalidate queries on INSERT instead of polling
+  const rtOpts = useMemo(() => ({ mode, enabled: isRunning }), [mode, isRunning])
+  useRealtimeTable('trades', userId, [['supabase-trades', userId]], rtOpts)
+  useRealtimeTable('orders', userId, [['supabase-closed-orders', userId]], rtOpts)
+  useRealtimeTable('positions', userId, [['supabase-positions', userId], ['supabase-latest-position', userId]], rtOpts)
+  useRealtimeTable('profits', userId, [['supabase-profits', userId], ['supabase-pnl-profits', userId]], rtOpts)
+
+  // Primary PnL from profits table (bbgo average-cost method)
+  const { data: pnlAgg } = useSupabasePnLFromProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  // Fallback PnL from trades (FIFO) when profits table is empty
+  const { data: pnlFallback } = useSupabasePnL(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
+  const activeExchangeRef = useRef(activeExchange)
+  activeExchangeRef.current = activeExchange
+  const exchangeRef = useRef(exchange)
+  exchangeRef.current = exchange
 
   const { candles, isLoading: klinesLoading, loadEarlierKlines } = useKlineData({
     userId,
@@ -120,12 +152,22 @@ export default function BotDetailPage() {
     enabled: !!exchange && !!symbol,
   })
 
+  const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
+
+  const { data: latestPosition } = useSupabaseLatestPosition(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  const { data: unrealized } = useUnrealizedPnL(userId, currentPrice, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  const { data: profitRows } = useSupabaseProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode, limit: 200 })
+
+  // Use profits-based PnL when available, fall back to FIFO
+  const hasProfitsData = (pnlAgg?.totalTrades ?? 0) > 0
+  const pnl = hasProfitsData ? pnlAgg : null
+  const pnlLegacy = !hasProfitsData ? pnlFallback : null
+
   const strategyMatch = useCallback(
     (tag: string | undefined) => !!bot && (tag === bot.strategy || tag === bot.id),
     [bot?.strategy, bot?.id]
   )
 
-  // OrderIDs from strategy-filtered trades → used to cross-reference closed orders
   const tradeOrderIds = useMemo(() => {
     const ids = new Set<number>()
     for (const t of tradesData ?? []) {
@@ -134,7 +176,7 @@ export default function BotDetailPage() {
     return ids
   }, [tradesData])
 
-  const allOpenOrders = openOrdersData?.orders ?? []
+  const allOpenOrders = wsOpenOrders ?? openOrdersData?.orders ?? []
   const allClosedOrders = closedOrdersData ?? []
   const openOrders = allOpenOrders.filter((o) => strategyMatch(o.tag))
   const closedOrders = allClosedOrders.filter(
@@ -151,18 +193,13 @@ export default function BotDetailPage() {
     [openOrders, symbol]
   )
 
-  const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
-
   const findMatchingStrategy = useCallback((strategies: Record<string, unknown>[]) => {
     if (!strategies.length) return undefined
-    // If only one strategy, use it
     if (strategies.length === 1) return strategies[0]
-    // Match by strategy type first
     if (bot?.strategy) {
       const matched = strategies.find((s) => s.strategy === bot.strategy)
       if (matched) return matched
     }
-    // Match by bot config (lowerPrice/upperPrice) to disambiguate multiple same-type strategies
     const botLower = bot?.config?.lowerPrice as number | undefined
     const botUpper = bot?.config?.upperPrice as number | undefined
     if (botLower != null && botUpper != null) {
@@ -173,7 +210,6 @@ export default function BotDetailPage() {
       })
       if (matched) return matched
     }
-    // Fallback: first strategy matching symbol
     return strategies.find((s) => {
       const strategy = s.strategy as string
       const inner = s[strategy] as Record<string, unknown> | undefined
@@ -231,13 +267,14 @@ export default function BotDetailPage() {
   }, [candles, indicators])
 
   const pnlLine = useMemo(() => {
-    if (!pnlData?.pnlCurve || pnlData.pnlCurve.length < 2) return null
+    const curve = pnl?.pnlCurve ?? pnlLegacy?.pnlCurve
+    if (!curve || curve.length < 2) return null
     return {
       id: 'pnl-curve', name: t('pnl.realized'), color: '#a855f7', lineWidth: 2,
       priceScaleId: 'pnl', scaleMargins: { top: 0.75, bottom: 0 },
-      data: pnlData.pnlCurve.map((p) => ({ time: p.time as import('lightweight-charts').Time, value: p.value })),
+      data: curve.map((p) => ({ time: p.time as import('lightweight-charts').Time, value: p.value })),
     }
-  }, [pnlData?.pnlCurve, t])
+  }, [pnl?.pnlCurve, pnlLegacy?.pnlCurve, t])
 
   const strategyStats = useMemo(() => {
     if (!strategyStatesData?.strategies) return null
@@ -246,36 +283,61 @@ export default function BotDetailPage() {
     const stats = extractStrategyStats(matching as Record<string, unknown>)
     if (!stats) return null
 
-    // Fallback: when bbgo strategy state reports zero position but trades show otherwise,
-    // use the trade-computed position from PnL data
-    if (stats.base === 0 && pnlData?.symbols) {
-      const symPnl = pnlData.symbols.find((s) => s.symbol === symbol)
-      if (symPnl && symPnl.openPosition > 0) {
-        return {
-          ...stats,
-          base: symPnl.openPosition,
-          quote: symPnl.openPositionCost,
-          averageCost: symPnl.openPositionCost / symPnl.openPosition,
-        }
+    // Fallback to positions table when bbgo strategy state reports zero but position exists
+    if (stats.base === 0 && latestPosition && !latestPosition.isClosed) {
+      return {
+        ...stats,
+        base: latestPosition.base,
+        quote: latestPosition.quote,
+        averageCost: latestPosition.averageCost,
       }
     }
     return stats
-  }, [strategyStatesData, findMatchingStrategy, pnlData?.symbols, symbol])
+  }, [strategyStatesData, findMatchingStrategy, latestPosition])
 
   interface DepthMessage {
     type: string
     data: {
       channel?: string
       depth?: { bids: Array<{ price: string; volume: string }>; asks: Array<{ price: string; volume: string }> }
+      balances?: Array<{ currency: string; available: string; locked: string }>
+      orders?: Array<{ id: string; symbol: string; side: string; orderType?: string; price: string; quantity: string; executedQuantity: string; status: string }>
     }
   }
 
   const handleWSMessage = useCallback((msg: DepthMessage) => {
-    if (msg.type !== 'market' || !msg.data.depth) return
-    setDepthData({
-      bids: msg.data.depth.bids.slice(0, 20).map((b) => ({ price: parseFloat(b.price), volume: parseFloat(b.volume) })),
-      asks: msg.data.depth.asks.slice(0, 20).map((a) => ({ price: parseFloat(a.price), volume: parseFloat(a.volume) })),
-    })
+    if (msg.type === 'market' && msg.data.depth) {
+      setDepthData({
+        bids: msg.data.depth.bids.slice(0, 20).map((b) => ({ price: parseFloat(b.price), volume: parseFloat(b.volume) })),
+        asks: msg.data.depth.asks.slice(0, 20).map((a) => ({ price: parseFloat(a.price), volume: parseFloat(a.volume) })),
+      })
+    }
+    // Manager WebSocket userData: balance and order updates from bbgo container
+    if (msg.type === 'userData') {
+      if (msg.data.channel === 'BALANCE' && msg.data.balances) {
+        const record: Record<string, BBGoBalance> = {}
+        for (const b of msg.data.balances) {
+          record[b.currency] = { currency: b.currency, available: b.available, locked: b.locked }
+        }
+        setWsBalances(record)
+      }
+      if (msg.data.channel === 'ORDER' && msg.data.orders) {
+        setWsOpenOrders(msg.data.orders.map((o) => ({
+          gid: 0,
+          orderID: parseInt(o.id) || 0,
+          exchange: activeExchangeRef.current || exchangeRef.current,
+          symbol: o.symbol,
+          side: o.side as 'BUY' | 'SELL',
+          orderType: (o.orderType as BBGoOrder['orderType']) || 'LIMIT',
+          price: o.price,
+          quantity: o.quantity,
+          executedQuantity: o.executedQuantity,
+          status: o.status,
+          clientOrderID: '',
+          isWorking: o.status === 'NEW',
+        })))
+      }
+    }
   }, [])
 
   const { connected: wsConnected } = useMarketData({
@@ -293,6 +355,16 @@ export default function BotDetailPage() {
     if (trades.some((t) => t.positionAction)) return null
     return computePositionTags(trades)
   }, [trades])
+
+  // Derived PnL values for display
+  const netProfit = pnl?.totalNetProfit ?? pnlLegacy?.totalRealizedPnl ?? 0
+  const unrealizedPnl = unrealized?.unrealizedPnl ?? pnlLegacy?.totalUnrealizedPnl ?? 0
+  const totalFees = pnl?.totalFees ?? pnlLegacy?.totalFees ?? 0
+  const winRate = pnl?.winRate ?? pnlLegacy?.winRate ?? 0
+  const profitFactor = pnl?.profitFactor ?? 0
+  const totalTrades = pnl?.totalTrades ?? pnlLegacy?.totalTrades ?? 0
+  const winningTrades = pnl?.profitCount ?? pnlLegacy?.winningTrades ?? 0
+  const losingTrades = pnl?.lossCount ?? pnlLegacy?.losingTrades ?? 0
 
   if (botLoading || !userId) {
     return (
@@ -318,7 +390,7 @@ export default function BotDetailPage() {
 
   const status = bot.container_status
   const botReachable = isRunning && pingData?.status === 'ok'
-  const balances = balancesData?.balances ?? {}
+  const balances = wsBalances ?? balancesData?.balances ?? {}
   const liveStrategies = strategyStatesData?.strategies ?? []
   const nonZeroBalances = Object.entries(balances).filter(
     ([, b]) => parseFloat(b.available) > 0 || parseFloat(b.locked) > 0
@@ -428,26 +500,24 @@ export default function BotDetailPage() {
         </div>
       )}
 
-      {pnlData && pnlData.totalTrades > 0 && (
-        <div className="grid gap-4 md:grid-cols-5">
+      {/* PnL Summary Cards — from profits table (bbgo average-cost) */}
+      {(totalTrades > 0 || unrealizedPnl !== 0) && (
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <Card className="rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
-                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.realized')}</p>
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.netProfit')}</p>
                 <div className={cn(
                   'flex h-7 w-7 items-center justify-center rounded-full',
-                  pnlData.totalRealizedPnl >= 0 ? 'bg-trade-up' : 'bg-trade-down'
+                  netProfit >= 0 ? 'bg-trade-up/10' : 'bg-trade-down/10'
                 )}>
-                  {pnlData.totalRealizedPnl >= 0
+                  {netProfit >= 0
                     ? <TrendingUp className="h-3.5 w-3.5 text-trade-up" />
                     : <TrendingDown className="h-3.5 w-3.5 text-trade-down" />}
                 </div>
               </div>
-              <p className={cn(
-                'mt-2 text-xl font-semibold font-mono',
-                pnlData.totalRealizedPnl > 0 ? 'text-trade-up' : pnlData.totalRealizedPnl < 0 ? 'text-trade-down' : ''
-              )}>
-                {pnlData.totalRealizedPnl >= 0 ? '+' : ''}{pnlData.totalRealizedPnl.toFixed(4)} USDT
+              <p className={cn('mt-2 text-lg font-semibold font-mono', pnlColor(netProfit))}>
+                {pnlSign(netProfit)}{netProfit.toFixed(4)}
               </p>
             </CardContent>
           </Card>
@@ -458,93 +528,91 @@ export default function BotDetailPage() {
                 <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.unrealized')}</p>
                 <div className={cn(
                   'flex h-7 w-7 items-center justify-center rounded-full',
-                  pnlData.totalUnrealizedPnl >= 0 ? 'bg-trade-up' : 'bg-trade-down'
+                  unrealizedPnl >= 0 ? 'bg-trade-up/10' : 'bg-trade-down/10'
                 )}>
-                  {pnlData.totalUnrealizedPnl >= 0
-                    ? <TrendingUp className="h-3.5 w-3.5 text-trade-up" />
-                    : <TrendingDown className="h-3.5 w-3.5 text-trade-down" />}
+                  <Crosshair className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
               </div>
-              <p className={cn(
-                'mt-2 text-xl font-semibold font-mono',
-                pnlData.totalUnrealizedPnl > 0 ? 'text-trade-up' : pnlData.totalUnrealizedPnl < 0 ? 'text-trade-down' : ''
-              )}>
-                {pnlData.totalUnrealizedPnl >= 0 ? '+' : ''}{pnlData.totalUnrealizedPnl.toFixed(4)} USDT
+              <p className={cn('mt-2 text-lg font-semibold font-mono', pnlColor(unrealizedPnl))}>
+                {pnlSign(unrealizedPnl)}{unrealizedPnl.toFixed(4)}
               </p>
             </CardContent>
           </Card>
+
           <Card className="rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.totalFees')}</p>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="mt-2 text-xl font-semibold font-mono text-muted-foreground">
-                -{pnlData.totalFees.toFixed(4)} USDT
+              <p className="mt-2 text-lg font-semibold font-mono text-muted-foreground">
+                -{totalFees.toFixed(4)}
               </p>
             </CardContent>
           </Card>
+
           <Card className="rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.winRate')}</p>
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="mt-2 text-xl font-semibold font-mono">
-                {pnlData.winRate.toFixed(1)}%
+              <p className="mt-2 text-lg font-semibold font-mono">
+                {winRate.toFixed(1)}%
                 <span className="ml-2 text-xs text-muted-foreground font-normal">
-                  ({t('pnl.winLossFormat', { wins: pnlData.winningTrades, losses: pnlData.losingTrades })})
+                  ({t('pnl.winLossFormat', { wins: winningTrades, losses: losingTrades })})
                 </span>
               </p>
             </CardContent>
           </Card>
+
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.profitFactor')}</p>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className={cn('mt-2 text-lg font-semibold font-mono', pnlColor(profitFactor - 1))}>
+                {profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card className="rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-medium text-muted-foreground">{t('pnl.totalTrades')}</p>
                 <Activity className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="mt-2 text-xl font-semibold font-mono">{pnlData.totalTrades}</p>
+              <p className="mt-2 text-lg font-semibold font-mono">{totalTrades}</p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {pnlData && pnlData.symbols?.length > 0 && (
+      {/* Current Position — from positions table */}
+      {latestPosition && !latestPosition.isClosed && (
         <Card className="rounded-xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">{t('pnl.bySymbol')}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('pnl.currentPosition')}</CardTitle>
           </CardHeader>
-          <div className="divide-y">
-            {pnlData.symbols.map((s) => (
-              <div key={s.symbol} className="flex items-center justify-between px-6 py-3 text-sm">
-                <div className="flex items-center gap-3 min-w-[140px]">
-                  <span className="font-medium">{s.symbol}</span>
-                  <span className="text-xs text-muted-foreground">{t('pnl.tradeCount', { count: s.tradeCount })}</span>
-                </div>
-                <div className="flex items-center gap-6">
-                  {s.openPosition > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {t('pnl.openPositionNoPrice', { amount: s.openPosition.toFixed(6) })}
-                    </span>
-                  )}
-                  {s.unrealizedPnl !== 0 && (
-                    <span className={cn(
-                      'text-xs font-mono',
-                      s.unrealizedPnl > 0 ? 'text-trade-up' : 'text-trade-down'
-                    )}>
-                      {t('pnl.unrealized')}: {s.unrealizedPnl >= 0 ? '+' : ''}{s.unrealizedPnl.toFixed(4)}
-                    </span>
-                  )}
-                  <span className={cn(
-                    'font-medium w-32 text-right font-mono',
-                    s.realizedPnl > 0 ? 'text-trade-up' : s.realizedPnl < 0 ? 'text-trade-down' : ''
-                  )}>
-                    {s.realizedPnl >= 0 ? '+' : ''}{s.realizedPnl.toFixed(4)}
-                  </span>
-                </div>
+          <div className="px-6 pb-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+            <div>
+              <span className="text-muted-foreground">{t('pnl.avgCost')}: </span>
+              <span className="font-mono font-medium">{latestPosition.averageCost.toFixed(4)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">{latestPosition.isLong ? t('pnl.positionLong', { qty: Math.abs(latestPosition.base).toFixed(6), price: latestPosition.averageCost.toFixed(4) }) : latestPosition.isShort ? t('pnl.positionShort', { qty: Math.abs(latestPosition.base).toFixed(6), price: latestPosition.averageCost.toFixed(4) }) : t('pnl.positionClosed')}</span>
+            </div>
+            {unrealized && (unrealized.unrealizedPnl !== 0 || unrealized.unrealizedPnlPct !== 0) && (
+              <div>
+                <span className="text-muted-foreground">{t('pnl.unrealized')}: </span>
+                <span className={cn('font-mono font-medium', pnlColor(unrealized.unrealizedPnl))}>
+                  {pnlSign(unrealized.unrealizedPnl)}{unrealized.unrealizedPnl.toFixed(4)}
+                  <span className="ml-1 text-xs">({pnlSign(unrealized.unrealizedPnlPct)}{unrealized.unrealizedPnlPct.toFixed(2)}%)</span>
+                </span>
               </div>
-            ))}
+            )}
           </div>
         </Card>
       )}
@@ -557,6 +625,9 @@ export default function BotDetailPage() {
           <TabsTrigger value="open-orders" className="rounded-md text-xs">{t('openOrders')} ({openOrders.length})</TabsTrigger>
           <TabsTrigger value="closed-orders" className="rounded-md text-xs">{t('closedOrders')} ({closedOrders.length})</TabsTrigger>
           <TabsTrigger value="trades" className="rounded-md text-xs">{t('recentTrades')}</TabsTrigger>
+          {(profitRows?.length ?? 0) > 0 && (
+            <TabsTrigger value="close-history" className="rounded-md text-xs">{t('pnl.closeHistory')}</TabsTrigger>
+          )}
           <TabsTrigger value="strategies" className="rounded-md text-xs">{t('strategies')}</TabsTrigger>
           {isRunning && <TabsTrigger value="logs" className="rounded-md text-xs">{t('containerLogs')}</TabsTrigger>}
         </TabsList>
@@ -576,7 +647,7 @@ export default function BotDetailPage() {
             loadEarlierKlines={loadEarlierKlines}
             strategyStats={strategyStats}
             currentPrice={currentPrice}
-            unrealizedPnlFromReport={pnlData?.totalUnrealizedPnl}
+            unrealizedPnlFromReport={unrealizedPnl}
             noSymbolText={t('noSymbolForChart')}
             startToSeeDataText={t('startToSeeData')}
             klineInterval={klineInterval}
@@ -714,6 +785,55 @@ export default function BotDetailPage() {
             ) : (
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 {isRunning ? t('noTrades') : t('startToSeeData')}
+              </CardContent>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Close History — from profits table (bbgo pre-computed) */}
+        <TabsContent value="close-history">
+          <Card className="rounded-xl">
+            {(profitRows?.length ?? 0) > 0 ? (
+              <ScrollArea className="max-h-[400px]">
+                <div className="divide-y">
+                  {profitRows!.map((row) => {
+                    const profit = parseFloat(row.profit ?? '0')
+                    const netProfitVal = parseFloat(row.net_profit ?? '0')
+                    const profitMargin = parseFloat(row.profit_margin ?? '0')
+                    return (
+                      <div key={row.id} className="flex items-center justify-between px-6 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={cn(
+                            'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
+                            netProfitVal >= 0 ? 'bg-trade-up/10 text-trade-up' : 'bg-trade-down/10 text-trade-down'
+                          )}>
+                            {netProfitVal >= 0 ? 'W' : 'L'}
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{row.symbol}</span>
+                              <span className="text-xs text-muted-foreground">{row.strategy}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground tabular-nums">{row.traded_at ? new Date(row.traded_at).toLocaleString() : ''}</span>
+                          </div>
+                        </div>
+                        <div className="text-right space-y-0.5 shrink-0">
+                          <p className={cn('text-sm font-mono font-medium', pnlColor(netProfitVal))}>
+                            {pnlSign(netProfitVal)}{netProfitVal.toFixed(4)}
+                          </p>
+                          <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
+                            <span>{t('pnl.profitMargin')}: {profitMargin.toFixed(2)}%</span>
+                            <span>{t('pnl.realized')}: {pnlSign(profit)}{profit.toFixed(4)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            ) : (
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {t('pnl.noData')}
               </CardContent>
             )}
           </Card>

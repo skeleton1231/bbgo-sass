@@ -207,7 +207,19 @@
       "openPosition": "ポジ: {amount} @ ~{price}",
       "openPositionNoPrice": "ポジ: {amount}",
       "avgBuy": "平均買い {price}",
-      "winLossFormat": "{wins}勝 / {losses}負"
+      "winLossFormat": "{wins}勝 / {losses}負",
+      "netProfit": "純利益",
+      "grossProfit": "総利益",
+      "grossLoss": "総損失",
+      "profitFactor": "プロフィットファクター",
+      "avgCost": "平均建値",
+      "currentPosition": "現在のポジション",
+      "positionLong": "ロング {qty} @ {price}",
+      "positionShort": "ショート {qty} @ {price}",
+      "positionClosed": "ポジションなし",
+      "noData": "損益データなし",
+      "closeHistory": "決済履歴",
+      "profitMargin": "マージン"
     },
     "crossExchange": "クロス取引所",
     "live": {

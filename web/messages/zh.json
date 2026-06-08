@@ -208,7 +208,19 @@
       "openPosition": "持仓: {amount} @ ~{price}",
       "openPositionNoPrice": "持仓: {amount}",
       "avgBuy": "均价 {price}",
-      "winLossFormat": "{wins}胜 / {losses}负"
+      "winLossFormat": "{wins}胜 / {losses}负",
+      "netProfit": "净利润",
+      "grossProfit": "毛利润",
+      "grossLoss": "毛亏损",
+      "profitFactor": "盈亏比",
+      "avgCost": "持仓均价",
+      "currentPosition": "当前持仓",
+      "positionLong": "做多 {qty} @ {price}",
+      "positionShort": "做空 {qty} @ {price}",
+      "positionClosed": "无持仓",
+      "noData": "暂无盈亏数据",
+      "closeHistory": "平仓记录",
+      "profitMargin": "利润率"
     },
     "crossExchange": "跨交易所",
     "live": {

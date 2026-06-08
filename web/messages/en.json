@@ -170,7 +170,19 @@
       "openPosition": "pos: {amount} @ ~{price}",
       "openPositionNoPrice": "pos: {amount}",
       "avgBuy": "avg buy {price}",
-      "winLossFormat": "{wins}W / {losses}L"
+      "winLossFormat": "{wins}W / {losses}L",
+      "netProfit": "Net Profit",
+      "grossProfit": "Gross Profit",
+      "grossLoss": "Gross Loss",
+      "profitFactor": "Profit Factor",
+      "avgCost": "Avg Cost",
+      "currentPosition": "Current Position",
+      "positionLong": "Long {qty} @ {price}",
+      "positionShort": "Short {qty} @ {price}",
+      "positionClosed": "No open position",
+      "noData": "No P&L data yet",
+      "closeHistory": "Close History",
+      "profitMargin": "Margin"
     },
     "crossExchange": "cross-exchange",
     "live": {

@@ -15,7 +15,6 @@ const validatedKey: string = SUPABASE_ANON_KEY
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 
 const secureCookieOptions = {
-  httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
   maxAge: COOKIE_MAX_AGE,
@@ -86,6 +85,10 @@ export async function updateSession(request: NextRequest, response: NextResponse
   try {
     const { data } = await supabase.auth.getUser()
     user = data?.user ?? null
+    // Force session refresh to rewrite cookies without httpOnly flag
+    if (user) {
+      await supabase.auth.refreshSession()
+    }
   } catch {
     // Network/auth service error — don't kick user out, just continue
     return reply
