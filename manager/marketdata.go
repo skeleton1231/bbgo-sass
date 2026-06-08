@@ -32,7 +32,7 @@ type MarketDataHub struct {
 }
 
 func NewMarketDataHub(addr string, subs []MarketSub) (*MarketDataHub, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := defaultDial(addr)
 	if err != nil {
 		return nil, fmt.Errorf("dial marketdata %s: %w", addr, err)
 	}
@@ -52,7 +52,9 @@ func NewMarketDataHub(addr string, subs []MarketSub) (*MarketDataHub, error) {
 }
 
 func defaultDial(addr string) (*grpc.ClientConn, error) {
-	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 }
 
 func (h *MarketDataHub) getOrDial(addr string) (*grpc.ClientConn, error) {
