@@ -177,19 +177,15 @@ func (cm *ContainerManager) instanceEnvArgs(inst *StrategyInstance) []string {
 
 	args = append(args, "-e", "BBGO_STRATEGY_INSTANCE_ID="+inst.InstanceID)
 
+	args = append(args,
+		"-e", "DB_DRIVER=supabase",
+		"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
+		"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
+		"-e", "BBGO_USER_ID="+inst.UserID,
+	)
+
 	if inst.Mode == ModePaper {
-		containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
-		args = append(args,
-			"-e", "DB_DRIVER=sqlite3",
-			"-e", "DB_DSN="+containerDir+"/bbgo.db",
-		)
-	} else {
-		args = append(args,
-			"-e", "DB_DRIVER=supabase",
-			"-e", "SUPABASE_URL="+cm.cfg.SupabaseURL,
-			"-e", "SUPABASE_SERVICE_KEY="+cm.cfg.SupabaseKey,
-			"-e", "BBGO_USER_ID="+inst.UserID,
-		)
+		args = append(args, "-e", "SUPABASE_TABLE_PREFIX=paper_")
 	}
 	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
 
@@ -271,6 +267,32 @@ func (cm *ContainerManager) FindRunningInstance(userID string) (*StrategyInstanc
 
 // --- Backtest ---
 
+func (cm *ContainerManager) backtestDir(userID, jobID string) string {
+	return filepath.Join(cm.cfg.DataDir, "backtest", userID, jobID)
+}
+
+func backtestContainerDir(userID, jobID string) string {
+	return fmt.Sprintf("/data/backtest/%s/%s", userID, jobID)
+}
+
+func (cm *ContainerManager) backtestResourceArgs() []string {
+	r := cm.cfg.BacktestResources
+	var args []string
+	if r.Memory != "" {
+		args = append(args, "--memory", r.Memory)
+	}
+	if r.MemorySwap != "" {
+		args = append(args, "--memory-swap", r.MemorySwap)
+	}
+	if r.CPUs != "" {
+		args = append(args, "--cpus", r.CPUs)
+	}
+	if r.PidsLimit > 0 {
+		args = append(args, "--pids-limit", fmt.Sprintf("%d", r.PidsLimit))
+	}
+	return args
+}
+
 func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent []byte) ([]byte, error) {
 	if cm.runBacktestFn != nil {
 		return cm.runBacktestFn(userID, jobID, yamlContent)
@@ -280,42 +302,40 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 		return nil, fmt.Errorf("invalid job ID: %s", jobID)
 	}
 
-	inst, err := cm.FindRunningInstance(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	hostBacktestDir := filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
-	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
+	hostDir := cm.backtestDir(userID, jobID)
+	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
 
-	configPath := filepath.Join(hostBacktestDir, "bbgo.yaml")
+	configPath := filepath.Join(hostDir, "bbgo.yaml")
 	if err := os.WriteFile(configPath, yamlContent, 0o644); err != nil {
 		return nil, fmt.Errorf("write backtest config: %w", err)
 	}
 
-	containerName := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
-	containerBacktestDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID) + "/backtest/" + jobID
-	containerConfigPath := containerBacktestDir + "/bbgo.yaml"
-	containerDbPath := containerBacktestDir + "/bbgo.db"
+	cDir := backtestContainerDir(userID, jobID)
 	args := []string{
-		"exec",
+		"run", "--rm",
+		"--name", "bt-" + jobID,
+		"--network", cm.cfg.DockerNetwork,
+		"-v", cm.cfg.DataVolume + ":/data",
+	}
+	args = append(args, cm.backtestResourceArgs()...)
+	args = append(args,
 		"-e", "DB_DRIVER=sqlite3",
-		"-e", "DB_DSN=" + containerDbPath,
+		"-e", "DB_DSN="+cDir+"/bbgo.db",
 		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
 		"-e", "BINANCE_TESTNET=0",
 		"-e", "PAPER_TRADE=0",
-	}
+	)
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
 	args = append(args,
-		containerName,
+		cm.cfg.BBGOImage,
 		"bbgo", "backtest",
 		"--sync",
-		"--config", containerConfigPath,
-		"--output", containerBacktestDir,
+		"--config", cDir+"/bbgo.yaml",
+		"--output", cDir,
 	)
 
 	out, err := cm.dockerLong(args...)
@@ -329,29 +349,18 @@ func (cm *ContainerManager) CleanupBacktest(userID, jobID string) {
 	if cm == nil {
 		return
 	}
-	inst, err := cm.FindRunningInstance(userID)
-	if err != nil {
-		return
-	}
-	dir := filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
+	dir := cm.backtestDir(userID, jobID)
 	if err := os.RemoveAll(dir); err != nil {
 		log.Printf("cleanup backtest %s for user %s: %v", jobID, userID, err)
 	}
 }
 
 func (cm *ContainerManager) BacktestReportDir(userID, jobID string) string {
-	inst, err := cm.FindRunningInstance(userID)
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
+	return cm.backtestDir(userID, jobID)
 }
 
 func (cm *ContainerManager) ReadBacktestReport(userID, jobID string) (json.RawMessage, []byte, error) {
 	reportDir := cm.BacktestReportDir(userID, jobID)
-	if reportDir == "" {
-		return nil, nil, fmt.Errorf("cannot resolve report dir for %s", jobID)
-	}
 
 	summaryPath := filepath.Join(reportDir, "summary.json")
 	summaryData, err := os.ReadFile(summaryPath)
@@ -373,33 +382,36 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return cm.syncBacktestFn(userID, exchange, symbol, startTime, endTime)
 	}
 
-	inst, err := cm.FindRunningInstance(userID)
-	if err != nil {
-		return "", err
-	}
-
 	yamlBytes, err := buildSyncConfig(exchange, symbol, startTime, endTime)
 	if err != nil {
 		return "", err
 	}
 
-	hostBacktestDir := filepath.Join(cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest")
-	if err := os.MkdirAll(hostBacktestDir, 0o755); err != nil {
+	syncID := "sync-" + exchange
+	hostDir := cm.backtestDir(userID, syncID)
+	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir: %w", err)
 	}
-	configPath := filepath.Join(hostBacktestDir, "sync.yaml")
+	configPath := filepath.Join(hostDir, "sync.yaml")
 	if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
 		return "", fmt.Errorf("write config: %w", err)
 	}
 
-	containerName := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
-	containerConfigPath := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID) + "/backtest/sync.yaml"
+	cDir := backtestContainerDir(userID, syncID)
 	args := []string{
-		"exec",
+		"run", "--rm",
+		"--name", "bt-" + syncID,
+		"--network", cm.cfg.DockerNetwork,
+		"-v", cm.cfg.DataVolume + ":/data",
+	}
+	args = append(args, cm.backtestResourceArgs()...)
+	args = append(args,
 		"-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db",
 		"-e", "BINANCE_TESTNET=0",
 		"-e", "PAPER_TRADE=0",
-	}
+		"-e", "DB_DRIVER=sqlite3",
+		"-e", "DB_DSN=/data/backtest-shared/sync.db",
+	)
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
@@ -410,12 +422,12 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 	}
 
 	args = append(args,
-		containerName,
+		cm.cfg.BBGOImage,
 		"bbgo", "backtest",
 		"--sync",
 		"--sync-only",
 		"--sync-from", syncFrom,
-		"--config", containerConfigPath,
+		"--config", cDir+"/sync.yaml",
 	)
 
 	out, err := cm.dockerLong(args...)

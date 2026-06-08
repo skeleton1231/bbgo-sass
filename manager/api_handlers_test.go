@@ -15,7 +15,7 @@ import (
 func setupHandlerAPI(t *testing.T) (*API, *chi.Mux) {
 	t.Helper()
 	store, dir := newTestStore(t)
-	cfg := &Config{ManagerToken: "test-token", DataDir: dir}
+	cfg := &Config{ManagerToken: "test-token", DataDir: dir, DockerNetwork: "bbgo-net", DataVolume: "bbgo-data", BBGOImage: "bbgo-base:latest"}
 	cm := NewContainerManager(cfg, nil, nil, store)
 	cm.checkRunningFn = func(name string) (bool, error) { return true, nil }
 	cm.dockerFn = func(args ...string) (string, error) { return "", nil }

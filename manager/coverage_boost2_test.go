@@ -46,39 +46,20 @@ func TestFlexString_UnmarshalJSON_Error(t *testing.T) {
 
 // --- container.go: RunBacktest non-hook path ---
 
-func TestRunBacktest_NoHook_NilStore(t *testing.T) {
-	cm := &ContainerManager{cfg: &Config{}, store: nil}
+func TestRunBacktest_NoHook_NoDocker(t *testing.T) {
+	dir := t.TempDir()
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, store: nil}
 	_, err := cm.RunBacktest("u1", "bt-1", []byte("yaml"))
 	if err == nil {
-		t.Fatal("expected error with nil store")
+		t.Fatal("expected error without docker")
 	}
 }
 
-func TestRunBacktest_NoHook_NoRunningInstance(t *testing.T) {
+func TestRunBacktest_NoHook_Success(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	cm := &ContainerManager{cfg: &Config{}, store: store}
-	_, err := cm.RunBacktest("u1", "bt-1", []byte("yaml"))
-	if err == nil {
-		t.Fatal("expected error with no running instance")
-	}
-}
-
-func TestRunBacktest_NoHook_WithRunningInstance(t *testing.T) {
-	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	if err := store.CreateInstance(inst, func(string) bool { return true }); err != nil {
-		t.Fatalf("create instance: %v", err)
-	}
-
 	cm := &ContainerManager{
-		cfg:   &Config{},
-		store: store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
+		cfg:   &Config{DataDir: dir, DockerNetwork: "bbgo-net", DataVolume: "bbgo-data", BBGOImage: "bbgo-base:latest"},
+		store: nil,
 		dockerFn: func(args ...string) (string, error) {
 			return "backtest output", nil
 		},
@@ -91,7 +72,7 @@ func TestRunBacktest_NoHook_WithRunningInstance(t *testing.T) {
 		t.Errorf("got %q", string(result))
 	}
 
-	btDir := filepath.Join(store.InstanceDir("u1", "live", "grid2-BTCUSDT"), "backtest", "bt-123")
+	btDir := filepath.Join(dir, "backtest", "u1", "bt-123")
 	if _, err := os.Stat(btDir); os.IsNotExist(err) {
 		t.Error("backtest dir not created")
 	}
@@ -107,17 +88,9 @@ func TestRunBacktest_NoHook_WithRunningInstance(t *testing.T) {
 
 func TestRunBacktest_NoHook_DockerError(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
-
 	cm := &ContainerManager{
-		cfg:   &Config{},
-		store: store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
+		cfg:   &Config{DataDir: dir, DockerNetwork: "bbgo-net", DataVolume: "bbgo-data", BBGOImage: "bbgo-base:latest"},
+		store: nil,
 		dockerFn: func(args ...string) (string, error) {
 			return "error details", fmt.Errorf("docker failed")
 		},
@@ -135,8 +108,7 @@ func TestRunBacktest_NoHook_DockerError(t *testing.T) {
 
 func TestReadBacktestReport_NoRunningInstance(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	cm := &ContainerManager{cfg: &Config{}, store: store}
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, store: nil}
 	_, _, err := cm.ReadBacktestReport("u1", "bt-1")
 	if err == nil {
 		t.Fatal("expected error")
@@ -145,20 +117,9 @@ func TestReadBacktestReport_NoRunningInstance(t *testing.T) {
 
 func TestReadBacktestReport_WithFiles(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, store: nil}
 
-	cm := &ContainerManager{
-		cfg:   &Config{},
-		store: store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
-	}
-
-	btDir := filepath.Join(store.InstanceDir("u1", "live", "grid2-BTCUSDT"), "backtest", "bt-1")
+	btDir := filepath.Join(dir, "backtest", "u1", "bt-1")
 	os.MkdirAll(btDir, 0o755)
 	summaryJSON := `{"totalPnl": 100.0}`
 	os.WriteFile(filepath.Join(btDir, "summary.json"), []byte(summaryJSON), 0o644)
@@ -179,16 +140,9 @@ func TestReadBacktestReport_WithFiles(t *testing.T) {
 
 func TestReadBacktestReport_NoSummary(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, store: nil}
 
-	cm := &ContainerManager{cfg: &Config{}, store: store}
-
-	btDir := filepath.Join(store.InstanceDir("u1", "live", "grid2-BTCUSDT"), "backtest", "bt-1")
+	btDir := filepath.Join(dir, "backtest", "u1", "bt-1")
 	os.MkdirAll(btDir, 0o755)
 
 	_, _, err := cm.ReadBacktestReport("u1", "bt-1")
@@ -199,29 +153,11 @@ func TestReadBacktestReport_NoSummary(t *testing.T) {
 
 // --- container.go: SyncBacktest non-hook path ---
 
-func TestSyncBacktest_NoHook_NoRunningInstance(t *testing.T) {
-	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	cm := &ContainerManager{cfg: &Config{}, store: store}
-	_, err := cm.SyncBacktest("u1", "binance", "BTCUSDT", "2024-01-01", "2024-01-31")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
 func TestSyncBacktest_NoHook_Success(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
-
 	cm := &ContainerManager{
-		cfg:   &Config{},
-		store: store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
+		cfg:   &Config{DataDir: dir, DockerNetwork: "bbgo-net", DataVolume: "bbgo-data", BBGOImage: "bbgo-base:latest"},
+		store: nil,
 		dockerFn: func(args ...string) (string, error) {
 			return "sync complete", nil
 		},
@@ -239,20 +175,9 @@ func TestSyncBacktest_NoHook_Success(t *testing.T) {
 
 func TestCleanupBacktest(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
+	cm := &ContainerManager{cfg: &Config{DataDir: dir}, store: nil}
 
-	cm := &ContainerManager{
-		cfg:            &Config{},
-		store:          store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
-	}
-
-	btDir := filepath.Join(store.InstanceDir("u1", "live", "grid2-BTCUSDT"), "backtest", "bt-1")
+	btDir := filepath.Join(dir, "backtest", "u1", "bt-1")
 	os.MkdirAll(btDir, 0o755)
 	os.WriteFile(filepath.Join(btDir, "bbgo.yaml"), []byte("test"), 0o644)
 
@@ -266,41 +191,6 @@ func TestCleanupBacktest(t *testing.T) {
 func TestCleanupBacktest_NilManager(t *testing.T) {
 	var cm *ContainerManager
 	cm.CleanupBacktest("u1", "bt-1")
-}
-
-// --- container.go: BacktestReportDir ---
-
-func TestBacktestReportDir(t *testing.T) {
-	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
-
-	cm := &ContainerManager{
-		cfg:            &Config{},
-		store:          store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
-	}
-	reportDir := cm.BacktestReportDir("u1", "bt-1")
-	if reportDir == "" {
-		t.Error("expected non-empty report dir")
-	}
-	if !strings.Contains(reportDir, "backtest") {
-		t.Errorf("report dir = %q", reportDir)
-	}
-}
-
-func TestBacktestReportDir_NoRunningInstance(t *testing.T) {
-	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	cm := &ContainerManager{cfg: &Config{}, store: store}
-	reportDir := cm.BacktestReportDir("u1", "bt-1")
-	if reportDir != "" {
-		t.Errorf("expected empty for no running instance, got %q", reportDir)
-	}
 }
 
 // --- container.go: EnsureNetwork ---

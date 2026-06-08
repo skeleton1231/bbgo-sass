@@ -47,40 +47,9 @@ func TestBusiness_LiveContainer_NoPaperTrade(t *testing.T) {
 	}
 }
 
-// --- PAPER TRADING: Paper container MUST get PAPER_TRADE=1 and use SQLite ---
+// --- PAPER TRADING: Paper container MUST get PAPER_TRADE=1 and use Supabase with paper_ prefix ---
 
 func TestBusiness_PaperContainer_HasPaperTrade(t *testing.T) {
-	cm := testContainerManager(t)
-
-	inst := &StrategyInstance{
-		UserID:   testUUID,
-		Mode:     ModePaper,
-		Strategy: "grid2",
-		Exchange: "binance",
-		Symbol:   "BTCUSDT",
-	}
-	args := cm.instanceEnvArgs(inst)
-	hasPaperTrade := false
-	hasSQLite := false
-	for i := 0; i < len(args)-1; i++ {
-		if args[i] == "-e" && args[i+1] == "PAPER_TRADE=1" {
-			hasPaperTrade = true
-		}
-		if args[i] == "-e" && strings.HasPrefix(args[i+1], "DB_DRIVER=sqlite3") {
-			hasSQLite = true
-		}
-	}
-	if !hasPaperTrade {
-		t.Error("paper container must have PAPER_TRADE=1")
-	}
-	if !hasSQLite {
-		t.Error("paper container must use sqlite3 driver")
-	}
-}
-
-// --- PAPER TRADING: Paper container must NOT have Supabase config ---
-
-func TestBusiness_PaperContainer_NoSupabase(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.cfg.SupabaseURL = "https://test.supabase.co"
 	cm.cfg.SupabaseKey = "test-key"
@@ -93,12 +62,56 @@ func TestBusiness_PaperContainer_NoSupabase(t *testing.T) {
 		Symbol:   "BTCUSDT",
 	}
 	args := cm.instanceEnvArgs(inst)
-	for _, arg := range args {
-		if strings.Contains(arg, "SUPABASE_URL") {
-			t.Error("paper container must not have SUPABASE_URL")
+	hasPaperTrade := false
+	hasSupabase := false
+	hasPaperPrefix := false
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "-e" && args[i+1] == "PAPER_TRADE=1" {
+			hasPaperTrade = true
 		}
-		if strings.Contains(arg, "SUPABASE_SERVICE_KEY") {
-			t.Error("paper container must not have SUPABASE_SERVICE_KEY")
+		if args[i] == "-e" && strings.HasPrefix(args[i+1], "DB_DRIVER=supabase") {
+			hasSupabase = true
+		}
+		if args[i] == "-e" && args[i+1] == "SUPABASE_TABLE_PREFIX=paper_" {
+			hasPaperPrefix = true
+		}
+	}
+	if !hasPaperTrade {
+		t.Error("paper container must have PAPER_TRADE=1")
+	}
+	if !hasSupabase {
+		t.Error("paper container must use supabase driver")
+	}
+	if !hasPaperPrefix {
+		t.Error("paper container must have SUPABASE_TABLE_PREFIX=paper_")
+	}
+}
+
+// --- PAPER TRADING: Paper container MUST have Supabase with paper_ prefix, but NO live credentials ---
+
+func TestBusiness_PaperContainer_SupabaseWithPrefix(t *testing.T) {
+	cm := testContainerManager(t)
+	cm.cfg.SupabaseURL = "https://test.supabase.co"
+	cm.cfg.SupabaseKey = "test-key"
+
+	inst := &StrategyInstance{
+		UserID:   testUUID,
+		Mode:     ModePaper,
+		Strategy: "grid2",
+		Exchange: "binance",
+		Symbol:   "BTCUSDT",
+	}
+	args := cm.instanceEnvArgs(inst)
+	if !hasEnv(args, "SUPABASE_URL=https://test.supabase.co") {
+		t.Error("paper container must have SUPABASE_URL")
+	}
+	if !hasEnv(args, "SUPABASE_TABLE_PREFIX=paper_") {
+		t.Error("paper container must have SUPABASE_TABLE_PREFIX=paper_")
+	}
+	// Paper mode should NOT inject real exchange API keys
+	for _, arg := range args {
+		if strings.Contains(arg, "BINANCE_API_KEY=") && !strings.Contains(arg, "SUPABASE") {
+			t.Error("paper container must not have real exchange API keys")
 		}
 	}
 }

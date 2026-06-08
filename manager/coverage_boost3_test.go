@@ -347,17 +347,9 @@ func TestCheckAndRecover_DeadNeedsRecreate(t *testing.T) {
 
 func TestSyncBacktest_NoHook_WithMarketDataAddr(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
-
 	cm := &ContainerManager{
-		cfg:   &Config{MarketDataAddr: "marketdata:9090"},
-		store: store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
+		cfg:   &Config{DataDir: dir, DockerNetwork: "bbgo-net", DataVolume: "bbgo-data", BBGOImage: "bbgo-base:latest", MarketDataAddr: "marketdata:9090"},
+		store: nil,
 		dockerFn: func(args ...string) (string, error) {
 			for _, a := range args {
 				if a == "MARKET_DATA_SERVICE_URL=marketdata:9090" {
@@ -378,17 +370,9 @@ func TestSyncBacktest_NoHook_WithMarketDataAddr(t *testing.T) {
 
 func TestRunBacktest_NoHook_WithMarketDataAddr(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, nil)
-	inst := &StrategyInstance{
-		InstanceID: "grid2-BTCUSDT", UserID: "u1", Mode: "live",
-		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
-	}
-	store.CreateInstance(inst, func(string) bool { return true })
-
 	cm := &ContainerManager{
-		cfg:   &Config{MarketDataAddr: "marketdata:9090"},
-		store: store,
-		checkRunningFn: func(name string) (bool, error) { return true, nil },
+		cfg:   &Config{DataDir: dir, DockerNetwork: "bbgo-net", DataVolume: "bbgo-data", BBGOImage: "bbgo-base:latest", MarketDataAddr: "marketdata:9090"},
+		store: nil,
 		dockerFn: func(args ...string) (string, error) {
 			for _, a := range args {
 				if a == "MARKET_DATA_SERVICE_URL=marketdata:9090" {

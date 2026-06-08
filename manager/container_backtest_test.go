@@ -28,14 +28,11 @@ func TestRunBacktest_RejectsPathTraversal(t *testing.T) {
 
 func TestCleanupBacktest_RemovesDirectory(t *testing.T) {
 	dir := t.TempDir()
-	store := NewInstanceStore(dir, testRegistry)
-	inst := createTestInstance(t, store, "user-1", ModeLive, "grid2", "BTCUSDT", nil)
 	cfg := &Config{DataDir: dir}
-	cm := NewContainerManager(cfg, nil, nil, store)
-	cm.checkRunningFn = func(string) (bool, error) { return true, nil }
+	cm := NewContainerManager(cfg, nil, nil, nil)
 
 	jobID := "bt-test123"
-	backtestDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", jobID)
+	backtestDir := filepath.Join(dir, "backtest", "user-1", jobID)
 	if err := os.MkdirAll(backtestDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -56,21 +53,65 @@ func TestCleanupBacktest_NilReceiver(t *testing.T) {
 	cm.CleanupBacktest("user-1", "bt-123")
 }
 
-func TestCleanupBacktest_NoContainerRunning(t *testing.T) {
+func TestCleanupBacktest_NonExistentDir(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{DataDir: dir}
 	cm := NewContainerManager(cfg, nil, nil, nil)
-	cm.checkRunningFn = func(string) (bool, error) { return false, nil }
 
-	backtestDir := dir + "/user-1/backtest/bt-123"
-	if err := os.MkdirAll(backtestDir, 0o755); err != nil {
+	cm.CleanupBacktest("user-1", "bt-nonexistent")
+}
+
+func TestBacktestReportDir(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{DataDir: dir}
+	cm := NewContainerManager(cfg, nil, nil, nil)
+
+	got := cm.BacktestReportDir("user-1", "bt-abc")
+	want := filepath.Join(dir, "backtest", "user-1", "bt-abc")
+	if got != want {
+		t.Errorf("BacktestReportDir = %q, want %q", got, want)
+	}
+}
+
+func TestReadBacktestReport(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{DataDir: dir}
+	cm := NewContainerManager(cfg, nil, nil, nil)
+
+	jobID := "bt-report1"
+	reportDir := filepath.Join(dir, "backtest", "user-1", jobID)
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	cm.CleanupBacktest("user-1", "bt-123")
+	summary := `{"totalTrades": 10, "profit": 500}`
+	if err := os.WriteFile(filepath.Join(reportDir, "summary.json"), []byte(summary), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	equity := "time\tequity\n2024-01-01\t10000\n2024-06-01\t10500"
+	if err := os.WriteFile(filepath.Join(reportDir, "equity_curve.tsv"), []byte(equity), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-	// Directory should still exist since backtestMode returns error
-	if _, err := os.Stat(backtestDir); os.IsNotExist(err) {
-		t.Error("expected directory to remain when no container is running")
+	report, equityCurve, err := cm.ReadBacktestReport("user-1", jobID)
+	if err != nil {
+		t.Fatalf("ReadBacktestReport: %v", err)
+	}
+	if string(report) != summary {
+		t.Errorf("report = %q, want %q", string(report), summary)
+	}
+	if string(equityCurve) != equity {
+		t.Errorf("equityCurve = %q, want %q", string(equityCurve), equity)
+	}
+}
+
+func TestReadBacktestReport_MissingSummary(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{DataDir: dir}
+	cm := NewContainerManager(cfg, nil, nil, nil)
+
+	_, _, err := cm.ReadBacktestReport("user-1", "bt-missing")
+	if err == nil {
+		t.Error("expected error for missing summary.json")
 	}
 }

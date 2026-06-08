@@ -244,10 +244,14 @@ func TestContainerManager_InstanceEnvArgs_PaperMode(t *testing.T) {
 	if !hasEnv(args, "PAPER_TRADE=1") {
 		t.Error("paper mode should have PAPER_TRADE=1")
 	}
-	if !hasEnv(args, "DB_DRIVER=sqlite3") {
-		t.Error("paper mode should have DB_DRIVER=sqlite3")
+	if !hasEnv(args, "DB_DRIVER=supabase") {
+		t.Error("paper mode should have DB_DRIVER=supabase")
+	}
+	if !hasEnv(args, "SUPABASE_TABLE_PREFIX=paper_") {
+		t.Error("paper mode should have SUPABASE_TABLE_PREFIX=paper_")
 	}
 }
+
 
 func TestContainerManager_InstanceEnvArgs_LiveMode(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{
@@ -266,7 +270,11 @@ func TestContainerManager_InstanceEnvArgs_LiveMode(t *testing.T) {
 	if !hasEnv(args, "BBGO_USER_ID=u1") {
 		t.Error("live mode should have BBGO_USER_ID")
 	}
+	if hasEnv(args, "SUPABASE_TABLE_PREFIX=paper_") {
+		t.Error("live mode should NOT have SUPABASE_TABLE_PREFIX")
+	}
 }
+
 
 func TestContainerManager_InstanceEnvArgs_MarketDataAddr(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{MarketDataAddr: "marketdata:9090"}}

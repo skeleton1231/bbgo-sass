@@ -480,8 +480,7 @@ func TestUploadLocalToStorage_Success(t *testing.T) {
 	storage := mockStorageServer(t)
 	api.storage = storage
 
-	inst := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	reportDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", "bt-local")
+	reportDir := api.container.BacktestReportDir(testUUID, "bt-local")
 	os.MkdirAll(reportDir, 0o755)
 	os.WriteFile(filepath.Join(reportDir, "summary.json"), []byte(`{"profit":100}`), 0644)
 
@@ -503,8 +502,7 @@ func TestUploadLocalToStorage_StorageError(t *testing.T) {
 	defer srv.Close()
 	api.storage = NewStorageClient(srv.URL, "key")
 
-	inst := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	reportDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", "bt-locerr")
+	reportDir := api.container.BacktestReportDir(testUUID, "bt-locerr")
 	os.MkdirAll(reportDir, 0o755)
 	os.WriteFile(filepath.Join(reportDir, "summary.json"), []byte(`{}`), 0644)
 
@@ -521,8 +519,7 @@ func TestUploadLocalToStorage_FileNotFound(t *testing.T) {
 	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
 	api.storage = mockStorageServer(t)
 
-	inst := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	reportDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", "bt-nofile")
+	reportDir := api.container.BacktestReportDir(testUUID, "bt-nofile")
 	os.MkdirAll(reportDir, 0o755)
 
 	job := &BacktestJob{ID: "bt-nofile", UserID: testUUID}
@@ -538,8 +535,7 @@ func TestUploadLocalToStorage_TradesFile(t *testing.T) {
 	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
 	api.storage = mockStorageServer(t)
 
-	inst := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	reportDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", "bt-trades")
+	reportDir := api.container.BacktestReportDir(testUUID, "bt-trades")
 	os.MkdirAll(reportDir, 0o755)
 	os.WriteFile(filepath.Join(reportDir, "trades.tsv"), []byte("time,price\n1,100"), 0644)
 
@@ -556,8 +552,7 @@ func TestUploadLocalToStorage_EquityCurve(t *testing.T) {
 	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
 	api.storage = mockStorageServer(t)
 
-	inst := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	reportDir := filepath.Join(store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID), "backtest", "bt-eq")
+	reportDir := api.container.BacktestReportDir(testUUID, "bt-eq")
 	os.MkdirAll(reportDir, 0o755)
 	os.WriteFile(filepath.Join(reportDir, "equity_curve.tsv"), []byte("time\tequity\n1\t1000"), 0644)
 

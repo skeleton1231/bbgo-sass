@@ -48,6 +48,7 @@ type Config struct {
 	BacktestEndTime     string
 	BacktestSharedDir   string
 	InstanceResources   ContainerResources
+	BacktestResources   ContainerResources
 }
 
 func LoadConfig() (*Config, error) {
@@ -81,6 +82,14 @@ func LoadConfig() (*Config, error) {
 			PidsLimit:  getEnvInt("CONTAINER_PIDS_LIMIT", 64),
 			LogMaxSize: getEnv("CONTAINER_LOG_MAX_SIZE", "10m"),
 			LogMaxFile: getEnvInt("CONTAINER_LOG_MAX_FILE", 3),
+		},
+		BacktestResources: ContainerResources{
+			Memory:     getEnv("BACKTEST_MEMORY", "256m"),
+			MemorySwap: getEnv("BACKTEST_MEMORY_SWAP", "512m"),
+			CPUs:       getEnv("BACKTEST_CPUS", "0.5"),
+			PidsLimit:  getEnvInt("BACKTEST_PIDS_LIMIT", 64),
+			LogMaxSize: getEnv("BACKTEST_LOG_MAX_SIZE", "10m"),
+			LogMaxFile: getEnvInt("BACKTEST_LOG_MAX_FILE", 3),
 		},
 	}
 
