@@ -85,6 +85,47 @@ export type Database = {
           },
         ]
       }
+      deposits: {
+        Row: {
+          address: string
+          amount: string
+          asset: string
+          exchange: string
+          id: string
+          time: string
+          txn_id: string
+          user_id: string
+        }
+        Insert: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          time?: string
+          txn_id?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          time?: string
+          txn_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deposits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_credentials: {
         Row: {
           api_key_encrypted: string
@@ -125,6 +166,339 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "exchange_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      futures_position_risks: {
+        Row: {
+          adl: string
+          break_even_price: string
+          entry_price: string
+          exchange: string
+          id: string
+          initial_margin: string
+          leverage: string
+          liquidation_price: string
+          maint_margin: string
+          margin_asset: string
+          mark_price: string
+          notional: string
+          open_order_initial_margin: string
+          position_amount: string
+          position_initial_margin: string
+          position_side: string
+          symbol: string
+          unrealized_pnl: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adl?: string
+          break_even_price?: string
+          entry_price?: string
+          exchange?: string
+          id?: string
+          initial_margin?: string
+          leverage?: string
+          liquidation_price?: string
+          maint_margin?: string
+          margin_asset?: string
+          mark_price?: string
+          notional?: string
+          open_order_initial_margin?: string
+          position_amount?: string
+          position_initial_margin?: string
+          position_side?: string
+          symbol?: string
+          unrealized_pnl?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adl?: string
+          break_even_price?: string
+          entry_price?: string
+          exchange?: string
+          id?: string
+          initial_margin?: string
+          leverage?: string
+          liquidation_price?: string
+          maint_margin?: string
+          margin_asset?: string
+          mark_price?: string
+          notional?: string
+          open_order_initial_margin?: string
+          position_amount?: string
+          position_initial_margin?: string
+          position_side?: string
+          symbol?: string
+          unrealized_pnl?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "futures_position_risks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      margin_interests: {
+        Row: {
+          asset: string
+          exchange: string
+          id: string
+          interest: string
+          interest_rate: string
+          isolated_symbol: string
+          principle: string
+          time: string
+          user_id: string
+        }
+        Insert: {
+          asset?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          interest_rate?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          interest_rate?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_interests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      margin_liquidations: {
+        Row: {
+          average_price: string
+          exchange: string
+          executed_quantity: string
+          id: string
+          is_isolated: boolean
+          order_id: number
+          price: string
+          quantity: string
+          side: string
+          symbol: string
+          time: string
+          time_in_force: string
+          user_id: string
+        }
+        Insert: {
+          average_price?: string
+          exchange?: string
+          executed_quantity?: string
+          id?: string
+          is_isolated?: boolean
+          order_id?: number
+          price?: string
+          quantity?: string
+          side?: string
+          symbol?: string
+          time?: string
+          time_in_force?: string
+          user_id: string
+        }
+        Update: {
+          average_price?: string
+          exchange?: string
+          executed_quantity?: string
+          id?: string
+          is_isolated?: boolean
+          order_id?: number
+          price?: string
+          quantity?: string
+          side?: string
+          symbol?: string
+          time?: string
+          time_in_force?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_liquidations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      margin_loans: {
+        Row: {
+          asset: string
+          exchange: string
+          id: string
+          isolated_symbol: string
+          principle: string
+          time: string
+          transaction_id: number
+          user_id: string
+        }
+        Insert: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_loans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      margin_repays: {
+        Row: {
+          asset: string
+          exchange: string
+          id: string
+          isolated_symbol: string
+          principle: string
+          time: string
+          transaction_id: number
+          user_id: string
+        }
+        Insert: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_repays_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nav_history_details: {
+        Row: {
+          available: string
+          balance: string
+          borrowed: string
+          currency: string
+          exchange: string
+          id: string
+          interest: string
+          is_isolated: boolean
+          is_margin: boolean
+          isolated_symbol: string
+          locked: string
+          net_asset: string
+          net_asset_in_btc: string
+          net_asset_in_usd: string
+          price_in_usd: string
+          session: string
+          subaccount: string
+          time: string
+          user_id: string
+        }
+        Insert: {
+          available?: string
+          balance?: string
+          borrowed?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          is_isolated?: boolean
+          is_margin?: boolean
+          isolated_symbol?: string
+          locked?: string
+          net_asset?: string
+          net_asset_in_btc?: string
+          net_asset_in_usd?: string
+          price_in_usd?: string
+          session?: string
+          subaccount?: string
+          time?: string
+          user_id: string
+        }
+        Update: {
+          available?: string
+          balance?: string
+          borrowed?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          is_isolated?: boolean
+          is_margin?: boolean
+          isolated_symbol?: string
+          locked?: string
+          net_asset?: string
+          net_asset_in_btc?: string
+          net_asset_in_usd?: string
+          price_in_usd?: string
+          session?: string
+          subaccount?: string
+          time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nav_history_details_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
@@ -211,6 +585,380 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sync_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_deposits: {
+        Row: {
+          address: string
+          amount: string
+          asset: string
+          exchange: string
+          id: string
+          time: string
+          txn_id: string
+          user_id: string
+        }
+        Insert: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          time?: string
+          txn_id?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          time?: string
+          txn_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_deposits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_futures_position_risks: {
+        Row: {
+          adl: string
+          break_even_price: string
+          entry_price: string
+          exchange: string
+          id: string
+          initial_margin: string
+          leverage: string
+          liquidation_price: string
+          maint_margin: string
+          margin_asset: string
+          mark_price: string
+          notional: string
+          open_order_initial_margin: string
+          position_amount: string
+          position_initial_margin: string
+          position_side: string
+          symbol: string
+          unrealized_pnl: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adl?: string
+          break_even_price?: string
+          entry_price?: string
+          exchange?: string
+          id?: string
+          initial_margin?: string
+          leverage?: string
+          liquidation_price?: string
+          maint_margin?: string
+          margin_asset?: string
+          mark_price?: string
+          notional?: string
+          open_order_initial_margin?: string
+          position_amount?: string
+          position_initial_margin?: string
+          position_side?: string
+          symbol?: string
+          unrealized_pnl?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adl?: string
+          break_even_price?: string
+          entry_price?: string
+          exchange?: string
+          id?: string
+          initial_margin?: string
+          leverage?: string
+          liquidation_price?: string
+          maint_margin?: string
+          margin_asset?: string
+          mark_price?: string
+          notional?: string
+          open_order_initial_margin?: string
+          position_amount?: string
+          position_initial_margin?: string
+          position_side?: string
+          symbol?: string
+          unrealized_pnl?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_futures_position_risks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_margin_interests: {
+        Row: {
+          asset: string
+          exchange: string
+          id: string
+          interest: string
+          interest_rate: string
+          isolated_symbol: string
+          principle: string
+          time: string
+          user_id: string
+        }
+        Insert: {
+          asset?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          interest_rate?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          interest_rate?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_margin_interests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_margin_liquidations: {
+        Row: {
+          average_price: string
+          exchange: string
+          executed_quantity: string
+          id: string
+          is_isolated: boolean
+          order_id: number
+          price: string
+          quantity: string
+          side: string
+          symbol: string
+          time: string
+          time_in_force: string
+          user_id: string
+        }
+        Insert: {
+          average_price?: string
+          exchange?: string
+          executed_quantity?: string
+          id?: string
+          is_isolated?: boolean
+          order_id?: number
+          price?: string
+          quantity?: string
+          side?: string
+          symbol?: string
+          time?: string
+          time_in_force?: string
+          user_id: string
+        }
+        Update: {
+          average_price?: string
+          exchange?: string
+          executed_quantity?: string
+          id?: string
+          is_isolated?: boolean
+          order_id?: number
+          price?: string
+          quantity?: string
+          side?: string
+          symbol?: string
+          time?: string
+          time_in_force?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_margin_liquidations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_margin_loans: {
+        Row: {
+          asset: string
+          exchange: string
+          id: string
+          isolated_symbol: string
+          principle: string
+          time: string
+          transaction_id: number
+          user_id: string
+        }
+        Insert: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_margin_loans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_margin_repays: {
+        Row: {
+          asset: string
+          exchange: string
+          id: string
+          isolated_symbol: string
+          principle: string
+          time: string
+          transaction_id: number
+          user_id: string
+        }
+        Insert: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          exchange?: string
+          id?: string
+          isolated_symbol?: string
+          principle?: string
+          time?: string
+          transaction_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_margin_repays_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_nav_history_details: {
+        Row: {
+          available: string
+          balance: string
+          borrowed: string
+          currency: string
+          exchange: string
+          id: string
+          interest: string
+          is_isolated: boolean
+          is_margin: boolean
+          isolated_symbol: string
+          locked: string
+          net_asset: string
+          net_asset_in_btc: string
+          net_asset_in_usd: string
+          price_in_usd: string
+          session: string
+          subaccount: string
+          time: string
+          user_id: string
+        }
+        Insert: {
+          available?: string
+          balance?: string
+          borrowed?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          is_isolated?: boolean
+          is_margin?: boolean
+          isolated_symbol?: string
+          locked?: string
+          net_asset?: string
+          net_asset_in_btc?: string
+          net_asset_in_usd?: string
+          price_in_usd?: string
+          session?: string
+          subaccount?: string
+          time?: string
+          user_id: string
+        }
+        Update: {
+          available?: string
+          balance?: string
+          borrowed?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          interest?: string
+          is_isolated?: boolean
+          is_margin?: boolean
+          isolated_symbol?: string
+          locked?: string
+          net_asset?: string
+          net_asset_in_btc?: string
+          net_asset_in_usd?: string
+          price_in_usd?: string
+          session?: string
+          subaccount?: string
+          time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_nav_history_details_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
@@ -473,6 +1221,56 @@ export type Database = {
           },
         ]
       }
+      paper_rewards: {
+        Row: {
+          created_at: string
+          currency: string
+          exchange: string
+          id: string
+          note: string | null
+          quantity: string
+          reward_type: string
+          spent: boolean
+          state: string
+          user_id: string
+          uuid: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          note?: string | null
+          quantity?: string
+          reward_type?: string
+          spent?: boolean
+          state?: string
+          user_id: string
+          uuid?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          note?: string | null
+          quantity?: string
+          reward_type?: string
+          spent?: boolean
+          state?: string
+          user_id?: string
+          uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_rewards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paper_trades: {
         Row: {
           exchange: string
@@ -549,6 +1347,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "paper_trades_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_withdraws: {
+        Row: {
+          address: string
+          amount: string
+          asset: string
+          exchange: string
+          id: string
+          network: string
+          time: string
+          txn_fee: string
+          txn_fee_currency: string
+          txn_id: string
+          user_id: string
+        }
+        Insert: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          network?: string
+          time?: string
+          txn_fee?: string
+          txn_fee_currency?: string
+          txn_id?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          network?: string
+          time?: string
+          txn_fee?: string
+          txn_fee_currency?: string
+          txn_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_withdraws_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
@@ -718,6 +1566,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "profits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rewards: {
+        Row: {
+          created_at: string
+          currency: string
+          exchange: string
+          id: string
+          note: string | null
+          quantity: string
+          reward_type: string
+          spent: boolean
+          state: string
+          user_id: string
+          uuid: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          note?: string | null
+          quantity?: string
+          reward_type?: string
+          spent?: boolean
+          state?: string
+          user_id: string
+          uuid?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          exchange?: string
+          id?: string
+          note?: string | null
+          quantity?: string
+          reward_type?: string
+          spent?: boolean
+          state?: string
+          user_id?: string
+          uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rewards_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
@@ -936,6 +1834,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      withdraws: {
+        Row: {
+          address: string
+          amount: string
+          asset: string
+          exchange: string
+          id: string
+          network: string
+          time: string
+          txn_fee: string
+          txn_fee_currency: string
+          txn_id: string
+          user_id: string
+        }
+        Insert: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          network?: string
+          time?: string
+          txn_fee?: string
+          txn_fee_currency?: string
+          txn_id?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          amount?: string
+          asset?: string
+          exchange?: string
+          id?: string
+          network?: string
+          time?: string
+          txn_fee?: string
+          txn_fee_currency?: string
+          txn_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdraws_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
