@@ -40,6 +40,7 @@ func main() {
 	}
 
 	defaultsCache := NewStrategyDefaultsCache(supaClient)
+	SetFieldsProvider(defaultsCache)
 	instanceStore := NewInstanceStore(cfg.DataDir, defaultsCache)
 	instanceStore.SetSupabase(supaClient)
 

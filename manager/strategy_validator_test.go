@@ -491,6 +491,42 @@ func TestValidate_DataDriven_TextFieldRequired(t *testing.T) {
 	}
 }
 
+func TestValidate_ProductionPath_UsesFieldsProvider(t *testing.T) {
+	// Simulates production: globalFieldsProvider set by StrategyDefaultsCache
+	origProvider := globalFieldsProvider
+	defer func() { globalFieldsProvider = origProvider }()
+
+	globalFieldsProvider = &mockFieldsProvider{
+		fields: map[string][]FieldDef{
+			"supertrend": {
+				{Key: "symbol", Type: "text", Required: true},
+				{Key: "quantity", Type: "number", Required: true, Min: ptrFloat(0.00001)},
+			},
+		},
+	}
+
+	config := rawJSON(`{"symbol":"BTCUSDT","interval":"1h"}`)
+	warnings := ValidateStrategyConfig("supertrend", config)
+
+	found := false
+	for _, w := range warnings {
+		if w.ID == "missing_quantity" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected missing_quantity via FieldsProvider path, got: %v", warnings)
+	}
+}
+
+type mockFieldsProvider struct {
+	fields map[string][]FieldDef
+}
+
+func (m *mockFieldsProvider) GetFields(strategyID string) []FieldDef {
+	return m.fields[strategyID]
+}
+
 func ptrFloat(v float64) *float64 { return &v }
 
 // ============================================================

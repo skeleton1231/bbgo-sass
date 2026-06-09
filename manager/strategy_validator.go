@@ -34,6 +34,11 @@ func validateWithRegistry(strategy string, m map[string]any) []StrategyWarning {
 	if registryFields := globalFieldsForTest[strategy]; len(registryFields) > 0 {
 		return validateFromFields(strategy, m, registryFields)
 	}
+	if provider := globalFieldsProvider; provider != nil {
+		if fields := provider.GetFields(strategy); len(fields) > 0 {
+			return validateFromFields(strategy, m, fields)
+		}
+	}
 	return validateFallback(strategy, m)
 }
 
@@ -108,9 +113,20 @@ func validateCrossCutting(strategy string, m map[string]any) []StrategyWarning {
 }
 
 // globalFieldsForTest is set by tests to inject FieldDef data without Supabase.
-// In production, this is nil and validateFallback is used until registry fields
-// are populated with required=true flags.
 var globalFieldsForTest map[string][]FieldDef
+
+// FieldsProvider is implemented by StrategyDefaultsCache to supply field definitions.
+type FieldsProvider interface {
+	GetFields(strategyID string) []FieldDef
+}
+
+// globalFieldsProvider is set at startup from StrategyDefaultsCache.
+var globalFieldsProvider FieldsProvider
+
+// SetFieldsProvider wires the registry cache into the validator.
+func SetFieldsProvider(p FieldsProvider) {
+	globalFieldsProvider = p
+}
 
 // validateFallback contains hardcoded per-strategy rules used when no registry
 // field definitions are available. These are a safety net only.
