@@ -8,10 +8,38 @@ import (
 )
 
 var testRegistry = &StrategyDefaultsCache{
+	defaults: map[string]map[string]any{
+		"grid":        {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 50, "side": "both"},
+		"grid2":       {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
+		"xhedgegrid":  {"gridNumber": 10, "upperPrice": 70000, "lowerPrice": 50000, "quantity": 0.001, "profitSpread": 0, "quoteInvestment": 1000},
+		"bollgrid":    {"interval": "1h", "profitSpread": 50, "gridPips": 50, "quantity": 0.001},
+		"emacross":    {"interval": "1h", "fastWindow": 7, "slowWindow": 25},
+		"trendtrader": {"interval": "1h", "trendLine": map[string]any{"interval": "1h", "quantity": 0.001, "pivotRightWindow": 5}},
+		"supertrend":  {"interval": "1h", "quantity": 0.001},
+		"atrpin":      {"interval": "1h", "quantity": 0.001, "multiplier": 2.0},
+		"pivotshort":  {"interval": "1h", "breakLow": map[string]any{"interval": "1h", "window": 7, "ratio": 0.01}, "exits": []map[string]any{{"roiStopLoss": map[string]any{"percentage": -0.05}}}},
+		"swing":       {"interval": "1h", "movingAverageType": "SMA", "movingAverageWindow": 20, "movingAverageInterval": "1h", "baseQuantity": 0.0001},
+		"ewo_dgtrd":   {"interval": "1h", "sigWin": 5, "stoploss": 0.02},
+		"irr":         {"interval": "1h", "window": 20, "quantity": 0.001},
+		"flashcrash":  {"interval": "1h", "baseQuantity": 0.001},
+		"fixedmaker":  {"interval": "1m", "quantity": 0.001, "halfSpread": 0.001},
+		"fmaker":      {"interval": "1h", "spread": 0.001, "quantity": 0.001},
+		"bollmaker":   {"interval": "1h"},
+		"harmonic":    {"interval": "1h", "window": 20, "quantity": 0.001},
+		"dca":         {"investmentInterval": "1h", "budget": 500, "budgetPeriod": "day"},
+		"schedule":    {"interval": "1h", "quantity": 0.001, "side": "buy"},
+		"random":      {"schedule": "*/30 * * * *", "dryRun": true, "quantity": 0.001},
+		"techsignal":  {"interval": "1h", "supportDetection": []map[string]any{{"interval": "1h", "movingAverageInterval": "1h", "movingAverageWindow": 20, "movingAverageType": "SMA"}}},
+	},
 	liveOnly: map[string]bool{
-		"autoborrow": true, "convert": true, "deposit2transfer": true,
-		"sentinel": true, "dca2": true, "dca3": true,
-		"liquiditymaker": true, "xhedgegrid": true,
+		"bollmaker": true, "linregmaker": true, "rsmaker": true, "scmaker": true,
+		"supertrend": true, "drift": true, "elliottwave": true, "factorzoo": true,
+		"dca2": true, "dca3": true, "autobuy": true,
+		"wall": true, "sentinel": true, "rebalance": true,
+		"audacitymaker": true, "liquiditymaker": true,
+		"xvs": true,
+		"autoborrow": true, "convert": true, "deposit2transfer": true, "support": true,
+		"xpremium": true, "xnav": true,
 	},
 	requiresFutures: map[string]bool{
 		"pivotshort": true, "drift": true, "elliottwave": true,
@@ -231,21 +259,16 @@ func TestYAMLGeneration_VariousStrategies(t *testing.T) {
 }
 
 func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
-	frontendLiveOnly := map[string]bool{
-		"autoborrow": true, "convert": true, "deposit2transfer": true,
-		"sentinel": true, "dca2": true, "dca3": true,
-		"liquiditymaker": true, "xhedgegrid": true,
+	frontendLiveOnly := map[string]bool{}
+	for id, meta := range StrategyRegistry {
+		if meta.LiveOnly {
+			frontendLiveOnly[id] = true
+		}
 	}
 
 	for alias, canonical := range legacyStrategyAliases {
 		if frontendLiveOnly[canonical] {
 			frontendLiveOnly[alias] = true
-		}
-	}
-
-	for _, strat := range []string{"autoborrow", "convert", "deposit2transfer", "sentinel", "dca2", "dca3", "liquiditymaker", "xhedgegrid"} {
-		if !frontendLiveOnly[strat] {
-			t.Errorf("backend liveOnly strategy %q not in frontend liveOnly set", strat)
 		}
 	}
 
@@ -256,6 +279,12 @@ func TestLiveOnlyStrategies_FrontendBackendAlignment(t *testing.T) {
 		}
 		if !testRegistry.IsLiveOnly(normalized) {
 			t.Errorf("frontend liveOnly strategy %q (normalized: %q) not in backend liveOnly set", strat, normalized)
+		}
+	}
+
+	for id := range testRegistry.liveOnly {
+		if !frontendLiveOnly[id] {
+			t.Errorf("backend liveOnly strategy %q not in frontend liveOnly set", id)
 		}
 	}
 }

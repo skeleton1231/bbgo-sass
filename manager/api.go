@@ -320,7 +320,23 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		symbol = "BTCUSDT"
 	}
 	inst.Symbol = symbol
-	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
+
+	var mergedConfig json.RawMessage = req.Config
+	if defaults := api.store.Defaults(); defaults != nil {
+		if d := defaults.GetDefaults(normalizedStrategy); d != nil {
+			var raw map[string]any
+			if len(req.Config) == 0 || string(req.Config) == "null" {
+				raw = map[string]any{}
+			} else if err := json.Unmarshal(req.Config, &raw); err != nil {
+				raw = map[string]any{}
+			}
+			merged := deepMerge(d, raw)
+			if b, err := json.Marshal(merged); err == nil {
+				mergedConfig = b
+			}
+		}
+	}
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, mergedConfig)
 
 	hasCredFn := func(exchange string) bool {
 		if api.creds == nil || req.Mode == ModePaper {

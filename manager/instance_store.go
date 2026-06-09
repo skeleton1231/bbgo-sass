@@ -406,7 +406,9 @@ func parseInstanceYAML(data []byte, userID, mode, dirName string) (*StrategyInst
 		break
 	}
 
-	if inst.Strategy != "" && inst.Symbol != "" {
+	if cfg.InstanceID != "" {
+		inst.InstanceID = cfg.InstanceID
+	} else if inst.Strategy != "" && inst.Symbol != "" {
 		inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
 	} else {
 		inst.InstanceID = dirName
@@ -528,6 +530,7 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 
 	containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
 	cfg := bbgoConfig{
+		InstanceID: inst.InstanceID,
 		Database: &databaseConfig{
 			Driver: "sqlite3",
 			DSN:    fmt.Sprintf("file:%s/bbgo.db?cache=shared&_journal_mode=WAL", containerDir),

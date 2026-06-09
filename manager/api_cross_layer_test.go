@@ -12,11 +12,19 @@ import (
 // TestCrossLayerLiveOnlyAlignment verifies the backend liveOnly strategies
 // covers all strategy IDs that the frontend marks as liveOnly.
 func TestCrossLayerLiveOnlyAlignment(t *testing.T) {
-	for _, id := range []string{"autoborrow", "convert", "deposit2transfer", "sentinel", "dca2", "dca3", "liquiditymaker", "xhedgegrid"} {
-		assert.True(t, testRegistry.IsLiveOnly(id), "expected %s to be liveOnly", id)
+	for id, meta := range StrategyRegistry {
+		if meta.LiveOnly {
+			assert.True(t, testRegistry.IsLiveOnly(id), "StrategyRegistry liveOnly strategy %s should be liveOnly in testRegistry", id)
+		}
 	}
 
-	// Legacy aliases should NOT be liveOnly — they get normalized
+	for id := range testRegistry.liveOnly {
+		meta, exists := StrategyRegistry[id]
+		if exists {
+			assert.True(t, meta.LiveOnly, "testRegistry liveOnly strategy %s should be liveOnly in StrategyRegistry", id)
+		}
+	}
+
 	assert.False(t, testRegistry.IsLiveOnly("sentinel_anomaly"))
 }
 

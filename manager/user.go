@@ -128,6 +128,7 @@ type syncConfig struct {
 }
 
 type bbgoConfig struct {
+	InstanceID              string                    `yaml:"instanceId,omitempty"`
 	Database                *databaseConfig           `yaml:"database,omitempty"`
 	Sessions                map[string]sessionConfig  `yaml:"sessions,omitempty"`
 	Exchange                map[string]exchangeConfig `yaml:"exchange"`
