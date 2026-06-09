@@ -497,6 +497,7 @@ type PublicStrategyInstancesSelect struct {
   CreatedAt     string      `json:"created_at"`
   CrossExchange bool        `json:"cross_exchange"`
   Exchange      string      `json:"exchange"`
+  FuturesConfig interface{} `json:"futures_config"`
   InstanceId    string      `json:"instance_id"`
   Mode          string      `json:"mode"`
   Name          string      `json:"name"`
@@ -512,6 +513,7 @@ type PublicStrategyInstancesInsert struct {
   CreatedAt     *string     `json:"created_at"`
   CrossExchange *bool       `json:"cross_exchange"`
   Exchange      *string     `json:"exchange"`
+  FuturesConfig interface{} `json:"futures_config"`
   InstanceId    string      `json:"instance_id"`
   Mode          string      `json:"mode"`
   Name          *string     `json:"name"`
@@ -527,6 +529,7 @@ type PublicStrategyInstancesUpdate struct {
   CreatedAt     *string     `json:"created_at"`
   CrossExchange *bool       `json:"cross_exchange"`
   Exchange      *string     `json:"exchange"`
+  FuturesConfig interface{} `json:"futures_config"`
   InstanceId    *string     `json:"instance_id"`
   Mode          *string     `json:"mode"`
   Name          *string     `json:"name"`
@@ -1645,4 +1648,28 @@ type PublicPaperFuturesPositionRisksUpdate struct {
   UnrealizedPnl          *string `json:"unrealized_pnl"`
   UpdatedAt              *string `json:"updated_at"`
   UserId                 *string `json:"user_id"`
+}
+
+type PublicPaperBalancesSelect struct {
+  Available string  `json:"available"`
+  Currency  string  `json:"currency"`
+  Locked    string  `json:"locked"`
+  UpdatedAt *string `json:"updated_at"`
+  UserId    string  `json:"user_id"`
+}
+
+type PublicPaperBalancesInsert struct {
+  Available *string `json:"available"`
+  Currency  string  `json:"currency"`
+  Locked    *string `json:"locked"`
+  UpdatedAt *string `json:"updated_at"`
+  UserId    string  `json:"user_id"`
+}
+
+type PublicPaperBalancesUpdate struct {
+  Available *string `json:"available"`
+  Currency  *string `json:"currency"`
+  Locked    *string `json:"locked"`
+  UpdatedAt *string `json:"updated_at"`
+  UserId    *string `json:"user_id"`
 }

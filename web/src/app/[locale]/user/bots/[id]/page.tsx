@@ -27,6 +27,8 @@ import {
   useUnrealizedPnL,
   useSupabaseProfits,
   useSupabasePnL,
+  useSupabaseOpenOrders,
+  useSupabaseBalances,
 } from '@/lib/bbgo/supabase-queries'
 import { useRealtimeTable } from '@/lib/supabase/use-realtime'
 import { useUserId } from '@/components/providers/user-id'
@@ -45,7 +47,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
-import { extractGridLines, extractStrategyStats } from '@/lib/bbgo/strategy-state'
+import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computePositionTags } from '@/lib/bbgo/position-tags'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
@@ -112,25 +114,35 @@ export default function BotDetailPage() {
   const [wsBalances, setWsBalances] = useState<Record<string, BBGoBalance> | null>(null)
   const [wsOpenOrders, setWsOpenOrders] = useState<BBGoOrder[] | null>(null)
 
-  const { data: sessionsData } = useBotSessions(userId, mode, isRunning)
+  const { data: sessionsData } = useBotSessions(userId, mode, isRunning, botId)
   const sessions = sessionsData?.sessions ?? []
   const firstSession = sessions[0]?.name ?? ''
   const activeSession = selectedSession || firstSession
 
-  const { data: openOrdersData } = useBotOpenOrders(userId, activeSession, mode, isRunning)
+  // Open orders: prefer container data when running, fall back to Supabase
+  const { data: supabaseOpenOrders } = useSupabaseOpenOrders(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
+  const { data: containerOpenOrders } = useBotOpenOrders(userId, activeSession, mode, isRunning, botId)
+  const openOrdersData = isRunning && containerOpenOrders ? containerOpenOrders : { orders: supabaseOpenOrders ?? [] }
+
   const { data: closedOrdersData } = useSupabaseClosedOrders(userId, { symbol: symbol || undefined, mode })
   const { data: tradesData } = useSupabaseTrades(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
-  const { data: balancesData } = useBotSessionBalances(userId, activeSession, mode, isRunning)
-  const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning)
-  const { data: pingData } = useBotPing(userId, mode, isRunning)
+
+  // Balances: Supabase-native (works when container is down)
+  const { data: supabaseBalances } = useSupabaseBalances(userId, { mode })
+  const { data: containerBalances } = useBotSessionBalances(userId, activeSession, mode, isRunning, botId)
+  const balancesData = isRunning && containerBalances ? containerBalances : { balances: supabaseBalances ?? {} }
+  const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning, botId)
+  const { data: pingData } = useBotPing(userId, mode, isRunning, botId)
   const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
 
   // Supabase Realtime: invalidate queries on INSERT instead of polling
   const rtOpts = useMemo(() => ({ mode, enabled: isRunning }), [mode, isRunning])
   useRealtimeTable('trades', userId, [['supabase-trades', userId]], rtOpts)
-  useRealtimeTable('orders', userId, [['supabase-closed-orders', userId]], rtOpts)
+  useRealtimeTable('orders', userId, [['supabase-closed-orders', userId], ['supabase-open-orders', userId]], rtOpts)
   useRealtimeTable('positions', userId, [['supabase-positions', userId], ['supabase-latest-position', userId]], rtOpts)
   useRealtimeTable('profits', userId, [['supabase-profits', userId], ['supabase-pnl-profits', userId]], rtOpts)
+  // Balance realtime: invalidate on balance changes (for paper_balances table)
+  useRealtimeTable('balances', userId, [['supabase-balances', userId]], rtOpts)
 
   // Primary PnL from profits table (bbgo average-cost method)
   const { data: pnlAgg } = useSupabasePnLFromProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
@@ -280,20 +292,8 @@ export default function BotDetailPage() {
     if (!strategyStatesData?.strategies) return null
     const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
     if (!matching) return null
-    const stats = extractStrategyStats(matching as Record<string, unknown>)
-    if (!stats) return null
-
-    // Fallback to positions table when bbgo strategy state reports zero but position exists
-    if (stats.base === 0 && latestPosition && !latestPosition.isClosed) {
-      return {
-        ...stats,
-        base: latestPosition.base,
-        quote: latestPosition.quote,
-        averageCost: latestPosition.averageCost,
-      }
-    }
-    return stats
-  }, [strategyStatesData, findMatchingStrategy, latestPosition])
+    return extractStrategyDetails(matching as Record<string, unknown>)
+  }, [strategyStatesData, findMatchingStrategy])
 
   interface DepthMessage {
     type: string
@@ -654,6 +654,8 @@ export default function BotDetailPage() {
             onIntervalChange={setKlineInterval}
             indicatorConfigs={indicators}
             onToggleIndicator={toggleIndicator}
+            supabasePosition={latestPosition ? { base: latestPosition.base, averageCost: latestPosition.averageCost, quote: latestPosition.quote, symbol: latestPosition.symbol, isClosed: latestPosition.isClosed } : undefined}
+            unrealizedPnlPct={unrealized?.unrealizedPnlPct}
           />
         </TabsContent>
 

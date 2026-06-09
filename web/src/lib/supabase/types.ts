@@ -592,6 +592,30 @@ export type Database = {
           },
         ]
       }
+      paper_balances: {
+        Row: {
+          available: string
+          currency: string
+          locked: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          available?: string
+          currency: string
+          locked?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          available?: string
+          currency?: string
+          locked?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       paper_deposits: {
         Row: {
           address: string
@@ -1629,6 +1653,7 @@ export type Database = {
           created_at: string
           cross_exchange: boolean
           exchange: string
+          futures_config: Json | null
           instance_id: string
           mode: string
           name: string
@@ -1643,6 +1668,7 @@ export type Database = {
           created_at?: string
           cross_exchange?: boolean
           exchange?: string
+          futures_config?: Json | null
           instance_id: string
           mode: string
           name?: string
@@ -1657,6 +1683,7 @@ export type Database = {
           created_at?: string
           cross_exchange?: boolean
           exchange?: string
+          futures_config?: Json | null
           instance_id?: string
           mode?: string
           name?: string

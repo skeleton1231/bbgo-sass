@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import type { BBGoTrade, BBGoOrder, PnLReport, DailyPnl, PnlCurvePoint, TradingVolumeEntry } from './queries'
+import type { BBGoTrade, BBGoOrder, BBGoBalance, PnLReport, DailyPnl, PnlCurvePoint, TradingVolumeEntry } from './queries'
 import { FifoQueue } from './fifo-pnl'
 import { tableName, tradeRowToBBGo, orderRowToBBGo } from './supabase-adapters'
 
@@ -83,6 +83,74 @@ export function useSupabaseClosedOrders(
     },
     enabled: !!userId,
     staleTime: 15_000,
+  })
+}
+
+
+export function useSupabaseOpenOrders(
+  userId: string,
+  opts?: {
+    exchange?: string
+    symbol?: string
+    strategyInstanceId?: string
+    mode?: 'live' | 'paper'
+  }
+) {
+  return useQuery<BBGoOrder[]>({
+    queryKey: ['supabase-open-orders', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      let q = sb
+        .from(tableName('orders', opts?.mode))
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'NEW')
+        .order('created_at', { ascending: false })
+
+      if (opts?.exchange) q = q.eq('exchange', opts.exchange)
+      if (opts?.symbol) q = q.eq('symbol', opts.symbol)
+      if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
+
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []).map((row, i) => orderRowToBBGo(row as OrderRow, i))
+    },
+    enabled: !!userId,
+    staleTime: 10_000,
+  })
+}
+
+export function useSupabaseBalances(
+  userId: string,
+  opts?: { mode?: 'live' | 'paper' }
+) {
+  return useQuery<Record<string, BBGoBalance>>({
+    queryKey: ['supabase-balances', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      // Only paper_balances table exists in Supabase; live balances come from exchange.
+      if (opts?.mode !== 'paper') return {}
+
+      const { data, error } = await sb
+        .from('paper_balances')
+        .select('*')
+        .eq('user_id', userId)
+
+      if (error) throw error
+
+      type BalanceRow = { currency: string; available: string; locked: string }
+      const balances: Record<string, BBGoBalance> = {}
+      for (const row of (data ?? []) as BalanceRow[]) {
+        balances[row.currency] = {
+          currency: row.currency,
+          available: row.available ?? '0',
+          locked: row.locked ?? '0',
+        }
+      }
+      return balances
+    },
+    enabled: !!userId,
+    staleTime: 10_000,
   })
 }
 
