@@ -143,6 +143,7 @@
     "cancel": "取消",
     "creating": "创建中...",
     "createError": "创建策略失败，请重试。",
+    "missingRequiredFields": "缺少必填字段：{fields}",
     "futures": "期货",
     "strategyParams": "策略参数",
     "errorLoading": "数据加载失败，请重试。",

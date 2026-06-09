@@ -141,6 +141,7 @@
     "strategy": "策略",
     "modeLabel": "模式",
     "createError": "建立策略失敗，請重試。",
+    "missingRequiredFields": "缺少必填欄位：{fields}",
     "sessionRoles": "會話角色",
     "cancel": "取消",
     "creating": "建立中...",

@@ -144,6 +144,7 @@
     "cancel": "Cancel",
     "creating": "Creating...",
     "createError": "Failed to create strategy. Please try again.",
+    "missingRequiredFields": "Required fields missing: {fields}",
     "futures": "Futures",
     "strategyParams": "Strategy Parameters",
     "errorLoading": "Failed to load data. Please try again.",

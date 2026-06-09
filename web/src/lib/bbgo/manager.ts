@@ -42,6 +42,12 @@ export interface SessionRoleConfig {
   futures: boolean
 }
 
+export interface StrategyWarning {
+  id: string
+  message: string
+  level: 'critical' | 'warning'
+}
+
 export interface InstanceInfo {
   instance_id: string
   user_id: string
@@ -51,6 +57,7 @@ export interface InstanceInfo {
   exchange: string
   name: string
   status: 'running' | 'stopped' | 'error' | 'starting'
+  warnings?: StrategyWarning[]
 }
 
 export interface InstanceListResponse {

@@ -68,9 +68,41 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    // Client-side required field validation using registry fields
+    if (schema) {
+      const missing: string[] = []
+      for (const field of schema.fields) {
+        if (!field.required) continue
+        const val = config[field.key]
+        if (val === undefined || val === null || val === '' || val === 0) {
+          // Skip if a default is provided and matches
+          if (field.default !== undefined && field.default !== '' && field.default !== 0) continue
+          missing.push(field.key)
+        }
+      }
+      if (missing.length) {
+        toast.error(t('missingRequiredFields', { fields: missing.join(', ') }), { duration: 6000 })
+        return
+      }
+    }
+
     const numericConfig = nestConfig(ensureTypes(schema, config))
     const onError = (err: Error) => {
       toast.error(err.message)
+    }
+    const onSuccess = (data: { warnings?: { id: string; message: string; level: string }[] }) => {
+      if (data.warnings?.length) {
+        const critical = data.warnings.filter(w => w.level === 'critical')
+        const warnings = data.warnings.filter(w => w.level !== 'critical')
+        if (critical.length) {
+          toast.error(critical.map(w => w.message).join('\n'), { duration: 8000 })
+        }
+        if (warnings.length) {
+          toast.warning(warnings.map(w => w.message).join('\n'), { duration: 6000 })
+        }
+      }
+      onClose()
     }
     if (isCrossExchange && schema?.sessionRoles) {
       const sessions = schema.sessionRoles.map((role: SessionRole) => {
@@ -93,7 +125,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           crossExchange: true,
           sessions,
         },
-        { onSuccess: onClose, onError }
+        { onSuccess, onError }
       )
     } else {
       createStrategy.mutate(
@@ -106,7 +138,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           mode,
           ...(schema?.requiresFutures ? { futuresConfig } : {}),
         },
-        { onSuccess: onClose, onError }
+        { onSuccess, onError }
       )
     }
   }

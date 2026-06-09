@@ -142,6 +142,7 @@
     "strategy": "ストラテジー",
     "modeLabel": "モード",
     "createError": "ストラテジーの作成に失敗しました。もう一度お試しください。",
+    "missingRequiredFields": "必須フィールドが不足しています：{fields}",
     "sessionRoles": "セッションロール",
     "cancel": "キャンセル",
     "creating": "作成中...",
