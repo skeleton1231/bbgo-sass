@@ -5,12 +5,10 @@ import { useTranslations } from 'next-intl'
 import { useUserId } from '@/components/providers/user-id'
 import {
   useUserStrategies,
-  useBotAssets,
-  useBotSessions,
   type BBGoTrade,
   type BBGoAsset,
 } from '@/lib/bbgo/queries'
-import { useSupabaseTrades, useSupabasePnL, useSupabaseTradingVolume } from '@/lib/bbgo/supabase-queries'
+import { useSupabaseTrades, useSupabasePnL, useSupabaseTradingVolume, useSupabaseBalances } from '@/lib/bbgo/supabase-queries'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,14 +44,38 @@ export default function DashboardPage() {
   const strategyCount = activeInstances.length
 
   const { data: tradesData } = useSupabaseTrades(userId, { mode: globalMode })
-  const { data: assetsData } = useBotAssets(userId, globalMode, isActive)
-  const { data: sessionsData } = useBotSessions(userId, globalMode, isActive)
+  const { data: balancesData } = useSupabaseBalances(userId, { mode: globalMode })
   const { data: volumeData } = useSupabaseTradingVolume(userId, { mode: globalMode })
   const { data: pnlData } = useSupabasePnL(userId, { mode: globalMode })
 
   const trades = tradesData ?? []
-  const assets = isActive ? (assetsData?.assets ?? {}) : {}
-  const sessionCount = isActive ? (sessionsData?.sessions?.length ?? 0) : 0
+
+  // Estimate BTC price from latest trade
+  const latestBtcPrice = trades.find((t) => t.symbol === 'BTCUSDT')?.price
+  const btcPrice = latestBtcPrice ? parseFloat(latestBtcPrice) : 0
+
+  // Build assets from Supabase balances with USD estimation
+  const rawBalances = balancesData ?? {}
+  const assets: Record<string, BBGoAsset> = {}
+  for (const [currency, b] of Object.entries(rawBalances)) {
+    const total = parseFloat(b.available) + parseFloat(b.locked)
+    if (total <= 0) continue
+    const priceInUSD = currency === 'USDT' ? 1 : currency === 'BTC' ? btcPrice : 0
+    const netAssetInUSD = (total * priceInUSD).toFixed(2)
+    assets[currency] = {
+      currency,
+      total: total.toString(),
+      available: b.available,
+      lock: b.locked,
+      borrowed: '0',
+      netAsset: total.toString(),
+      netAssetInUSD,
+      netAssetInBTC: '0',
+      priceInUSD: priceInUSD.toString(),
+    }
+  }
+
+  const sessionCount = activeInstances.filter((i) => i.status === 'running').length
 
   const totalValue = Object.values(assets).reduce((sum, a: BBGoAsset) => {
     return sum + parseFloat(a.netAssetInUSD || '0')
@@ -127,7 +149,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="mt-3 text-2xl font-semibold font-mono">
-              {anyActive && totalValue > 0
+              {totalValue > 0
                 ? `$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : '—'}
             </p>
@@ -135,7 +157,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {isActive && (
+      {Object.keys(assets).length > 0 && (
         <ErrorBoundary>
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="rounded-xl">

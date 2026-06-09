@@ -83,7 +83,7 @@ function cmdGoTypes() {
 
   // Fix: nullable pointer fields in Insert structs serialize as null, overriding DB defaults.
   // Add omitempty so nil pointers are omitted from JSON, letting the DB handle defaults.
-  const fixPointerOmitempty = (s) => s.replace(/(\*[a-zA-Z]+\s+`json:"[^"]+")"/g, '$1,omitempty"');
+  const fixPointerOmitempty = (s) => s.replace(/(\*[a-zA-Z]+\s+`json:"[^"]+)"/g, '$1,omitempty"');
   const managerOutput = fixPointerOmitempty(output.replace("package database", "package main"));
   const bbgoOutput = fixPointerOmitempty(output.replace("package database", "package supabasetypes"));
 
@@ -157,23 +157,52 @@ function cmdRepair(args) {
   const files = readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort();
   if (files.length === 0) { console.log("No migration files found"); return; }
 
-  // If specific versions given, use those; otherwise mark all
+  const status = args[0] === "reverted" ? "reverted" : "applied";
+  const versionArgs = status === "reverted" ? args.slice(1) : args;
+
+  const targets = versionArgs.length > 0
+    ? files.filter((f) => versionArgs.some((a) => f.startsWith(a)))
+    : files;
+
+  if (targets.length === 0) { console.error("No matching migrations found"); process.exit(1); }
+
+  console.log("Linking project...");
+  try { run(`npx supabase link --project-ref ${ref}`); } catch {}
+
+  for (const f of targets) {
+    const version = f.split("_")[0];
+    console.log(`Repairing ${f} (version ${version}) as ${status}...`);
+    run(`npx supabase migration repair ${version} --status ${status}`);
+  }
+  console.log(`Repaired ${targets.length} migration(s) as ${status}.`);
+}
+
+function cmdReapply(args) {
+  const ref = requireRef();
+  const dbURL = process.env.SUPABASE_DB_URL;
+  if (!dbURL) { console.error("Set SUPABASE_DB_URL in .env"); process.exit(1); }
+
+  const migDir = resolve(ROOT, "supabase", "migrations");
+  const files = readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort();
+
   const targets = args.length > 0
     ? files.filter((f) => args.some((a) => f.startsWith(a)))
     : files;
 
   if (targets.length === 0) { console.error("No matching migrations found"); process.exit(1); }
 
-  // Ensure project is linked first
   console.log("Linking project...");
   try { run(`npx supabase link --project-ref ${ref}`); } catch {}
 
   for (const f of targets) {
     const version = f.split("_")[0];
-    console.log(`Repairing ${f} (version ${version}) as applied...`);
-    run(`npx supabase migration repair ${version} --status applied`);
+    console.log(`Marking ${f} as reverted...`);
+    run(`npx supabase migration repair ${version} --status reverted`);
   }
-  console.log(`Repaired ${targets.length} migration(s). Run "pnpm sb push" to apply remaining.`);
+
+  console.log("Pushing migrations...");
+  run(`npx supabase db push --db-url "${dbURL}" --include-all`);
+  console.log(`Re-applied ${targets.length} migration(s).`);
 }
 
 function cmdStatus() {
@@ -199,7 +228,8 @@ Commands:
   go-types             Generate Go types (requires SUPABASE_DB_URL)
   deploy [name|--all]  Deploy edge functions (default: --all)
   secrets [set|list|unset]  Manage secrets (no args = set SB_SECRET_KEY)
-  repair [versions]    Mark local migrations as applied (default: all)
+  repair [reverted] [versions]  Mark migrations as applied or reverted (default: all)
+  reapply [versions]   Re-apply migrations: mark reverted then push (default: all)
   push                 Push migrations to remote
   pull                 Pull remote schema to local
   diff                 Diff local migrations against remote
@@ -233,6 +263,7 @@ const handlers = {
   secrets: () => cmdSecrets(args),
   push: () => cmdPush(args),
   repair: () => cmdRepair(args),
+  reapply: () => cmdReapply(args),
   pull: cmdPull,
   diff: cmdDiff,
   link: cmdLink,
