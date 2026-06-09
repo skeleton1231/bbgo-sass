@@ -17,7 +17,7 @@ var staticDefaults = &staticDefaultsProvider{defaults: map[string]map[string]any
 	"trendtrader": {"interval": "1h", "trendLine": map[string]any{"interval": "1h", "quantity": 0.001, "pivotRightWindow": 5}},
 	"supertrend":  {"interval": "1h", "quantity": 0.001},
 	"atrpin":      {"interval": "1h", "quantity": 0.001, "multiplier": 2.0},
-	"pivotshort":  {"interval": "1h", "breakLow": map[string]any{"interval": "1h", "window": 7, "ratio": 0.01}},
+	"pivotshort":  {"interval": "1h", "breakLow": map[string]any{"interval": "1h", "window": 7, "ratio": 0.01}, "exits": []map[string]any{{"roiStopLoss": map[string]any{"percentage": -0.05}}}},
 	"swing":       {"interval": "1h", "movingAverageType": "SMA", "movingAverageWindow": 20, "movingAverageInterval": "1h", "baseQuantity": 0.0001},
 	"ewo_dgtrd":   {"interval": "1h", "sigWin": 5, "stoploss": 0.02},
 	"irr":         {"interval": "1h", "window": 20, "quantity": 0.001},
@@ -117,6 +117,21 @@ func TestBacktestDefaults_BollgridProfitSpread(t *testing.T) {
 
 func strContains(s, sub string) bool {
 	return strings.Contains(s, sub)
+}
+
+func TestBacktestDefaults_PivotshortExits(t *testing.T) {
+	config := `{"symbol":"BTCUSDT"}`
+	yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(yaml)
+	if !strContains(s, "roistoploss:") && !strContains(s, "roiStopLoss:") {
+		t.Errorf("pivotshort should have roiStopLoss exit injected, got:\n%s", s)
+	}
+	if !strContains(s, "percentage: -0.05") {
+		t.Errorf("pivotshort roiStopLoss should have percentage -0.05, got:\n%s", s)
+	}
 }
 
 func TestBacktestYAML_NumbersNotQuoted(t *testing.T) {

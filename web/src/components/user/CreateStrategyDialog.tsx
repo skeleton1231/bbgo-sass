@@ -4,10 +4,11 @@ import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
 import { useStrategyRegistry } from '@/components/providers/strategy-registry'
-import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, nestConfig, type SessionRole } from '@/lib/bbgo/strategies'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, nestConfig, type SessionRole, type FuturesConfig } from '@/lib/bbgo/strategies'
 import { EXCHANGES } from '@/lib/bbgo/constants'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { StrategyConfigForm } from './StrategyConfigForm'
+import { FuturesConfigFields } from './FuturesConfigFields'
 import { toast } from 'sonner'
 
 const ENV_PREFIXES: Record<string, string> = {
@@ -36,11 +37,13 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const { mode: globalMode } = useTradingMode()
   const [mode, setMode] = useState<'live' | 'paper'>(globalMode)
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2', registry))
+  const [futuresConfig, setFuturesConfig] = useState<FuturesConfig>({ leverage: 1, marginType: 'cross' })
   const [sessionExchanges, setSessionExchanges] = useState<Record<string, string>>({})
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
     setConfig(getStrategyDefaults(newStrategy, registry))
+    setFuturesConfig({ leverage: 1, marginType: 'cross' })
     if (getStrategySchema(newStrategy, registry)?.liveOnly) {
       setMode('live')
     }
@@ -101,6 +104,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           strategy,
           config: numericConfig,
           mode,
+          ...(schema?.requiresFutures ? { futuresConfig } : {}),
         },
         { onSuccess: onClose, onError }
       )
@@ -227,6 +231,14 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
             fields={schema.fields}
             values={config}
             onChange={setConfig}
+          />
+        )}
+
+        {schema?.requiresFutures && (
+          <FuturesConfigFields
+            value={futuresConfig}
+            onChange={setFuturesConfig}
+            symbol={config.symbol as string | undefined}
           />
         )}
 

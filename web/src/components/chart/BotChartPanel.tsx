@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import type { TradeMarker, OrderLevel, GridLine, IndicatorLine, KlineCandle } from '@/components/chart/CandlestickChart'
 import type { IndicatorConfig } from '@/lib/bbgo/indicators'
-import type { StrategyStats } from '@/lib/bbgo/strategy-state'
+import type { StrategyDetails } from '@/lib/bbgo/strategy-state'
 import { extractBaseCurrency } from '@/lib/bbgo/fifo-pnl'
+import { StrategySidePanel } from './strategy-panel'
 
 const CandlestickChart = dynamic(
   () => import('@/components/chart/CandlestickChart').then((m) => ({ default: m.CandlestickChart })),
@@ -38,7 +39,7 @@ interface BotChartPanelProps {
   pnlLine: IndicatorLine | null
   klinesLoading: boolean
   loadEarlierKlines?: () => void
-  strategyStats: StrategyStats | null
+  strategyStats: StrategyDetails | null
   currentPrice?: number
   unrealizedPnlFromReport?: number
   noSymbolText: string
@@ -47,6 +48,14 @@ interface BotChartPanelProps {
   onIntervalChange: (interval: string) => void
   indicatorConfigs?: IndicatorConfig[]
   onToggleIndicator?: (id: string) => void
+  supabasePosition?: {
+    base: number
+    averageCost: number
+    quote: number
+    symbol: string
+    isClosed: boolean
+  }
+  unrealizedPnlPct?: number
 }
 
 export function BotChartPanel({
@@ -70,6 +79,8 @@ export function BotChartPanel({
   onIntervalChange,
   indicatorConfigs = [],
   onToggleIndicator,
+  supabasePosition,
+  unrealizedPnlPct,
 }: BotChartPanelProps) {
   const t = useTranslations('Bots')
   const sp = useTranslations('Bots.chartSidePanel')
@@ -134,25 +145,24 @@ export function BotChartPanel({
               )}
             </div>
           </div>
-          {strategyStats && strategyStats.base > 0 && currentPrice && (
+          {supabasePosition && !supabasePosition.isClosed && currentPrice && (
             <div className="flex items-center gap-4 mt-1.5 pt-2 border-t text-xs font-mono">
               <span className="text-muted-foreground">
-                {sp('holding')}: <span className="text-trade-up font-medium">{strategyStats.base.toFixed(6)} {extractBaseCurrency(strategyStats.symbol)}</span>
+                {sp('holding')}: <span className="text-trade-up font-medium">{Math.abs(supabasePosition.base).toFixed(6)} {extractBaseCurrency(supabasePosition.symbol)}</span>
               </span>
-              {strategyStats.averageCost > 0 && (
+              {supabasePosition.averageCost > 0 && (
                 <span className="text-muted-foreground">
-                  {sp('entry')}: <span className="text-foreground font-medium">${strategyStats.averageCost.toLocaleString()}</span>
+                  {sp('entry')}: <span className="text-foreground font-medium">${supabasePosition.averageCost.toLocaleString()}</span>
                 </span>
               )}
               <span className={cn(
                 'font-medium',
-                currentPrice > strategyStats.averageCost ? 'text-trade-up' : 'text-trade-down'
+                (unrealizedPnlFromReport ?? 0) >= 0 ? 'text-trade-up' : 'text-trade-down'
               )}>
-                {currentPrice > strategyStats.averageCost ? '+' : ''}
-                {((currentPrice - strategyStats.averageCost) * strategyStats.base).toFixed(2)} USDT
+                {(unrealizedPnlFromReport ?? 0) >= 0 ? '+' : ''}{(unrealizedPnlFromReport ?? 0).toFixed(2)} USDT
               </span>
               <span className="text-muted-foreground">
-                ≈ ${(currentPrice * strategyStats.base).toFixed(2)}
+                ≈ ${(currentPrice * Math.abs(supabasePosition.base)).toFixed(2)}
               </span>
             </div>
           )}
@@ -191,127 +201,12 @@ export function BotChartPanel({
                 />
               </div>
               {strategyStats && (
-                <StrategySidePanel strategyStats={strategyStats} currentPrice={currentPrice} gridLines={gridLines} unrealizedPnlFromReport={unrealizedPnlFromReport} />
+                <StrategySidePanel details={strategyStats} currentPrice={currentPrice} gridLines={gridLines} unrealizedPnlFromReport={unrealizedPnlFromReport} supabasePosition={supabasePosition} unrealizedPnlPct={unrealizedPnlPct} />
               )}
             </div>
           )}
         </CardContent>
       </Card>
     </ErrorBoundary>
-  )
-}
-
-function StrategySidePanel({ strategyStats, currentPrice, gridLines, unrealizedPnlFromReport }: {
-  strategyStats: StrategyStats
-  currentPrice?: number
-  gridLines: GridLine[]
-  unrealizedPnlFromReport?: number
-}) {
-  const sp = useTranslations('Bots.chartSidePanel')
-
-  const unrealizedPnl = unrealizedPnlFromReport ?? (currentPrice && strategyStats.averageCost > 0
-    ? (currentPrice - strategyStats.averageCost) * strategyStats.base
-    : 0)
-  const investedCost = Math.abs(strategyStats.quote)
-  const currentValue = currentPrice ? currentPrice * strategyStats.base : 0
-  const pnlPercent = strategyStats.averageCost > 0 && currentPrice
-    ? ((currentPrice - strategyStats.averageCost) / strategyStats.averageCost) * 100
-    : 0
-  const baseSymbol = extractBaseCurrency(strategyStats.symbol)
-
-  return (
-    <div className="hidden lg:flex flex-col gap-2 w-52 shrink-0 text-xs">
-      <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-        <p className="font-medium text-sm">{strategyStats.strategy}</p>
-        <div className="space-y-1.5 font-mono text-muted-foreground">
-          <div className="flex justify-between">
-            <span>{sp('range')}</span>
-            <span className="text-foreground">{strategyStats.lowerPrice.toLocaleString()}–{strategyStats.upperPrice.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>{sp('grids')}</span>
-            <span className="text-foreground">{strategyStats.gridNumber}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>{sp('qtyPerGrid')}</span>
-            <span className="text-foreground">{strategyStats.quantity}</span>
-          </div>
-          {strategyStats.stopLossPrice > 0 && (
-            <div className="flex justify-between">
-              <span>{sp('stopLoss')}</span>
-              <span className="text-trade-down">{strategyStats.stopLossPrice.toLocaleString()}</span>
-            </div>
-          )}
-          {strategyStats.takeProfitPrice > 0 && (
-            <div className="flex justify-between">
-              <span>{sp('takeProfit')}</span>
-              <span className="text-trade-up">{strategyStats.takeProfitPrice.toLocaleString()}</span>
-            </div>
-          )}
-          <hr className="border-border" />
-        </div>
-      </div>
-      <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-        <p className="font-medium text-sm">{sp('position')}</p>
-        <div className="space-y-1.5 font-mono text-muted-foreground">
-          <div className="flex justify-between items-center">
-            <span>{sp('holding')}</span>
-            <span className="text-trade-up font-medium">
-              {strategyStats.base.toFixed(6)} {baseSymbol}
-            </span>
-          </div>
-          {strategyStats.averageCost > 0 && (
-            <div className="flex justify-between">
-              <span>{sp('entryPrice')}</span>
-              <span className="text-foreground">${strategyStats.averageCost.toLocaleString()}</span>
-            </div>
-          )}
-          {investedCost > 0 && (
-            <div className="flex justify-between">
-              <span>{sp('invested')}</span>
-              <span className="text-foreground">${investedCost.toFixed(2)}</span>
-            </div>
-          )}
-          {currentPrice && strategyStats.base > 0 && strategyStats.averageCost > 0 && (
-            <div className="flex justify-between items-center">
-              <span>{sp('unrealized')}</span>
-              <div className="text-right">
-                <span className={cn(
-                  'font-medium',
-                  unrealizedPnl >= 0 ? 'text-trade-up' : 'text-trade-down'
-                )}>
-                  {unrealizedPnl >= 0 ? '+' : ''}{unrealizedPnl.toFixed(2)}
-                </span>
-                <span className={cn(
-                  'ml-1 text-[10px]',
-                  pnlPercent >= 0 ? 'text-trade-up/70' : 'text-trade-down/70'
-                )}>
-                  ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
-                </span>
-              </div>
-            </div>
-          )}
-          {currentPrice && strategyStats.base > 0 && (
-            <div className="flex justify-between">
-              <span>{sp('currentValue')}</span>
-              <span className="text-foreground">${currentValue.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-      </div>
-      {gridLines.length > 0 && (
-        <div className="rounded-lg border bg-muted/30 p-3">
-          <p className="font-medium mb-1.5">{sp('gridLevels')}</p>
-          <div className="max-h-40 overflow-y-auto space-y-0.5 font-mono text-muted-foreground">
-            {gridLines.slice(0, 12).map((g, i) => (
-              <div key={i} className="flex justify-between">
-                <span className="text-[10px]">{g.label}</span>
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5" style={{ backgroundColor: g.color }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
   )
 }

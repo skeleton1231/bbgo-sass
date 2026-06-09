@@ -1,5 +1,12 @@
 const PROXY_PREFIX = '/api/manager'
 
+function buildSessionQS(mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
+  if (strategyInstanceID) params.set('instanceID', strategyInstanceID)
+  return params.toString()
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const { headers: customHeaders, ...rest } = options ?? {}
   const res = await fetch(`${PROXY_PREFIX}${path}`, {
@@ -266,6 +273,7 @@ export function createStrategy(userId: string, data: {
   mode: 'live' | 'paper'
   crossExchange?: boolean
   sessions?: SessionRoleConfig[]
+  futuresConfig?: { leverage?: number; marginType?: string }
 }) {
   return request<InstanceInfo>(`/users/${userId}/strategies`, {
     method: 'POST',
@@ -362,44 +370,59 @@ export function listBacktestJobs() {
 
 // --- Bot data via Manager → bbgo container REST API ---
 
-export function fetchBotPing(userId: string, mode?: 'live' | 'paper') {
-  return request<{ status: string }>(`/users/${userId}/bbgo/ping?mode=${mode ?? 'live'}`)
+export function fetchBotPing(userId: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
+  if (strategyInstanceID) params.set('instanceID', strategyInstanceID)
+  return request<{ status: string }>(`/users/${userId}/bbgo/ping?${params}`)
 }
 
-export function fetchBotSessions(userId: string, mode?: 'live' | 'paper') {
-  return request<{ sessions: BBGoSession[] }>(`/users/${userId}/bbgo/sessions?mode=${mode ?? 'live'}`)
+export function fetchBotSessions(userId: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
+  if (strategyInstanceID) params.set('instanceID', strategyInstanceID)
+  return request<{ sessions: BBGoSession[] }>(`/users/${userId}/bbgo/sessions?${params}`)
 }
 
 export function fetchBotSessionDetail(userId: string, session: string, mode?: 'live' | 'paper') {
   return request<{ session: BBGoSession }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}?mode=${mode ?? 'live'}`)
 }
 
-export function fetchBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper') {
-  return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/trades?mode=${mode ?? 'live'}`)
+export function fetchBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const qs = buildSessionQS(mode, strategyInstanceID)
+  return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/trades?${qs}`)
 }
 
-export function fetchBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper') {
-  return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/open-orders?mode=${mode ?? 'live'}`)
+export function fetchBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const qs = buildSessionQS(mode, strategyInstanceID)
+  return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/open-orders?${qs}`)
 }
 
-export function fetchBotSessionAccount(userId: string, session: string, mode?: 'live' | 'paper') {
-  return request<{ account: unknown }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/account?mode=${mode ?? 'live'}`)
+export function fetchBotSessionAccount(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const qs = buildSessionQS(mode, strategyInstanceID)
+  return request<{ account: unknown }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/account?${qs}`)
 }
 
-export function fetchBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper') {
-  return request<{ balances: Record<string, BBGoBalance> }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/balances?mode=${mode ?? 'live'}`)
+export function fetchBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const qs = buildSessionQS(mode, strategyInstanceID)
+  return request<{ balances: Record<string, BBGoBalance> }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/balances?${qs}`)
 }
 
-export function fetchBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper') {
-  return request<{ symbols: string[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/symbols?mode=${mode ?? 'live'}`)
+export function fetchBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const qs = buildSessionQS(mode, strategyInstanceID)
+  return request<{ symbols: string[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/symbols?${qs}`)
 }
 
-export function fetchBotAssets(userId: string, mode?: 'live' | 'paper') {
-  return request<{ assets: Record<string, BBGoAsset> }>(`/users/${userId}/bbgo/assets?mode=${mode ?? 'live'}`)
+export function fetchBotAssets(userId: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const qs = buildSessionQS(mode, strategyInstanceID)
+  return request<{ assets: Record<string, BBGoAsset> }>(`/users/${userId}/bbgo/assets?${qs}`)
 }
 
-export function fetchBotStrategies(userId: string, mode?: 'live' | 'paper') {
-  return request<{ strategies: BBGoStrategyState[] }>(`/users/${userId}/bbgo/strategies?mode=${mode ?? 'live'}`)
+export function fetchBotStrategies(userId: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
+  const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
+  if (strategyInstanceID) params.set('instanceID', strategyInstanceID)
+  return request<{ strategies: BBGoStrategyState[] }>(`/users/${userId}/bbgo/strategies?${params}`)
 }
 
 export interface TradeMarkersResponse {

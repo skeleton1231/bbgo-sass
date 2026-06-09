@@ -53,6 +53,20 @@ func TestComputeInstanceID_DCA2(t *testing.T) {
 	}
 }
 
+func TestComputeInstanceID_PivotShort_WithInterval(t *testing.T) {
+	id := computeInstanceID("pivotshort", "BTCUSDT", rawJSON(`{"interval":"1m"}`))
+	if id != "pivotshort:BTCUSDT:1m" {
+		t.Errorf("got %q, want %q", id, "pivotshort:BTCUSDT:1m")
+	}
+}
+
+func TestComputeInstanceID_PivotShort_NoInterval(t *testing.T) {
+	id := computeInstanceID("pivotshort", "BTCUSDT", rawJSON(`{}`))
+	if id != "pivotshort:BTCUSDT" {
+		t.Errorf("got %q, want %q", id, "pivotshort:BTCUSDT")
+	}
+}
+
 func TestComputeInstanceID_UnknownStrategy(t *testing.T) {
 	id := computeInstanceID("mystategy", "BTCUSDT", rawJSON(`{}`))
 	if id != "mystategy:BTCUSDT" {

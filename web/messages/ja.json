@@ -173,7 +173,18 @@
       "unrealized": "未実現損益",
       "currentValue": "現在価値",
       "gridLevels": "グリッドレベル",
-      "entry": "エントリー"
+      "entry": "エントリー",
+      "spread": "スプレッド",
+      "quantity": "数量",
+      "interval": "間隔",
+      "budget": "予算",
+      "leverage": "レバレッジ",
+      "maInterval": "MA間隔",
+      "fastLength": "短期EMA",
+      "slowLength": "長期EMA",
+      "gridProfit": "グリッド利益",
+      "totalArbitrage": "裁定回数",
+      "numTrades": "取引数"
     },
     "depth": "板",
     "orderBook": "オーダーブック",
@@ -482,6 +493,17 @@
     },
     "linear": {
       "interval": "リニア期間"
+    }
+  },
+  "Futures": {
+    "title": "先物設定",
+    "leverage": "レバレッジ",
+    "leverageHint": "{symbol} 取引のレバレッジ倍率",
+    "marginTypeLabel": "マージンタイプ",
+    "marginTypeHint": "クロスマージンは全ポジションで証拠金を共有、分離マージンはこのポジションのみ",
+    "marginType": {
+      "cross": "クロスマージン",
+      "isolated": "分離マージン"
     }
   }
 }

@@ -174,7 +174,18 @@
       "unrealized": "未实现盈亏",
       "currentValue": "当前市值",
       "gridLevels": "网格线",
-      "entry": "入场价"
+      "entry": "入场价",
+      "spread": "价差",
+      "quantity": "数量",
+      "interval": "周期",
+      "budget": "预算",
+      "leverage": "杠杆",
+      "maInterval": "均线周期",
+      "fastLength": "快线周期",
+      "slowLength": "慢线周期",
+      "gridProfit": "网格利润",
+      "totalArbitrage": "套利次数",
+      "numTrades": "交易次数"
     },
     "depth": "深度",
     "orderBook": "订单簿",
@@ -494,6 +505,17 @@
     },
     "linear": {
       "interval": "线性周期"
+    }
+  },
+  "Futures": {
+    "title": "期货设置",
+    "leverage": "杠杆",
+    "leverageHint": "{symbol} 交易的杠杆倍数",
+    "marginTypeLabel": "保证金类型",
+    "marginTypeHint": "全仓模式共享保证金，逐仓模式仅限本仓位风险",
+    "marginType": {
+      "cross": "全仓保证金",
+      "isolated": "逐仓保证金"
     }
   }
 }

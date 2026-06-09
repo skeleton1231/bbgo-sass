@@ -191,20 +191,20 @@ export function useBotDetail(userId: string, botId: string | null) {
 
 // --- Bot data queries (real-time from bbgo container) ---
 
-export function useBotPing(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotPing(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategyInstanceID?: string) {
   return useQuery<{ status: string }>({
-    queryKey: ['bot-ping', userId, mode],
-    queryFn: () => fetchBotPing(userId, mode),
+    queryKey: ['bot-ping', userId, mode, strategyInstanceID],
+    queryFn: () => fetchBotPing(userId, mode, strategyInstanceID),
     enabled: !!userId && (containerRunning ?? false),
     staleTime: 30_000,
     refetchInterval: 30_000,
   })
 }
 
-export function useBotSessions(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotSessions(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategyInstanceID?: string) {
   return useQuery<{ sessions: BBGoSession[] }>({
-    queryKey: ['bot-sessions', userId, mode],
-    queryFn: () => fetchBotSessions(userId, mode),
+    queryKey: ['bot-sessions', userId, mode, strategyInstanceID],
+    queryFn: () => fetchBotSessions(userId, mode, strategyInstanceID),
     enabled: !!userId && (containerRunning ?? false),
     staleTime: 15_000,
     refetchInterval: 15_000,
@@ -221,20 +221,20 @@ export function useBotSessionTrades(userId: string, session: string, mode?: 'liv
   })
 }
 
-export function useBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotOpenOrders(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategyInstanceID?: string) {
   return useQuery<{ orders: BBGoOrder[] }>({
-    queryKey: ['bot-orders', userId, session, mode],
-    queryFn: () => fetchBotOpenOrders(userId, session, mode),
+    queryKey: ['bot-orders', userId, session, mode, strategyInstanceID],
+    queryFn: () => fetchBotOpenOrders(userId, session, mode, strategyInstanceID),
     enabled: !!userId && !!session && (containerRunning ?? false),
     staleTime: 15_000,
     refetchInterval: 15_000,
   })
 }
 
-export function useBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategyInstanceID?: string) {
   return useQuery<{ balances: Record<string, BBGoBalance> }>({
-    queryKey: ['bot-balances', userId, session, mode],
-    queryFn: () => fetchBotSessionBalances(userId, session, mode),
+    queryKey: ['bot-balances', userId, session, mode, strategyInstanceID],
+    queryFn: () => fetchBotSessionBalances(userId, session, mode, strategyInstanceID),
     enabled: !!userId && !!session && (containerRunning ?? false),
     staleTime: 20_000,
     refetchInterval: 20_000,
@@ -327,10 +327,10 @@ export function useBotAssets(userId: string, mode?: 'live' | 'paper', containerR
   })
 }
 
-export function useBotStrategiesState(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
+export function useBotStrategiesState(userId: string, mode?: 'live' | 'paper', containerRunning?: boolean, strategyInstanceID?: string) {
   return useQuery<{ strategies: BBGoStrategyState[] }>({
-    queryKey: ['bot-strategies-state', userId, mode],
-    queryFn: () => fetchBotStrategies(userId, mode),
+    queryKey: ['bot-strategies-state', userId, mode, strategyInstanceID],
+    queryFn: () => fetchBotStrategies(userId, mode, strategyInstanceID),
     enabled: !!userId && (containerRunning ?? false),
     staleTime: 30_000,
     refetchInterval: 30_000,

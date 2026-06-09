@@ -20,6 +20,11 @@ export interface SessionRole {
   futures: boolean
 }
 
+export interface FuturesConfig {
+  leverage?: number
+  marginType?: 'cross' | 'isolated'
+}
+
 export interface StrategySchema {
   id: string
   label: string
@@ -30,6 +35,7 @@ export interface StrategySchema {
   crossExchange?: boolean
   sessionRoles?: SessionRole[]
   liveOnly?: boolean
+  requiresFutures?: boolean
 }
 
 export function registryRowToSchema(row: {
@@ -43,6 +49,7 @@ export function registryRowToSchema(row: {
   fields: unknown
   session_roles: unknown
   sort_order: number | null
+  requires_futures: boolean | null
 }): StrategySchema {
   return {
     id: row.id,
@@ -54,6 +61,7 @@ export function registryRowToSchema(row: {
     liveOnly: row.live_only ?? false,
     crossExchange: row.cross_exchange ?? false,
     sessionRoles: Array.isArray(row.session_roles) ? row.session_roles as SessionRole[] : undefined,
+    requiresFutures: row.requires_futures ?? false,
   }
 }
 

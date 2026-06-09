@@ -10,7 +10,7 @@ function forwardRequest(
   path: string[],
   userId: string
 ) {
-  const search = request.nextUrl.search
+  const search = decodeURIComponent(request.nextUrl.search)
   const targetUrl = `${MANAGER_URL}/api/${path.join('/')}${search}`
 
   const headers: Record<string, string> = {

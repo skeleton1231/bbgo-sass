@@ -206,7 +206,18 @@
       "unrealized": "Unrealized P&L",
       "currentValue": "Current Value",
       "gridLevels": "Grid Levels",
-      "entry": "Entry"
+      "entry": "Entry",
+      "spread": "Spread",
+      "quantity": "Quantity",
+      "interval": "Interval",
+      "budget": "Budget",
+      "leverage": "Leverage",
+      "maInterval": "MA Interval",
+      "fastLength": "Fast EMA",
+      "slowLength": "Slow EMA",
+      "gridProfit": "Grid Profit",
+      "totalArbitrage": "Total Arbitrage",
+      "numTrades": "Trades"
     },
     "depth": "Depth",
     "orderBook": "Order Book",
@@ -495,6 +506,17 @@
     },
     "linear": {
       "interval": "Linear Interval"
+    }
+  },
+  "Futures": {
+    "title": "Futures Settings",
+    "leverage": "Leverage",
+    "leverageHint": "Leverage multiplier for {symbol} trading",
+    "marginTypeLabel": "Margin Type",
+    "marginTypeHint": "Cross-margin shares margin across positions. Isolated limits risk to this position only.",
+    "marginType": {
+      "cross": "Cross Margin",
+      "isolated": "Isolated Margin"
     }
   }
 }

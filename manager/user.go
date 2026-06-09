@@ -79,6 +79,11 @@ func normalizeStrategyConfig(strategy string, params map[string]any) (string, ma
 	return strategy, params
 }
 
+type FuturesConfig struct {
+	Leverage   int    `json:"leverage,omitempty"`
+	MarginType string `json:"marginType,omitempty"`
+}
+
 type SessionRoleConfig struct {
 	Name         string `json:"name"`
 	Exchange     string `json:"exchange"`
@@ -94,6 +99,7 @@ type StrategyEntry struct {
 	Mode          string              `json:"mode"`
 	CrossExchange bool                `json:"crossExchange"`
 	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
+	FuturesConfig *FuturesConfig      `json:"futuresConfig,omitempty"`
 }
 
 type UserMode struct {
@@ -132,11 +138,14 @@ type bbgoConfig struct {
 }
 
 type sessionConfig struct {
-	Exchange      string             `yaml:"exchange"`
-	EnvVarPrefix  string             `yaml:"envVarPrefix"`
-	Futures       bool               `yaml:"futures,omitempty"`
-	PublicOnly    bool               `yaml:"publicOnly,omitempty"`
-	PaperBalances map[string]float64 `yaml:"paperBalances,omitempty"`
+	Exchange              string             `yaml:"exchange"`
+	EnvVarPrefix          string             `yaml:"envVarPrefix"`
+	Futures               bool               `yaml:"futures,omitempty"`
+	IsolatedFutures       bool               `yaml:"isolatedFutures,omitempty"`
+	IsolatedFuturesSymbol string             `yaml:"isolatedFuturesSymbol,omitempty"`
+	SymbolLeverage        map[string]int     `yaml:"symbolLeverage,omitempty"`
+	PublicOnly            bool               `yaml:"publicOnly,omitempty"`
+	PaperBalances         map[string]float64 `yaml:"paperBalances,omitempty"`
 }
 
 type exchangeConfig struct {

@@ -239,6 +239,7 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		Mode          string              `json:"mode"`
 		CrossExchange bool                `json:"crossExchange"`
 		Sessions      []SessionRoleConfig `json:"sessions"`
+		FuturesConfig *FuturesConfig      `json:"futuresConfig,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -311,6 +312,7 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		UserID: userID, Mode: req.Mode, Strategy: normalizedStrategy,
 		Exchange: req.Exchange, Config: req.Config, Name: req.Name,
 		CrossExchange: req.CrossExchange, Sessions: req.Sessions,
+		FuturesConfig: req.FuturesConfig,
 	}
 
 	symbol := extractSymbolFromConfig(req.Config)
@@ -606,6 +608,7 @@ func (api *API) startInstanceContainer(inst *StrategyInstance) {
 		go api.syncer.MarkCredentialsVerified(inst.UserID, inst.Mode, []StrategyEntry{{
 			Strategy: inst.Strategy, Exchange: inst.Exchange,
 			CrossExchange: inst.CrossExchange, Sessions: inst.Sessions,
+			FuturesConfig: inst.FuturesConfig,
 		}})
 	}
 

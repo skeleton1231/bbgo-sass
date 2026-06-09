@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -346,6 +347,55 @@ func TestBuildInstanceYAML_PaperMode(t *testing.T) {
 	}
 	if len(yamlBytes) == 0 {
 		t.Error("expected non-empty YAML")
+	}
+}
+
+func TestBuildInstanceYAML_FuturesSymbolLeverage(t *testing.T) {
+	registry := &StrategyDefaultsCache{
+		defaults:        map[string]map[string]any{"pivotshort": {"quantity": 0.001}},
+		requiresFutures: map[string]bool{"pivotshort": true},
+	}
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModePaper, Strategy: "pivotshort",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config:        rawJSON(`{"symbol":"BTCUSDT","interval":"1m"}`),
+		FuturesConfig: &FuturesConfig{Leverage: 3, MarginType: "cross"},
+	}
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlStr := string(yamlBytes)
+	if !strings.Contains(yamlStr, "futures: true") {
+		t.Errorf("YAML missing 'futures: true'\n%s", yamlStr)
+	}
+	if !strings.Contains(yamlStr, "symbolleverage:") && !strings.Contains(yamlStr, "symbolLeverage:") {
+		t.Errorf("YAML missing symbolLeverage\n%s", yamlStr)
+	}
+	if !strings.Contains(yamlStr, "BTCUSDT: 3") {
+		t.Errorf("YAML missing leverage setting BTCUSDT: 3\n%s", yamlStr)
+	}
+}
+
+func TestBuildInstanceYAML_FuturesIsolated(t *testing.T) {
+	registry := &StrategyDefaultsCache{
+		requiresFutures: map[string]bool{"pivotshort": true},
+	}
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModeLive, Strategy: "pivotshort",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config:        rawJSON(`{"symbol":"BTCUSDT"}`),
+		FuturesConfig: &FuturesConfig{Leverage: 5, MarginType: "isolated"},
+	}
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlStr := string(yamlBytes)
+	if !strings.Contains(yamlStr, "isolatedfutures: true") && !strings.Contains(yamlStr, "isolatedFutures: true") {
+		t.Errorf("YAML missing isolatedFutures\n%s", yamlStr)
 	}
 }
 

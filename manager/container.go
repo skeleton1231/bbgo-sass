@@ -332,7 +332,7 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 	}
 	args = append(args,
 		cm.cfg.BBGOImage,
-		"bbgo", "backtest",
+		"backtest",
 		"--sync",
 		"--config", cDir+"/bbgo.yaml",
 		"--output", cDir,
@@ -423,7 +423,7 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 
 	args = append(args,
 		cm.cfg.BBGOImage,
-		"bbgo", "backtest",
+		"backtest",
 		"--sync",
 		"--sync-only",
 		"--sync-from", syncFrom,

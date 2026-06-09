@@ -173,7 +173,18 @@
       "unrealized": "미실현 손익",
       "currentValue": "현재 가치",
       "gridLevels": "그리드 레벨",
-      "entry": "진입가"
+      "entry": "진입가",
+      "spread": "스프레드",
+      "quantity": "수량",
+      "interval": "간격",
+      "budget": "예산",
+      "leverage": "레버리지",
+      "maInterval": "MA 간격",
+      "fastLength": "빠른 EMA",
+      "slowLength": "느린 EMA",
+      "gridProfit": "그리드 수익",
+      "totalArbitrage": "차익거래 횟수",
+      "numTrades": "거래 수"
     },
     "depth": "호가",
     "orderBook": "오더북",
@@ -482,6 +493,17 @@
     },
     "linear": {
       "interval": "선형 주기"
+    }
+  },
+  "Futures": {
+    "title": "선물 설정",
+    "leverage": "레버리지",
+    "leverageHint": "{symbol} 거래 레버리지 배수",
+    "marginTypeLabel": "마진 유형",
+    "marginTypeHint": "교차 마진은 모든 포지션의 증거금을 공유, 격리 마진은 이 포지션만 제한",
+    "marginType": {
+      "cross": "교차 마진",
+      "isolated": "격리 마진"
     }
   }
 }

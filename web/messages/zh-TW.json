@@ -172,7 +172,18 @@
       "unrealized": "未實現盈虧",
       "currentValue": "當前市值",
       "gridLevels": "網格線",
-      "entry": "入場價"
+      "entry": "入場價",
+      "spread": "價差",
+      "quantity": "數量",
+      "interval": "週期",
+      "budget": "預算",
+      "leverage": "槓桿",
+      "maInterval": "均線週期",
+      "fastLength": "快線週期",
+      "slowLength": "慢線週期",
+      "gridProfit": "網格利潤",
+      "totalArbitrage": "套利次數",
+      "numTrades": "交易次數"
     },
     "depth": "深度",
     "orderBook": "訂單簿",
@@ -481,6 +492,17 @@
     },
     "linear": {
       "interval": "線性週期"
+    }
+  },
+  "Futures": {
+    "title": "期貨設定",
+    "leverage": "槓桿",
+    "leverageHint": "{symbol} 交易的槓桿倍數",
+    "marginTypeLabel": "保證金類型",
+    "marginTypeHint": "全倉模式共享保證金，逐倉模式僅限本倉位風險",
+    "marginType": {
+      "cross": "全倉保證金",
+      "isolated": "逐倉保證金"
     }
   }
 }

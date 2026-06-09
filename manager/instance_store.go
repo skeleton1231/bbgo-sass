@@ -272,6 +272,10 @@ func (s *InstanceStore) upsertToSupabase(inst *StrategyInstance) {
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
+	if inst.FuturesConfig != nil {
+		b, _ := json.Marshal(inst.FuturesConfig)
+		row.FuturesConfig = json.RawMessage(b)
+	}
 	_, _, err := s.sb.client.From("strategy_instances").Upsert(row, "user_id,mode,instance_id", "", "").Execute()
 	if err != nil {
 		log.Printf("upsert instance %s to supabase: %v\n", inst.InstanceID, err)
@@ -342,6 +346,11 @@ func rowToInstance(r PublicStrategyInstancesSelect) StrategyInstance {
 		b, _ := json.Marshal(r.Sessions)
 		json.Unmarshal(b, &sessions)
 	}
+	var futuresConfig *FuturesConfig
+	if r.FuturesConfig != nil {
+		b, _ := json.Marshal(r.FuturesConfig)
+		json.Unmarshal(b, &futuresConfig)
+	}
 	return StrategyInstance{
 		InstanceID:    r.InstanceId,
 		UserID:        r.UserId,
@@ -353,6 +362,7 @@ func rowToInstance(r PublicStrategyInstancesSelect) StrategyInstance {
 		Name:          r.Name,
 		CrossExchange: r.CrossExchange,
 		Sessions:      sessions,
+		FuturesConfig: futuresConfig,
 	}
 }
 
@@ -400,6 +410,26 @@ func parseInstanceYAML(data []byte, userID, mode, dirName string) (*StrategyInst
 		inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
 	} else {
 		inst.InstanceID = dirName
+	}
+
+	// Extract futures config from session
+	for _, sc := range cfg.Sessions {
+		if sc.Futures {
+			fc := &FuturesConfig{}
+			if len(sc.SymbolLeverage) > 0 {
+				for _, lev := range sc.SymbolLeverage {
+					fc.Leverage = lev
+					break
+				}
+			}
+			if sc.IsolatedFutures {
+				fc.MarginType = "isolated"
+			} else {
+				fc.MarginType = "cross"
+			}
+			inst.FuturesConfig = fc
+			break
+		}
 	}
 
 	return inst, nil
@@ -478,6 +508,15 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 		}
 		if registry != nil && registry.RequiresFutures(inst.Strategy) {
 			sc.Futures = true
+			if inst.FuturesConfig != nil {
+				if inst.FuturesConfig.Leverage > 0 {
+					sc.SymbolLeverage = map[string]int{symbol: inst.FuturesConfig.Leverage}
+				}
+				if inst.FuturesConfig.MarginType == "isolated" {
+					sc.IsolatedFutures = true
+					sc.IsolatedFuturesSymbol = symbol
+				}
+			}
 		}
 		sessions[exchange] = sc
 
