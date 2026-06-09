@@ -10,8 +10,6 @@ import {
   useStartInstance,
   useStopInstance,
   useBotSessions,
-  useBotOpenOrders,
-  useBotSessionBalances,
   useBotStrategiesState,
   useBotPing,
   useContainerLogs,
@@ -47,6 +45,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
+import { FuturesMarginPanel } from '@/components/user/FuturesMarginPanel'
 import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computePositionTags } from '@/lib/bbgo/position-tags'
@@ -87,7 +86,7 @@ export default function BotDetailPage() {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const userId = useUserId()
-  const botId = params.id
+  const botId = decodeURIComponent(params.id)
   const rawMode = searchParams.get('mode')
   const { mode: globalMode } = useTradingMode()
 
@@ -119,18 +118,16 @@ export default function BotDetailPage() {
   const firstSession = sessions[0]?.name ?? ''
   const activeSession = selectedSession || firstSession
 
-  // Open orders: prefer container data when running, fall back to Supabase
+  // Open orders: Supabase-native (works when container is down)
   const { data: supabaseOpenOrders } = useSupabaseOpenOrders(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
-  const { data: containerOpenOrders } = useBotOpenOrders(userId, activeSession, mode, isRunning, botId)
-  const openOrdersData = isRunning && containerOpenOrders ? containerOpenOrders : { orders: supabaseOpenOrders ?? [] }
+  const openOrdersData = { orders: supabaseOpenOrders ?? [] }
 
-  const { data: closedOrdersData } = useSupabaseClosedOrders(userId, { symbol: symbol || undefined, mode })
+  const { data: closedOrdersData } = useSupabaseClosedOrders(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
   const { data: tradesData } = useSupabaseTrades(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
 
   // Balances: Supabase-native (works when container is down)
   const { data: supabaseBalances } = useSupabaseBalances(userId, { mode })
-  const { data: containerBalances } = useBotSessionBalances(userId, activeSession, mode, isRunning, botId)
-  const balancesData = isRunning && containerBalances ? containerBalances : { balances: supabaseBalances ?? {} }
+  const balancesData = { balances: supabaseBalances ?? {} }
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning, botId)
   const { data: pingData } = useBotPing(userId, mode, isRunning, botId)
   const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
@@ -176,8 +173,8 @@ export default function BotDetailPage() {
   const pnlLegacy = !hasProfitsData ? pnlFallback : null
 
   const strategyMatch = useCallback(
-    (tag: string | undefined) => !!bot && (tag === bot.strategy || tag === bot.id),
-    [bot?.strategy, bot?.id]
+    (strategyInstanceId: string | undefined) => !!bot && strategyInstanceId === bot.id,
+    [bot?.id]
   )
 
   const tradeOrderIds = useMemo(() => {
@@ -190,9 +187,9 @@ export default function BotDetailPage() {
 
   const allOpenOrders = wsOpenOrders ?? openOrdersData?.orders ?? []
   const allClosedOrders = closedOrdersData ?? []
-  const openOrders = allOpenOrders.filter((o) => strategyMatch(o.tag))
+  const openOrders = allOpenOrders.filter((o) => strategyMatch(o.strategyInstanceId))
   const closedOrders = allClosedOrders.filter(
-    (o) => strategyMatch(o.tag) || tradeOrderIds.has(o.orderID)
+    (o) => strategyMatch(o.strategyInstanceId) || tradeOrderIds.has(o.orderID)
   )
 
   const tradeMarkers: TradeMarker[] = useMemo(
@@ -629,6 +626,7 @@ export default function BotDetailPage() {
             <TabsTrigger value="close-history" className="rounded-md text-xs">{t('pnl.closeHistory')}</TabsTrigger>
           )}
           <TabsTrigger value="strategies" className="rounded-md text-xs">{t('strategies')}</TabsTrigger>
+          <TabsTrigger value="futures-margin" className="rounded-md text-xs">{t('futuresMargin')}</TabsTrigger>
           {isRunning && <TabsTrigger value="logs" className="rounded-md text-xs">{t('containerLogs')}</TabsTrigger>}
         </TabsList>
 
@@ -883,6 +881,12 @@ export default function BotDetailPage() {
               <CardContent className="py-8 text-center text-sm text-muted-foreground">{t('noStrategiesTab')}</CardContent>
             )}
           </Card>
+        </TabsContent>
+
+        <TabsContent value="futures-margin">
+          <ErrorBoundary>
+            <FuturesMarginPanel />
+          </ErrorBoundary>
         </TabsContent>
 
         {isRunning && (

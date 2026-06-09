@@ -5,6 +5,7 @@ export function tableName(base: string, mode?: 'live' | 'paper'): string {
 }
 
 export function tradeRowToBBGo(row: Record<string, unknown>, idx: number): BBGoTrade {
+  const strategyInstanceId = (row.strategy_instance_id as string) || undefined
   return {
     gid: idx,
     id: parseInt(String(row.trade_id ?? idx), 10) || idx,
@@ -21,6 +22,7 @@ export function tradeRowToBBGo(row: Record<string, unknown>, idx: number): BBGoT
     tradedAt: String(row.traded_at ?? ''),
     fee: String(row.fee ?? '0'),
     feeCurrency: String(row.fee_currency ?? ''),
+    strategyInstanceId,
   }
 }
 
@@ -43,6 +45,7 @@ export function orderRowToBBGo(row: Record<string, unknown>, idx: number): BBGoO
     stopPrice: stopPrice !== '0' ? stopPrice : undefined,
     creationTime: String(row.created_at ?? ''),
     isWorking: Boolean(row.is_working),
-    tag: strategyInstanceId,
+    tag: (row.tag as string) || undefined,
+    strategyInstanceId,
   }
 }

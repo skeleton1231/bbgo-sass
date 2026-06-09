@@ -226,43 +226,6 @@ func TestAPI_Health_WithRunningInstance(t *testing.T) {
 	}
 }
 
-func TestAPI_BBGoPnL_WithMockClient(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "sessions") && !strings.Contains(r.URL.Path, "trades") {
-			json.NewEncoder(w).Encode(BBGoSessionsResponse{Sessions: []BBGoSession{{Name: "binance"}}})
-			return
-		}
-		trades := []BBGoTrade{
-			{GID: 1, Symbol: "BTCUSDT", Side: "BUY", Price: "50000", Quantity: "0.1", Fee: "0.001", FeeCurrency: "USDT"},
-			{GID: 2, Symbol: "BTCUSDT", Side: "SELL", Price: "51000", Quantity: "0.1", Fee: "0.001", FeeCurrency: "USDT"},
-		}
-		json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: trades})
-	}))
-	defer srv.Close()
-
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBPnL_InstanceNotRunning(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?mode=live", nil)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503, got %d", w.Code)
-	}
-}
-
 func TestAPI_HasDataForRange_NoDB(t *testing.T) {
 	api, _ := setupHandlerAPI(t)
 	api.container.cfg.BacktestSharedDir = t.TempDir()
@@ -316,27 +279,6 @@ func TestAPI_DownloadCSV_TradesNotFound(t *testing.T) {
 	}
 }
 
-func TestAPI_SymbolPriceLookup_NoHub(t *testing.T) {
-	api, _ := setupHandlerAPI(t)
-	api.hub = nil
-
-	lookup := api.symbolPriceLookup(nil)
-	_, err := lookup("BTCUSDT")
-	if err == nil {
-		t.Error("expected error when hub is nil")
-	}
-}
-
-func TestAPI_SymbolPriceLookup_NilConn(t *testing.T) {
-	api, _ := setupHandlerAPI(t)
-	api.hub = &MarketDataHub{}
-
-	lookup := api.symbolPriceLookup(nil)
-	_, err := lookup("BTCUSDT")
-	if err == nil {
-		t.Error("expected error when hub conn is nil")
-	}
-}
 
 func TestAPI_UploadLocalToStorage_DisallowedFile(t *testing.T) {
 	api, _ := setupHandlerAPI(t)
@@ -413,70 +355,6 @@ func TestAPI_BBGoSessionDetail_Error(t *testing.T) {
 	}
 }
 
-func TestAPI_BBGoSessionOpenOrders_MockServer(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(BBGoOrdersResponse{Orders: []BBGoOrder{
-			{OrderID: 1, Symbol: "BTCUSDT", Side: "BUY"},
-		}})
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/open-orders?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoSessionOpenOrders_Error(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/open-orders?mode=live", nil)
-	if w.Code != http.StatusBadGateway {
-		t.Errorf("expected 502, got %d", w.Code)
-	}
-}
-
-func TestAPI_BBGoSessionAccount_MockServer(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"account": map[string]any{}})
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/account?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoSessionAccount_Error(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/account?mode=live", nil)
-	if w.Code != http.StatusBadGateway {
-		t.Errorf("expected 502, got %d", w.Code)
-	}
-}
-
-func TestAPI_BBGoSessionBalances_MockServer(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(BBGoBalancesResponse{Balances: map[string]BBGoBalance{
-			"BTC": {Currency: "BTC", Available: json.Number("1.0")},
-		}})
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/balances?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoSessionBalances_Error(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/balances?mode=live", nil)
-	if w.Code != http.StatusBadGateway {
-		t.Errorf("expected 502, got %d", w.Code)
-	}
-}
-
 func TestAPI_BBGoSessionSymbols_MockServer(t *testing.T) {
 	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(BBGoSymbolsResponse{Symbols: []string{"BTCUSDT", "ETHUSDT"}})
@@ -497,30 +375,6 @@ func TestAPI_BBGoSessionSymbols_Error(t *testing.T) {
 	}
 }
 
-func TestAPI_BBGoTrades_MockServer(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: []BBGoTrade{
-			{GID: 1, Symbol: "BTCUSDT", Side: "BUY", Price: "50000"},
-		}})
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trades?mode=live&exchange=binance", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoAssets_MockServer(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(BBGoAssetsResponse{Assets: map[string]BBGoAsset{
-			"BTC": {Currency: "BTC", Total: json.Number("1.0")},
-		}})
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/assets?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
 func TestAPI_BBGoStrategies_MockServer(t *testing.T) {
 	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(BBGoStrategiesResponse{Strategies: []BBGoStrategyState{
@@ -530,26 +384,6 @@ func TestAPI_BBGoStrategies_MockServer(t *testing.T) {
 	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/strategies?mode=live", nil)
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoClosedOrders_Error(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/orders/closed?mode=live", nil)
-	if w.Code != http.StatusBadGateway {
-		t.Errorf("expected 502, got %d", w.Code)
-	}
-}
-
-func TestAPI_BBGoTradingVolume_Error(t *testing.T) {
-	_, r, _ := setupMockBBGo(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
-	})
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trading-volume?mode=live", nil)
-	if w.Code != http.StatusBadGateway {
-		t.Errorf("expected 502, got %d", w.Code)
 	}
 }
 

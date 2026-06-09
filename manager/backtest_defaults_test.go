@@ -40,6 +40,10 @@ func (s *staticDefaultsProvider) GetDefaults(strategyID string) map[string]any {
 	return s.defaults[strategyID]
 }
 
+func (s *staticDefaultsProvider) RequiresFutures(strategyID string) bool {
+	return false
+}
+
 func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 	tests := []struct {
 		strategy  string
@@ -160,4 +164,64 @@ func TestBacktestYAML_NumbersNotQuoted(t *testing.T) {
 			}
 		})
 	}
+}
+
+type futuresDefaultsProvider struct {
+	staticDefaultsProvider
+	futuresStrategies map[string]bool
+}
+
+func (f *futuresDefaultsProvider) RequiresFutures(strategyID string) bool {
+	return f.futuresStrategies[strategyID]
+}
+
+func TestBacktestYAML_FuturesConfig(t *testing.T) {
+	provider := &futuresDefaultsProvider{
+		futuresStrategies: map[string]bool{"pivotshort": true},
+	}
+
+	t.Run("includes futures and leverage when strategy requires it", func(t *testing.T) {
+		config := `{"symbol":"BTCUSDT","leverage":10}`
+		yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(yaml)
+		if !strContains(s, "futures: true") {
+			t.Errorf("futures strategy should have futures: true, got:\n%s", s)
+		}
+		if !strContains(s, "symbolLeverage:") {
+			t.Errorf("futures strategy should have symbolLeverage, got:\n%s", s)
+		}
+		if !strContains(s, "BTCUSDT: 10") {
+			t.Errorf("leverage should be 10 for BTCUSDT, got:\n%s", s)
+		}
+	})
+
+	t.Run("no futures config when strategy does not require it", func(t *testing.T) {
+		config := `{"symbol":"BTCUSDT","quantity":0.1}`
+		yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(yaml)
+		if strContains(s, "futures: true") {
+			t.Errorf("non-futures strategy should not have futures: true, got:\n%s", s)
+		}
+	})
+
+	t.Run("isolated margin from marginType", func(t *testing.T) {
+		config := `{"symbol":"BTCUSDT","leverage":5,"marginType":"isolated"}`
+		yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(yaml)
+		if !strContains(s, "isolatedFutures: true") {
+			t.Errorf("isolated margin should have isolatedFutures: true, got:\n%s", s)
+		}
+		if !strContains(s, "isolatedFuturesSymbol: BTCUSDT") {
+			t.Errorf("isolated margin should have isolatedFuturesSymbol, got:\n%s", s)
+		}
+	})
 }

@@ -22,6 +22,7 @@ func TestBusiness_LiveContainer_NoPaperTrade(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.cfg.SupabaseURL = "https://test.supabase.co"
 	cm.cfg.SupabaseKey = "test-key"
+	cm.cfg.SupabaseDBURL = "postgresql://test:test@localhost:5432/postgres"
 
 	inst := &StrategyInstance{
 		UserID:   testUUID,
@@ -36,14 +37,14 @@ func TestBusiness_LiveContainer_NoPaperTrade(t *testing.T) {
 			t.Errorf("live container must not have PAPER_TRADE env, got: %s", arg)
 		}
 	}
-	hasSupabaseURL := false
+	hasSupabaseDBURL := false
 	for _, arg := range args {
-		if strings.Contains(arg, "SUPABASE_URL") {
-			hasSupabaseURL = true
+		if strings.Contains(arg, "SUPABASE_DB_URL") {
+			hasSupabaseDBURL = true
 		}
 	}
-	if !hasSupabaseURL {
-		t.Error("live container should have SUPABASE_URL env")
+	if !hasSupabaseDBURL {
+		t.Error("live container should have SUPABASE_DB_URL env")
 	}
 }
 
@@ -53,6 +54,7 @@ func TestBusiness_PaperContainer_HasPaperTrade(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.cfg.SupabaseURL = "https://test.supabase.co"
 	cm.cfg.SupabaseKey = "test-key"
+	cm.cfg.SupabaseDBURL = "postgresql://test:test@localhost:5432/postgres"
 
 	inst := &StrategyInstance{
 		UserID:   testUUID,
@@ -93,6 +95,7 @@ func TestBusiness_PaperContainer_SupabaseWithPrefix(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.cfg.SupabaseURL = "https://test.supabase.co"
 	cm.cfg.SupabaseKey = "test-key"
+	cm.cfg.SupabaseDBURL = "postgresql://test:test@localhost:5432/postgres"
 
 	inst := &StrategyInstance{
 		UserID:   testUUID,
@@ -102,8 +105,8 @@ func TestBusiness_PaperContainer_SupabaseWithPrefix(t *testing.T) {
 		Symbol:   "BTCUSDT",
 	}
 	args := cm.instanceEnvArgs(inst)
-	if !hasEnv(args, "SUPABASE_URL=https://test.supabase.co") {
-		t.Error("paper container must have SUPABASE_URL")
+	if !hasEnv(args, "SUPABASE_DB_URL=postgresql://test:test@localhost:5432/postgres") {
+		t.Error("paper container must have SUPABASE_DB_URL")
 	}
 	if !hasEnv(args, "SUPABASE_TABLE_PREFIX=paper_") {
 		t.Error("paper container must have SUPABASE_TABLE_PREFIX=paper_")

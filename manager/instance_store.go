@@ -529,6 +529,15 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 	}
 
 	containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
+
+	anyFutures := false
+	for _, s := range sessions {
+		if s.Futures {
+			anyFutures = true
+			break
+		}
+	}
+
 	cfg := bbgoConfig{
 		InstanceID: inst.InstanceID,
 		Database: &databaseConfig{
@@ -540,7 +549,8 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 		Sync: &syncConfig{
 			UserDataStream: &syncUserDataStreamConfig{
 				Trades:       true,
-				FilledOrders: true,
+				FilledOrders:    true,
+				FuturesPosition: anyFutures,
 			},
 		},
 		ExchangeStrategies:      exchangeStrategies,

@@ -517,33 +517,6 @@ func TestAPI_BBGoPing_Running(t *testing.T) {
 
 // --- api.go: BBGoTrades with running mock ---
 
-func TestAPI_BBGoTrades_Running(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"trades":[]}`))
-	}))
-	defer srv.Close()
-
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return NewBBGoClient(srv.URL)
-	}
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trades?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- api.go: SyncBacktestData with sync mock ---
-
 func TestAPI_SyncBacktestData_WithSync(t *testing.T) {
 	api, r := setupHandlerAPI(t)
 	store, _ := newTestStore(t)
@@ -648,58 +621,6 @@ func TestAPI_SubmitBacktest_MissingExchangeV2(t *testing.T) {
 }
 
 // --- api.go: BBGoOpenOrders / BBGoBalances / BBGoAssets with running mock ---
-
-func TestAPI_BBGoAssets_Running(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"assets":{}}`))
-	}))
-	defer srv.Close()
-
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return NewBBGoClient(srv.URL)
-	}
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/assets?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- api.go: BBGoPnL with running mock and fallback ---
-
-func TestAPI_BBGoPnL_RunningWithTrades(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"trades":[{"id":1,"symbol":"BTCUSDT","side":"buy","price":"50000","quantity":"0.1","fee":"0.001"}]}`))
-	}))
-	defer srv.Close()
-
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return NewBBGoClient(srv.URL)
-	}
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- container.go: StopAllForUser ---
 
 func TestContainer_StopAllForUser(t *testing.T) {
 	cm := testContainerManager(t)

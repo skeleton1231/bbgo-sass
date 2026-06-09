@@ -11,32 +11,6 @@ import (
 
 // --- api.go: BBGoPnL with paper mode (skips syncer) ---
 
-func TestAPI_BBGoPnL_PaperMode(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"trades":[{"id":1,"symbol":"BTCUSDT","side":"buy","price":"50000","quantity":"0.1","fee":"0.001"}]}`))
-	}))
-	defer srv.Close()
-
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return NewBBGoClient(srv.URL)
-	}
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- api.go: BBGoClosedOrders with running mock ---
-
 func TestAPI_BBGoClosedOrders_Running(t *testing.T) {
 	api, r := setupHandlerAPI(t)
 	store, _ := newTestStore(t)
@@ -314,28 +288,6 @@ func TestAPI_SubmitBacktest_BadBody(t *testing.T) {
 }
 
 // --- api.go: SubmitBacktest missing symbol ---
-
-func TestAPI_SubmitBacktest_MissingSymbolV2(t *testing.T) {
-	_, r := setupHandlerAPI(t)
-	w := doRequest(r, "POST", "/api/backtest/submit", map[string]any{
-		"strategy": "grid2", "exchange": "binance",
-		"start_time": "2024-01-01", "end_time": "2024-01-31",
-	})
-	// Submit doesn't validate all fields — returns 202
-	t.Logf("status = %d, body = %s", w.Code, w.Body.String())
-}
-
-// --- api.go: SubmitBacktest missing start time ---
-
-func TestAPI_SubmitBacktest_MissingStartTime(t *testing.T) {
-	_, r := setupHandlerAPI(t)
-	w := doRequest(r, "POST", "/api/backtest/submit", map[string]any{
-		"strategy": "grid2", "exchange": "binance", "symbol": "BTCUSDT",
-	})
-	t.Logf("status = %d, body = %s", w.Code, w.Body.String())
-}
-
-// --- api.go: CreateStrategy with symbol ---
 
 func TestAPI_CreateStrategy_WithSymbol(t *testing.T) {
 	api, r := setupHandlerAPI(t)

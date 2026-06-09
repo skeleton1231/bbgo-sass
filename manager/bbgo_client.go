@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 )
 
@@ -97,168 +96,23 @@ type BBGoTradesResponse struct {
 	Trades []BBGoTrade `json:"trades"`
 }
 
-func (c *BBGoClient) GetTrades(exchange, symbol string, lastGID int64) ([]BBGoTrade, error) {
-	return c.GetTradesWithStrategy(exchange, symbol, lastGID, "")
-}
-
-func (c *BBGoClient) GetTradesWithStrategy(exchange, symbol string, lastGID int64, strategy string) ([]BBGoTrade, error) {
-	q := url.Values{"gid": {strconv.FormatInt(lastGID, 10)}}
-	if exchange != "" {
-		q.Set("exchange", exchange)
-	}
-	if symbol != "" {
-		q.Set("symbol", symbol)
-	}
-	if strategy != "" {
-		q.Set("strategy", strategy)
-	}
-
-	var resp BBGoTradesResponse
-	if err := c.get("/api/trades?"+q.Encode(), &resp); err != nil {
-		return nil, err
-	}
-	return resp.Trades, nil
-}
-
-const syncPageSize = 500
-
-// GetAllTrades paginates through trades using the GID cursor.
-func (c *BBGoClient) GetAllTrades(exchange, symbol string) ([]BBGoTrade, error) {
-	return c.GetAllTradesFrom(exchange, symbol, 0)
-}
-
-func (c *BBGoClient) GetAllTradesFrom(exchange, symbol string, lastGID int64) ([]BBGoTrade, error) {
-	return c.GetAllTradesFromWithStrategy(exchange, symbol, lastGID, "")
-}
-
-func (c *BBGoClient) GetAllTradesFromWithStrategy(exchange, symbol string, lastGID int64, strategy string) ([]BBGoTrade, error) {
-	var all []BBGoTrade
-	cursor := lastGID
-	for {
-		trades, err := c.GetTradesWithStrategy(exchange, symbol, cursor, strategy)
-		if err != nil {
-			return nil, err
-		}
-		if len(trades) == 0 {
-			break
-		}
-		all = append(all, trades...)
-		maxGID := cursor
-		for _, t := range trades {
-			if t.GID > maxGID {
-				maxGID = t.GID
-			}
-		}
-		cursor = maxGID
-		if len(trades) < syncPageSize {
-			break
-		}
-	}
-	return all, nil
-}
-
-type BBGoOrder struct {
-	GID              uint64     `json:"gid"`
-	OrderID          uint64     `json:"orderID"`
-	UUID             string     `json:"uuid,omitempty"`
-	ClientOrderID    string     `json:"clientOrderID,omitempty"`
-	Exchange         string     `json:"exchange"`
-	Symbol           string     `json:"symbol"`
-	Side             string     `json:"side"`
-	Type             string     `json:"orderType"`
-	Price            flexString `json:"price"`
-	Quantity         flexString `json:"quantity"`
-	ExecutedQuantity flexString `json:"executedQuantity"`
-	Status           string     `json:"status"`
-	StopPrice        flexString `json:"stopPrice,omitempty"`
-	CreationTime     string     `json:"creationTime"`
-	IsWorking        bool       `json:"isWorking"`
-	Tag              string     `json:"tag,omitempty"`
-}
-
-type BBGoOrdersResponse struct {
-	Orders []BBGoOrder `json:"orders"`
-}
-
-func (c *BBGoClient) GetClosedOrders(exchange, symbol string, lastGID int64) ([]BBGoOrder, error) {
-	q := url.Values{"gid": {strconv.FormatInt(lastGID, 10)}}
-	if exchange != "" {
-		q.Set("exchange", exchange)
-	}
-	if symbol != "" {
-		q.Set("symbol", symbol)
-	}
-
-	var resp BBGoOrdersResponse
-	if err := c.get("/api/orders/closed?"+q.Encode(), &resp); err != nil {
-		return nil, err
-	}
-	return resp.Orders, nil
-}
-
-
-type PositionSummary struct {
-	NetPosition float64 `json:"netPosition"`
-	Symbol      string  `json:"symbol"`
-}
-
-func (c *BBGoClient) GetTradesRange(exchange, symbol, strategy string, since, until *time.Time, limit int, ordering string) ([]BBGoTrade, error) {
-	q := url.Values{}
-	if exchange != "" {
-		q.Set("exchange", exchange)
-	}
-	if symbol != "" {
-		q.Set("symbol", symbol)
-	}
-	if strategy != "" {
-		q.Set("strategy", strategy)
-	}
-	if since != nil {
-		q.Set("since", since.Format(time.RFC3339))
-	}
-	if until != nil {
-		q.Set("until", until.Format(time.RFC3339))
-	}
-	if limit > 0 {
-		q.Set("limit", strconv.Itoa(limit))
-	}
-	if ordering != "" {
-		q.Set("ordering", ordering)
-	}
-
-	var resp BBGoTradesResponse
-	if err := c.get("/api/trades?"+q.Encode(), &resp); err != nil {
-		return nil, err
-	}
-	return resp.Trades, nil
-}
-
-func (c *BBGoClient) GetTradePositionSummary(exchange, symbol string, before *time.Time) (*PositionSummary, error) {
-	q := url.Values{}
-	if exchange != "" {
-		q.Set("exchange", exchange)
-	}
-	if symbol != "" {
-		q.Set("symbol", symbol)
-	}
-	if before != nil {
-		q.Set("before", before.Format(time.RFC3339))
-	}
-
-	var resp PositionSummary
-	if err := c.get("/api/trades/position-summary?"+q.Encode(), &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
 type BBGoSession struct {
 	Name         string `json:"name"`
-	ExchangeName string `json:"exchange"`
+	ExchangeName string `json:"exchangeName"`
 }
 
 type BBGoSessionsResponse struct {
 	Sessions []BBGoSession `json:"sessions"`
+}
+
+type BBGoSymbolsResponse struct {
+	Symbols []string `json:"symbols"`
+}
+
+type BBGoStrategyState map[string]any
+
+type BBGoStrategiesResponse struct {
+	Strategies []BBGoStrategyState `json:"strategies"`
 }
 
 func (c *BBGoClient) GetSessions() ([]BBGoSession, error) {
@@ -281,104 +135,12 @@ func (c *BBGoClient) GetSession(name string) (*BBGoSession, error) {
 	return &resp.Session, nil
 }
 
-type bbgoSessionTradeSlice struct {
-	Trades []BBGoTrade `json:"Trades"`
-}
-
-type BBGoSessionTradesResponse struct {
-	Trades map[string]bbgoSessionTradeSlice `json:"trades"`
-}
-
-func (c *BBGoClient) GetSessionTrades(session string) ([]BBGoTrade, error) {
-	var resp BBGoSessionTradesResponse
-	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/trades", &resp); err != nil {
-		return nil, err
-	}
-	var all []BBGoTrade
-	for _, slice := range resp.Trades {
-		all = append(all, slice.Trades...)
-	}
-	return all, nil
-}
-
-func (c *BBGoClient) GetSessionOpenOrders(session string) ([]BBGoOrder, error) {
-	var resp BBGoOrdersResponse
-	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/open-orders", &resp); err != nil {
-		return nil, err
-	}
-	return resp.Orders, nil
-}
-
-type BBGoBalance struct {
-	Currency  string      `json:"currency"`
-	Available json.Number `json:"available"`
-	Locked    json.Number `json:"locked"`
-}
-
-type BBGoAccountResponse struct {
-	Account json.RawMessage `json:"account"`
-}
-
-func (c *BBGoClient) GetSessionAccount(session string) (json.RawMessage, error) {
-	var resp BBGoAccountResponse
-	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/account", &resp); err != nil {
-		return nil, err
-	}
-	return resp.Account, nil
-}
-
-type BBGoBalancesResponse struct {
-	Balances map[string]BBGoBalance `json:"balances"`
-}
-
-func (c *BBGoClient) GetSessionBalances(session string) (map[string]BBGoBalance, error) {
-	var resp BBGoBalancesResponse
-	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/account/balances", &resp); err != nil {
-		return nil, err
-	}
-	return resp.Balances, nil
-}
-
-type BBGoSymbolsResponse struct {
-	Symbols []string `json:"symbols"`
-}
-
 func (c *BBGoClient) GetSessionSymbols(session string) ([]string, error) {
 	var resp BBGoSymbolsResponse
 	if err := c.get("/api/sessions/"+url.PathEscape(session)+"/symbols", &resp); err != nil {
 		return nil, err
 	}
 	return resp.Symbols, nil
-}
-
-type BBGoAsset struct {
-	Currency      string      `json:"currency"`
-	Total         json.Number `json:"total"`
-	Available     json.Number `json:"available"`
-	Locked        json.Number `json:"lock"`
-	Borrowed      json.Number `json:"borrowed"`
-	NetAsset      json.Number `json:"netAsset"`
-	NetAssetInUSD json.Number `json:"netAssetInUSD"`
-	NetAssetInBTC json.Number `json:"netAssetInBTC"`
-	PriceInUSD    json.Number `json:"priceInUSD"`
-}
-
-type BBGoAssetsResponse struct {
-	Assets map[string]BBGoAsset `json:"assets"`
-}
-
-func (c *BBGoClient) GetAssets() (map[string]BBGoAsset, error) {
-	var resp BBGoAssetsResponse
-	if err := c.get("/api/assets", &resp); err != nil {
-		return nil, err
-	}
-	return resp.Assets, nil
-}
-
-type BBGoStrategyState map[string]any
-
-type BBGoStrategiesResponse struct {
-	Strategies []BBGoStrategyState `json:"strategies"`
 }
 
 func (c *BBGoClient) GetStrategies() ([]BBGoStrategyState, error) {
@@ -389,29 +151,3 @@ func (c *BBGoClient) GetStrategies() ([]BBGoStrategyState, error) {
 	return resp.Strategies, nil
 }
 
-type BBGoTradingVolumeResponse struct {
-	TradingVolumes json.RawMessage `json:"tradingVolumes"`
-}
-
-func (c *BBGoClient) GetTradingVolume(period, segment string) (json.RawMessage, error) {
-	path := "/api/trading-volume"
-	q := url.Values{}
-	if period != "" {
-		q.Set("period", period)
-	}
-	if segment != "" {
-		q.Set("segment", segment)
-	}
-	if len(q) > 0 {
-		path += "?" + q.Encode()
-	}
-	var resp BBGoTradingVolumeResponse
-	if err := c.get(path, &resp); err != nil {
-		return nil, err
-	}
-	return resp.TradingVolumes, nil
-}
-
-func formatUint(v uint64) string {
-	return strconv.FormatUint(v, 10)
-}

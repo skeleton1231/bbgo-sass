@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -687,16 +686,6 @@ func TestNotify_NilNotifier(t *testing.T) {
 	ex.notify(&BacktestJob{UserID: "u1"}, "title", "msg")
 }
 
-// --- api.go: symbolPriceLookup nil hub ---
-
-func TestSymbolPriceLookup_NilHub(t *testing.T) {
-	api, _ := setupHandlerAPI(t)
-	lookup := api.symbolPriceLookup(context.Background())
-	_, err := lookup("BTCUSDT")
-	if err == nil {
-		t.Fatal("expected error with nil hub")
-	}
-}
 
 // --- api.go: uploadLocalToStorage ---
 

@@ -158,6 +158,7 @@
     "liveOnlyHint": "This strategy requires live mode.",
     "liveOnlyOverrideHint": "This strategy only supports live mode. Your paper mode selection has been overridden to live.",
     "containerLogs": "Container Logs",
+    "futuresMargin": "Futures",
     "loadingLogs": "Loading logs...",
     "noStrategiesTab": "No strategies",
     "pnl": {
@@ -518,6 +519,30 @@
     "marginType": {
       "cross": "Cross Margin",
       "isolated": "Isolated Margin"
-    }
+    },
+    "noData": "No futures or margin data available yet. Data will appear once a futures strategy starts trading.",
+    "positionRisks": "Futures Positions",
+    "marginHistory": "Margin History",
+    "symbol": "Symbol",
+    "entryPrice": "Entry Price",
+    "markPrice": "Mark Price",
+    "liqPrice": "Liq. Price",
+    "positionAmt": "Position",
+    "unrealizedPnl": "Unrealized PnL",
+    "notional": "Notional",
+    "loans": "Loans",
+    "repays": "Repays",
+    "interests": "Interests",
+    "liquidations": "Liquidations",
+    "recentInterests": "Recent Interest Charges",
+    "recentLiquidations": "Recent Liquidations",
+    "asset": "Asset",
+    "principle": "Principle",
+    "interest": "Interest",
+    "rate": "Rate",
+    "time": "Time",
+    "side": "Side",
+    "price": "Price",
+    "quantity": "Quantity"
   }
 }

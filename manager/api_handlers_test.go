@@ -148,17 +148,6 @@ func TestAPI_DeleteNotificationConfig(t *testing.T) {
 	}
 }
 
-func TestAPI_ProxyToBot_NotRunning(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	api.container.checkRunningFn = func(name string) (bool, error) { return false, nil }
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trades?mode=live", nil)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503, got %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
 func TestAPI_Close(t *testing.T) {
 	api, _ := setupHandlerAPI(t)
 	api.Close()
@@ -234,54 +223,6 @@ func TestAPI_BBGOSessions_NotRunning(t *testing.T) {
 	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/sessions?mode=live", nil)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Errorf("expected 503, got %d", w.Code)
-	}
-}
-
-func TestAPI_BBGoClosedOrders_MockServer(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(serveJSON(BBGoOrdersResponse{Orders: []BBGoOrder{}}))
-	defer srv.Close()
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/orders/closed?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoTradingVolume_MockServer(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(serveJSON(BBGoTradingVolumeResponse{TradingVolumes: json.RawMessage(`{}`)}))
-	defer srv.Close()
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trading-volume?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoAccount_MockServer(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(serveJSON(BBGoAccountResponse{Account: json.RawMessage(`{}`)}))
-	defer srv.Close()
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/account?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
 
@@ -404,80 +345,6 @@ func TestAPI_MarketKlines_NoHub(t *testing.T) {
 	}
 }
 
-func TestAPI_BBGoTradeMarkers_RequiresSymbol(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(serveJSON(BBGoTradesResponse{Trades: []BBGoTrade{}}))
-	defer srv.Close()
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trades/markers?mode=live", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 without symbol, got %d", w.Code)
-	}
-}
-
-func TestAPI_BBGoSessionTrades_MockServer(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(serveJSON(BBGoSessionTradesResponse{
-		Trades: map[string]bbgoSessionTradeSlice{
-			"binance": {Trades: []BBGoTrade{{ID: 1, Symbol: "BTCUSDT"}}},
-		},
-	}))
-	defer srv.Close()
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/session/binance/trades?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGOPnL_NotRunning(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	api.container.checkRunningFn = func(name string) (bool, error) { return false, nil }
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?mode=live", nil)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503, got %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoPnL_WithMockTrades(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if strings.Contains(req.URL.Path, "sessions") {
-			serveJSON(BBGoSessionsResponse{Sessions: []BBGoSession{{Name: "binance"}}})(w, req)
-		} else if strings.Contains(req.URL.Path, "trades") {
-			serveJSON(BBGoTradesResponse{Trades: []BBGoTrade{
-				{Symbol: "BTCUSDT", Side: "BUY", Price: "50000", Quantity: "1", Fee: "0", FeeCurrency: "USDT", TradedAt: "2024-01-01T00:00:00Z"},
-				{Symbol: "BTCUSDT", Side: "SELL", Price: "55000", Quantity: "1", Fee: "0", FeeCurrency: "USDT", TradedAt: "2024-01-02T00:00:00Z"},
-			}})(w, req)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?mode=live", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
 func TestAPI_RunBacktest(t *testing.T) {
 	api, r := setupHandlerAPI(t)
 	api.container.runBacktestFn = func(userID, jobID string, yamlContent []byte) ([]byte, error) {
@@ -537,24 +404,6 @@ func TestAPI_BacktestSyncStatus_NoDB(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["available"] != false {
 		t.Errorf("expected available=false, got %v", resp["available"])
-	}
-}
-
-func TestAPI_SubmitBacktest(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	api.container.cfg.BacktestSharedDir = t.TempDir()
-
-	body := map[string]any{
-		"strategy":   "grid2",
-		"config":     map[string]any{"symbol": "BTCUSDT"},
-		"exchange":   "binance",
-		"symbol":     "BTCUSDT",
-		"start_time": "2024-01-01",
-		"end_time":   "2024-06-01",
-	}
-	w := doRequest(r, "POST", "/api/backtest/submit", body)
-	if w.Code != http.StatusAccepted {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
 
@@ -885,26 +734,6 @@ func TestAPI_ListCredentials_WithStore(t *testing.T) {
 	api.creds = NewCredentialStore(t.TempDir(), newTestEncryptor(t))
 
 	w := doRequest(r, "GET", "/api/credentials", nil)
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAPI_BBGoTradeMarkers_WithMockServer(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		trades := []BBGoTrade{
-			{GID: 1, Symbol: "BTCUSDT", Side: "BUY", Price: "50000", Quantity: "0.1", TradedAt: "2024-01-01T00:00:00Z", PositionAction: "Open"},
-		}
-		json.NewEncoder(w).Encode(BBGoTradesResponse{Trades: trades})
-	}))
-	defer srv.Close()
-
-	api.newBBGoClient = func(baseURL string) *BBGoClient {
-		return &BBGoClient{baseURL: srv.URL, client: srv.Client()}
-	}
-w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trades/markers?symbol=BTCUSDT&mode=live", nil)
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
 	}

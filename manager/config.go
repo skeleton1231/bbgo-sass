@@ -30,6 +30,7 @@ type Config struct {
 	DataVolume          string
 	SupabaseURL         string
 	SupabaseKey         string
+	SupabaseDBURL       string
 	EncryptionKey       string
 	DockerNetwork       string
 	BBGOImage           string
@@ -58,6 +59,7 @@ func LoadConfig() (*Config, error) {
 		DataVolume:          getEnv("DATA_VOLUME", "bbgo-data"),
 		SupabaseURL:         getEnv("SUPABASE_URL", ""),
 		SupabaseKey:         getEnv("SUPABASE_SERVICE_KEY", ""),
+		SupabaseDBURL:       getEnv("SUPABASE_DB_URL", ""),
 		EncryptionKey:       getEnv("ENCRYPTION_KEY", ""),
 		DockerNetwork:       getEnv("DOCKER_NETWORK", "bbgo-net"),
 		BBGOImage:           getEnv("BBGO_IMAGE", "bbgo-base:latest"),
@@ -93,8 +95,8 @@ func LoadConfig() (*Config, error) {
 		},
 	}
 
-	if cfg.SupabaseURL == "" || cfg.SupabaseKey == "" {
-		return nil, fmt.Errorf("SUPABASE_URL and SUPABASE_SERVICE_KEY are required")
+	if cfg.SupabaseDBURL == "" && (cfg.SupabaseURL == "" || cfg.SupabaseKey == "") {
+		return nil, fmt.Errorf("SUPABASE_DB_URL (or SUPABASE_URL + SUPABASE_SERVICE_KEY) is required")
 	}
 	if cfg.ManagerToken == "" {
 		return nil, fmt.Errorf("MANAGER_TOKEN is required (shared secret for API authentication)")

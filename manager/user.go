@@ -109,6 +109,7 @@ type UserMode struct {
 
 type DefaultsProvider interface {
 	GetDefaults(strategyID string) map[string]any
+	RequiresFutures(strategyID string) bool
 }
 
 // --- YAML config types (shared with instance_store.go) ---
@@ -119,8 +120,9 @@ type databaseConfig struct {
 }
 
 type syncUserDataStreamConfig struct {
-	Trades       bool `yaml:"trades"`
-	FilledOrders bool `yaml:"filledOrders"`
+	Trades          bool `yaml:"trades"`
+	FilledOrders    bool `yaml:"filledOrders"`
+	FuturesPosition bool `yaml:"futuresPosition,omitempty"`
 }
 
 type syncConfig struct {
@@ -205,13 +207,40 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	}
 	allParams["symbol"] = symbol
 
+	var sessionFutures bool
+	var sessionSymbolLeverage map[string]int
+	var sessionIsolatedFutures bool
+	var sessionIsolatedFuturesSymbol string
+
+	if defaults != nil && defaults.RequiresFutures(strategy) {
+		sessionFutures = true
+		leverage := 20
+		if v, ok := allParams["leverage"].(float64); ok && v > 0 {
+			leverage = int(v)
+		}
+		sessionSymbolLeverage = map[string]int{symbol: leverage}
+
+		marginType := ""
+		if v, ok := allParams["marginType"].(string); ok {
+			marginType = v
+		}
+		if marginType == "isolated" {
+			sessionIsolatedFutures = true
+			sessionIsolatedFuturesSymbol = symbol
+		}
+	}
+
 	btCfg := struct {
 		Exchange map[string]struct {
 			Symbol string `yaml:"symbol"`
 		} `yaml:"exchange"`
 		Sessions map[string]struct {
-			Exchange     string `yaml:"exchange"`
-			EnvVarPrefix string `yaml:"envVarPrefix"`
+			Exchange              string         `yaml:"exchange"`
+			EnvVarPrefix          string         `yaml:"envVarPrefix"`
+			Futures               bool           `yaml:"futures,omitempty"`
+			SymbolLeverage        map[string]int `yaml:"symbolLeverage,omitempty"`
+			IsolatedFutures       bool           `yaml:"isolatedFutures,omitempty"`
+			IsolatedFuturesSymbol string         `yaml:"isolatedFuturesSymbol,omitempty"`
 		} `yaml:"sessions"`
 		ExchangeStrategies []map[string]any `yaml:"exchangeStrategies"`
 		Backtest           struct {
@@ -230,10 +259,21 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 			exchange: {Symbol: symbol},
 		},
 		Sessions: map[string]struct {
-			Exchange     string `yaml:"exchange"`
-			EnvVarPrefix string `yaml:"envVarPrefix"`
+			Exchange              string         `yaml:"exchange"`
+			EnvVarPrefix          string         `yaml:"envVarPrefix"`
+			Futures               bool           `yaml:"futures,omitempty"`
+			SymbolLeverage        map[string]int `yaml:"symbolLeverage,omitempty"`
+			IsolatedFutures       bool           `yaml:"isolatedFutures,omitempty"`
+			IsolatedFuturesSymbol string         `yaml:"isolatedFuturesSymbol,omitempty"`
 		}{
-			exchange: {Exchange: exchange, EnvVarPrefix: prefix},
+			exchange: {
+				Exchange:              exchange,
+				EnvVarPrefix:          prefix,
+				Futures:               sessionFutures,
+				SymbolLeverage:        sessionSymbolLeverage,
+				IsolatedFutures:       sessionIsolatedFutures,
+				IsolatedFuturesSymbol: sessionIsolatedFuturesSymbol,
+			},
 		},
 		ExchangeStrategies: []map[string]any{
 			{

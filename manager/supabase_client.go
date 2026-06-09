@@ -104,6 +104,90 @@ func (sc *SupabaseClient) GetTradesForPnL(userID string) ([]BBGoTrade, error) {
 	return allTrades, nil
 }
 
+func (sc *SupabaseClient) QueryFuturesPositionRisks(userID, tableName string) ([]PublicFuturesPositionRisksSelect, error) {
+	data, _, err := sc.client.From(tableName).
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Order("updated_at", &postgrest.OrderOpts{Ascending: false}).
+		Execute()
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", tableName, err)
+	}
+	var rows []PublicFuturesPositionRisksSelect
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", tableName, err)
+	}
+	return rows, nil
+}
+
+func (sc *SupabaseClient) QueryMarginLoans(userID, tableName string) ([]PublicMarginLoansSelect, error) {
+	data, _, err := sc.client.From(tableName).
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Order("time", &postgrest.OrderOpts{Ascending: false}).
+		Limit(100, "").
+		Execute()
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", tableName, err)
+	}
+	var rows []PublicMarginLoansSelect
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", tableName, err)
+	}
+	return rows, nil
+}
+
+func (sc *SupabaseClient) QueryMarginRepays(userID, tableName string) ([]PublicMarginRepaysSelect, error) {
+	data, _, err := sc.client.From(tableName).
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Order("time", &postgrest.OrderOpts{Ascending: false}).
+		Limit(100, "").
+		Execute()
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", tableName, err)
+	}
+	var rows []PublicMarginRepaysSelect
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", tableName, err)
+	}
+	return rows, nil
+}
+
+func (sc *SupabaseClient) QueryMarginInterests(userID, tableName string) ([]PublicMarginInterestsSelect, error) {
+	data, _, err := sc.client.From(tableName).
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Order("time", &postgrest.OrderOpts{Ascending: false}).
+		Limit(100, "").
+		Execute()
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", tableName, err)
+	}
+	var rows []PublicMarginInterestsSelect
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", tableName, err)
+	}
+	return rows, nil
+}
+
+func (sc *SupabaseClient) QueryMarginLiquidations(userID, tableName string) ([]PublicMarginLiquidationsSelect, error) {
+	data, _, err := sc.client.From(tableName).
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Order("time", &postgrest.OrderOpts{Ascending: false}).
+		Limit(100, "").
+		Execute()
+	if err != nil {
+		return nil, fmt.Errorf("query %s: %w", tableName, err)
+	}
+	var rows []PublicMarginLiquidationsSelect
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", tableName, err)
+	}
+	return rows, nil
+}
+
 func ptrStr(s string) *string { return &s }
 
 func parseUintOrZero(s string) uint64 {

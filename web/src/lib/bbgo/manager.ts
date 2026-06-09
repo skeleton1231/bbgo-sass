@@ -178,6 +178,7 @@ export interface BBGoTrade {
   tradedAt: string
   fee: string
   feeCurrency: string
+  strategyInstanceId?: string
   positionAction?: 'open' | 'close' | 'add' | 'reduce' | 'trade'
   netPosition?: number
 }
@@ -199,6 +200,7 @@ export interface BBGoOrder {
   creationTime?: string
   isWorking?: boolean
   tag?: string
+  strategyInstanceId?: string
 }
 
 export interface BBGoBalance {
@@ -512,6 +514,95 @@ export function fetchBotPnL(userId: string, exchange?: string, symbol?: string, 
   if (symbol) params.set('symbol', symbol)
   if (strategy) params.set('strategy', strategy)
   return request<PnLReport>(`/users/${userId}/bbgo/pnl?${params}`)
+}
+
+// --- Futures & Margin data ---
+
+export interface FuturesPositionRisk {
+  id: string
+  exchange: string
+  symbol: string
+  position_side: string
+  leverage: string
+  entry_price: string
+  mark_price: string
+  liquidation_price: string
+  break_even_price: string
+  position_amount: string
+  unrealized_pnl: string
+  notional: string
+  initial_margin: string
+  maint_margin: string
+  position_initial_margin: string
+  open_order_initial_margin: string
+  adl: string
+  margin_asset: string
+  updated_at: string
+}
+
+export interface MarginLoan {
+  id: string
+  exchange: string
+  asset: string
+  isolated_symbol: string
+  principle: string
+  transaction_id: number
+  time: string
+}
+
+export interface MarginRepay {
+  id: string
+  exchange: string
+  asset: string
+  isolated_symbol: string
+  principle: string
+  transaction_id: number
+  time: string
+}
+
+export interface MarginInterest {
+  id: string
+  exchange: string
+  asset: string
+  isolated_symbol: string
+  principle: string
+  interest: string
+  interest_rate: string
+  time: string
+}
+
+export interface MarginLiquidation {
+  id: string
+  exchange: string
+  symbol: string
+  side: string
+  order_id: number
+  price: string
+  quantity: string
+  average_price: string
+  executed_quantity: string
+  time_in_force: string
+  is_isolated: boolean
+  time: string
+}
+
+export interface MarginHistoryResponse {
+  loans: MarginLoan[]
+  repays: MarginRepay[]
+  interests: MarginInterest[]
+  liquidations: MarginLiquidation[]
+}
+
+export function fetchFuturesPositions(userId: string, mode?: 'live' | 'paper') {
+  const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
+  return request<{ positions: FuturesPositionRisk[] }>(`/users/${userId}/bbgo/futures/positions?${params}`)
+}
+
+export function fetchMarginHistory(userId: string, mode?: 'live' | 'paper') {
+  const params = new URLSearchParams()
+  params.set('mode', mode ?? 'live')
+  return request<MarginHistoryResponse>(`/users/${userId}/bbgo/margin/history?${params}`)
 }
 
 // --- Market data (from shared marketdata service via Manager) ---

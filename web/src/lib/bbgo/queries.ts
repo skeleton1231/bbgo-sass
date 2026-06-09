@@ -33,6 +33,8 @@ import {
   fetchBotDetail,
   fetchMarketTicker,
   fetchBotTradeMarkers,
+  fetchFuturesPositions as apiFetchFuturesPositions,
+  fetchMarginHistory as apiFetchMarginHistory,
   type TradingVolumeEntry,
   type TradeMarkersResponse,
   type InstanceInfo,
@@ -54,6 +56,11 @@ import {
   type PnlCurvePoint,
   type MarketTicker,
   type Bot,
+  type FuturesPositionRisk,
+  type MarginLoan,
+  type MarginRepay,
+  type MarginInterest,
+  type MarginLiquidation,
 } from './manager'
 
 // --- Strategy & container queries ---
@@ -388,6 +395,28 @@ export function useBotPnL(userId: string, exchange?: string, symbol?: string, mo
   })
 }
 
+// --- Futures & Margin ---
+
+export function useFuturesPositions(userId: string, mode?: 'live' | 'paper') {
+  return useQuery({
+    queryKey: ['futures-positions', userId, mode ?? 'live'],
+    queryFn: () => apiFetchFuturesPositions(userId, mode),
+    enabled: !!userId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useMarginHistory(userId: string, mode?: 'live' | 'paper') {
+  return useQuery({
+    queryKey: ['margin-history', userId, mode ?? 'live'],
+    queryFn: () => apiFetchMarginHistory(userId, mode),
+    enabled: !!userId,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+}
+
 // --- Credentials ---
 
 export function useCredentials(userId: string) {
@@ -435,4 +464,9 @@ export type {
   PnlCurvePoint,
   TradingVolumeEntry,
   TradeMarkersResponse,
+  FuturesPositionRisk,
+  MarginLoan,
+  MarginRepay,
+  MarginInterest,
+  MarginLiquidation,
 }

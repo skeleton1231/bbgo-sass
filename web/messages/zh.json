@@ -157,6 +157,7 @@
     "liveOnlyHint": "此策略仅支持实盘模式。",
     "liveOnlyOverrideHint": "此策略仅支持实盘模式，已自动从模拟切换为实盘。",
     "containerLogs": "容器日志",
+    "futuresMargin": "期货",
     "loadingLogs": "加载日志...",
     "noStrategiesTab": "暂无策略",
     "chart": "图表",
@@ -517,6 +518,30 @@
     "marginType": {
       "cross": "全仓保证金",
       "isolated": "逐仓保证金"
-    }
+    },
+    "noData": "暂无期货或保证金数据，期货策略开始交易后将自动显示",
+    "positionRisks": "期货持仓",
+    "marginHistory": "保证金记录",
+    "symbol": "交易对",
+    "entryPrice": "开仓价",
+    "markPrice": "标记价",
+    "liqPrice": "强平价",
+    "positionAmt": "持仓量",
+    "unrealizedPnl": "未实现盈亏",
+    "notional": "名义价值",
+    "loans": "借币",
+    "repays": "还币",
+    "interests": "利息",
+    "liquidations": "强仓",
+    "recentInterests": "近期利息",
+    "recentLiquidations": "近期强仓记录",
+    "asset": "资产",
+    "principle": "本金",
+    "interest": "利息",
+    "rate": "利率",
+    "time": "时间",
+    "side": "方向",
+    "price": "价格",
+    "quantity": "数量"
   }
 }

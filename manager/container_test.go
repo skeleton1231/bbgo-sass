@@ -256,6 +256,7 @@ func TestContainerManager_InstanceEnvArgs_PaperMode(t *testing.T) {
 func TestContainerManager_InstanceEnvArgs_LiveMode(t *testing.T) {
 	cm := &ContainerManager{cfg: &Config{
 		SupabaseURL: "https://supa.example.com", SupabaseKey: "test-key",
+		SupabaseDBURL: "postgresql://test:test@localhost:5432/postgres",
 	}}
 	inst := &StrategyInstance{
 		UserID: "u1", Mode: ModeLive, Exchange: "binance", InstanceID: "inst1",

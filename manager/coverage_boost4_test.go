@@ -412,23 +412,6 @@ func TestAPI_StartInstanceContainer_WithMockClient(t *testing.T) {
 
 // --- api.go: BBGoPnL ---
 
-func TestAPI_BBGoPnL_InstanceNotRunning(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/pnl?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- api.go: SubmitBacktest full path ---
-
 func TestAPI_SubmitBacktest_CompleteJob(t *testing.T) {
 	api, r := setupHandlerAPI(t)
 
@@ -476,42 +459,6 @@ func TestAPI_MarketSymbols_NilHub(t *testing.T) {
 }
 
 // --- api.go: BBGoTrades / BBGoSessionTrades ---
-
-func TestAPI_BBGoTrades_InstanceNotRunning(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/trades?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- strategy_registry.go: RefreshLoop ---
-
-
-
-// --- api.go: BBGoAssets ---
-
-func TestAPI_BBGoAssets_InstanceNotRunning(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	store, _ := newTestStore(t)
-	api.store = store
-	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }
-
-	inst := createTestInstance(t, store, testUUID, "paper", "grid2", "BTCUSDT", nil)
-	w := doRequest(r, "GET", "/api/users/"+testUUID+"/bbgo/assets?instanceID="+inst.InstanceID+"&mode=paper", nil)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
-// --- api.go: BacktestSyncStatus ---
 
 func TestAPI_BacktestSyncStatus(t *testing.T) {
 	_, r := setupHandlerAPI(t)

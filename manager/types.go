@@ -38,25 +38,12 @@ type sessionDetailResponse struct {
 	Session BBGoSession `json:"session"`
 }
 
-type tradesResponse struct {
-	Trades []BBGoTrade `json:"trades"`
-}
 
-type ordersResponse struct {
-	Orders []BBGoOrder `json:"orders"`
-}
-
-type balancesResponse struct {
-	Balances map[string]BBGoBalance `json:"balances"`
-}
 
 type symbolsResponse struct {
 	Symbols []string `json:"symbols"`
 }
 
-type assetsResponse struct {
-	Assets map[string]BBGoAsset `json:"assets"`
-}
 
 type bbgoStrategiesResponse struct {
 	Strategies []BBGoStrategyState `json:"strategies"`
@@ -187,17 +174,6 @@ type botsResponse struct {
 	Bots []Bot `json:"bots"`
 }
 
-// --- Trading volume passthrough ---
-
-type tradingVolumeResponse struct {
-	TradingVolumes json.RawMessage `json:"tradingVolumes"`
-}
-
-// --- Account passthrough ---
-
-type accountResponse struct {
-	Account json.RawMessage `json:"account"`
-}
 
 // --- Status messages ---
 

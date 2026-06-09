@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import type { BBGoTrade, BBGoOrder, BBGoBalance, PnLReport, DailyPnl, PnlCurvePoint, TradingVolumeEntry } from './queries'
+import type { BBGoTrade, BBGoOrder, BBGoBalance, PnLReport, DailyPnl, PnlCurvePoint, TradingVolumeEntry, FuturesPositionRisk, MarginLoan, MarginRepay, MarginInterest, MarginLiquidation } from './queries'
 import { FifoQueue } from './fifo-pnl'
 import { tableName, tradeRowToBBGo, orderRowToBBGo } from './supabase-adapters'
 
@@ -12,6 +12,11 @@ type OrderRow = Tables['orders']['Row']
 type TradeRow = Tables['trades']['Row']
 type PositionRow = Tables['positions']['Row']
 type ProfitRow = Tables['profits']['Row']
+type FuturesPositionRiskRow = Tables['futures_position_risks']['Row']
+type MarginLoanRow = Tables['margin_loans']['Row']
+type MarginRepayRow = Tables['margin_repays']['Row']
+type MarginInterestRow = Tables['margin_interests']['Row']
+type MarginLiquidationRow = Tables['margin_liquidations']['Row']
 
 // --- Supabase hooks returning BBGo types ---
 
@@ -654,5 +659,64 @@ export function useSupabaseTradingVolume(
     },
     enabled: !!userId && !!trades,
     staleTime: 60_000,
+  })
+}
+
+export function useSupabaseFuturesPositions(
+  userId: string,
+  opts?: { mode?: 'live' | 'paper'; exchange?: string; symbol?: string }
+) {
+  return useQuery<FuturesPositionRisk[]>({
+    queryKey: ['supabase-futures-positions', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      let q = sb
+        .from(tableName('futures_position_risks', opts?.mode))
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+
+      if (opts?.exchange) q = q.eq('exchange', opts.exchange)
+      if (opts?.symbol) q = q.eq('symbol', opts.symbol)
+
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as FuturesPositionRisk[]
+    },
+    enabled: !!userId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useSupabaseMarginHistory(
+  userId: string,
+  opts?: { mode?: 'live' | 'paper' }
+) {
+  return useQuery<{ loans: MarginLoan[]; repays: MarginRepay[]; interests: MarginInterest[]; liquidations: MarginLiquidation[] }>({
+    queryKey: ['supabase-margin-history', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      const mode = opts?.mode
+      const [loansRes, repaysRes, interestsRes, liquidationsRes] = await Promise.all([
+        sb.from(tableName('margin_loans', mode)).select('*').eq('user_id', userId).order('time', { ascending: false }),
+        sb.from(tableName('margin_repays', mode)).select('*').eq('user_id', userId).order('time', { ascending: false }),
+        sb.from(tableName('margin_interests', mode)).select('*').eq('user_id', userId).order('time', { ascending: false }),
+        sb.from(tableName('margin_liquidations', mode)).select('*').eq('user_id', userId).order('time', { ascending: false }),
+      ])
+      if (loansRes.error) throw loansRes.error
+      if (repaysRes.error) throw repaysRes.error
+      if (interestsRes.error) throw interestsRes.error
+      if (liquidationsRes.error) throw liquidationsRes.error
+      return {
+        loans: (loansRes.data ?? []) as MarginLoan[],
+        repays: (repaysRes.data ?? []) as MarginRepay[],
+        interests: (interestsRes.data ?? []) as MarginInterest[],
+        liquidations: (liquidationsRes.data ?? []) as MarginLiquidation[],
+      }
+    },
+    enabled: !!userId,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
   })
 }

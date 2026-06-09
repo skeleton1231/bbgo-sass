@@ -71,24 +71,6 @@ func TestCredModeError(t *testing.T) {
 	}
 }
 
-func TestStrategyMatch(t *testing.T) {
-	tests := []struct {
-		trade  string
-		filter string
-		want   bool
-	}{
-		{"grid2", "grid2", true},
-		{"grid2-BTCUSDT", "grid2", true},
-		{"grid2:binance", "grid2", true},
-		{"supertrend", "grid2", false},
-		{"grid20", "grid2", false},
-	}
-	for _, tt := range tests {
-		if got := strategyMatch(tt.trade, tt.filter); got != tt.want {
-			t.Errorf("strategyMatch(%q, %q) = %v, want %v", tt.trade, tt.filter, got, tt.want)
-		}
-	}
-}
 
 func TestWriteJSON(t *testing.T) {
 	w := httptest.NewRecorder()

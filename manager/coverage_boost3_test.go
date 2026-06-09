@@ -477,22 +477,6 @@ func TestAPI_SyncBacktestData_Handler(t *testing.T) {
 
 // --- api.go: SubmitBacktest HTTP handler ---
 
-func TestAPI_SubmitBacktest_Handler(t *testing.T) {
-	_, r := setupHandlerAPI(t)
-
-	w := doRequest(r, "POST", "/api/backtest/submit", map[string]any{
-		"strategy":   "grid2",
-		"config":     map[string]any{"gridNumber": 5},
-		"exchange":   "binance",
-		"symbol":     "BTCUSDT",
-		"start_time": "2024-01-01",
-		"end_time":   "2024-01-31",
-	})
-	if w.Code != http.StatusOK && w.Code != http.StatusAccepted {
-		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-}
-
 func TestAPI_SubmitBacktest_BadJSON(t *testing.T) {
 	_, r := setupHandlerAPI(t)
 
