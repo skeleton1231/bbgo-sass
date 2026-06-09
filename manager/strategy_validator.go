@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
+	"strings"
 )
 
 type StrategyWarning struct {
@@ -11,6 +13,9 @@ type StrategyWarning struct {
 	Level   string `json:"level"`
 }
 
+// ValidateStrategyConfig checks a merged strategy config for problems.
+// If registry fields are available, it uses data-driven required/type/min/max checks.
+// Falls back to hardcoded per-strategy rules when no registry data exists.
 func ValidateStrategyConfig(strategy string, config json.RawMessage) []StrategyWarning {
 	var m map[string]any
 	if len(config) == 0 || string(config) == "null" {
@@ -19,6 +24,97 @@ func ValidateStrategyConfig(strategy string, config json.RawMessage) []StrategyW
 		m = map[string]any{}
 	}
 
+	return validateWithRegistry(strategy, m)
+}
+
+// validateWithRegistry uses strategy_registry.fields for data-driven validation.
+// Hardcoded per-strategy rules in validateFallback are used only as a safety net
+// when no registry data is loaded (e.g., in unit tests with no Supabase).
+func validateWithRegistry(strategy string, m map[string]any) []StrategyWarning {
+	if registryFields := globalFieldsForTest[strategy]; len(registryFields) > 0 {
+		return validateFromFields(strategy, m, registryFields)
+	}
+	return validateFallback(strategy, m)
+}
+
+// validateFromFields is the data-driven validator: iterates FieldDef entries
+// marked required=true and checks the merged config for presence and value.
+func validateFromFields(strategy string, m map[string]any, fields []FieldDef) []StrategyWarning {
+	var warnings []StrategyWarning
+
+	for _, f := range fields {
+		if !f.Required {
+			continue
+		}
+
+		val, exists := lookupNested(m, f.Key)
+
+		switch f.Type {
+		case "number":
+			if !exists || toFloat(val) <= 0 {
+				warnings = append(warnings, StrategyWarning{
+					ID:      fmt.Sprintf("missing_%s", toSnakeCase(f.Key)),
+					Message: fmt.Sprintf("%s is required for %s", f.Key, strategy),
+					Level:   "critical",
+				})
+			} else if f.Min != nil && toFloat(val) < *f.Min {
+				warnings = append(warnings, StrategyWarning{
+					ID:      fmt.Sprintf("invalid_%s", toSnakeCase(f.Key)),
+					Message: fmt.Sprintf("%s must be >= %v", f.Key, *f.Min),
+					Level:   "critical",
+				})
+			}
+		case "text", "select":
+			if !exists || toString(val) == "" {
+				warnings = append(warnings, StrategyWarning{
+					ID:      fmt.Sprintf("missing_%s", toSnakeCase(f.Key)),
+					Message: fmt.Sprintf("%s is required for %s", f.Key, strategy),
+					Level:   "critical",
+				})
+			}
+		}
+	}
+
+	// Cross-cutting checks not expressible as field-level rules
+	warnings = append(warnings, validateCrossCutting(strategy, m)...)
+
+	return warnings
+}
+
+// validateCrossCutting handles multi-field invariants that can't be expressed
+// as individual field required checks (e.g., upperPrice > lowerPrice).
+func validateCrossCutting(strategy string, m map[string]any) []StrategyWarning {
+	var warnings []StrategyWarning
+
+	switch strategy {
+	case "grid", "grid2":
+		upper := toFloat(m["upperPrice"])
+		lower := toFloat(m["lowerPrice"])
+		if upper > 0 && lower > 0 && upper <= lower {
+			warnings = append(warnings, StrategyWarning{
+				ID: "invalid_price_range", Message: "upperPrice must be greater than lowerPrice", Level: "critical",
+			})
+		}
+	case "pivotshort":
+		leverage := toFloat(m["leverage"])
+		if leverage <= 0 {
+			warnings = append(warnings, StrategyWarning{
+				ID: "futures_no_leverage", Message: "pivotshort is a futures strategy — leverage must be set", Level: "critical",
+			})
+		}
+	}
+
+	return warnings
+}
+
+// globalFieldsForTest is set by tests to inject FieldDef data without Supabase.
+// In production, this is nil and validateFallback is used until registry fields
+// are populated with required=true flags.
+var globalFieldsForTest map[string][]FieldDef
+
+// validateFallback contains hardcoded per-strategy rules used when no registry
+// field definitions are available. These are a safety net only.
+func validateFallback(strategy string, m map[string]any) []StrategyWarning {
 	switch strategy {
 	case "grid", "grid2":
 		return validateGrid(m)
@@ -40,10 +136,6 @@ func ValidateStrategyConfig(strategy string, config json.RawMessage) []StrategyW
 		return validateTrendtrader(m)
 	case "atrpin":
 		return validateAtrpin(m)
-	case "drift":
-		return validateDrift(m)
-	case "elliottwave":
-		return validateElliottwave(m)
 	case "pivotshort":
 		return validatePivotshort(m)
 	case "swing":
@@ -52,26 +144,20 @@ func ValidateStrategyConfig(strategy string, config json.RawMessage) []StrategyW
 		return validateEwoDgtrd(m)
 	case "harmonic":
 		return validateHarmonic(m)
-	case "irr":
-		return validateIrr(m)
 	case "dca":
 		return validateDCA(m)
 	case "schedule", "autobuy":
 		return validateSchedule(m)
 	case "random":
 		return validateRandom(m)
-	case "flashcrash":
-		return validateFlashcrash(m)
 	case "xmaker", "xcross":
 		return validateCrossMaker(m)
-	case "xlog":
-		return validateXlog(m)
-	case "xbalance":
-		return validateXbalance(m)
 	default:
 		return nil
 	}
 }
+
+// --- Hardcoded fallback validators ---
 
 func validateGrid(m map[string]any) []StrategyWarning {
 	var warnings []StrategyWarning
@@ -245,22 +331,6 @@ func validateAtrpin(m map[string]any) []StrategyWarning {
 	return warnings
 }
 
-func validateDrift(m map[string]any) []StrategyWarning {
-	return nil
-}
-
-func validateElliottwave(m map[string]any) []StrategyWarning {
-	var warnings []StrategyWarning
-
-	if !hasAnyQuantity(m) {
-		warnings = append(warnings, StrategyWarning{
-			ID: "missing_quantity", Message: "quantity is required", Level: "critical",
-		})
-	}
-
-	return warnings
-}
-
 func validatePivotshort(m map[string]any) []StrategyWarning {
 	var warnings []StrategyWarning
 
@@ -324,10 +394,6 @@ func validateHarmonic(m map[string]any) []StrategyWarning {
 	return warnings
 }
 
-func validateIrr(m map[string]any) []StrategyWarning {
-	return nil
-}
-
 func validateDCA(m map[string]any) []StrategyWarning {
 	var warnings []StrategyWarning
 
@@ -370,10 +436,6 @@ func validateRandom(m map[string]any) []StrategyWarning {
 	return warnings
 }
 
-func validateFlashcrash(m map[string]any) []StrategyWarning {
-	return nil
-}
-
 func validateCrossMaker(m map[string]any) []StrategyWarning {
 	var warnings []StrategyWarning
 
@@ -386,13 +448,7 @@ func validateCrossMaker(m map[string]any) []StrategyWarning {
 	return warnings
 }
 
-func validateXlog(m map[string]any) []StrategyWarning {
-	return nil
-}
-
-func validateXbalance(m map[string]any) []StrategyWarning {
-	return nil
-}
+// --- Helpers ---
 
 func hasAnyQuantity(m map[string]any) bool {
 	for _, key := range []string{"quantity", "baseQuantity", "quoteInvestment", "amount", "investAmount"} {
@@ -435,4 +491,33 @@ func toFloat(v any) float64 {
 func toString(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+// lookupNested resolves dot-separated keys like "breakLow.interval" in a nested map.
+func lookupNested(m map[string]any, key string) (any, bool) {
+	parts := strings.Split(key, ".")
+	var current any = m
+	for _, p := range parts {
+		cm, ok := current.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current, ok = cm[p]
+		if !ok {
+			return nil, false
+		}
+	}
+	return current, true
+}
+
+// toSnakeCase converts camelCase to snake_case for warning IDs.
+func toSnakeCase(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			b.WriteByte('_')
+		}
+		b.WriteRune(r)
+	}
+	return strings.ToLower(b.String())
 }

@@ -395,6 +395,105 @@ func TestValidate_Fixedmaker_DefaultsCoverHalfSpread(t *testing.T) {
 }
 
 // ============================================================
+// Data-Driven Validation (from registry fields)
+// ============================================================
+
+func TestValidate_DataDriven_Grid2MissingQuantity(t *testing.T) {
+	orig := globalFieldsForTest
+	globalFieldsForTest = map[string][]FieldDef{
+		"grid2": {
+			{Key: "symbol", Type: "text", Required: true},
+			{Key: "quantity", Type: "number", Required: true, Min: ptrFloat(0.00001)},
+			{Key: "gridNumber", Type: "number", Required: true, Min: ptrFloat(2)},
+			{Key: "upperPrice", Type: "number", Required: true},
+			{Key: "lowerPrice", Type: "number", Required: true},
+			{Key: "profitSpread", Type: "number", Required: false},
+		},
+	}
+	defer func() { globalFieldsForTest = orig }()
+
+	config := rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000}`)
+	warnings := ValidateStrategyConfig("grid2", config)
+
+	found := false
+	for _, w := range warnings {
+		if w.ID == "missing_quantity" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected missing_quantity from data-driven validation, got: %v", warnings)
+	}
+}
+
+func TestValidate_DataDriven_Grid2Valid(t *testing.T) {
+	orig := globalFieldsForTest
+	globalFieldsForTest = map[string][]FieldDef{
+		"grid2": {
+			{Key: "symbol", Type: "text", Required: true},
+			{Key: "quantity", Type: "number", Required: true, Min: ptrFloat(0.00001)},
+			{Key: "gridNumber", Type: "number", Required: true, Min: ptrFloat(2)},
+		},
+	}
+	defer func() { globalFieldsForTest = orig }()
+
+	config := rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001}`)
+	warnings := ValidateStrategyConfig("grid2", config)
+	if len(warnings) != 0 {
+		t.Errorf("expected no warnings for valid grid2, got: %v", warnings)
+	}
+}
+
+func TestValidate_DataDriven_InvalidPriceRange(t *testing.T) {
+	orig := globalFieldsForTest
+	globalFieldsForTest = map[string][]FieldDef{
+		"grid2": {
+			{Key: "quantity", Type: "number", Required: true},
+		},
+	}
+	defer func() { globalFieldsForTest = orig }()
+
+	config := rawJSON(`{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":50000,"lowerPrice":70000,"quantity":0.001}`)
+	warnings := ValidateStrategyConfig("grid2", config)
+
+	found := false
+	for _, w := range warnings {
+		if w.ID == "invalid_price_range" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected invalid_price_range from cross-cutting check, got: %v", warnings)
+	}
+}
+
+func TestValidate_DataDriven_TextFieldRequired(t *testing.T) {
+	orig := globalFieldsForTest
+	globalFieldsForTest = map[string][]FieldDef{
+		"schedule": {
+			{Key: "side", Type: "select", Required: true},
+			{Key: "quantity", Type: "number", Required: true},
+		},
+	}
+	defer func() { globalFieldsForTest = orig }()
+
+	config := rawJSON(`{"symbol":"ETHUSDT","interval":"1h","quantity":0.01}`)
+	warnings := ValidateStrategyConfig("schedule", config)
+
+	found := false
+	for _, w := range warnings {
+		if w.ID == "missing_side" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected missing_side from data-driven validation, got: %v", warnings)
+	}
+}
+
+func ptrFloat(v float64) *float64 { return &v }
+
+// ============================================================
 // Helper
 // ============================================================
 

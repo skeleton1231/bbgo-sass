@@ -13,6 +13,15 @@ type StrategyDefaultsCache struct {
 	defaults        map[string]map[string]any
 	liveOnly        map[string]bool
 	requiresFutures map[string]bool
+	fields          map[string][]FieldDef
+}
+
+type FieldDef struct {
+	Key      string   `json:"key"`
+	Type     string   `json:"type"`
+	Required bool     `json:"required"`
+	Min      *float64 `json:"min,omitempty"`
+	Max      *float64 `json:"max,omitempty"`
 }
 
 func NewStrategyDefaultsCache(sc *SupabaseClient) *StrategyDefaultsCache {
@@ -21,12 +30,13 @@ func NewStrategyDefaultsCache(sc *SupabaseClient) *StrategyDefaultsCache {
 		defaults:        make(map[string]map[string]any),
 		liveOnly:        make(map[string]bool),
 		requiresFutures: make(map[string]bool),
+		fields:          make(map[string][]FieldDef),
 	}
 }
 
 func (r *StrategyDefaultsCache) Load() error {
 	rows, _, err := r.sc.client.From("strategy_registry").
-		Select("id,defaults,live_only,requires_futures", "", false).
+		Select("id,defaults,live_only,requires_futures,fields", "", false).
 		Eq("enabled", "true").
 		Execute()
 	if err != nil {
@@ -38,19 +48,21 @@ func (r *StrategyDefaultsCache) Load() error {
 		Defaults        json.RawMessage `json:"defaults"`
 		LiveOnly        bool            `json:"live_only"`
 		RequiresFutures bool            `json:"requires_futures"`
+		Fields          json.RawMessage `json:"fields"`
 	}
 	if err := json.Unmarshal(rows, &entries); err != nil {
 		return err
 	}
 
-	m := make(map[string]map[string]any, len(entries))
+	defs := make(map[string]map[string]any, len(entries))
 	lo := make(map[string]bool)
 	rf := make(map[string]bool)
+	fl := make(map[string][]FieldDef)
 	for _, e := range entries {
 		if len(e.Defaults) > 0 && string(e.Defaults) != "{}" {
-			var defs map[string]any
-			if err := json.Unmarshal(e.Defaults, &defs); err == nil && len(defs) > 0 {
-				m[e.ID] = defs
+			var d map[string]any
+			if err := json.Unmarshal(e.Defaults, &d); err == nil && len(d) > 0 {
+				defs[e.ID] = d
 			}
 		}
 		if e.LiveOnly {
@@ -59,12 +71,19 @@ func (r *StrategyDefaultsCache) Load() error {
 		if e.RequiresFutures {
 			rf[e.ID] = true
 		}
+		if len(e.Fields) > 0 && string(e.Fields) != "[]" {
+			var fields []FieldDef
+			if err := json.Unmarshal(e.Fields, &fields); err == nil && len(fields) > 0 {
+				fl[e.ID] = fields
+			}
+		}
 	}
 
 	r.mu.Lock()
-	r.defaults = m
+	r.defaults = defs
 	r.liveOnly = lo
 	r.requiresFutures = rf
+	r.fields = fl
 	r.mu.Unlock()
 	return nil
 }
@@ -109,4 +128,10 @@ func (r *StrategyDefaultsCache) RequiresFutures(strategyID string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.requiresFutures[strategyID]
+}
+
+func (r *StrategyDefaultsCache) GetFields(strategyID string) []FieldDef {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.fields[strategyID]
 }
