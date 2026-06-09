@@ -359,10 +359,21 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		go api.startInstanceContainer(inst)
 	}
 
-	writeJSON(w, http.StatusCreated, instanceInfo{
-		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
-		Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
-		Name: inst.Name, Status: StatusStarting,
+	var warnings []StrategyWarning
+	if w := ValidateStrategyConfig(normalizedStrategy, mergedConfig); len(w) > 0 {
+		warnings = w
+	}
+
+	writeJSON(w, http.StatusCreated, struct {
+		instanceInfo
+		Warnings []StrategyWarning `json:"warnings,omitempty"`
+	}{
+		instanceInfo: instanceInfo{
+			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
+			Name: inst.Name, Status: StatusStarting,
+		},
+		Warnings: warnings,
 	})
 }
 
