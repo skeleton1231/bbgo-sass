@@ -681,7 +681,18 @@ export function useSupabaseFuturesPositions(
 
       const { data, error } = await q
       if (error) throw error
-      return (data ?? []) as FuturesPositionRisk[]
+
+      // Dedup: keep only the latest snapshot per (exchange, symbol, position_side)
+      const seen = new Set<string>()
+      const latest: FuturesPositionRisk[] = []
+      for (const row of (data ?? []) as FuturesPositionRisk[]) {
+        const key = `${row.exchange}:${row.symbol}:${row.position_side}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          latest.push(row)
+        }
+      }
+      return latest
     },
     enabled: !!userId,
     staleTime: 30_000,

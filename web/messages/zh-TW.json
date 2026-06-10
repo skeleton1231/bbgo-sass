@@ -206,6 +206,12 @@
       "maker": "Maker",
       "net": "淨 {position}"
     },
+    "positionAction": {
+      "open_long": "開多",
+      "open_short": "開空",
+      "close_long": "平多",
+      "close_short": "平空"
+    },
     "avgCost": "均價 {price}",
     "pnl": {
       "realized": "已實現盈虧",
@@ -230,7 +236,12 @@
       "positionClosed": "無持倉",
       "noData": "暫無盈虧數據",
       "closeHistory": "平倉記錄",
-      "profitMargin": "利潤率"
+      "profitMargin": "利潤率",
+      "entry": "入場價",
+      "mark": "標記價",
+      "qty": "數量",
+      "liqPrice": "強平價",
+      "notional": "名義價值"
     },
     "crossExchange": "跨交易所",
     "live": {

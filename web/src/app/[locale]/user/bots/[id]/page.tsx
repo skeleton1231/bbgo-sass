@@ -46,7 +46,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
-import { FuturesMarginPanel } from '@/components/user/FuturesMarginPanel'
+import { TradeRow } from '@/components/user/TradeRow'
+import { PositionCard } from '@/components/user/PositionCard'
 import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computePositionTags } from '@/lib/bbgo/position-tags'
@@ -592,32 +593,12 @@ export default function BotDetailPage() {
         </div>
       )}
 
-      {/* Current Position — from positions table */}
-      {latestPosition && !latestPosition.isClosed && (
-        <Card className="rounded-xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">{t('pnl.currentPosition')}</CardTitle>
-          </CardHeader>
-          <div className="px-6 pb-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-            <div>
-              <span className="text-muted-foreground">{t('pnl.avgCost')}: </span>
-              <span className="font-mono font-medium">{latestPosition.averageCost.toFixed(4)}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">{latestPosition.isLong ? t('pnl.positionLong', { qty: Math.abs(latestPosition.base).toFixed(6), price: latestPosition.averageCost.toFixed(4) }) : latestPosition.isShort ? t('pnl.positionShort', { qty: Math.abs(latestPosition.base).toFixed(6), price: latestPosition.averageCost.toFixed(4) }) : t('pnl.positionClosed')}</span>
-            </div>
-            {unrealized && (unrealized.unrealizedPnl !== 0 || unrealized.unrealizedPnlPct !== 0) && (
-              <div>
-                <span className="text-muted-foreground">{t('pnl.unrealized')}: </span>
-                <span className={cn('font-mono font-medium', pnlColor(unrealized.unrealizedPnl))}>
-                  {pnlSign(unrealized.unrealizedPnl)}{unrealized.unrealizedPnl.toFixed(4)}
-                  <span className="ml-1 text-xs">({pnlSign(unrealized.unrealizedPnlPct)}{unrealized.unrealizedPnlPct.toFixed(2)}%)</span>
-                </span>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+      {/* Position — unified card for spot and futures */}
+      <PositionCard
+        position={latestPosition}
+        unrealized={unrealized}
+        futuresRisk={futuresRisk}
+      />
 
       <Tabs defaultValue="chart" className="space-y-4">
         <TabsList className="bg-muted/50 p-1 rounded-lg w-full overflow-x-auto">
@@ -631,7 +612,6 @@ export default function BotDetailPage() {
             <TabsTrigger value="close-history" className="rounded-md text-xs">{t('pnl.closeHistory')}</TabsTrigger>
           )}
           <TabsTrigger value="strategies" className="rounded-md text-xs">{t('strategies')}</TabsTrigger>
-          <TabsTrigger value="futures-margin" className="rounded-md text-xs">{t('futuresMargin')}</TabsTrigger>
           {isRunning && <TabsTrigger value="logs" className="rounded-md text-xs">{t('containerLogs')}</TabsTrigger>}
         </TabsList>
 
@@ -752,48 +732,18 @@ export default function BotDetailPage() {
             {trades.length > 0 ? (
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
-                  {trades.map((trade: BBGoTrade) => {
-                    const isBuy = trade.side === 'BUY'
-                    const serverTag = trade.positionAction
-                    const localTag = tradePositionTags?.[trades.indexOf(trade)]
-                    const tag = serverTag ?? localTag?.tag ?? null
+                  {trades.map((trade: BBGoTrade, idx: number) => {
+                    const serverPa = trade.serverPositionAction
+                    const localTag = tradePositionTags?.[idx]
+                    const tag = !serverPa ? (trade.positionAction ?? localTag?.tag ?? null) : null
                     const netPos = trade.netPosition ?? localTag?.netPos ?? 0
                     return (
-                      <div key={trade.id} className={cn(
-                        'flex items-center justify-between px-6 py-3 border-l-2',
-                        tag === 'open' ? 'border-l-blue-400' : tag === 'close' ? 'border-l-orange-400' : isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
-                      )}>
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={cn(
-                            'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
-                            isBuy ? 'bg-trade-up/10 text-trade-up' : 'bg-trade-down/10 text-trade-down'
-                          )}>
-                            {isBuy ? 'B' : 'S'}
-                          </div>
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium truncate">{trade.symbol}</span>
-                              {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">{t('tradeTags.open')}</Badge>}
-                              {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">{t('tradeTags.close')}</Badge>}
-                              {tag === 'add' && <Badge variant="outline" className="rounded-md text-[10px] border-emerald-400 text-emerald-400">{t('tradeTags.add')}</Badge>}
-                              {tag === 'reduce' && <Badge variant="outline" className="rounded-md text-[10px] border-amber-400 text-amber-400">{t('tradeTags.reduce')}</Badge>}
-                              {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">{t('tradeTags.maker')}</Badge>}
-                              <span className="text-[10px] text-muted-foreground tabular-nums">{t('tradeTags.net', { position: netPos.toFixed(6) })}</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground">{trade.exchange}</span>
-                          </div>
-                        </div>
-                        <div className="text-right space-y-0.5 shrink-0">
-                          <p className="text-sm font-mono">{trade.price} × {trade.quantity}</p>
-                          <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-                            {trade.quoteQuantity && parseFloat(trade.quoteQuantity) > 0 && (
-                              <span>${parseFloat(trade.quoteQuantity).toFixed(2)}</span>
-                            )}
-                            <span>{trade.fee} {trade.feeCurrency}</span>
-                            {trade.tradedAt && <span className="tabular-nums">{new Date(trade.tradedAt).toLocaleString()}</span>}
-                          </div>
-                        </div>
-                      </div>
+                      <TradeRow
+                        key={trade.id}
+                        trade={trade}
+                        tag={tag}
+                        netPosition={netPos}
+                      />
                     )
                   })}
                 </div>
@@ -897,12 +847,6 @@ export default function BotDetailPage() {
               <CardContent className="py-8 text-center text-sm text-muted-foreground">{t('noStrategiesTab')}</CardContent>
             )}
           </Card>
-        </TabsContent>
-
-        <TabsContent value="futures-margin">
-          <ErrorBoundary>
-            <FuturesMarginPanel />
-          </ErrorBoundary>
         </TabsContent>
 
         {isRunning && (

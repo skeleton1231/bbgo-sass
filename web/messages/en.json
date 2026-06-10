@@ -184,7 +184,12 @@
       "positionClosed": "No open position",
       "noData": "No P&L data yet",
       "closeHistory": "Close History",
-      "profitMargin": "Margin"
+      "profitMargin": "Margin",
+      "entry": "Entry",
+      "mark": "Mark",
+      "qty": "Qty",
+      "liqPrice": "Liq.",
+      "notional": "Notional"
     },
     "crossExchange": "cross-exchange",
     "live": {
@@ -240,6 +245,12 @@
       "reduce": "Reduce",
       "maker": "Maker",
       "net": "net {position}"
+    },
+    "positionAction": {
+      "open_long": "Open Long",
+      "open_short": "Open Short",
+      "close_long": "Close Long",
+      "close_short": "Close Short"
     },
     "avgCost": "Avg Cost {price}",
     "noBinanceTestnetCreds": "No Binance testnet API credentials configured. Add them in Settings first."

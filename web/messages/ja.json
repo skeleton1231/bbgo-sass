@@ -207,6 +207,12 @@
       "maker": "Maker",
       "net": "ネット {position}"
     },
+    "positionAction": {
+      "open_long": "ロング建玉",
+      "open_short": "ショート建玉",
+      "close_long": "ロング決済",
+      "close_short": "ショート決済"
+    },
     "avgCost": "平均原価 {price}",
     "pnl": {
       "realized": "実現損益",
@@ -231,7 +237,12 @@
       "positionClosed": "ポジションなし",
       "noData": "損益データなし",
       "closeHistory": "決済履歴",
-      "profitMargin": "マージン"
+      "profitMargin": "マージン",
+      "entry": "参入",
+      "mark": "マーク",
+      "qty": "数量",
+      "liqPrice": "清算",
+      "notional": "名目"
     },
     "crossExchange": "クロス取引所",
     "live": {

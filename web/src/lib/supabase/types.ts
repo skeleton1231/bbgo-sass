@@ -191,6 +191,7 @@ export type Database = {
           position_amount: string
           position_initial_margin: string
           position_side: string
+          strategy_instance_id: string
           symbol: string
           unrealized_pnl: string
           updated_at: string
@@ -213,6 +214,7 @@ export type Database = {
           position_amount?: string
           position_initial_margin?: string
           position_side?: string
+          strategy_instance_id?: string
           symbol?: string
           unrealized_pnl?: string
           updated_at?: string
@@ -235,6 +237,7 @@ export type Database = {
           position_amount?: string
           position_initial_margin?: string
           position_side?: string
+          strategy_instance_id?: string
           symbol?: string
           unrealized_pnl?: string
           updated_at?: string
@@ -522,6 +525,7 @@ export type Database = {
           order_id: string
           order_type: string
           order_uuid: string
+          position_action: string
           price: string
           quantity: string
           side: string
@@ -548,6 +552,7 @@ export type Database = {
           order_id: string
           order_type: string
           order_uuid?: string
+          position_action?: string
           price: string
           quantity: string
           side: string
@@ -574,6 +579,7 @@ export type Database = {
           order_id?: string
           order_type?: string
           order_uuid?: string
+          position_action?: string
           price?: string
           quantity?: string
           side?: string
@@ -600,6 +606,7 @@ export type Database = {
           available: string
           currency: string
           locked: string
+          strategy_instance_id: string
           total: string
           updated_at: string | null
           user_id: string
@@ -608,6 +615,7 @@ export type Database = {
           available?: string
           currency: string
           locked?: string
+          strategy_instance_id?: string
           total?: string
           updated_at?: string | null
           user_id: string
@@ -616,6 +624,7 @@ export type Database = {
           available?: string
           currency?: string
           locked?: string
+          strategy_instance_id?: string
           total?: string
           updated_at?: string | null
           user_id?: string
@@ -681,6 +690,7 @@ export type Database = {
           position_amount: string
           position_initial_margin: string
           position_side: string
+          strategy_instance_id: string
           symbol: string
           unrealized_pnl: string
           updated_at: string
@@ -703,6 +713,7 @@ export type Database = {
           position_amount?: string
           position_initial_margin?: string
           position_side?: string
+          strategy_instance_id?: string
           symbol?: string
           unrealized_pnl?: string
           updated_at?: string
@@ -725,6 +736,7 @@ export type Database = {
           position_amount?: string
           position_initial_margin?: string
           position_side?: string
+          strategy_instance_id?: string
           symbol?: string
           unrealized_pnl?: string
           updated_at?: string
@@ -1012,6 +1024,7 @@ export type Database = {
           order_id: string
           order_type: string
           order_uuid: string
+          position_action: string
           price: string
           quantity: string
           side: string
@@ -1038,6 +1051,7 @@ export type Database = {
           order_id?: string
           order_type?: string
           order_uuid?: string
+          position_action?: string
           price?: string
           quantity?: string
           side?: string
@@ -1064,6 +1078,7 @@ export type Database = {
           order_id?: string
           order_type?: string
           order_uuid?: string
+          position_action?: string
           price?: string
           quantity?: string
           side?: string
@@ -1094,6 +1109,7 @@ export type Database = {
           exchange: string
           id: string
           net_profit: string | null
+          position_action: string
           profit: string | null
           quote: string
           quote_currency: string
@@ -1113,6 +1129,7 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
+          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1132,6 +1149,7 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
+          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1319,6 +1337,7 @@ export type Database = {
           order_id: string
           order_uuid: string
           pnl: string | null
+          position_action: string
           price: string
           quantity: string
           quote_quantity: string | null
@@ -1344,6 +1363,7 @@ export type Database = {
           order_id?: string
           order_uuid?: string
           pnl?: string | null
+          position_action?: string
           price?: string
           quantity?: string
           quote_quantity?: string | null
@@ -1369,6 +1389,7 @@ export type Database = {
           order_id?: string
           order_uuid?: string
           pnl?: string | null
+          position_action?: string
           price?: string
           quantity?: string
           quote_quantity?: string | null
@@ -1449,6 +1470,7 @@ export type Database = {
           exchange: string
           id: string
           net_profit: string | null
+          position_action: string
           profit: string | null
           quote: string
           quote_currency: string
@@ -1468,6 +1490,7 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
+          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1487,6 +1510,7 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
+          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1776,6 +1800,7 @@ export type Database = {
           order_id: string
           order_uuid: string
           pnl: string | null
+          position_action: string
           price: string
           quantity: string
           quote_quantity: string | null
@@ -1801,6 +1826,7 @@ export type Database = {
           order_id: string
           order_uuid?: string
           pnl?: string | null
+          position_action?: string
           price: string
           quantity: string
           quote_quantity?: string | null
@@ -1826,6 +1852,7 @@ export type Database = {
           order_id?: string
           order_uuid?: string
           pnl?: string | null
+          position_action?: string
           price?: string
           quantity?: string
           quote_quantity?: string | null

@@ -96,7 +96,15 @@ export function FuturesMarginPanel() {
                             {num(p.liquidation_price).toFixed(2)}
                           </span>
                         </td>
-                        <td className="text-right py-1.5 pr-3 font-mono">{num(p.position_amount).toFixed(4)}</td>
+                        <td className="text-right py-1.5 pr-3 font-mono">
+                          {num(p.position_amount) > 0 ? (
+                            <span className="text-blue-400">{num(p.position_amount).toFixed(4)} L</span>
+                          ) : num(p.position_amount) < 0 ? (
+                            <span className="text-rose-400">{Math.abs(num(p.position_amount)).toFixed(4)} S</span>
+                          ) : (
+                            '0.0000'
+                          )}
+                        </td>
                         <td className={`text-right py-1.5 pr-3 font-mono font-semibold ${pnlColor(upnl)}`}>
                           {pnlSign(upnl)}{upnl.toFixed(4)}
                         </td>

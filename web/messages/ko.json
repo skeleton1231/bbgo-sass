@@ -207,6 +207,12 @@
       "maker": "Maker",
       "net": "순 {position}"
     },
+    "positionAction": {
+      "open_long": "롱 오픈",
+      "open_short": "숏 오픈",
+      "close_long": "롱 청산",
+      "close_short": "숏 청산"
+    },
     "avgCost": "평균 단가 {price}",
     "pnl": {
       "realized": "실현 손익",
@@ -231,7 +237,12 @@
       "positionClosed": "포지션 없음",
       "noData": "손익 데이터 없음",
       "closeHistory": "청산 기록",
-      "profitMargin": "마진"
+      "profitMargin": "마진",
+      "entry": "진입",
+      "mark": "마크",
+      "qty": "수량",
+      "liqPrice": "청산",
+      "notional": "명목"
     },
     "crossExchange": "크로스 거래소",
     "live": {
