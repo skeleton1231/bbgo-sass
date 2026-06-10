@@ -54,6 +54,9 @@ interface BotChartPanelProps {
     quote: number
     symbol: string
     isClosed: boolean
+    leverage?: number
+    liquidationPrice?: number
+    direction?: 'long' | 'short' | 'flat'
   }
   unrealizedPnlPct?: number
 }
@@ -147,12 +150,33 @@ export function BotChartPanel({
           </div>
           {supabasePosition && !supabasePosition.isClosed && currentPrice && (
             <div className="flex items-center gap-4 mt-1.5 pt-2 border-t text-xs font-mono">
+              {supabasePosition.direction && supabasePosition.direction !== 'flat' && (
+                <span className={cn(
+                  'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase',
+                  supabasePosition.direction === 'long' ? 'bg-trade-up/20 text-trade-up' : 'bg-trade-down/20 text-trade-down'
+                )}>
+                  {supabasePosition.direction === 'long' ? '▲ Long' : '▼ Short'}
+                </span>
+              )}
+              {supabasePosition.leverage && supabasePosition.leverage > 1 && (
+                <span className="text-amber-400 font-semibold">
+                  {supabasePosition.leverage}x
+                </span>
+              )}
               <span className="text-muted-foreground">
                 {sp('holding')}: <span className="text-trade-up font-medium">{Math.abs(supabasePosition.base).toFixed(6)} {extractBaseCurrency(supabasePosition.symbol)}</span>
               </span>
               {supabasePosition.averageCost > 0 && (
                 <span className="text-muted-foreground">
                   {sp('entry')}: <span className="text-foreground font-medium">${supabasePosition.averageCost.toLocaleString()}</span>
+                </span>
+              )}
+              {supabasePosition.liquidationPrice && supabasePosition.liquidationPrice > 0 && (
+                <span className="text-trade-down/80">
+                  Liq: <span className="font-medium">${supabasePosition.liquidationPrice.toLocaleString()}</span>
+                  <span className="text-muted-foreground ml-1">
+                    ({((Math.abs(currentPrice - supabasePosition.liquidationPrice) / currentPrice) * 100).toFixed(1)}%)
+                  </span>
                 </span>
               )}
               <span className={cn(
@@ -198,6 +222,7 @@ export function BotChartPanel({
                     }
                   }}
                   onCandleHover={setOhlcvData}
+                  liquidationPrice={supabasePosition?.liquidationPrice}
                 />
               </div>
               {strategyStats && (

@@ -38,6 +38,9 @@ export interface TradeMarker {
   feeCurrency?: string
   orderId?: number
   positionAction?: 'open' | 'close' | 'add' | 'reduce' | 'trade'
+    | 'openLong' | 'closeLong' | 'openShort' | 'closeShort'
+    | 'addLong' | 'reduceLong' | 'addShort' | 'reduceShort'
+    | 'flipLongToShort' | 'flipShortToLong'
 }
 
 export interface OrderLevel {
@@ -75,6 +78,70 @@ interface CandlestickChartProps {
   onVisibleTimeRangeChange?: (range: { from: number; to: number } | null) => void
   onCrosshairMove?: (data: { time?: number; price?: number } | null) => void
   onCandleHover?: (data: { time: number; open: number; high: number; low: number; close: number; volume?: number } | null) => void
+  liquidationPrice?: number
+}
+
+type MarkerAction = TradeMarker['positionAction']
+
+const MARKER_COLORS = {
+  openLong: '#3b82f6',
+  closeLong: '#f97316',
+  openShort: '#ef4444',
+  closeShort: '#22c55e',
+  addLong: '#60a5fa',
+  reduceLong: '#fb923c',
+  addShort: '#f87171',
+  reduceShort: '#4ade80',
+  flipLongToShort: '#a855f7',
+  flipShortToLong: '#a855f7',
+  buy: '#22c55e',
+  sell: '#ef4444',
+} as const
+
+interface MarkerVisual {
+  position: 'belowBar' | 'aboveBar'
+  color: string
+  shape: 'circle' | 'square' | 'arrowUp' | 'arrowDown'
+  icon: string
+  label: string
+}
+
+function getMarkerInfo(action: MarkerAction, side: 'BUY' | 'SELL'): MarkerVisual {
+  const c = MARKER_COLORS
+  switch (action) {
+    case 'openLong':
+      return { position: 'belowBar', color: c.openLong, shape: 'circle', icon: '▲', label: 'Open Long' }
+    case 'closeLong':
+      return { position: 'aboveBar', color: c.closeLong, shape: 'square', icon: '▼', label: 'Close Long' }
+    case 'openShort':
+      return { position: 'aboveBar', color: c.openShort, shape: 'circle', icon: '▼', label: 'Open Short' }
+    case 'closeShort':
+      return { position: 'belowBar', color: c.closeShort, shape: 'square', icon: '▲', label: 'Close Short' }
+    case 'addLong':
+      return { position: 'belowBar', color: c.addLong, shape: 'arrowUp', icon: '▲', label: 'Add Long' }
+    case 'reduceLong':
+      return { position: 'aboveBar', color: c.reduceLong, shape: 'arrowDown', icon: '▼', label: 'Reduce Long' }
+    case 'addShort':
+      return { position: 'aboveBar', color: c.addShort, shape: 'arrowDown', icon: '▼', label: 'Add Short' }
+    case 'reduceShort':
+      return { position: 'belowBar', color: c.reduceShort, shape: 'arrowUp', icon: '▲', label: 'Reduce Short' }
+    case 'flipLongToShort':
+      return { position: 'aboveBar', color: c.flipLongToShort, shape: 'square', icon: '▼▲', label: 'Flip → Short' }
+    case 'flipShortToLong':
+      return { position: 'belowBar', color: c.flipShortToLong, shape: 'square', icon: '▲▼', label: 'Flip → Long' }
+    case 'open':
+      return { position: 'belowBar', color: c.openLong, shape: 'circle', icon: '▲', label: 'Open' }
+    case 'close':
+      return { position: 'aboveBar', color: c.closeLong, shape: 'square', icon: '▼', label: 'Close' }
+    case 'add':
+      return { position: 'belowBar', color: c.addLong, shape: 'arrowUp', icon: '▲', label: 'Add' }
+    case 'reduce':
+      return { position: 'aboveBar', color: c.reduceLong, shape: 'arrowDown', icon: '▼', label: 'Reduce' }
+    default:
+      return side === 'BUY'
+        ? { position: 'belowBar', color: c.buy, shape: 'arrowUp', icon: '▲', label: '' }
+        : { position: 'aboveBar', color: c.sell, shape: 'arrowDown', icon: '▼', label: '' }
+  }
 }
 
 function getChartTheme(): DeepPartial<ChartOptions> {
@@ -114,6 +181,7 @@ export function CandlestickChart({
   onVisibleTimeRangeChange,
   onCrosshairMove,
   onCandleHover,
+  liquidationPrice,
 }: CandlestickChartProps) {
   const t = useTranslations('Bots')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -313,17 +381,15 @@ export function CandlestickChart({
       const markers = tradeMarkers
         .sort((a, b) => (a.time as number) - (b.time as number))
         .map((t) => {
-          const action = t.positionAction
-          const actionLabel = action === 'open' ? ' Open' : action === 'close' ? ' Close' : action === 'add' ? ' Add' : action === 'reduce' ? ' Reduce' : ''
-          const isOpen = action === 'open'
-          const isClose = action === 'close'
+          const a = t.positionAction
+          const info = getMarkerInfo(a, t.side)
           const snappedTime = snapToNearestCandle(t.time as number, candleTimes)
           return {
             time: (snappedTime ?? t.time) as Time,
-            position: t.side === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
-            color: isOpen ? '#3b82f6' : isClose ? '#f97316' : t.side === 'BUY' ? '#22c55e' : '#ef4444',
-            shape: isOpen ? 'circle' as const : isClose ? 'square' as const : t.side === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
-            text: `${t.side === 'BUY' ? '▲' : '▼'}${actionLabel} ${t.quantity}`,
+            position: info.position,
+            color: info.color,
+            shape: info.shape,
+            text: `${info.icon} ${info.label} ${t.quantity}`,
           }
         })
       const markersKey = markers.map((m) => `${m.time}-${m.shape}-${m.text}`).join('|')
@@ -370,6 +436,15 @@ export function CandlestickChart({
       })
     }
 
+    if (liquidationPrice && liquidationPrice > 0) {
+      allLines.push({
+        price: liquidationPrice,
+        color: 'rgba(239, 68, 68, 0.8)',
+        lineStyle: 2,
+        title: '⚠ Liq',
+      })
+    }
+
     if (allLines.length === 0) return
 
     for (const line of allLines) {
@@ -383,7 +458,7 @@ export function CandlestickChart({
       })
       priceLinesRef.current.push(pl)
     }
-  }, [orderLevels, gridLines])
+  }, [orderLevels, gridLines, liquidationPrice])
 
   // Indicator lines as overlay series
   useEffect(() => {

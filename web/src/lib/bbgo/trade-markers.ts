@@ -1,11 +1,12 @@
 import type { BBGoOrder, BBGoTrade, TradeMarkersResponse } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
-import { computePositionTags } from './position-tags'
+import { computePositionTags, computeFuturesPositionTags } from './position-tags'
 
 export function buildTradeMarkers(
   trades: BBGoTrade[] | null | undefined,
   _closedOrders: BBGoOrder[] | null | undefined,
-  symbol: string
+  symbol: string,
+  isFutures?: boolean
 ): TradeMarker[] {
   const markers: TradeMarker[] = []
 
@@ -31,6 +32,11 @@ export function buildTradeMarkers(
       sorted[i]!.positionAction = trades!.find(
         (t) => Math.floor(new Date(t.tradedAt).getTime() / 1000) === (sorted[i]!.time as number) && t.side === sorted[i]!.side
       )?.positionAction ?? 'trade'
+    }
+  } else if (isFutures) {
+    const tags = computeFuturesPositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))
+    for (let i = 0; i < sorted.length; i++) {
+      sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'
     }
   } else {
     const tags = computePositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))

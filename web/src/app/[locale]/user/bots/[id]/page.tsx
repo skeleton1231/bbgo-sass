@@ -27,6 +27,7 @@ import {
   useSupabasePnL,
   useSupabaseOpenOrders,
   useSupabaseBalances,
+  useSupabaseFuturesPositions,
 } from '@/lib/bbgo/supabase-queries'
 import { useRealtimeTable } from '@/lib/supabase/use-realtime'
 import { useUserId } from '@/components/providers/user-id'
@@ -166,6 +167,10 @@ export default function BotDetailPage() {
   const { data: latestPosition } = useSupabaseLatestPosition(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: unrealized } = useUnrealizedPnL(userId, currentPrice, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: profitRows } = useSupabaseProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode, limit: 200 })
+  const { data: futuresPositions } = useSupabaseFuturesPositions(userId, { mode, symbol: symbol || undefined })
+
+  const futuresRisk = futuresPositions?.find((p) => p.symbol === symbol)
+  const isFutures = !!futuresRisk && parseFloat(futuresRisk.position_amount) !== 0
 
   // Use profits-based PnL when available, fall back to FIFO
   const hasProfitsData = (pnlAgg?.totalTrades ?? 0) > 0
@@ -193,8 +198,8 @@ export default function BotDetailPage() {
   )
 
   const tradeMarkers: TradeMarker[] = useMemo(
-    () => buildTradeMarkers(tradesData ?? null, closedOrders, symbol),
-    [tradesData, closedOrders, symbol]
+    () => buildTradeMarkers(tradesData ?? null, closedOrders, symbol, isFutures),
+    [tradesData, closedOrders, symbol, isFutures]
   )
 
   const orderLevels: OrderLevel[] = useMemo(
@@ -652,7 +657,18 @@ export default function BotDetailPage() {
             onIntervalChange={setKlineInterval}
             indicatorConfigs={indicators}
             onToggleIndicator={toggleIndicator}
-            supabasePosition={latestPosition ? { base: latestPosition.base, averageCost: latestPosition.averageCost, quote: latestPosition.quote, symbol: latestPosition.symbol, isClosed: latestPosition.isClosed } : undefined}
+            supabasePosition={latestPosition ? {
+              base: latestPosition.base,
+              averageCost: latestPosition.averageCost,
+              quote: latestPosition.quote,
+              symbol: latestPosition.symbol,
+              isClosed: latestPosition.isClosed,
+              ...(futuresRisk ? {
+                leverage: parseFloat(futuresRisk.leverage),
+                liquidationPrice: parseFloat(futuresRisk.liquidation_price) || undefined,
+                direction: parseFloat(futuresRisk.position_amount) > 0 ? 'long' as const : parseFloat(futuresRisk.position_amount) < 0 ? 'short' as const : 'flat' as const,
+              } : {}),
+            } : undefined}
             unrealizedPnlPct={unrealized?.unrealizedPnlPct}
           />
         </TabsContent>

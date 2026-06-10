@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computePositionTags } from '../position-tags'
+import { computePositionTags, computeFuturesPositionTags } from '../position-tags'
 
 describe('computePositionTags', () => {
   it('tags first BUY as open', () => {
@@ -113,5 +113,129 @@ describe('computePositionTags', () => {
     // Without tradedAt, both tie → b-a reverses order: index 1 first (open), index 0 second (add)
     expect(result[1]!.tag).toBe('open')
     expect(result[0]!.tag).toBe('add')
+  })
+})
+
+describe('computeFuturesPositionTags', () => {
+  it('tags first BUY as openLong', () => {
+    const trades = [{ side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' }]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openLong')
+    expect(result[0]!.netPos).toBe(0.001)
+    expect(result[0]!.direction).toBe('long')
+  })
+
+  it('tags first SELL as openShort', () => {
+    const trades = [{ side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' }]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openShort')
+    expect(result[0]!.netPos).toBe(-0.001)
+    expect(result[0]!.direction).toBe('short')
+  })
+
+  it('tags closing BUY after short as closeShort', () => {
+    const trades = [
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:10:59Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openShort')
+    expect(result[1]!.tag).toBe('closeShort')
+    expect(result[1]!.direction).toBe('flat')
+  })
+
+  it('tags closing SELL after long as closeLong', () => {
+    const trades = [
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:10:59Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openLong')
+    expect(result[1]!.tag).toBe('closeLong')
+  })
+
+  it('tags addLong and reduceLong', () => {
+    const trades = [
+      { side: 'BUY' as const, quantity: '0.002', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:10:59Z' },
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:15:59Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openLong')
+    expect(result[1]!.tag).toBe('addLong')
+    expect(result[2]!.tag).toBe('reduceLong')
+    expect(result[2]!.netPos).toBe(0.002)
+  })
+
+  it('tags addShort and reduceShort', () => {
+    const trades = [
+      { side: 'SELL' as const, quantity: '0.002', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:10:59Z' },
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:15:59Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openShort')
+    expect(result[1]!.tag).toBe('addShort')
+    expect(result[2]!.tag).toBe('reduceShort')
+    expect(result[2]!.netPos).toBe(-0.002)
+  })
+
+  it('handles flip from long to short', () => {
+    const trades = [
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'SELL' as const, quantity: '0.002', tradedAt: '2026-06-04T08:10:59Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openLong')
+    expect(result[1]!.tag).toBe('flipLongToShort')
+    expect(result[1]!.netPos).toBe(-0.001)
+    expect(result[1]!.direction).toBe('short')
+  })
+
+  it('handles flip from short to long', () => {
+    const trades = [
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'BUY' as const, quantity: '0.002', tradedAt: '2026-06-04T08:10:59Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    expect(result[0]!.tag).toBe('openShort')
+    expect(result[1]!.tag).toBe('flipShortToLong')
+    expect(result[1]!.netPos).toBe(0.001)
+    expect(result[1]!.direction).toBe('long')
+  })
+
+  it('handles full long round trip', () => {
+    const trades = [
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T08:10:59Z' },
+      { side: 'SELL' as const, quantity: '0.002', tradedAt: '2026-06-04T08:15:59Z' },
+    ]
+    const tags = computeFuturesPositionTags(trades).map((r) => r.tag)
+    expect(tags).toEqual(['openLong', 'addLong', 'closeLong'])
+  })
+
+  it('handles full short round trip', () => {
+    const trades = [
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:05:59Z' },
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:10:59Z' },
+      { side: 'BUY' as const, quantity: '0.002', tradedAt: '2026-06-04T08:15:59Z' },
+    ]
+    const tags = computeFuturesPositionTags(trades).map((r) => r.tag)
+    expect(tags).toEqual(['openShort', 'addShort', 'closeShort'])
+  })
+
+  it('returns empty for empty trades', () => {
+    expect(computeFuturesPositionTags([])).toEqual([])
+  })
+
+  it('respects chronological ordering with DESC input', () => {
+    const trades = [
+      { side: 'BUY' as const, quantity: '0.001', tradedAt: '2026-06-04T12:00:00Z' },
+      { side: 'SELL' as const, quantity: '0.001', tradedAt: '2026-06-04T08:00:00Z' },
+    ]
+    const result = computeFuturesPositionTags(trades)
+    // SELL@08:00 is processed first (openShort), BUY@12:00 closes it
+    expect(result[1]!.tag).toBe('openShort')
+    expect(result[0]!.tag).toBe('closeShort')
   })
 })

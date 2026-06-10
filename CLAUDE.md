@@ -141,6 +141,8 @@ Exchange → BBGO Container → Supabase (orders, trades, positions, profits)
 
 BBGO writes directly to Supabase when `DB_DRIVER=supabase` is set. Paper containers write to `paper_orders`, `paper_trades`, `paper_positions`, `paper_profits` tables via `SUPABASE_TABLE_PREFIX=paper_`. Frontend reads from the appropriate table based on the current trading mode.
 
+Paper trading now supports **futures and margin** modes in addition to spot. When a strategy session has `Futures=true` or `Margin=true`, the paper trade engine activates futures position tracking (short selling, leverage-based margin locking, unrealized PnL, liquidation price computation) or margin simulation (borrow/repay assets, hourly interest accrual). Futures position risks are synced to `paper_futures_position_risks` every 30s via background goroutine. Margin interest accrues hourly at 0.01% rate. See `pkg/bbgo/paper_trade_futures.go` for implementation details.
+
 Supabase Realtime broadcasts changes to the frontend for live updates (migration `00023_realtime_tables.sql`).
 
 ### Frontend Trading Mode
@@ -389,6 +391,8 @@ Core tables:
 | `rewards` / `withdraws` / `deposits` | BBGO (direct) | Account activity |
 | `margin_loans` / `margin_repays` / `margin_interests` / `margin_liquidations` | BBGO (direct) | Margin trading records |
 | `futures_position_risks` | BBGO (direct) | Futures position risk snapshots |
+| `paper_futures_position_risks` | BBGO (direct, paper mode) | Paper futures position risk snapshots (synced every 30s) |
+| `paper_margin_loans` / `paper_margin_repays` / `paper_margin_interests` / `paper_margin_liquidations` | BBGO (direct, paper mode) | Paper margin trading records |
 | `backtest_reports` | Manager | Backtest results (JSONB) |
 | `user_containers` | Manager | Legacy container state |
 
