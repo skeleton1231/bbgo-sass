@@ -23,7 +23,6 @@ export function tradeRowToBBGo(row: Record<string, unknown>, idx: number): BBGoT
     fee: String(row.fee ?? '0'),
     feeCurrency: String(row.fee_currency ?? ''),
     strategyInstanceId,
-    serverPositionAction: (row.position_action as BBGoTrade['serverPositionAction']) || undefined,
   }
 }
 
@@ -48,6 +47,5 @@ export function orderRowToBBGo(row: Record<string, unknown>, idx: number): BBGoO
     isWorking: Boolean(row.is_working),
     tag: (row.tag as string) || undefined,
     strategyInstanceId,
-    serverPositionAction: (row.position_action as BBGoOrder['serverPositionAction']) || undefined,
   }
 }

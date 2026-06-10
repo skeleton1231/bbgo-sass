@@ -88,7 +88,6 @@ type BBGoTrade struct {
 	Fee             flexString `json:"fee"`
 	FeeCurrency     string     `json:"feeCurrency"`
 	StrategyID      string     `json:"strategyID,omitempty"`
-	PositionAction  string     `json:"positionAction,omitempty"`
 	NetPosition     float64    `json:"netPosition,omitempty"`
 }
 

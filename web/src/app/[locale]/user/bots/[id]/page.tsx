@@ -733,9 +733,8 @@ export default function BotDetailPage() {
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
                   {trades.map((trade: BBGoTrade, idx: number) => {
-                    const serverPa = trade.serverPositionAction
                     const localTag = tradePositionTags?.[idx]
-                    const tag = !serverPa ? (trade.positionAction ?? localTag?.tag ?? null) : null
+                    const tag = trade.positionAction ?? localTag?.tag ?? null
                     const netPos = trade.netPosition ?? localTag?.netPos ?? 0
                     return (
                       <TradeRow

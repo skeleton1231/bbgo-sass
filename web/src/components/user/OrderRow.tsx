@@ -13,13 +13,6 @@ interface OrderRowProps {
 
 const TRANSLATED_STATUSES = ['New', 'Filled', 'PartiallyFilled', 'Canceled', 'Rejected'] as const
 
-const POSITION_ACTION_STYLES: Record<string, { border: string; text: string; bg: string }> = {
-  open_long:   { border: 'border-blue-400',   text: 'text-blue-400',   bg: 'bg-blue-400/10' },
-  open_short:  { border: 'border-rose-400',   text: 'text-rose-400',   bg: 'bg-rose-400/10' },
-  close_long:  { border: 'border-sky-400',    text: 'text-sky-400',    bg: 'bg-sky-400/10' },
-  close_short: { border: 'border-orange-400', text: 'text-orange-400', bg: 'bg-orange-400/10' },
-}
-
 export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
   const t = useTranslations('Bots')
   const statusLabel = (TRANSLATED_STATUSES as readonly string[]).includes(order.status)
@@ -31,10 +24,7 @@ export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
   const isBuy = order.side === 'BUY'
   const sideColor = isBuy ? 'text-trade-up' : 'text-trade-down'
   const sideBg = isBuy ? 'bg-trade-up/10' : 'bg-trade-down/10'
-
-  const pa = order.serverPositionAction
-  const paStyle = pa ? POSITION_ACTION_STYLES[pa] : null
-  const borderClass = paStyle ? paStyle.border : isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
+  const borderClass = isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
 
   return (
     <div className={cn(
@@ -49,11 +39,6 @@ export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium truncate">{order.symbol}</span>
             <Badge variant="secondary" className="rounded-md text-[10px] shrink-0">{order.orderType}</Badge>
-            {pa && (
-              <Badge variant="outline" className={cn('rounded-md text-[10px] shrink-0', paStyle?.border, paStyle?.text)}>
-                {t(`positionAction.${pa}`)}
-              </Badge>
-            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="font-mono">{order.price}</span>

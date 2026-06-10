@@ -2,13 +2,6 @@ import type { BBGoOrder, BBGoTrade, TradeMarkersResponse } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
 import { computePositionTags, computeFuturesPositionTags } from './position-tags'
 
-const SERVER_PA_TO_MARKER: Record<string, TradeMarker['positionAction']> = {
-  open_long: 'openLong',
-  open_short: 'openShort',
-  close_long: 'closeLong',
-  close_short: 'closeShort',
-}
-
 export function buildTradeMarkers(
   trades: BBGoTrade[] | null | undefined,
   _closedOrders: BBGoOrder[] | null | undefined,
@@ -22,33 +15,18 @@ export function buildTradeMarkers(
       ...trades
         .filter((tr) => !symbol || tr.symbol === symbol)
         .slice(0, 200)
-        .map((tr) => {
-          const marker: TradeMarker = {
-            time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker['time'],
-            side: tr.side as 'BUY' | 'SELL',
-            price: parseFloat(tr.price),
-            quantity: parseFloat(tr.quantity),
-          }
-          if (tr.serverPositionAction) {
-            marker.positionAction = SERVER_PA_TO_MARKER[tr.serverPositionAction] ?? 'trade'
-          }
-          return marker
-        })
+        .map((tr) => ({
+          time: Math.floor(new Date(tr.tradedAt).getTime() / 1000) as TradeMarker['time'],
+          side: tr.side as 'BUY' | 'SELL',
+          price: parseFloat(tr.price),
+          quantity: parseFloat(tr.quantity),
+        }))
     )
   }
 
   const sorted = markers.sort((a, b) => (a.time as number) - (b.time as number))
 
-  const hasServerPa = sorted.some((m) => m.positionAction && m.positionAction !== 'trade')
-  if (hasServerPa) {
-    // Server-side position_action already set on markers
-  } else if (trades?.some((t) => t.positionAction)) {
-    for (let i = 0; i < sorted.length; i++) {
-      sorted[i]!.positionAction = trades!.find(
-        (t) => Math.floor(new Date(t.tradedAt).getTime() / 1000) === (sorted[i]!.time as number) && t.side === sorted[i]!.side
-      )?.positionAction ?? 'trade'
-    }
-  } else if (isFutures) {
+  if (isFutures) {
     const tags = computeFuturesPositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))
     for (let i = 0; i < sorted.length; i++) {
       sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'

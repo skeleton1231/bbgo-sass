@@ -180,7 +180,6 @@ export interface BBGoTrade {
   feeCurrency: string
   strategyInstanceId?: string
   positionAction?: 'open' | 'close' | 'add' | 'reduce' | 'trade'
-  serverPositionAction?: 'open_long' | 'open_short' | 'close_long' | 'close_short'
   netPosition?: number
 }
 
@@ -202,7 +201,6 @@ export interface BBGoOrder {
   isWorking?: boolean
   tag?: string
   strategyInstanceId?: string
-  serverPositionAction?: 'open_long' | 'open_short' | 'close_long' | 'close_short'
 }
 
 export interface BBGoBalance {
