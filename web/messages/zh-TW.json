@@ -204,13 +204,19 @@
       "add": "加倉",
       "reduce": "減倉",
       "maker": "Maker",
-      "net": "淨 {position}"
-    },
-    "positionAction": {
-      "open_long": "開多",
-      "open_short": "開空",
-      "close_long": "平多",
-      "close_short": "平空"
+      "net": "淨 {position}",
+      "futures": {
+        "openLong": "開多",
+        "closeLong": "平多",
+        "openShort": "開空",
+        "closeShort": "平空",
+        "addLong": "加多",
+        "reduceLong": "減多",
+        "addShort": "加空",
+        "reduceShort": "減空",
+        "flipLongToShort": "平多 → 開空",
+        "flipShortToLong": "平空 → 開多"
+      }
     },
     "avgCost": "均價 {price}",
     "pnl": {

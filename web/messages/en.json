@@ -244,13 +244,19 @@
       "add": "Add",
       "reduce": "Reduce",
       "maker": "Maker",
-      "net": "net {position}"
-    },
-    "positionAction": {
-      "open_long": "Open Long",
-      "open_short": "Open Short",
-      "close_long": "Close Long",
-      "close_short": "Close Short"
+      "net": "net {position}",
+      "futures": {
+        "openLong": "Open Long",
+        "closeLong": "Close Long",
+        "openShort": "Open Short",
+        "closeShort": "Close Short",
+        "addLong": "Add Long",
+        "reduceLong": "Reduce Long",
+        "addShort": "Add Short",
+        "reduceShort": "Reduce Short",
+        "flipLongToShort": "Close Long → Open Short",
+        "flipShortToLong": "Close Short → Open Long"
+      }
     },
     "avgCost": "Avg Cost {price}",
     "noBinanceTestnetCreds": "No Binance testnet API credentials configured. Add them in Settings first."

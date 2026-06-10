@@ -50,7 +50,7 @@ import { TradeRow } from '@/components/user/TradeRow'
 import { PositionCard } from '@/components/user/PositionCard'
 import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
-import { computePositionTags } from '@/lib/bbgo/position-tags'
+import { computePositionTags, computeFuturesPositionTags } from '@/lib/bbgo/position-tags'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 
 import {
@@ -356,8 +356,8 @@ export default function BotDetailPage() {
   const trades = useMemo(() => tradesData ?? [], [tradesData])
   const tradePositionTags = useMemo(() => {
     if (trades.some((t) => t.positionAction)) return null
-    return computePositionTags(trades)
-  }, [trades])
+    return isFutures ? computeFuturesPositionTags(trades) : computePositionTags(trades)
+  }, [trades, isFutures])
 
   // Derived PnL values for display
   const netProfit = pnl?.totalNetProfit ?? pnlLegacy?.totalRealizedPnl ?? 0
@@ -742,6 +742,7 @@ export default function BotDetailPage() {
                         trade={trade}
                         tag={tag}
                         netPosition={netPos}
+                        isFutures={isFutures}
                       />
                     )
                   })}

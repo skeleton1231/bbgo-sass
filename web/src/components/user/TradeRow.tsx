@@ -5,24 +5,56 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import type { BBGoTrade } from '@/lib/bbgo/queries'
 
-type LocalTag = 'open' | 'close' | 'add' | 'reduce' | 'trade'
+type SpotTag = 'open' | 'close' | 'add' | 'reduce'
+type FuturesTag = 'openLong' | 'closeLong' | 'openShort' | 'closeShort'
+  | 'addLong' | 'reduceLong' | 'addShort' | 'reduceShort'
+  | 'flipLongToShort' | 'flipShortToLong'
+
+const LONG_TAGS = new Set<string>(['openLong', 'closeLong', 'addLong', 'reduceLong', 'flipShortToLong'])
+const SHORT_TAGS = new Set<string>(['openShort', 'closeShort', 'addShort', 'reduceShort', 'flipLongToShort'])
+const OPEN_TAGS = new Set<string>(['openLong', 'openShort'])
+const CLOSE_TAGS = new Set<string>(['closeLong', 'closeShort'])
+
+const SPOT_STYLES: Record<string, { border: string; text: string }> = {
+  open:   { border: 'border-l-blue-400',    text: 'text-blue-400' },
+  close:  { border: 'border-l-orange-400',   text: 'text-orange-400' },
+  add:    { border: 'border-l-emerald-400',  text: 'text-emerald-400' },
+  reduce: { border: 'border-l-amber-400',    text: 'text-amber-400' },
+}
+
+const FUTURES_STYLES: Record<string, { border: string; text: string }> = {
+  openLong:        { border: 'border-l-blue-400',    text: 'text-blue-400' },
+  addLong:         { border: 'border-l-blue-400',    text: 'text-blue-400' },
+  closeLong:       { border: 'border-l-sky-400',     text: 'text-sky-400' },
+  reduceLong:      { border: 'border-l-sky-400',     text: 'text-sky-400' },
+  openShort:       { border: 'border-l-rose-400',    text: 'text-rose-400' },
+  addShort:        { border: 'border-l-rose-400',    text: 'text-rose-400' },
+  closeShort:      { border: 'border-l-orange-400',  text: 'text-orange-400' },
+  reduceShort:     { border: 'border-l-orange-400',  text: 'text-orange-400' },
+  flipLongToShort: { border: 'border-l-purple-400',  text: 'text-purple-400' },
+  flipShortToLong: { border: 'border-l-purple-400',  text: 'text-purple-400' },
+}
 
 interface TradeRowProps {
   trade: BBGoTrade
   tag?: string | null
   netPosition?: number
+  isFutures?: boolean
 }
 
-function getBorderClass(tag: string | null | undefined, isBuy: boolean): string {
-  if (tag === 'open') return 'border-l-blue-400'
-  if (tag === 'close') return 'border-l-orange-400'
-  return isBuy ? 'border-l-trade-up' : 'border-l-trade-down'
-}
-
-export function TradeRow({ trade, tag, netPosition = 0 }: TradeRowProps) {
+export function TradeRow({ trade, tag, netPosition = 0, isFutures }: TradeRowProps) {
   const t = useTranslations('Bots')
   const isBuy = trade.side === 'BUY'
-  const borderClass = getBorderClass(tag, isBuy)
+
+  const isFuturesTag = tag && (LONG_TAGS.has(tag) || SHORT_TAGS.has(tag))
+  const styles = isFuturesTag ? FUTURES_STYLES[tag] : tag ? SPOT_STYLES[tag] : null
+  const borderClass = styles?.border ?? (isBuy ? 'border-l-trade-up' : 'border-l-trade-down')
+
+  const label = isFuturesTag
+    ? t(`tradeTags.futures.${tag}` as `tradeTags.futures.${FuturesTag}`)
+    : tag && tag in SPOT_STYLES
+      ? t(`tradeTags.${tag}` as `tradeTags.${SpotTag}`)
+      : null
 
   return (
     <div className={cn('flex items-center justify-between px-6 py-3 border-l-2', borderClass)}>
@@ -36,10 +68,11 @@ export function TradeRow({ trade, tag, netPosition = 0 }: TradeRowProps) {
         <div className="flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium truncate">{trade.symbol}</span>
-            {tag === 'open' && <Badge variant="outline" className="rounded-md text-[10px] border-blue-400 text-blue-400">{t('tradeTags.open')}</Badge>}
-            {tag === 'close' && <Badge variant="outline" className="rounded-md text-[10px] border-orange-400 text-orange-400">{t('tradeTags.close')}</Badge>}
-            {tag === 'add' && <Badge variant="outline" className="rounded-md text-[10px] border-emerald-400 text-emerald-400">{t('tradeTags.add')}</Badge>}
-            {tag === 'reduce' && <Badge variant="outline" className="rounded-md text-[10px] border-amber-400 text-amber-400">{t('tradeTags.reduce')}</Badge>}
+            {label && (
+              <Badge variant="outline" className={cn('rounded-md text-[10px]', styles?.text)}>
+                {label}
+              </Badge>
+            )}
             {trade.isMaker && <Badge variant="outline" className="rounded-md text-[10px]">{t('tradeTags.maker')}</Badge>}
             <span className="text-[10px] text-muted-foreground tabular-nums">{t('tradeTags.net', { position: netPosition.toFixed(6) })}</span>
           </div>

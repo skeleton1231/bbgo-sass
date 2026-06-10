@@ -205,13 +205,19 @@
       "add": "追加",
       "reduce": "削減",
       "maker": "Maker",
-      "net": "ネット {position}"
-    },
-    "positionAction": {
-      "open_long": "ロング建玉",
-      "open_short": "ショート建玉",
-      "close_long": "ロング決済",
-      "close_short": "ショート決済"
+      "net": "ネット {position}",
+      "futures": {
+        "openLong": "ロング建玉",
+        "closeLong": "ロング決済",
+        "openShort": "ショート建玉",
+        "closeShort": "ショート決済",
+        "addLong": "ロング追加",
+        "reduceLong": "ロング削減",
+        "addShort": "ショート追加",
+        "reduceShort": "ショート削減",
+        "flipLongToShort": "ロング決済 → ショート建玉",
+        "flipShortToLong": "ショート決済 → ロング建玉"
+      }
     },
     "avgCost": "平均原価 {price}",
     "pnl": {

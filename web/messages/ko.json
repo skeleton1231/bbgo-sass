@@ -205,13 +205,19 @@
       "add": "추가",
       "reduce": "감소",
       "maker": "Maker",
-      "net": "순 {position}"
-    },
-    "positionAction": {
-      "open_long": "롱 오픈",
-      "open_short": "숏 오픈",
-      "close_long": "롱 청산",
-      "close_short": "숏 청산"
+      "net": "순 {position}",
+      "futures": {
+        "openLong": "롱 오핀",
+        "closeLong": "롱 청산",
+        "openShort": "쇡 오핀",
+        "closeShort": "쇡 청산",
+        "addLong": "롱 추가",
+        "reduceLong": "롱 감소",
+        "addShort": "쇡 추가",
+        "reduceShort": "쇡 감소",
+        "flipLongToShort": "롱 청산 → 쇡 오핀",
+        "flipShortToLong": "쇡 청산 → 롱 오핀"
+      }
     },
     "avgCost": "평균 단가 {price}",
     "pnl": {
