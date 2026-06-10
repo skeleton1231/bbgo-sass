@@ -75,6 +75,7 @@ type PublicOrdersSelect struct {
   CreatedAt          string  `json:"created_at"`
   Exchange           string  `json:"exchange"`
   ExecutedQuantity   *string `json:"executed_quantity,omitempty"`
+  Gid                int64   `json:"gid"`
   Id                 string  `json:"id"`
   IsFutures          bool    `json:"is_futures"`
   IsIsolated         bool    `json:"is_isolated"`
@@ -96,11 +97,12 @@ type PublicOrdersSelect struct {
 }
 
 type PublicOrdersInsert struct {
-  ActualOrderId      *int64  `json:"actual_order_id,omitempty"`
+  ActualOrderId      *int64  `json:"actual_order_id"`
   ClientOrderId      *string `json:"client_order_id,omitempty"`
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   ExecutedQuantity   *string `json:"executed_quantity,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
   IsIsolated         *bool   `json:"is_isolated,omitempty"`
@@ -122,11 +124,12 @@ type PublicOrdersInsert struct {
 }
 
 type PublicOrdersUpdate struct {
-  ActualOrderId      *int64  `json:"actual_order_id,omitempty"`
+  ActualOrderId      *int64  `json:"actual_order_id"`
   ClientOrderId      *string `json:"client_order_id,omitempty"`
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   ExecutedQuantity   *string `json:"executed_quantity,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
   IsIsolated         *bool   `json:"is_isolated,omitempty"`
@@ -151,6 +154,7 @@ type PublicTradesSelect struct {
   Exchange           string  `json:"exchange"`
   Fee                string  `json:"fee"`
   FeeCurrency        string  `json:"fee_currency"`
+  Gid                int64   `json:"gid"`
   Id                 string  `json:"id"`
   IsBuyer            bool    `json:"is_buyer"`
   IsFutures          bool    `json:"is_futures"`
@@ -176,6 +180,7 @@ type PublicTradesInsert struct {
   Exchange           *string `json:"exchange,omitempty"`
   Fee                string  `json:"fee"`
   FeeCurrency        string  `json:"fee_currency"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsBuyer            *bool   `json:"is_buyer,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
@@ -201,6 +206,7 @@ type PublicTradesUpdate struct {
   Exchange           *string `json:"exchange,omitempty"`
   Fee                *string `json:"fee,omitempty"`
   FeeCurrency        *string `json:"fee_currency,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsBuyer            *bool   `json:"is_buyer,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
@@ -270,7 +276,7 @@ type PublicBacktestReportsUpdate struct {
   CreatedAt    *string     `json:"created_at,omitempty"`
   EndDate      *string     `json:"end_date,omitempty"`
   Id           *string     `json:"id,omitempty"`
-  LossCount    *int32      `json:"loss_count,omitempty"`
+  LossCount    *int32      `json:"loss_count"`
   MaxDrawdown  *string     `json:"max_drawdown,omitempty"`
   ProfitFactor *string     `json:"profit_factor,omitempty"`
   ReportJson   interface{} `json:"report_json"`
@@ -279,9 +285,9 @@ type PublicBacktestReportsUpdate struct {
   StartDate    *string     `json:"start_date,omitempty"`
   Strategy     *string     `json:"strategy,omitempty"`
   TotalProfit  *string     `json:"total_profit,omitempty"`
-  TotalTrades  *int32      `json:"total_trades,omitempty"`
+  TotalTrades  *int32      `json:"total_trades"`
   UserId       *string     `json:"user_id,omitempty"`
-  WinCount     *int32      `json:"win_count,omitempty"`
+  WinCount     *int32      `json:"win_count"`
   WinRate      *string     `json:"win_rate,omitempty"`
 }
 
@@ -340,7 +346,7 @@ type PublicPositionsUpdate struct {
   Strategy           *string `json:"strategy,omitempty"`
   StrategyInstanceId *string `json:"strategy_instance_id,omitempty"`
   Symbol             *string `json:"symbol,omitempty"`
-  TradeId            *int64  `json:"trade_id,omitempty"`
+  TradeId            *int64  `json:"trade_id"`
   TradedAt           *string `json:"traded_at,omitempty"`
   UserId             *string `json:"user_id,omitempty"`
 }
@@ -433,7 +439,7 @@ type PublicProfitsUpdate struct {
   Strategy           *string `json:"strategy,omitempty"`
   StrategyInstanceId *string `json:"strategy_instance_id,omitempty"`
   Symbol             *string `json:"symbol,omitempty"`
-  TradeId            *int64  `json:"trade_id,omitempty"`
+  TradeId            *int64  `json:"trade_id"`
   TradedAt           *string `json:"traded_at,omitempty"`
   UserId             *string `json:"user_id,omitempty"`
 }
@@ -452,7 +458,7 @@ type PublicStrategyRegistrySelect struct {
   LiveOnly        *bool       `json:"live_only,omitempty"`
   RequiresFutures *bool       `json:"requires_futures,omitempty"`
   SessionRoles    interface{} `json:"session_roles"`
-  SortOrder       *int32      `json:"sort_order,omitempty"`
+  SortOrder       *int32      `json:"sort_order"`
   UpdatedAt       *string     `json:"updated_at,omitempty"`
 }
 
@@ -470,7 +476,7 @@ type PublicStrategyRegistryInsert struct {
   LiveOnly        *bool       `json:"live_only,omitempty"`
   RequiresFutures *bool       `json:"requires_futures,omitempty"`
   SessionRoles    interface{} `json:"session_roles"`
-  SortOrder       *int32      `json:"sort_order,omitempty"`
+  SortOrder       *int32      `json:"sort_order"`
   UpdatedAt       *string     `json:"updated_at,omitempty"`
 }
 
@@ -488,7 +494,7 @@ type PublicStrategyRegistryUpdate struct {
   LiveOnly        *bool       `json:"live_only,omitempty"`
   RequiresFutures *bool       `json:"requires_futures,omitempty"`
   SessionRoles    interface{} `json:"session_roles"`
-  SortOrder       *int32      `json:"sort_order,omitempty"`
+  SortOrder       *int32      `json:"sort_order"`
   UpdatedAt       *string     `json:"updated_at,omitempty"`
 }
 
@@ -546,6 +552,7 @@ type PublicPaperOrdersSelect struct {
   CreatedAt          string  `json:"created_at"`
   Exchange           string  `json:"exchange"`
   ExecutedQuantity   *string `json:"executed_quantity,omitempty"`
+  Gid                int64   `json:"gid"`
   Id                 string  `json:"id"`
   IsFutures          bool    `json:"is_futures"`
   IsIsolated         bool    `json:"is_isolated"`
@@ -567,11 +574,12 @@ type PublicPaperOrdersSelect struct {
 }
 
 type PublicPaperOrdersInsert struct {
-  ActualOrderId      *int64  `json:"actual_order_id,omitempty"`
+  ActualOrderId      *int64  `json:"actual_order_id"`
   ClientOrderId      *string `json:"client_order_id,omitempty"`
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   ExecutedQuantity   *string `json:"executed_quantity,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
   IsIsolated         *bool   `json:"is_isolated,omitempty"`
@@ -593,11 +601,12 @@ type PublicPaperOrdersInsert struct {
 }
 
 type PublicPaperOrdersUpdate struct {
-  ActualOrderId      *int64  `json:"actual_order_id,omitempty"`
+  ActualOrderId      *int64  `json:"actual_order_id"`
   ClientOrderId      *string `json:"client_order_id,omitempty"`
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   ExecutedQuantity   *string `json:"executed_quantity,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
   IsIsolated         *bool   `json:"is_isolated,omitempty"`
@@ -622,6 +631,7 @@ type PublicPaperTradesSelect struct {
   Exchange           string  `json:"exchange"`
   Fee                string  `json:"fee"`
   FeeCurrency        string  `json:"fee_currency"`
+  Gid                int64   `json:"gid"`
   Id                 string  `json:"id"`
   IsBuyer            bool    `json:"is_buyer"`
   IsFutures          bool    `json:"is_futures"`
@@ -647,6 +657,7 @@ type PublicPaperTradesInsert struct {
   Exchange           *string `json:"exchange,omitempty"`
   Fee                *string `json:"fee,omitempty"`
   FeeCurrency        *string `json:"fee_currency,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsBuyer            *bool   `json:"is_buyer,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
@@ -672,6 +683,7 @@ type PublicPaperTradesUpdate struct {
   Exchange           *string `json:"exchange,omitempty"`
   Fee                *string `json:"fee,omitempty"`
   FeeCurrency        *string `json:"fee_currency,omitempty"`
+  Gid                *int64  `json:"gid"`
   Id                 *string `json:"id,omitempty"`
   IsBuyer            *bool   `json:"is_buyer,omitempty"`
   IsFutures          *bool   `json:"is_futures,omitempty"`
@@ -748,7 +760,7 @@ type PublicPaperPositionsUpdate struct {
   Strategy           *string `json:"strategy,omitempty"`
   StrategyInstanceId *string `json:"strategy_instance_id,omitempty"`
   Symbol             *string `json:"symbol,omitempty"`
-  TradeId            *int64  `json:"trade_id,omitempty"`
+  TradeId            *int64  `json:"trade_id"`
   TradedAt           *string `json:"traded_at,omitempty"`
   UserId             *string `json:"user_id,omitempty"`
 }
@@ -841,7 +853,7 @@ type PublicPaperProfitsUpdate struct {
   Strategy           *string `json:"strategy,omitempty"`
   StrategyInstanceId *string `json:"strategy_instance_id,omitempty"`
   Symbol             *string `json:"symbol,omitempty"`
-  TradeId            *int64  `json:"trade_id,omitempty"`
+  TradeId            *int64  `json:"trade_id"`
   TradedAt           *string `json:"traded_at,omitempty"`
   UserId             *string `json:"user_id,omitempty"`
 }
@@ -1047,7 +1059,7 @@ type PublicMarginLoansInsert struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         string  `json:"user_id"`
 }
 
@@ -1058,7 +1070,7 @@ type PublicMarginLoansUpdate struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         *string `json:"user_id,omitempty"`
 }
 
@@ -1080,7 +1092,7 @@ type PublicMarginRepaysInsert struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         string  `json:"user_id"`
 }
 
@@ -1091,7 +1103,7 @@ type PublicMarginRepaysUpdate struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         *string `json:"user_id,omitempty"`
 }
 
@@ -1153,7 +1165,7 @@ type PublicMarginLiquidationsInsert struct {
   ExecutedQuantity *string `json:"executed_quantity,omitempty"`
   Id               *string `json:"id,omitempty"`
   IsIsolated       *bool   `json:"is_isolated,omitempty"`
-  OrderId          *int64  `json:"order_id,omitempty"`
+  OrderId          *int64  `json:"order_id"`
   Price            *string `json:"price,omitempty"`
   Quantity         *string `json:"quantity,omitempty"`
   Side             *string `json:"side,omitempty"`
@@ -1169,7 +1181,7 @@ type PublicMarginLiquidationsUpdate struct {
   ExecutedQuantity *string `json:"executed_quantity,omitempty"`
   Id               *string `json:"id,omitempty"`
   IsIsolated       *bool   `json:"is_isolated,omitempty"`
-  OrderId          *int64  `json:"order_id,omitempty"`
+  OrderId          *int64  `json:"order_id"`
   Price            *string `json:"price,omitempty"`
   Quantity         *string `json:"quantity,omitempty"`
   Side             *string `json:"side,omitempty"`
@@ -1449,7 +1461,7 @@ type PublicPaperMarginLoansInsert struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         string  `json:"user_id"`
 }
 
@@ -1460,7 +1472,7 @@ type PublicPaperMarginLoansUpdate struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         *string `json:"user_id,omitempty"`
 }
 
@@ -1482,7 +1494,7 @@ type PublicPaperMarginRepaysInsert struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         string  `json:"user_id"`
 }
 
@@ -1493,7 +1505,7 @@ type PublicPaperMarginRepaysUpdate struct {
   IsolatedSymbol *string `json:"isolated_symbol,omitempty"`
   Principle      *string `json:"principle,omitempty"`
   Time           *string `json:"time,omitempty"`
-  TransactionId  *int64  `json:"transaction_id,omitempty"`
+  TransactionId  *int64  `json:"transaction_id"`
   UserId         *string `json:"user_id,omitempty"`
 }
 
@@ -1555,7 +1567,7 @@ type PublicPaperMarginLiquidationsInsert struct {
   ExecutedQuantity *string `json:"executed_quantity,omitempty"`
   Id               *string `json:"id,omitempty"`
   IsIsolated       *bool   `json:"is_isolated,omitempty"`
-  OrderId          *int64  `json:"order_id,omitempty"`
+  OrderId          *int64  `json:"order_id"`
   Price            *string `json:"price,omitempty"`
   Quantity         *string `json:"quantity,omitempty"`
   Side             *string `json:"side,omitempty"`
@@ -1571,7 +1583,7 @@ type PublicPaperMarginLiquidationsUpdate struct {
   ExecutedQuantity *string `json:"executed_quantity,omitempty"`
   Id               *string `json:"id,omitempty"`
   IsIsolated       *bool   `json:"is_isolated,omitempty"`
-  OrderId          *int64  `json:"order_id,omitempty"`
+  OrderId          *int64  `json:"order_id"`
   Price            *string `json:"price,omitempty"`
   Quantity         *string `json:"quantity,omitempty"`
   Side             *string `json:"side,omitempty"`

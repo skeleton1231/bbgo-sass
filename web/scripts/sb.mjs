@@ -32,7 +32,6 @@ loadEnv();
 const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const TYPES_PATH = resolve(ROOT, process.env.SUPABASE_TYPES_PATH || "src/types/database.types.ts");
 const GO_TYPES_PATH = resolve(ROOT, process.env.SUPABASE_GO_TYPES_PATH || "../manager/supabase_types.go");
-const BBGO_GO_TYPES_PATH = resolve(ROOT, process.env.BBGO_GO_TYPES_PATH || "../../pkg/supabasetypes/database_types.go");
 
 function getRef() {
   return process.env.SUPABASE_PROJECT_REF || extractRef(process.env.SUPABASE_URL);
@@ -85,15 +84,11 @@ function cmdGoTypes() {
   // Add omitempty so nil pointers are omitted from JSON, letting the DB handle defaults.
   const fixPointerOmitempty = (s) => s.replace(/(\*[a-zA-Z]+\s+`json:"[^"]+)"/g, '$1,omitempty"');
   const managerOutput = fixPointerOmitempty(output.replace("package database", "package main"));
-  const bbgoOutput = fixPointerOmitempty(output.replace("package database", "package supabasetypes"));
 
   mkdirSync(dirname(GO_TYPES_PATH), { recursive: true });
   writeFileSync(GO_TYPES_PATH, managerOutput);
   console.log(`Go types written to ${GO_TYPES_PATH}`);
 
-  mkdirSync(dirname(BBGO_GO_TYPES_PATH), { recursive: true });
-  writeFileSync(BBGO_GO_TYPES_PATH, bbgoOutput);
-  console.log(`Go types written to ${BBGO_GO_TYPES_PATH}`);
 }
 
 function cmdDeploy(args) {
@@ -212,7 +207,6 @@ function cmdStatus() {
   console.log(`Secret key:    ${process.env.SUPABASE_SECRET_KEY ? "configured" : "(not set)"}`);
   console.log(`Types path:    ${TYPES_PATH}`);
   console.log(`Go types path: ${GO_TYPES_PATH}`);
-  console.log(`BBGO types path: ${BBGO_GO_TYPES_PATH}`);
   console.log();
   run("npx supabase projects list");
 }
@@ -244,7 +238,6 @@ Environment (.env):
   SUPABASE_SECRET_KEY    Auto-set as SB_SECRET_KEY
   SUPABASE_TYPES_PATH    Output path (default: src/types/database.types.ts)
   SUPABASE_GO_TYPES_PATH Go output path (default: ../manager/supabase_types.go)
-  BBGO_GO_TYPES_PATH     BBGO repo output path (default: ../../pkg/supabasetypes/database_types.go)
   SUPABASE_URL           Auto-detect project ref from this
 
 Examples:
