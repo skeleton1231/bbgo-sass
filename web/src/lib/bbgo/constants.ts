@@ -40,7 +40,7 @@ export const EXCHANGE_OPTIONS = [
 ] as const
 
 // Exchanges that support futures market data sessions
-export const FUTURES_SESSION_EXCHANGES = new Set(['binance', 'okex', 'bybit', 'bitget'])
+export const FUTURES_SESSION_EXCHANGES = new Set(['binance', 'okex', 'bybit'])
 
 /**
  * Derives the market data session name for a given exchange and trading type.

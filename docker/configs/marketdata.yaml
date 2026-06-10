@@ -30,11 +30,6 @@ sessions:
     exchange: bitget
     envVarPrefix: BITGET
     publicOnly: true
-  bitget_futures:
-    exchange: bitget
-    envVarPrefix: BITGET
-    futures: true
-    publicOnly: true
   kucoin:
     exchange: kucoin
     envVarPrefix: KUCOIN
