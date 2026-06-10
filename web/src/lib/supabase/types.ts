@@ -525,7 +525,6 @@ export type Database = {
           order_id: string
           order_type: string
           order_uuid: string
-          position_action: string
           price: string
           quantity: string
           side: string
@@ -552,7 +551,6 @@ export type Database = {
           order_id: string
           order_type: string
           order_uuid?: string
-          position_action?: string
           price: string
           quantity: string
           side: string
@@ -579,7 +577,6 @@ export type Database = {
           order_id?: string
           order_type?: string
           order_uuid?: string
-          position_action?: string
           price?: string
           quantity?: string
           side?: string
@@ -1024,7 +1021,6 @@ export type Database = {
           order_id: string
           order_type: string
           order_uuid: string
-          position_action: string
           price: string
           quantity: string
           side: string
@@ -1051,7 +1047,6 @@ export type Database = {
           order_id?: string
           order_type?: string
           order_uuid?: string
-          position_action?: string
           price?: string
           quantity?: string
           side?: string
@@ -1078,7 +1073,6 @@ export type Database = {
           order_id?: string
           order_type?: string
           order_uuid?: string
-          position_action?: string
           price?: string
           quantity?: string
           side?: string
@@ -1109,7 +1103,6 @@ export type Database = {
           exchange: string
           id: string
           net_profit: string | null
-          position_action: string
           profit: string | null
           quote: string
           quote_currency: string
@@ -1129,7 +1122,6 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
-          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1149,7 +1141,6 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
-          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1337,7 +1328,6 @@ export type Database = {
           order_id: string
           order_uuid: string
           pnl: string | null
-          position_action: string
           price: string
           quantity: string
           quote_quantity: string | null
@@ -1363,7 +1353,6 @@ export type Database = {
           order_id?: string
           order_uuid?: string
           pnl?: string | null
-          position_action?: string
           price?: string
           quantity?: string
           quote_quantity?: string | null
@@ -1389,7 +1378,6 @@ export type Database = {
           order_id?: string
           order_uuid?: string
           pnl?: string | null
-          position_action?: string
           price?: string
           quantity?: string
           quote_quantity?: string | null
@@ -1470,7 +1458,6 @@ export type Database = {
           exchange: string
           id: string
           net_profit: string | null
-          position_action: string
           profit: string | null
           quote: string
           quote_currency: string
@@ -1490,7 +1477,6 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
-          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1510,7 +1496,6 @@ export type Database = {
           exchange?: string
           id?: string
           net_profit?: string | null
-          position_action?: string
           profit?: string | null
           quote?: string
           quote_currency?: string
@@ -1800,7 +1785,6 @@ export type Database = {
           order_id: string
           order_uuid: string
           pnl: string | null
-          position_action: string
           price: string
           quantity: string
           quote_quantity: string | null
@@ -1826,7 +1810,6 @@ export type Database = {
           order_id: string
           order_uuid?: string
           pnl?: string | null
-          position_action?: string
           price: string
           quantity: string
           quote_quantity?: string | null
@@ -1852,7 +1835,6 @@ export type Database = {
           order_id?: string
           order_uuid?: string
           pnl?: string | null
-          position_action?: string
           price?: string
           quantity?: string
           quote_quantity?: string | null
