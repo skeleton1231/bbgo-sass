@@ -38,3 +38,17 @@ export const EXCHANGE_OPTIONS = [
   { id: 'coinbase', label: 'Coinbase' },
   { id: 'bitfinex', label: 'Bitfinex' },
 ] as const
+
+// Exchanges that support futures market data sessions
+export const FUTURES_SESSION_EXCHANGES = new Set(['binance', 'okex', 'bybit', 'bitget'])
+
+/**
+ * Derives the market data session name for a given exchange and trading type.
+ * Returns undefined for spot (default), or "{exchange}_futures" for futures.
+ */
+export function marketDataSession(exchange: string, isFutures?: boolean): string | undefined {
+  if (isFutures && FUTURES_SESSION_EXCHANGES.has(exchange)) {
+    return `${exchange}_futures`
+  }
+  return undefined
+}

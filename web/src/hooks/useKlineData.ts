@@ -22,6 +22,7 @@ interface UseKlineDataOptions {
   symbol: string
   interval?: string
   mode?: 'live' | 'paper'
+  session?: string // e.g., "binance_futures" to use futures market data
   enabled?: boolean
 }
 
@@ -36,14 +37,14 @@ function parseKlineRaw(k: { time: string | number; open: string; high: string; l
   }
 }
 
-export function useKlineData({ userId, exchange, symbol, interval, mode, enabled = true }: UseKlineDataOptions) {
+export function useKlineData({ userId, exchange, symbol, interval, mode, session, enabled = true }: UseKlineDataOptions) {
   const queryClient = useQueryClient()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const loadingMoreRef = useRef(false)
   const wsCandlesRef = useRef<Map<string, KlineCandle>>(new Map())
   const earliestTimeRef = useRef<number | null>(null)
 
-  const queryKey = useMemo(() => ['klines', exchange, symbol, interval, mode] as const, [exchange, symbol, interval, mode])
+  const queryKey = useMemo(() => ['klines', exchange, symbol, interval, mode, session] as const, [exchange, symbol, interval, mode, session])
 
   const { data: candles = [], isLoading, error, refetch } = useQuery<KlineCandle[]>({
     queryKey,
@@ -55,6 +56,7 @@ export function useKlineData({ userId, exchange, symbol, interval, mode, enabled
         limit: '200',
       })
       if (mode) params.set('mode', mode)
+      if (session) params.set('session', session)
       const res = await fetch(`/api/manager/markets/${encodeURIComponent(exchange)}/klines?${params}`)
       if (!res.ok) throw new Error(`Failed to fetch klines: ${res.status}`)
       const data = await res.json()
@@ -88,6 +90,7 @@ export function useKlineData({ userId, exchange, symbol, interval, mode, enabled
         end_time: String(endTime),
       })
       if (mode) params.set('mode', mode)
+      if (session) params.set('session', session)
       const res = await fetch(`/api/manager/markets/${encodeURIComponent(exchange)}/klines?${params}`)
       if (!res.ok) return
 
@@ -109,7 +112,7 @@ export function useKlineData({ userId, exchange, symbol, interval, mode, enabled
       loadingMoreRef.current = false
       setIsLoadingMore(false)
     }
-  }, [exchange, symbol, interval, enabled, mode, queryClient, queryKey])
+  }, [exchange, symbol, interval, enabled, mode, session, queryClient, queryKey])
 
   const handleWSMessage = useCallback((msg: { type: string; data: { exchange?: string; symbol?: string; channel?: string; kline?: KlineUpdate } }) => {
     if (msg.type !== 'market') return

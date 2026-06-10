@@ -154,6 +154,15 @@ func modeFromQuery(r *http.Request) string {
 	return ModeLive
 }
 
+// resolveTarget returns the session name to use for gRPC routing.
+// If session is specified, it overrides the exchange (e.g., "binance_futures").
+func resolveTarget(exchange, session string) string {
+	if session != "" {
+		return session
+	}
+	return exchange
+}
+
 func (api *API) isInstanceStarting(instanceID string) bool {
 	_, ok := api.starting.Load(instanceID)
 	return ok
@@ -787,9 +796,10 @@ func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "market data service not connected")
 		return
 	}
+	target := resolveTarget(exchange, r.URL.Query().Get("session"))
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	req := &pb.QueryTickerRequest{Exchange: exchange, Symbol: symbol}
+	req := &pb.QueryTickerRequest{Exchange: target, Symbol: symbol}
 	var err error
 	var resp *pb.QueryTickerResponse
 	if api.queryTickerFn != nil {
@@ -842,11 +852,12 @@ func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
 	if t, err := strconv.ParseInt(r.URL.Query().Get("end_time"), 10, 64); err == nil {
 		endTime = t
 	}
+	target := resolveTarget(exchange, r.URL.Query().Get("session"))
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	var err error
 	req := &pb.QueryKLinesRequest{
-		Exchange: exchange, Symbol: symbol, Interval: interval,
+		Exchange: target, Symbol: symbol, Interval: interval,
 		StartTime: startTime, EndTime: endTime, Limit: limit,
 	}
 	var resp *pb.QueryKLinesResponse

@@ -620,8 +620,10 @@ export interface MarketTicker {
   volume: number
 }
 
-export function fetchMarketTicker(exchange: string, symbol: string) {
-  return request<{ ticker: MarketTicker }>(`/markets/${encodeURIComponent(exchange)}/ticker?symbol=${encodeURIComponent(symbol)}`)
+export function fetchMarketTicker(exchange: string, symbol: string, session?: string) {
+  const params = new URLSearchParams({ symbol })
+  if (session) params.set('session', session)
+  return request<{ ticker: MarketTicker }>(`/markets/${encodeURIComponent(exchange)}/ticker?${params}`)
 }
 
 export interface MarketKline {
@@ -635,12 +637,13 @@ export interface MarketKline {
   closed: boolean
 }
 
-export function fetchMarketKlines(exchange: string, symbol: string, interval?: string, limit?: number, startTime?: number, endTime?: number) {
+export function fetchMarketKlines(exchange: string, symbol: string, interval?: string, limit?: number, startTime?: number, endTime?: number, session?: string) {
   const params = new URLSearchParams({ symbol })
   if (interval) params.set('interval', interval)
   if (limit) params.set('limit', String(limit))
   if (startTime) params.set('start_time', String(startTime))
   if (endTime) params.set('end_time', String(endTime))
+  if (session) params.set('session', session)
   return request<{ klines: MarketKline[] }>(`/markets/${encodeURIComponent(exchange)}/klines?${params}`)
 }
 

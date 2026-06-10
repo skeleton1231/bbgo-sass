@@ -110,8 +110,12 @@ func (h *MarketDataHub) subscribeDefault(subs []MarketSub) {
 
 	pbSubs := make([]*pb.Subscription, len(subs))
 	for i, s := range subs {
+		exchange := s.Exchange
+		if s.Session != "" {
+			exchange = s.Session
+		}
 		pbSubs[i] = &pb.Subscription{
-			Exchange: s.Exchange,
+			Exchange: exchange,
 			Channel:  channelPb(s.Channel),
 			Symbol:   s.Symbol,
 			Interval: s.Interval,

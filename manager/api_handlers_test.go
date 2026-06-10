@@ -788,3 +788,22 @@ func TestAPI_DeleteCredential_WithStore(t *testing.T) {
 		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
+
+func TestResolveTarget(t *testing.T) {
+	tests := []struct {
+		exchange string
+		session  string
+		want     string
+	}{
+		{"binance", "", "binance"},
+		{"binance", "binance_futures", "binance_futures"},
+		{"okex", "okex_futures", "okex_futures"},
+		{"bybit", "", "bybit"},
+	}
+	for _, tt := range tests {
+		got := resolveTarget(tt.exchange, tt.session)
+		if got != tt.want {
+			t.Errorf("resolveTarget(%q, %q) = %q, want %q", tt.exchange, tt.session, got, tt.want)
+		}
+	}
+}

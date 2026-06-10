@@ -275,10 +275,10 @@ export function useMarketTicker(exchange: string, symbol: string) {
   })
 }
 
-export function useMarketKlines(exchange: string, symbol: string, interval?: string) {
+export function useMarketKlines(exchange: string, symbol: string, interval?: string, session?: string) {
   return useQuery<{ klines: Array<{ time: number; open: string; high: string; low: string; close: string; volume: string; closed: boolean }> }>({
-    queryKey: ['market-klines', exchange, symbol, interval],
-    queryFn: () => fetchMarketKlines(exchange, symbol, interval),
+    queryKey: ['market-klines', exchange, symbol, interval, session],
+    queryFn: () => fetchMarketKlines(exchange, symbol, interval, undefined, undefined, undefined, session),
     enabled: !!exchange && !!symbol,
     staleTime: 60_000,
   })

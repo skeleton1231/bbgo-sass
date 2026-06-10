@@ -3,17 +3,37 @@ sessions:
     exchange: binance
     envVarPrefix: BINANCE
     publicOnly: true
+  binance_futures:
+    exchange: binance
+    envVarPrefix: BINANCE
+    futures: true
+    publicOnly: true
   okex:
     exchange: okex
     envVarPrefix: OKEX
+    publicOnly: true
+  okex_futures:
+    exchange: okex
+    envVarPrefix: OKEX
+    futures: true
     publicOnly: true
   bybit:
     exchange: bybit
     envVarPrefix: BYBIT
     publicOnly: true
+  bybit_futures:
+    exchange: bybit
+    envVarPrefix: BYBIT
+    futures: true
+    publicOnly: true
   bitget:
     exchange: bitget
     envVarPrefix: BITGET
+    publicOnly: true
+  bitget_futures:
+    exchange: bitget
+    envVarPrefix: BITGET
+    futures: true
     publicOnly: true
   kucoin:
     exchange: kucoin

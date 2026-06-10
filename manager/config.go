@@ -9,6 +9,7 @@ import (
 
 type MarketSub struct {
 	Exchange string
+	Session  string // session name for routing to spot or futures (e.g., "binance_futures")
 	Channel  string
 	Symbol   string
 	Interval string
@@ -156,6 +157,9 @@ func parseMarketSubs(entries []string) []MarketSub {
 			} else {
 				sub.Depth = parts[3]
 			}
+		}
+		if len(parts) > 4 {
+			sub.Session = parts[4]
 		}
 		subs = append(subs, sub)
 	}
