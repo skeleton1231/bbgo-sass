@@ -528,8 +528,6 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 		})
 	}
 
-	containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
-
 	anyFutures := false
 	for _, s := range sessions {
 		if s.Futures {
@@ -540,12 +538,9 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 
 	cfg := bbgoConfig{
 		InstanceID: inst.InstanceID,
-		Database: &databaseConfig{
-			Driver: "sqlite3",
-			DSN:    fmt.Sprintf("file:%s/bbgo.db?cache=shared&_journal_mode=WAL", containerDir),
-		},
-		Sessions: sessions,
-		Exchange: exchanges,
+		Database:   nil,
+		Sessions:   sessions,
+		Exchange:   exchanges,
 		Sync: &syncConfig{
 			UserDataStream: &syncUserDataStreamConfig{
 				Trades:       true,

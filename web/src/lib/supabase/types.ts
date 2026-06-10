@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       backtest_reports: {
@@ -513,6 +538,7 @@ export type Database = {
           created_at: string
           exchange: string
           executed_quantity: string | null
+          gid: number
           id: string
           is_futures: boolean
           is_isolated: boolean
@@ -538,6 +564,7 @@ export type Database = {
           created_at?: string
           exchange?: string
           executed_quantity?: string | null
+          gid?: number
           id?: string
           is_futures?: boolean
           is_isolated?: boolean
@@ -563,6 +590,7 @@ export type Database = {
           created_at?: string
           exchange?: string
           executed_quantity?: string | null
+          gid?: number
           id?: string
           is_futures?: boolean
           is_isolated?: boolean
@@ -597,6 +625,7 @@ export type Database = {
           available: string
           currency: string
           locked: string
+          total: string
           updated_at: string | null
           user_id: string
         }
@@ -604,6 +633,7 @@ export type Database = {
           available?: string
           currency: string
           locked?: string
+          total?: string
           updated_at?: string | null
           user_id: string
         }
@@ -611,6 +641,7 @@ export type Database = {
           available?: string
           currency?: string
           locked?: string
+          total?: string
           updated_at?: string | null
           user_id?: string
         }
@@ -997,6 +1028,7 @@ export type Database = {
           created_at: string
           exchange: string
           executed_quantity: string | null
+          gid: number
           id: string
           is_futures: boolean
           is_isolated: boolean
@@ -1022,6 +1054,7 @@ export type Database = {
           created_at?: string
           exchange?: string
           executed_quantity?: string | null
+          gid?: number
           id?: string
           is_futures?: boolean
           is_isolated?: boolean
@@ -1047,6 +1080,7 @@ export type Database = {
           created_at?: string
           exchange?: string
           executed_quantity?: string | null
+          gid?: number
           id?: string
           is_futures?: boolean
           is_isolated?: boolean
@@ -1300,6 +1334,7 @@ export type Database = {
           exchange: string
           fee: string
           fee_currency: string
+          gid: number
           id: string
           is_buyer: boolean
           is_futures: boolean
@@ -1324,6 +1359,7 @@ export type Database = {
           exchange?: string
           fee?: string
           fee_currency?: string
+          gid?: number
           id?: string
           is_buyer?: boolean
           is_futures?: boolean
@@ -1348,6 +1384,7 @@ export type Database = {
           exchange?: string
           fee?: string
           fee_currency?: string
+          gid?: number
           id?: string
           is_buyer?: boolean
           is_futures?: boolean
@@ -1754,6 +1791,7 @@ export type Database = {
           exchange: string
           fee: string
           fee_currency: string
+          gid: number
           id: string
           is_buyer: boolean
           is_futures: boolean
@@ -1778,6 +1816,7 @@ export type Database = {
           exchange?: string
           fee: string
           fee_currency: string
+          gid?: number
           id?: string
           is_buyer?: boolean
           is_futures?: boolean
@@ -1802,6 +1841,7 @@ export type Database = {
           exchange?: string
           fee?: string
           fee_currency?: string
+          gid?: number
           id?: string
           is_buyer?: boolean
           is_futures?: boolean
@@ -2046,6 +2086,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
