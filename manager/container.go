@@ -178,7 +178,7 @@ func (cm *ContainerManager) instanceEnvArgs(inst *StrategyInstance) []string {
 	args = append(args, "-e", "BBGO_STRATEGY_INSTANCE_ID="+inst.InstanceID)
 
 	args = append(args,
-		"-e", "DB_DRIVER=supabase",
+		"-e", "DB_DRIVER=postgresql",
 		"-e", "SUPABASE_DB_URL="+cm.cfg.SupabaseDBURL,
 		"-e", "BBGO_USER_ID="+inst.UserID,
 	)

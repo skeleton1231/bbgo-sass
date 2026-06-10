@@ -71,7 +71,7 @@ func TestBusiness_PaperContainer_HasPaperTrade(t *testing.T) {
 		if args[i] == "-e" && args[i+1] == "PAPER_TRADE=1" {
 			hasPaperTrade = true
 		}
-		if args[i] == "-e" && strings.HasPrefix(args[i+1], "DB_DRIVER=supabase") {
+		if args[i] == "-e" && strings.HasPrefix(args[i+1], "DB_DRIVER=postgresql") {
 			hasSupabase = true
 		}
 		if args[i] == "-e" && args[i+1] == "SUPABASE_TABLE_PREFIX=paper_" {

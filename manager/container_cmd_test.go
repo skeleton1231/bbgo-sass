@@ -73,8 +73,8 @@ func TestCreateAndStartInstance_FullDockerCommand_LiveMode(t *testing.T) {
 	if !strings.Contains(cmdStr, "BINANCE_API_SECRET=live-secret") {
 		t.Error("expected BINANCE_API_SECRET injection")
 	}
-	if !strings.Contains(cmdStr, "DB_DRIVER=supabase") {
-		t.Error("expected DB_DRIVER=supabase")
+	if !strings.Contains(cmdStr, "DB_DRIVER=postgresql") {
+		t.Error("expected DB_DRIVER=postgresql")
 	}
 	if !strings.Contains(cmdStr, "MARKET_DATA_SERVICE_URL=marketdata:9090") {
 		t.Error("expected MARKET_DATA_SERVICE_URL injection")

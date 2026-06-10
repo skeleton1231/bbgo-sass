@@ -85,7 +85,7 @@ func TestCrossLayerDockerEnvArgsLive(t *testing.T) {
 	assert.Contains(t, s, "BINANCE_API_KEY=mykey")
 	assert.Contains(t, s, "BINANCE_API_SECRET=mysecret")
 	assert.Contains(t, s, "BINANCE_API_PASSPHRASE=mypass")
-	assert.Contains(t, s, "DB_DRIVER=supabase")
+	assert.Contains(t, s, "DB_DRIVER=postgresql")
 }
 
 // TestCrossLayerDockerEnvArgsPaper verifies paper mode has PAPER_TRADE=1 and NO credentials.

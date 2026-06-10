@@ -244,8 +244,8 @@ func TestContainerManager_InstanceEnvArgs_PaperMode(t *testing.T) {
 	if !hasEnv(args, "PAPER_TRADE=1") {
 		t.Error("paper mode should have PAPER_TRADE=1")
 	}
-	if !hasEnv(args, "DB_DRIVER=supabase") {
-		t.Error("paper mode should have DB_DRIVER=supabase")
+	if !hasEnv(args, "DB_DRIVER=postgresql") {
+		t.Error("paper mode should have DB_DRIVER=postgresql")
 	}
 	if !hasEnv(args, "SUPABASE_TABLE_PREFIX=paper_") {
 		t.Error("paper mode should have SUPABASE_TABLE_PREFIX=paper_")
@@ -265,8 +265,8 @@ func TestContainerManager_InstanceEnvArgs_LiveMode(t *testing.T) {
 	if hasEnv(args, "PAPER_TRADE=1") {
 		t.Error("live mode should NOT have PAPER_TRADE=1")
 	}
-	if !hasEnv(args, "DB_DRIVER=supabase") {
-		t.Error("live mode should have DB_DRIVER=supabase")
+	if !hasEnv(args, "DB_DRIVER=postgresql") {
+		t.Error("live mode should have DB_DRIVER=postgresql")
 	}
 	if !hasEnv(args, "BBGO_USER_ID=u1") {
 		t.Error("live mode should have BBGO_USER_ID")
