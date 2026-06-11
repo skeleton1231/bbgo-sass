@@ -24,7 +24,11 @@ var testRegistry = &StrategyDefaultsCache{
 		"flashcrash":  {"interval": "1h", "baseQuantity": 0.001},
 		"fixedmaker":  {"interval": "1m", "quantity": 0.001, "halfSpread": 0.001},
 		"fmaker":      {"interval": "1h", "spread": 0.001, "quantity": 0.001},
-		"bollmaker":   {"interval": "1h"},
+		"bollmaker": {
+			"interval": "1h", "bidQuantity": 0.001, "askQuantity": 0.001,
+			"defaultBollinger": map[string]any{"interval": "1h", "window": 20, "bandWidth": 3.0},
+			"neutralBollinger": map[string]any{"interval": "1h", "window": 20, "bandWidth": 2.0},
+		},
 		"harmonic":    {"interval": "1h", "window": 20, "quantity": 0.001},
 		"dca":         {"investmentInterval": "1h", "budget": 500, "budgetPeriod": "day"},
 		"schedule":    {"interval": "1h", "quantity": 0.001, "side": "buy"},

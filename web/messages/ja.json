@@ -248,7 +248,10 @@
       "mark": "マーク",
       "qty": "数量",
       "liqPrice": "清算",
-      "notional": "名目"
+      "notional": "名目",
+      "liveTag": "リアルタイム",
+      "snapshotTag": "スナップ",
+      "spot": "現物"
     },
     "crossExchange": "クロス取引所",
     "live": {

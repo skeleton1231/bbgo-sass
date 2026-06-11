@@ -589,11 +589,12 @@ export default function BotDetailPage() {
         </div>
       )}
 
-      {/* Position — unified card for spot and futures */}
+      {/* Position — unified cards for spot and futures */}
       <PositionCard
-        position={latestPosition}
-        unrealized={unrealized}
-        futuresRisk={futuresRisk}
+        spotPositions={latestPosition ? [latestPosition] : []}
+        futuresRisks={futuresPositions ?? []}
+        spotUnrealized={unrealized}
+        currentPrice={currentPrice}
       />
 
       <Tabs defaultValue="chart" className="space-y-4">

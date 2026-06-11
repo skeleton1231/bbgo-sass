@@ -247,7 +247,10 @@
       "mark": "標記價",
       "qty": "數量",
       "liqPrice": "強平價",
-      "notional": "名義價值"
+      "notional": "名義價值",
+      "liveTag": "即時",
+      "snapshotTag": "快照",
+      "spot": "現貨"
     },
     "crossExchange": "跨交易所",
     "live": {

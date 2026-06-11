@@ -701,6 +701,54 @@ export function useSupabaseFuturesPositions(
   })
 }
 
+export interface FuturesRealtimeMetrics {
+  markPrice: number
+  unrealizedPnl: number
+  unrealizedPnlPct: number
+  liqDistancePct: number
+  isLive: boolean
+}
+
+function num(s: string | undefined | null): number {
+  if (!s) return 0
+  const v = parseFloat(s)
+  return isNaN(v) ? 0 : v
+}
+
+export function computeFuturesRealtime(
+  risk: FuturesPositionRisk,
+  currentPrice: number | undefined,
+): FuturesRealtimeMetrics {
+  const amount = num(risk.position_amount)
+  const entry = num(risk.entry_price)
+  const dbMark = num(risk.mark_price)
+  const liq = num(risk.liquidation_price)
+
+  const isLive = typeof currentPrice === 'number' && currentPrice > 0 && entry > 0 && amount !== 0
+  const markPrice = isLive ? currentPrice! : dbMark
+
+  let unrealizedPnl = 0
+  if (entry > 0 && amount !== 0 && markPrice > 0) {
+    unrealizedPnl = amount > 0
+      ? (markPrice - entry) * amount
+      : (entry - markPrice) * Math.abs(amount)
+  }
+  const cost = entry * Math.abs(amount)
+  const unrealizedPnlPct = cost > 0 ? (unrealizedPnl / cost) * 100 : 0
+
+  const liqDistancePct = liq > 0 && markPrice > 0
+    ? (Math.abs(markPrice - liq) / markPrice) * 100
+    : 0
+
+  return {
+    markPrice,
+    unrealizedPnl: Math.round(unrealizedPnl * 1e6) / 1e6,
+    unrealizedPnlPct: Math.round(unrealizedPnlPct * 100) / 100,
+    liqDistancePct: Math.round(liqDistancePct * 100) / 100,
+    isLive,
+  }
+}
+
 export function useSupabaseMarginHistory(
   userId: string,
   opts?: { mode?: 'live' | 'paper' }

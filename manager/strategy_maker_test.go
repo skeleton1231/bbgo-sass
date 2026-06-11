@@ -37,6 +37,77 @@ func TestStrategy_Bollmaker_DisableShort(t *testing.T) {
 	assertYAMLContains(t, s, "shadowProtection", "true")
 }
 
+// TestStrategy_Bollmaker_RegistryFillsNestedBandWidth is a regression test for the
+// collapsed-bollinger-bands bug. The user's stored config supplied bollinger
+// interval+window but omitted bandWidth; without registry deep-merge, bandWidth
+// stayed 0 and BOLL bands collapsed to the SMA line.
+//
+// Verifies that buildInstanceYAML, when given a registry with the production
+// bollmaker defaults, fills bandWidth into both defaultBollinger and
+// neutralBollinger even when the user config omits it entirely.
+func TestStrategy_Bollmaker_RegistryFillsNestedBandWidth(t *testing.T) {
+	config := map[string]any{
+		"interval": "1h", "bidQuantity": 0.001, "askQuantity": 0.001,
+		"defaultBollinger": map[string]any{"interval": "1h", "window": 20},
+		"neutralBollinger": map[string]any{"interval": "1h", "window": 20},
+	}
+	rawConfig, _ := json.Marshal(config)
+	inst := &StrategyInstance{
+		UserID:   testUUID,
+		Mode:     ModeLive,
+		Strategy: "bollmaker",
+		Exchange: "binance",
+		Symbol:   "BTCUSDT",
+		Config:   rawConfig,
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, testRegistry)
+	if err != nil {
+		t.Fatalf("buildInstanceYAML: %v", err)
+	}
+	s := string(yamlBytes)
+
+	if !strings.Contains(s, "bandWidth:") {
+		t.Errorf("YAML missing bandWidth — registry defaults did not deep-merge into nested bollinger config\n%s", s)
+	}
+	assertYAMLContains(t, s, "bandWidth", "3")
+}
+
+// TestStrategy_Bollmaker_RegistryBandWidthNotOverriddenByUser verifies the inverse:
+// when the user explicitly sets a bandWidth, that value wins over the registry
+// default. Guards against the deep-merge silently overwriting intentional user choices.
+func TestStrategy_Bollmaker_RegistryBandWidthNotOverriddenByUser(t *testing.T) {
+	config := map[string]any{
+		"interval": "1h",
+		"defaultBollinger": map[string]any{
+			"interval": "1h", "window": 30, "bandWidth": 1.5,
+		},
+		"neutralBollinger": map[string]any{
+			"interval": "1h", "window": 30, "bandWidth": 2.5,
+		},
+	}
+	rawConfig, _ := json.Marshal(config)
+	inst := &StrategyInstance{
+		UserID:   testUUID,
+		Mode:     ModeLive,
+		Strategy: "bollmaker",
+		Exchange: "binance",
+		Symbol:   "BTCUSDT",
+		Config:   rawConfig,
+	}
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, testRegistry)
+	if err != nil {
+		t.Fatalf("buildInstanceYAML: %v", err)
+	}
+	s := string(yamlBytes)
+
+	if !strings.Contains(s, "window: 30") {
+		t.Errorf("user-supplied window=30 should survive deep-merge\n%s", s)
+	}
+	if !strings.Contains(s, "bandWidth: 1.5") {
+		t.Errorf("user-supplied defaultBollinger.bandWidth=1.5 should survive deep-merge\n%s", s)
+	}
+}
+
 func TestStrategy_Linregmaker_TrendAware(t *testing.T) {
 	config := map[string]any{
 		"interval": "5m", "bidQuantity": 0.005, "askQuantity": 0.005,

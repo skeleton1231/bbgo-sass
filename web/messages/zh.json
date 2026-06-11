@@ -250,7 +250,10 @@
       "mark": "标记价",
       "qty": "数量",
       "liqPrice": "强平价",
-      "notional": "名义价值"
+      "notional": "名义价值",
+      "liveTag": "实时",
+      "snapshotTag": "快照",
+      "spot": "现货"
     },
     "crossExchange": "跨交易所",
     "live": {

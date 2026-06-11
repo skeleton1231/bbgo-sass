@@ -203,7 +203,35 @@ Semaphore limits to 2 concurrent backtests. Stale jobs from previous manager res
 
 ### Strategy Defaults
 
-Before running, backtest configs are enriched with defaults from the strategy registry (`StrategyDefaultsCache`). Missing fields like `symbol`, `quantity`, `gridNumber`, `interval` etc. are injected to prevent strategy panics.
+Before running, configs are enriched with defaults from the strategy registry (`StrategyDefaultsCache`). Missing fields like `symbol`, `quantity`, `gridNumber`, `interval` etc. are injected to prevent strategy panics.
+
+**Deep-merge mechanism.** `deepMerge(base, overlay)` in `manager/user.go:46` recursively merges registry defaults (`base`) under user config (`overlay`) — overlay wins at scalar level, nested maps recurse. Called from three sites that must stay wired:
+
+| Call site | Path |
+|---|---|
+| `manager/instance_store.go:451` | `buildInstanceYAML` — the running-instance start path |
+| `manager/api.go:332` | `CreateStrategy` handler — first-time instance creation |
+| `manager/user.go:173` | Backtest config generation |
+
+**Alignment discipline (root cause of the 2026-06-11 BOLL bandWidth bug).** Defaults exist in three places that can drift:
+
+1. `pkg/strategy/<name>/strategy.go` `Defaults()` — compiled into the bbgo binary; the **source of truth**
+2. `strategy_registry.defaults` (Supabase JSONB) — what the manager deep-merges from
+3. `strategy_registry.fields[*].default` — what the frontend form shows
+
+When you change `Defaults()` in bbgo code, you MUST also:
+
+1. Write a new migration under `saas/web/supabase/migrations/` that `UPDATE`s `strategy_registry.defaults` to match. Use `jsonb_set` for surgical nested updates (see `00043_bollmaker_bandwidth_fix.sql` as the template — same shape as `00016_autobuy_bollinger_bandwidth_fix.sql`).
+2. Update the corresponding `fields[*].default` entries if the field is user-visible.
+3. Run `pnpm sb push` from `saas/web/` to apply the migration.
+4. Restart `bbgo-manager` so `StrategyDefaultsCache.Load()` picks up the new row (or wait 5 minutes for `RefreshLoop`).
+5. For existing instance containers: the on-disk `bbgo.yaml` is **not** regenerated on restart — only on instance creation. The bbgo-layer `Defaults()` defensive fix (see `pkg/strategy/bollmaker/strategy.go`) is what catches existing instances.
+
+**Test coverage that prevents this class of bug without per-strategy tests:**
+
+- `manager/strategy_cross_test.go` `TestDeepMerge_NestedMapMerge` — proves deep-merge recurses.
+- `manager/strategy_maker_test.go` `TestStrategy_Bollmaker_RegistryFillsNestedBandWidth` — regression for the specific bug; pattern to copy when adding a new strategy with nested required fields.
+- `manager/api_cross_layer_type_test.go` `testRegistry` — must mirror production `strategy_registry.defaults` or deep-merge tests give false confidence.
 
 ### Key Files
 

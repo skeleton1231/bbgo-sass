@@ -189,7 +189,10 @@
       "mark": "Mark",
       "qty": "Qty",
       "liqPrice": "Liq.",
-      "notional": "Notional"
+      "notional": "Notional",
+      "liveTag": "LIVE",
+      "snapshotTag": "Snapshot",
+      "spot": "Spot"
     },
     "crossExchange": "cross-exchange",
     "live": {

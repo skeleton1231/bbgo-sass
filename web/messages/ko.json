@@ -248,7 +248,10 @@
       "mark": "마크",
       "qty": "수량",
       "liqPrice": "청산",
-      "notional": "명목"
+      "notional": "명목",
+      "liveTag": "실시간",
+      "snapshotTag": "스냅샷",
+      "spot": "현물"
     },
     "crossExchange": "크로스 거래소",
     "live": {
