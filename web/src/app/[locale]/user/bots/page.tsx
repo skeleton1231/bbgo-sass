@@ -166,7 +166,7 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
               </span>
               {isRunning && (
                 <Link
-                  href={`/user/bots/${bot.id}?mode=${bot.mode}`}
+                  href={`/user/bots/${encodeURIComponent(bot.id)}?mode=${bot.mode}`}
                   className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
                 >
                   {t('dashboard')}
