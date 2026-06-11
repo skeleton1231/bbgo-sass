@@ -49,6 +49,7 @@ import {
   type BBGoTrade,
   type BBGoOrder,
   type BBGoBalance,
+  type PositionAction,
   type BBGoAsset,
   type BBGoStrategyState,
   type PnLReport,
@@ -469,4 +470,5 @@ export type {
   MarginRepay,
   MarginInterest,
   MarginLiquidation,
+  PositionAction,
 }

@@ -50,7 +50,6 @@ import { TradeRow } from '@/components/user/TradeRow'
 import { PositionCard } from '@/components/user/PositionCard'
 import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
-import { computePositionTags, computeFuturesPositionTags } from '@/lib/bbgo/position-tags'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 
 import {
@@ -168,10 +167,12 @@ export default function BotDetailPage() {
   const { data: latestPosition } = useSupabaseLatestPosition(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: unrealized } = useUnrealizedPnL(userId, currentPrice, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: profitRows } = useSupabaseProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode, limit: 200 })
-  const { data: futuresPositions } = useSupabaseFuturesPositions(userId, { mode, symbol: symbol || undefined })
+  const { data: futuresPositions } = useSupabaseFuturesPositions(userId, { mode, symbol: symbol || undefined, strategyInstanceId: botId })
 
-  const futuresRisk = futuresPositions?.find((p) => p.symbol === symbol)
-  const isFutures = !!futuresRisk && parseFloat(futuresRisk.position_amount) !== 0
+  const futuresRisk = futuresPositions?.find((p) => p.strategy_instance_id === botId)
+  const hasFuturesOrder = (supabaseOpenOrders ?? []).some((o) => o.isFutures)
+    || (closedOrdersData ?? []).some((o) => o.isFutures)
+  const isFutures = (!!futuresRisk && parseFloat(futuresRisk.position_amount) !== 0) || hasFuturesOrder
 
   // Use profits-based PnL when available, fall back to FIFO
   const hasProfitsData = (pnlAgg?.totalTrades ?? 0) > 0
@@ -354,11 +355,6 @@ export default function BotDetailPage() {
   const stopInstance = useStopInstance()
 
   const trades = useMemo(() => tradesData ?? [], [tradesData])
-  const tradePositionTags = useMemo(() => {
-    if (trades.some((t) => t.positionAction)) return null
-    return isFutures ? computeFuturesPositionTags(trades) : computePositionTags(trades)
-  }, [trades, isFutures])
-
   // Derived PnL values for display
   const netProfit = pnl?.totalNetProfit ?? pnlLegacy?.totalRealizedPnl ?? 0
   const unrealizedPnl = unrealized?.unrealizedPnl ?? pnlLegacy?.totalUnrealizedPnl ?? 0
@@ -732,20 +728,14 @@ export default function BotDetailPage() {
             {trades.length > 0 ? (
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
-                  {trades.map((trade: BBGoTrade, idx: number) => {
-                    const localTag = tradePositionTags?.[idx]
-                    const tag = trade.positionAction ?? localTag?.tag ?? null
-                    const netPos = trade.netPosition ?? localTag?.netPos ?? 0
-                    return (
-                      <TradeRow
-                        key={trade.id}
-                        trade={trade}
-                        tag={tag}
-                        netPosition={netPos}
-                        isFutures={isFutures}
-                      />
-                    )
-                  })}
+                  {trades.map((trade: BBGoTrade) => (
+                    <TradeRow
+                      key={trade.id}
+                      trade={trade}
+                      netPosition={trade.netPosition ?? 0}
+                      isFutures={isFutures}
+                    />
+                  ))}
                 </div>
               </ScrollArea>
             ) : (

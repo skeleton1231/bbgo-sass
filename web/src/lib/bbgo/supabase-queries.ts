@@ -664,7 +664,7 @@ export function useSupabaseTradingVolume(
 
 export function useSupabaseFuturesPositions(
   userId: string,
-  opts?: { mode?: 'live' | 'paper'; exchange?: string; symbol?: string }
+  opts?: { mode?: 'live' | 'paper'; exchange?: string; symbol?: string; strategyInstanceId?: string }
 ) {
   return useQuery<FuturesPositionRisk[]>({
     queryKey: ['supabase-futures-positions', userId, opts],
@@ -678,15 +678,16 @@ export function useSupabaseFuturesPositions(
 
       if (opts?.exchange) q = q.eq('exchange', opts.exchange)
       if (opts?.symbol) q = q.eq('symbol', opts.symbol)
+      if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
 
       const { data, error } = await q
       if (error) throw error
 
-      // Dedup: keep only the latest snapshot per (exchange, symbol, position_side)
+      // Dedup: keep only the latest snapshot per (exchange, symbol, position_side, strategy_instance_id)
       const seen = new Set<string>()
       const latest: FuturesPositionRisk[] = []
       for (const row of (data ?? []) as FuturesPositionRisk[]) {
-        const key = `${row.exchange}:${row.symbol}:${row.position_side}`
+        const key = `${row.exchange}:${row.symbol}:${row.position_side}:${row.strategy_instance_id}`
         if (!seen.has(key)) {
           seen.add(key)
           latest.push(row)

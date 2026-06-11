@@ -1,4 +1,4 @@
-import type { BBGoTrade, BBGoOrder } from './queries'
+import type { BBGoTrade, BBGoOrder, PositionAction } from './queries'
 
 export function tableName(base: string, mode?: 'live' | 'paper'): string {
   return mode === 'paper' ? `paper_${base}` : base
@@ -23,6 +23,7 @@ export function tradeRowToBBGo(row: Record<string, unknown>, idx: number): BBGoT
     fee: String(row.fee ?? '0'),
     feeCurrency: String(row.fee_currency ?? ''),
     strategyInstanceId,
+    positionAction: (row.position_action as PositionAction) || undefined,
   }
 }
 
@@ -47,5 +48,7 @@ export function orderRowToBBGo(row: Record<string, unknown>, idx: number): BBGoO
     isWorking: Boolean(row.is_working),
     tag: (row.tag as string) || undefined,
     strategyInstanceId,
+    isFutures: Boolean(row.is_futures),
+    positionAction: (row.position_action as PositionAction) || undefined,
   }
 }

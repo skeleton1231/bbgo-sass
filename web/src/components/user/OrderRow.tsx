@@ -3,13 +3,23 @@
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import type { BBGoOrder } from '@/lib/bbgo/queries'
+import type { BBGoOrder, PositionAction } from '@/lib/bbgo/queries'
 
 interface OrderRowProps {
   order: BBGoOrder
   showStatus?: boolean
   showTime?: boolean
 }
+
+const POSITION_ACTION_LABELS: Record<string, string> = {
+  OPEN: 'Open', ADD: 'Add', REDUCE: 'Reduce', CLOSE: 'Close',
+  OPEN_LONG: 'Open Long', ADD_LONG: 'Add Long', REDUCE_LONG: 'Reduce Long', CLOSE_LONG: 'Close Long',
+  OPEN_SHORT: 'Open Short', ADD_SHORT: 'Add Short', REDUCE_SHORT: 'Reduce Short', CLOSE_SHORT: 'Close Short',
+  FLIP_LONG_TO_SHORT: 'Flip → Short', FLIP_SHORT_TO_LONG: 'Flip → Long',
+}
+
+const LONG_ACTIONS = new Set(['OPEN_LONG', 'ADD_LONG', 'REDUCE_LONG', 'CLOSE_LONG', 'FLIP_SHORT_TO_LONG'])
+const SHORT_ACTIONS = new Set(['OPEN_SHORT', 'ADD_SHORT', 'REDUCE_SHORT', 'CLOSE_SHORT', 'FLIP_LONG_TO_SHORT'])
 
 const TRANSLATED_STATUSES = ['New', 'Filled', 'PartiallyFilled', 'Canceled', 'Rejected'] as const
 
@@ -32,13 +42,22 @@ export function OrderRow({ order, showStatus, showTime }: OrderRowProps) {
       borderClass
     )}>
       <div className="flex items-center gap-3 min-w-0">
-        <div className={cn('flex h-6 w-6 items-center justify-center rounded text-xs font-bold', sideBg, sideColor)}>
+        <div className={cn('flex items-center justify-center rounded text-xs font-bold h-6 w-6', sideBg, sideColor)}>
           {isBuy ? 'B' : 'S'}
         </div>
         <div className="flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium truncate">{order.symbol}</span>
             <Badge variant="secondary" className="rounded-md text-[10px] shrink-0">{order.orderType}</Badge>
+            {order.positionAction && POSITION_ACTION_LABELS[order.positionAction] && (
+              <Badge variant="outline" className={cn(
+                'rounded-md text-[10px] shrink-0',
+                LONG_ACTIONS.has(order.positionAction) && 'text-blue-400',
+                SHORT_ACTIONS.has(order.positionAction) && 'text-rose-400',
+              )}>
+                {POSITION_ACTION_LABELS[order.positionAction]}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="font-mono">{order.price}</span>

@@ -510,10 +510,19 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 		}
 		if registry != nil && registry.RequiresFutures(inst.Strategy) {
 			sc.Futures = true
-			if inst.FuturesConfig != nil {
-				if inst.FuturesConfig.Leverage > 0 {
-					sc.SymbolLeverage = map[string]int{symbol: inst.FuturesConfig.Leverage}
+			leverage := 0
+			if inst.FuturesConfig != nil && inst.FuturesConfig.Leverage > 0 {
+				leverage = inst.FuturesConfig.Leverage
+			}
+			if leverage == 0 {
+				if lv := toFloat(params["leverage"]); lv >= 1 {
+					leverage = int(lv)
 				}
+			}
+			if leverage > 0 {
+				sc.SymbolLeverage = map[string]int{symbol: leverage}
+			}
+			if inst.FuturesConfig != nil {
 				if inst.FuturesConfig.MarginType == "isolated" {
 					sc.IsolatedFutures = true
 					sc.IsolatedFuturesSymbol = symbol

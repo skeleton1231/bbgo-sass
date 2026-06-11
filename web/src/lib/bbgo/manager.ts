@@ -162,6 +162,12 @@ export interface BBGoSession {
   exchange: string
 }
 
+export type PositionAction =
+  | 'OPEN' | 'ADD' | 'REDUCE' | 'CLOSE'
+  | 'OPEN_LONG' | 'ADD_LONG' | 'REDUCE_LONG' | 'CLOSE_LONG'
+  | 'OPEN_SHORT' | 'ADD_SHORT' | 'REDUCE_SHORT' | 'CLOSE_SHORT'
+  | 'FLIP_LONG_TO_SHORT' | 'FLIP_SHORT_TO_LONG'
+
 export interface BBGoTrade {
   gid: number
   id: number
@@ -179,7 +185,7 @@ export interface BBGoTrade {
   fee: string
   feeCurrency: string
   strategyInstanceId?: string
-  positionAction?: 'open' | 'close' | 'add' | 'reduce' | 'trade'
+  positionAction?: PositionAction
   netPosition?: number
 }
 
@@ -201,6 +207,8 @@ export interface BBGoOrder {
   isWorking?: boolean
   tag?: string
   strategyInstanceId?: string
+  isFutures?: boolean
+  positionAction?: PositionAction
 }
 
 export interface BBGoBalance {
@@ -523,6 +531,7 @@ export interface FuturesPositionRisk {
   exchange: string
   symbol: string
   position_side: string
+  strategy_instance_id: string
   leverage: string
   entry_price: string
   mark_price: string

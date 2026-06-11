@@ -3,6 +3,8 @@
 #        docker build -f saas/docker/Dockerfile.manager ..
 FROM golang:1.26-bookworm AS builder
 
+ENV GOPROXY=https://goproxy.cn,direct
+
 WORKDIR /src/manager
 COPY saas/manager/go.mod saas/manager/go.sum ./
 COPY go.mod go.sum /src/bbgo/

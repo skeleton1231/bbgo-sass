@@ -1,12 +1,24 @@
 import type { BBGoOrder, BBGoTrade, TradeMarkersResponse } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
-import { computePositionTags, computeFuturesPositionTags } from './position-tags'
+
+type TradeMarkerAction = TradeMarker['positionAction']
+
+function positionActionToTag(action: string | null | undefined): TradeMarkerAction {
+  if (!action) return 'trade'
+  const map: Record<string, string> = {
+    OPEN: 'open', ADD: 'add', REDUCE: 'reduce', CLOSE: 'close',
+    OPEN_LONG: 'openLong', ADD_LONG: 'addLong', REDUCE_LONG: 'reduceLong', CLOSE_LONG: 'closeLong',
+    OPEN_SHORT: 'openShort', ADD_SHORT: 'addShort', REDUCE_SHORT: 'reduceShort', CLOSE_SHORT: 'closeShort',
+    FLIP_LONG_TO_SHORT: 'flipLongToShort', FLIP_SHORT_TO_LONG: 'flipShortToLong',
+  }
+  return (map[action] ?? 'trade') as TradeMarkerAction
+}
 
 export function buildTradeMarkers(
   trades: BBGoTrade[] | null | undefined,
   _closedOrders: BBGoOrder[] | null | undefined,
   symbol: string,
-  isFutures?: boolean
+  _isFutures?: boolean
 ): TradeMarker[] {
   const markers: TradeMarker[] = []
 
@@ -20,25 +32,12 @@ export function buildTradeMarkers(
           side: tr.side as 'BUY' | 'SELL',
           price: parseFloat(tr.price),
           quantity: parseFloat(tr.quantity),
+          positionAction: positionActionToTag(tr.positionAction ?? null),
         }))
     )
   }
 
-  const sorted = markers.sort((a, b) => (a.time as number) - (b.time as number))
-
-  if (isFutures) {
-    const tags = computeFuturesPositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))
-    for (let i = 0; i < sorted.length; i++) {
-      sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'
-    }
-  } else {
-    const tags = computePositionTags(sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) })))
-    for (let i = 0; i < sorted.length; i++) {
-      sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'
-    }
-  }
-
-  return sorted
+  return markers.sort((a, b) => (a.time as number) - (b.time as number))
 }
 
 export function buildTradeMarkersFromServer(data: TradeMarkersResponse | undefined): TradeMarker[] {

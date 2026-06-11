@@ -84,6 +84,7 @@ type PublicOrdersSelect struct {
   OrderId            string  `json:"order_id"`
   OrderType          string  `json:"order_type"`
   OrderUuid          string  `json:"order_uuid"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              string  `json:"price"`
   Quantity           string  `json:"quantity"`
   Side               string  `json:"side"`
@@ -111,6 +112,7 @@ type PublicOrdersInsert struct {
   OrderId            string  `json:"order_id"`
   OrderType          string  `json:"order_type"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              string  `json:"price"`
   Quantity           string  `json:"quantity"`
   Side               string  `json:"side"`
@@ -138,6 +140,7 @@ type PublicOrdersUpdate struct {
   OrderId            *string `json:"order_id,omitempty"`
   OrderType          *string `json:"order_type,omitempty"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              *string `json:"price,omitempty"`
   Quantity           *string `json:"quantity,omitempty"`
   Side               *string `json:"side,omitempty"`
@@ -164,6 +167,7 @@ type PublicTradesSelect struct {
   OrderId            string  `json:"order_id"`
   OrderUuid          string  `json:"order_uuid"`
   Pnl                *string `json:"pnl,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              string  `json:"price"`
   Quantity           string  `json:"quantity"`
   QuoteQuantity      *string `json:"quote_quantity,omitempty"`
@@ -190,6 +194,7 @@ type PublicTradesInsert struct {
   OrderId            string  `json:"order_id"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
   Pnl                *string `json:"pnl,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              string  `json:"price"`
   Quantity           string  `json:"quantity"`
   QuoteQuantity      *string `json:"quote_quantity,omitempty"`
@@ -216,6 +221,7 @@ type PublicTradesUpdate struct {
   OrderId            *string `json:"order_id,omitempty"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
   Pnl                *string `json:"pnl,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              *string `json:"price,omitempty"`
   Quantity           *string `json:"quantity,omitempty"`
   QuoteQuantity      *string `json:"quote_quantity,omitempty"`
@@ -298,7 +304,9 @@ type PublicPositionsSelect struct {
   CreatedAt          string  `json:"created_at"`
   Exchange           string  `json:"exchange"`
   Id                 string  `json:"id"`
+  LastPositionAction *string `json:"last_position_action,omitempty"`
   NetProfit          *string `json:"net_profit,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Profit             *string `json:"profit,omitempty"`
   Quote              string  `json:"quote"`
   QuoteCurrency      string  `json:"quote_currency"`
@@ -318,7 +326,9 @@ type PublicPositionsInsert struct {
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   Id                 *string `json:"id,omitempty"`
+  LastPositionAction *string `json:"last_position_action,omitempty"`
   NetProfit          *string `json:"net_profit,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Profit             *string `json:"profit,omitempty"`
   Quote              *string `json:"quote,omitempty"`
   QuoteCurrency      *string `json:"quote_currency,omitempty"`
@@ -338,7 +348,9 @@ type PublicPositionsUpdate struct {
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   Id                 *string `json:"id,omitempty"`
+  LastPositionAction *string `json:"last_position_action,omitempty"`
   NetProfit          *string `json:"net_profit,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Profit             *string `json:"profit,omitempty"`
   Quote              *string `json:"quote,omitempty"`
   QuoteCurrency      *string `json:"quote_currency,omitempty"`
@@ -561,6 +573,7 @@ type PublicPaperOrdersSelect struct {
   OrderId            string  `json:"order_id"`
   OrderType          string  `json:"order_type"`
   OrderUuid          string  `json:"order_uuid"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              string  `json:"price"`
   Quantity           string  `json:"quantity"`
   Side               string  `json:"side"`
@@ -588,6 +601,7 @@ type PublicPaperOrdersInsert struct {
   OrderId            *string `json:"order_id,omitempty"`
   OrderType          *string `json:"order_type,omitempty"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              *string `json:"price,omitempty"`
   Quantity           *string `json:"quantity,omitempty"`
   Side               *string `json:"side,omitempty"`
@@ -615,6 +629,7 @@ type PublicPaperOrdersUpdate struct {
   OrderId            *string `json:"order_id,omitempty"`
   OrderType          *string `json:"order_type,omitempty"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              *string `json:"price,omitempty"`
   Quantity           *string `json:"quantity,omitempty"`
   Side               *string `json:"side,omitempty"`
@@ -641,6 +656,7 @@ type PublicPaperTradesSelect struct {
   OrderId            string  `json:"order_id"`
   OrderUuid          string  `json:"order_uuid"`
   Pnl                *string `json:"pnl,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              string  `json:"price"`
   Quantity           string  `json:"quantity"`
   QuoteQuantity      *string `json:"quote_quantity,omitempty"`
@@ -667,6 +683,7 @@ type PublicPaperTradesInsert struct {
   OrderId            *string `json:"order_id,omitempty"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
   Pnl                *string `json:"pnl,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              *string `json:"price,omitempty"`
   Quantity           *string `json:"quantity,omitempty"`
   QuoteQuantity      *string `json:"quote_quantity,omitempty"`
@@ -693,6 +710,7 @@ type PublicPaperTradesUpdate struct {
   OrderId            *string `json:"order_id,omitempty"`
   OrderUuid          *string `json:"order_uuid,omitempty"`
   Pnl                *string `json:"pnl,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Price              *string `json:"price,omitempty"`
   Quantity           *string `json:"quantity,omitempty"`
   QuoteQuantity      *string `json:"quote_quantity,omitempty"`
@@ -712,7 +730,9 @@ type PublicPaperPositionsSelect struct {
   CreatedAt          string  `json:"created_at"`
   Exchange           string  `json:"exchange"`
   Id                 string  `json:"id"`
+  LastPositionAction *string `json:"last_position_action,omitempty"`
   NetProfit          *string `json:"net_profit,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Profit             *string `json:"profit,omitempty"`
   Quote              string  `json:"quote"`
   QuoteCurrency      string  `json:"quote_currency"`
@@ -732,7 +752,9 @@ type PublicPaperPositionsInsert struct {
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   Id                 *string `json:"id,omitempty"`
+  LastPositionAction *string `json:"last_position_action,omitempty"`
   NetProfit          *string `json:"net_profit,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Profit             *string `json:"profit,omitempty"`
   Quote              *string `json:"quote,omitempty"`
   QuoteCurrency      *string `json:"quote_currency,omitempty"`
@@ -752,7 +774,9 @@ type PublicPaperPositionsUpdate struct {
   CreatedAt          *string `json:"created_at,omitempty"`
   Exchange           *string `json:"exchange,omitempty"`
   Id                 *string `json:"id,omitempty"`
+  LastPositionAction *string `json:"last_position_action,omitempty"`
   NetProfit          *string `json:"net_profit,omitempty"`
+  PositionAction     *string `json:"position_action,omitempty"`
   Profit             *string `json:"profit,omitempty"`
   Quote              *string `json:"quote,omitempty"`
   QuoteCurrency      *string `json:"quote_currency,omitempty"`

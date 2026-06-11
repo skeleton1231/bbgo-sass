@@ -378,6 +378,49 @@ func TestBuildInstanceYAML_FuturesSymbolLeverage(t *testing.T) {
 	}
 }
 
+func TestBuildInstanceYAML_FuturesConfigOverridesStrategyLeverage(t *testing.T) {
+	registry := &StrategyDefaultsCache{
+		defaults:        map[string]map[string]any{"pivotshort": {"quantity": 0.001}},
+		requiresFutures: map[string]bool{"pivotshort": true},
+	}
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModePaper, Strategy: "pivotshort",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config:        rawJSON(`{"symbol":"BTCUSDT","leverage":5}`),
+		FuturesConfig: &FuturesConfig{Leverage: 10},
+	}
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlStr := string(yamlBytes)
+	if !strings.Contains(yamlStr, "BTCUSDT: 10") {
+		t.Errorf("FuturesConfig.Leverage should take priority, got:\n%s", yamlStr)
+	}
+}
+
+func TestBuildInstanceYAML_FuturesLeverageFromConfig(t *testing.T) {
+	registry := &StrategyDefaultsCache{
+		defaults:        map[string]map[string]any{"pivotshort": {"quantity": 0.001}},
+		requiresFutures: map[string]bool{"pivotshort": true},
+	}
+	inst := &StrategyInstance{
+		UserID: testUUID, Mode: ModePaper, Strategy: "pivotshort",
+		Exchange: "binance", Symbol: "BTCUSDT",
+		Config: rawJSON(`{"symbol":"BTCUSDT","interval":"1m","leverage":5}`),
+	}
+	inst.InstanceID = computeInstanceID(inst.Strategy, inst.Symbol, inst.Config)
+	yamlBytes, err := buildInstanceYAML(inst, func(string) bool { return true }, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlStr := string(yamlBytes)
+	if !strings.Contains(yamlStr, "BTCUSDT: 5") {
+		t.Errorf("YAML should use leverage from strategy config, got:\n%s", yamlStr)
+	}
+}
+
 func TestBuildInstanceYAML_FuturesIsolated(t *testing.T) {
 	registry := &StrategyDefaultsCache{
 		requiresFutures: map[string]bool{"pivotshort": true},

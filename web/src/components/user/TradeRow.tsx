@@ -12,8 +12,24 @@ type FuturesTag = 'openLong' | 'closeLong' | 'openShort' | 'closeShort'
 
 const LONG_TAGS = new Set<string>(['openLong', 'closeLong', 'addLong', 'reduceLong', 'flipShortToLong'])
 const SHORT_TAGS = new Set<string>(['openShort', 'closeShort', 'addShort', 'reduceShort', 'flipLongToShort'])
-const OPEN_TAGS = new Set<string>(['openLong', 'openShort'])
-const CLOSE_TAGS = new Set<string>(['closeLong', 'closeShort'])
+
+function futuresSideFromTag(tag: string | null | undefined): 'Long' | 'Short' | null {
+  if (!tag) return null
+  if (LONG_TAGS.has(tag)) return 'Long'
+  if (SHORT_TAGS.has(tag)) return 'Short'
+  return null
+}
+
+function positionActionToTag(action: string | null | undefined): SpotTag | FuturesTag | null {
+  if (!action) return null
+  const map: Record<string, SpotTag | FuturesTag> = {
+    OPEN: 'open', ADD: 'add', REDUCE: 'reduce', CLOSE: 'close',
+    OPEN_LONG: 'openLong', ADD_LONG: 'addLong', REDUCE_LONG: 'reduceLong', CLOSE_LONG: 'closeLong',
+    OPEN_SHORT: 'openShort', ADD_SHORT: 'addShort', REDUCE_SHORT: 'reduceShort', CLOSE_SHORT: 'closeShort',
+    FLIP_LONG_TO_SHORT: 'flipLongToShort', FLIP_SHORT_TO_LONG: 'flipShortToLong',
+  }
+  return map[action] ?? null
+}
 
 const SPOT_STYLES: Record<string, { border: string; text: string }> = {
   open:   { border: 'border-l-blue-400',    text: 'text-blue-400' },
@@ -37,15 +53,16 @@ const FUTURES_STYLES: Record<string, { border: string; text: string }> = {
 
 interface TradeRowProps {
   trade: BBGoTrade
-  tag?: string | null
   netPosition?: number
   isFutures?: boolean
 }
 
-export function TradeRow({ trade, tag, netPosition = 0, isFutures }: TradeRowProps) {
+export function TradeRow({ trade, netPosition = 0, isFutures }: TradeRowProps) {
   const t = useTranslations('Bots')
   const isBuy = trade.side === 'BUY'
 
+  const tag = positionActionToTag(trade.positionAction ?? null)
+  const futuresSide = isFutures ? (futuresSideFromTag(tag) ?? (isBuy ? 'Long' : 'Short')) : null
   const isFuturesTag = tag && (LONG_TAGS.has(tag) || SHORT_TAGS.has(tag))
   const styles = isFuturesTag ? FUTURES_STYLES[tag] : tag ? SPOT_STYLES[tag] : null
   const borderClass = styles?.border ?? (isBuy ? 'border-l-trade-up' : 'border-l-trade-down')
@@ -60,10 +77,11 @@ export function TradeRow({ trade, tag, netPosition = 0, isFutures }: TradeRowPro
     <div className={cn('flex items-center justify-between px-6 py-3 border-l-2', borderClass)}>
       <div className="flex items-center gap-3 min-w-0">
         <div className={cn(
-          'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
+          'flex items-center justify-center rounded text-xs font-bold',
+          futuresSide ? 'h-6 px-2' : 'h-6 w-6',
           isBuy ? 'bg-trade-up/10 text-trade-up' : 'bg-trade-down/10 text-trade-down'
         )}>
-          {isBuy ? 'B' : 'S'}
+          {futuresSide ?? (isBuy ? 'B' : 'S')}
         </div>
         <div className="flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2">

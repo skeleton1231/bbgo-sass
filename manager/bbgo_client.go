@@ -87,8 +87,10 @@ type BBGoTrade struct {
 	TradedAt        string     `json:"tradedAt"`
 	Fee             flexString `json:"fee"`
 	FeeCurrency     string     `json:"feeCurrency"`
-	StrategyID      string     `json:"strategyID,omitempty"`
-	NetPosition     float64    `json:"netPosition,omitempty"`
+	StrategyID          string     `json:"strategyID,omitempty"`
+	StrategyInstanceID  string     `json:"strategyInstanceId,omitempty"`
+	PositionAction      string     `json:"positionAction,omitempty"`
+	NetPosition         float64    `json:"netPosition,omitempty"`
 }
 
 type BBGoTradesResponse struct {

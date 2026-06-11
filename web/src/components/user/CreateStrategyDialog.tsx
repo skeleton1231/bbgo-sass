@@ -42,8 +42,14 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
     setStrategy(newStrategy)
-    setConfig(getStrategyDefaults(newStrategy, registry))
-    setFuturesConfig({ leverage: 1, marginType: 'cross' })
+    const defaults = getStrategyDefaults(newStrategy, registry)
+    setConfig(defaults)
+    const schema = getStrategySchema(newStrategy, registry)
+    const leverageFromConfig = typeof defaults.leverage === 'number' ? defaults.leverage : 1
+    setFuturesConfig({
+      leverage: schema?.requiresFutures ? leverageFromConfig : 1,
+      marginType: 'cross',
+    })
     if (getStrategySchema(newStrategy, registry)?.liveOnly) {
       setMode('live')
     }
@@ -88,6 +94,12 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
     }
 
     const numericConfig = nestConfig(ensureTypes(schema, config))
+
+    // Sync strategy config leverage to futuresConfig for futures strategies
+    const effectiveFuturesConfig = schema?.requiresFutures
+      ? { ...futuresConfig, leverage: typeof numericConfig.leverage === 'number' ? numericConfig.leverage : futuresConfig.leverage }
+      : futuresConfig
+
     const onError = (err: Error) => {
       toast.error(err.message)
     }
@@ -136,7 +148,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           strategy,
           config: numericConfig,
           mode,
-          ...(schema?.requiresFutures ? { futuresConfig } : {}),
+          ...(schema?.requiresFutures ? { futuresConfig: effectiveFuturesConfig } : {}),
         },
         { onSuccess, onError }
       )
