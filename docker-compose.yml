@@ -53,8 +53,8 @@ services:
       - MANAGER_TOKEN=${MANAGER_TOKEN}
       - MARKETDATA_ADDR=bbgo-marketdata:9090
       - MARKETDATA_REST_ADDR=bbgo-marketdata:8080
-      - MARKETDATA_TESTNET_ADDR=bbgo-marketdata-testnet:9090
-      - MARKETDATA_TESTNET_REST_ADDR=bbgo-marketdata-testnet:8080
+      - MARKETDATA_TESTNET_ADDR=
+      - MARKETDATA_TESTNET_REST_ADDR=
     depends_on:
       marketdata:
         condition: service_healthy
