@@ -29,6 +29,7 @@ import {
   useSupabaseOpenOrders,
   useSupabaseBalances,
   useSupabaseFuturesPositions,
+  computeFuturesRealtime,
   tradeKey,
   orderKey,
 } from '@/lib/bbgo/supabase-queries'
@@ -178,10 +179,26 @@ export default function BotDetailPage() {
   const { data: profitRows } = useSupabaseProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode, limit: 200 })
   const { data: futuresPositions } = useSupabaseFuturesPositions(userId, { mode, symbol: symbol || undefined, strategyInstanceId: botId })
 
-  const futuresRisk = futuresPositions?.find((p) => p.strategy_instance_id === botId)
+  const openFuturesPositions = (futuresPositions ?? []).filter(
+    (p) => Math.abs(parseFloat(p.position_amount)) > 0
+  )
+  const futuresRisk = openFuturesPositions[0]
   const hasFuturesOrder = (supabaseOpenOrders ?? []).some((o) => o.isFutures)
     || (closedOrdersData ?? []).some((o) => o.isFutures)
-  const isFutures = (!!futuresRisk && parseFloat(futuresRisk.position_amount) !== 0) || hasFuturesOrder
+  const isFutures = openFuturesPositions.length > 0 || hasFuturesOrder
+
+  // For futures bots, the positions table (used by useUnrealizedPnL) often holds base=0 rows
+  // because the paper engine writes both zero and non-zero snapshots at the same timestamp.
+  // Compute the top-line unrealized PnL directly from futures_position_risks via the same
+  // computeFuturesRealtime helper used by PositionCard, so the summary matches the cards.
+  const futuresUnrealized = useMemo(() => {
+    if (!isFutures || openFuturesPositions.length === 0) return null
+    let sum = 0
+    for (const r of openFuturesPositions) {
+      sum += computeFuturesRealtime(r, currentPrice).unrealizedPnl
+    }
+    return Math.round(sum * 1e6) / 1e6
+  }, [isFutures, openFuturesPositions, currentPrice])
 
   // Use profits-based PnL when available, fall back to FIFO
   const hasProfitsData = (pnlAgg?.totalTrades ?? 0) > 0
@@ -366,10 +383,10 @@ export default function BotDetailPage() {
   const trades = useMemo(() => tradesData ?? [], [tradesData])
   // Derived PnL values for display
   const netProfit = pnl?.totalNetProfit ?? pnlLegacy?.totalRealizedPnl ?? 0
-  const unrealizedPnl = unrealized?.unrealizedPnl ?? pnlLegacy?.totalUnrealizedPnl ?? 0
+  const unrealizedPnl = futuresUnrealized ?? unrealized?.unrealizedPnl ?? pnlLegacy?.totalUnrealizedPnl ?? 0
   const totalFees = pnl?.totalFees ?? pnlLegacy?.totalFees ?? 0
   const winRate = pnl?.winRate ?? pnlLegacy?.winRate ?? 0
-  const profitFactor = pnl?.profitFactor ?? 0
+  const profitFactor = pnl?.profitFactor ?? pnlLegacy?.profitFactor ?? 0
   const totalTrades = pnl?.totalTrades ?? pnlLegacy?.totalTrades ?? 0
   const winningTrades = pnl?.profitCount ?? pnlLegacy?.winningTrades ?? 0
   const losingTrades = pnl?.lossCount ?? pnlLegacy?.losingTrades ?? 0

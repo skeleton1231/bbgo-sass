@@ -245,7 +245,11 @@ function aggregateProfits(rows: ProfitRow[]): ProfitAggregation {
   let profitCount = 0
   let lossCount = 0
 
-  const dailyMap = new Map<string, { netProfit: number; fees: number }>()
+  // Each profit row represents one position event (open with fee-only, or close with realized PnL).
+  // totalTrades counts ALL rows so the "Total Trades" stat matches what users see in the trades table.
+  // profitCount/lossCount remain restricted to closed positions with non-zero net PnL for win-rate.
+  let totalTrades = 0
+  const dailyMap = new Map<string, { netProfit: number; fees: number; trades: number }>()
 
   // Sort ascending for cumulative curve
   const sorted = [...rows].sort(
@@ -254,6 +258,7 @@ function aggregateProfits(rows: ProfitRow[]): ProfitAggregation {
 
   let cumulative = 0
   const pnlCurve: PnlCurvePoint[] = []
+  const seenCurveTimes = new Set<number>()
 
   for (const row of sorted) {
     const netProfit = parseFloat(row.net_profit)
@@ -261,6 +266,7 @@ function aggregateProfits(rows: ProfitRow[]): ProfitAggregation {
 
     totalNetProfit += netProfit
     totalFees += fee
+    totalTrades++
 
     if (netProfit > 0) {
       profitCount++
@@ -270,24 +276,25 @@ function aggregateProfits(rows: ProfitRow[]): ProfitAggregation {
       totalGrossLoss += netProfit
     }
 
-    // Daily breakdown
+    // Daily breakdown — trades counts every profit-row event
     const day = row.traded_at.slice(0, 10)
-    const dayEntry = dailyMap.get(day) ?? { netProfit: 0, fees: 0 }
+    const dayEntry = dailyMap.get(day) ?? { netProfit: 0, fees: 0, trades: 0 }
     dayEntry.netProfit += netProfit
     dayEntry.fees += fee
+    dayEntry.trades++
     dailyMap.set(day, dayEntry)
 
-    // Cumulative PnL curve
+    // Cumulative PnL curve — use real traded_at timestamp to preserve intraday resolution
     cumulative += netProfit
-    const ts = Math.floor(new Date(day + 'T00:00:00Z').getTime() / 1000)
-    if (pnlCurve.length === 0 || pnlCurve[pnlCurve.length - 1]!.time !== ts) {
+    const ts = Math.floor(new Date(row.traded_at).getTime() / 1000)
+    if (!seenCurveTimes.has(ts)) {
+      seenCurveTimes.add(ts)
       pnlCurve.push({ time: ts, value: Math.round(cumulative * 100) / 100 })
     } else {
       pnlCurve[pnlCurve.length - 1]!.value = Math.round(cumulative * 100) / 100
     }
   }
 
-  const totalTrades = profitCount + lossCount
   const dailyEntries = Array.from(dailyMap.entries()).sort(([a], [b]) => a.localeCompare(b))
   let runningPnl = 0
   const dailyBreakdown: DailyPnl[] = []
@@ -298,7 +305,7 @@ function aggregateProfits(rows: ProfitRow[]): ProfitAggregation {
       pnl: Math.round(runningPnl * 100) / 100,
       realizedPnl: Math.round(entry.netProfit * 100) / 100,
       fees: Math.round(entry.fees * 100) / 100,
-      trades: 0,
+      trades: entry.trades,
     } as DailyPnl)
   }
 
@@ -390,10 +397,11 @@ export function useSupabaseLatestPositions(
     queryFn: () => {
       if (!positions || positions.length === 0) return []
 
-      // Group by (exchange, symbol), keep latest per group
+      // Group by (exchange, symbol, strategy_instance_id), keep latest per group.
+      // strategy_instance_id is necessary so multiple bots on the same symbol don't collapse.
       const latestByGroup = new Map<string, PositionRow>()
       for (const row of positions) {
-        const key = `${row.exchange}:${row.symbol}`
+        const key = `${row.exchange}:${row.symbol}:${row.strategy_instance_id}`
         if (!latestByGroup.has(key)) {
           latestByGroup.set(key, row)
         }
@@ -497,6 +505,7 @@ function computePnLFromTrades(trades: BBGoTrade[]): PnLReport {
     return {
       totalRealizedPnl: 0, totalUnrealizedPnl: 0, totalFees: 0,
       totalTrades: 0, winningTrades: 0, losingTrades: 0, winRate: 0,
+      profitFactor: 0,
       symbols: [], dailyBreakdown: [], pnlCurve: [],
     }
   }
@@ -622,6 +631,11 @@ function computePnLFromTrades(trades: BBGoTrade[]): PnLReport {
     winningTrades: winning,
     losingTrades: losing,
     winRate: totalTrades > 0 ? Math.round((winning / totalTrades) * 1000) / 10 : 0,
+    profitFactor: totalRealized < 0
+      ? 0
+      : totalRealized > 0
+        ? Infinity
+        : 0,
     symbols,
     dailyBreakdown,
     pnlCurve,
@@ -717,7 +731,10 @@ export function useSupabaseFuturesPositions(
       const { data, error } = await q
       if (error) throw error
 
-      // Dedup: keep only the latest snapshot per (exchange, symbol, position_side, strategy_instance_id)
+      // Dedup: keep only the latest snapshot per (exchange, symbol, position_side, strategy_instance_id).
+      // In paper one-way mode, position_side is always 'BOTH' (see migration 00046 + paper_trade_futures.go),
+      // so this collapses to one row per (symbol, strategy_instance_id). In live hedge mode, Long and Short
+      // remain distinct buckets and both positions are preserved.
       const seen = new Set<string>()
       const latest: FuturesPositionRisk[] = []
       for (const row of (data ?? []) as FuturesPositionRisk[]) {

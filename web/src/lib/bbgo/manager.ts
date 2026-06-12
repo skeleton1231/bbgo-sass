@@ -271,6 +271,7 @@ export interface PnLReport {
   winningTrades: number
   losingTrades: number
   winRate: number
+  profitFactor?: number
   symbols: SymbolPnL[]
   dailyBreakdown: DailyPnl[]
   pnlCurve: PnlCurvePoint[]

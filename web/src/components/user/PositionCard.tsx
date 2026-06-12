@@ -39,7 +39,11 @@ export function PositionCard({ spotPositions, futuresRisks, spotUnrealized, curr
   return (
     <div className="space-y-3">
       {openFutures.map((risk) => (
-        <FuturesPositionCard key={`${risk.exchange}:${risk.symbol}:${risk.position_side}`} risk={risk} currentPrice={currentPrice} />
+        <FuturesPositionCard
+          key={`${risk.exchange}:${risk.symbol}:${risk.position_side}:${risk.strategy_instance_id}`}
+          risk={risk}
+          currentPrice={currentPrice}
+        />
       ))}
       {openSpot.map((p) => (
         <SpotPositionCard key={`${p.exchange}:${p.symbol}:${p.strategyInstanceId}`} position={p} unrealized={spotUnrealized} />
