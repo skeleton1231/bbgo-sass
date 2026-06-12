@@ -149,6 +149,13 @@
     "errorLoading": "資料載入失敗，請重試。",
     "save": "儲存",
     "saving": "儲存中...",
+    "edit": "編輯",
+    "leverageLabel": "槓桿",
+    "editLeverageTitle": "編輯槓桿 — {strategy} {symbol}",
+    "leverageRangeError": "槓桿倍數必須在 1 到 125 之間",
+    "leverageUpdated": "槓桿已更新為 {leverage}x",
+    "leverageRestartHint": "修改槓桿需要重啟容器才能生效。",
+    "marginTypeLabel": "保證金模式",
     "testnet": "測試網",
     "noCredsForExchange": "未設定 {exchange} 的 API 憑證，請先在設定中新增。",
     "noCredsForRole": "{role} ({exchange}) 未設定 API 憑證。",
@@ -251,6 +258,10 @@
       "liveTag": "即時",
       "snapshotTag": "快照",
       "spot": "現貨"
+    },
+    "positionAction": {
+      "open_long": "做多",
+      "open_short": "做空"
     },
     "crossExchange": "跨交易所",
     "live": {

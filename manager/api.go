@@ -88,6 +88,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 		r.Route("/", func(r chi.Router) {
 			r.Use(UserRateLimit(3*time.Second, 20))
 			r.Post("/api/users/{userID}/strategies", api.CreateStrategy)
+			r.Patch("/api/users/{userID}/strategies/{strategyID}", api.UpdateStrategy)
 			r.Delete("/api/users/{userID}/strategies/{strategyID}", api.DeleteStrategy)
 			r.Delete("/api/users/{userID}/strategies", api.ClearAllStrategies)
 			r.Post("/api/users/{userID}/start", api.StartUser)
@@ -307,6 +308,25 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Inject FuturesConfig.leverage into config so it propagates everywhere:
+	// validator, instance YAML (strategy struct field), backtest YAML, and persistence.
+	// FuturesConfig is the UI's source of truth; config.leverage must mirror it.
+	if req.FuturesConfig != nil && req.FuturesConfig.Leverage > 0 {
+		var raw map[string]any
+		if len(req.Config) == 0 || string(req.Config) == "null" {
+			raw = map[string]any{}
+		} else if err := json.Unmarshal(req.Config, &raw); err != nil {
+			raw = map[string]any{}
+		}
+		raw["leverage"] = req.FuturesConfig.Leverage
+		if req.FuturesConfig.MarginType != "" {
+			raw["marginType"] = req.FuturesConfig.MarginType
+		}
+		if b, err := json.Marshal(raw); err == nil {
+			req.Config = b
+		}
+	}
+
 	inst := &StrategyInstance{
 		UserID: userID, Mode: req.Mode, Strategy: normalizedStrategy,
 		Exchange: req.Exchange, Config: req.Config, Name: req.Name,
@@ -401,6 +421,114 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user_id": userID, "instances": instances})
 }
 
+// UpdateStrategy handles PATCH requests to update an existing instance's FuturesConfig.
+// Supports updating leverage and marginType using merge semantics (zero-valued fields
+// in the request body do not clear existing values). Triggers a container restart if
+// the instance is currently running so the new YAML takes effect immediately.
+//
+// Restarts are serialized via api.starting: we explicitly clear any stale flag from a
+// prior in-flight start BEFORE stopping the container, then unconditionally spawn a
+// fresh start goroutine. This avoids the race where a previous start's health-check
+// loop holds the flag, blocks our restart, and then times out leaving the container
+// dead while the API reports "starting".
+func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
+	userID, ok := api.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+	instanceID := chi.URLParam(r, "strategyID")
+	mode := modeFromQuery(r)
+
+	var req struct {
+		FuturesConfig *FuturesConfig `json:"futuresConfig"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.FuturesConfig == nil {
+		writeError(w, http.StatusBadRequest, "futuresConfig is required")
+		return
+	}
+	const maxLeverage = 125
+	if req.FuturesConfig.Leverage < 0 || req.FuturesConfig.Leverage > maxLeverage {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("leverage must be between 1 and %d", maxLeverage))
+		return
+	}
+	if mt := req.FuturesConfig.MarginType; mt != "" && mt != "cross" && mt != "isolated" {
+		writeError(w, http.StatusBadRequest, "marginType must be 'cross' or 'isolated'")
+		return
+	}
+
+	existing, err := api.store.GetInstance(userID, mode, instanceID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+
+	// L1: leverage/marginType only affect futures strategies. Reject early so users
+	// don't see a misleading "leverage updated" toast on a spot strategy that
+	// silently ignores the change.
+	if api.store.Defaults() != nil && !api.store.Defaults().RequiresFutures(existing.Strategy) {
+		writeError(w, http.StatusBadRequest, "strategy does not support futures config")
+		return
+	}
+
+	wasRunning := api.isInstanceRunning(existing.UserID, existing.Mode, existing.InstanceID)
+	if wasRunning {
+		// H1: clear any stale starting flag from an in-flight start BEFORE stop.
+		// The previous start's health-check goroutine holds this flag while polling;
+		// if we don't clear it, LoadOrStore below returns loaded=true and we skip
+		// the restart, leaving the container dead after stop.
+		api.starting.Delete(existing.InstanceID)
+		// H3: surface stop failure instead of reporting success on a container
+		// that may still be running with the old YAML.
+		if err := api.container.StopInstance(existing.UserID, existing.Mode, existing.InstanceID); err != nil {
+			log.Printf("update-strategy: stop instance %s for user %s failed: %v", existing.InstanceID, userID, err)
+			writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("failed to stop running container: %v", err))
+			return
+		}
+	}
+
+	hasCredFn := func(exchange string) bool {
+		if api.creds == nil || existing.Mode == ModePaper {
+			return false
+		}
+		_, err := api.creds.GetByMode(userID, exchange, false)
+		return err == nil
+	}
+
+	inst, err := api.store.UpdateInstanceFuturesConfig(userID, existing.Mode, instanceID, req.FuturesConfig, hasCredFn)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// M2: store applies merge semantics — inst.FuturesConfig may differ from req.FuturesConfig.
+	merged := inst.FuturesConfig
+
+	if wasRunning {
+		// We already cleared the flag above and stopped the container. Spawn a fresh
+		// start unconditionally (LoadOrStore just guards against concurrent calls
+		// racing in between here and the goroutine startup).
+		if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+			go api.startInstanceContainer(inst)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, struct {
+		InstanceID    string         `json:"instance_id"`
+		UserID        string         `json:"user_id"`
+		Mode          string         `json:"mode"`
+		Status        string         `json:"status"`
+		FuturesConfig *FuturesConfig `json:"futuresConfig"`
+	}{
+		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
+		Status:        map[bool]string{true: StatusStarting, false: StatusStopped}[wasRunning],
+		FuturesConfig: merged,
+	})
+}
+
 func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
@@ -416,7 +544,7 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
-		api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		_ = api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 	}
 
 	if err := api.store.RemoveInstance(inst.UserID, inst.Mode, inst.InstanceID); err != nil {
@@ -438,7 +566,7 @@ func (api *API) ClearAllStrategies(w http.ResponseWriter, r *http.Request) {
 	mode := modeFromQuery(r)
 	instances, _ := api.store.ListInstances(userID, mode)
 	for _, inst := range instances {
-		api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		_ = api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 		api.store.RemoveInstance(inst.UserID, inst.Mode, inst.InstanceID)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
@@ -494,7 +622,9 @@ func (api *API) StopInstance(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "instance not found")
 		return
 	}
-	api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+	if err := api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID); err != nil {
+		log.Printf("stop instance %s for user %s: %v", inst.InstanceID, userID, err)
+	}
 	api.starting.Delete(inst.InstanceID)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status": "stopped", "instance_id": inst.InstanceID,
@@ -567,7 +697,7 @@ func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
 	mode := modeFromQuery(r)
 	instances, _ := api.store.ListInstances(userID, mode)
 	for _, inst := range instances {
-		api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		_ = api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 		api.starting.Delete(inst.InstanceID)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID, "mode": mode})
@@ -909,17 +1039,18 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Strategy  string          `json:"strategy"`
-		Config    json.RawMessage `json:"config"`
-		Exchange  string          `json:"exchange"`
-		StartTime string          `json:"start_time"`
-		EndTime   string          `json:"end_time"`
+		Strategy     string          `json:"strategy"`
+		Config       json.RawMessage `json:"config"`
+		Exchange     string          `json:"exchange"`
+		StartTime    string          `json:"start_time"`
+		EndTime      string          `json:"end_time"`
+		FuturesConfig *FuturesConfig `json:"futuresConfig,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "", api.store.Defaults())
+	yamlContent, err := buildBacktestYAML(req.Strategy, req.Config, req.StartTime, req.EndTime, req.Exchange, "", api.store.Defaults(), req.FuturesConfig)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid config: %v", err))
 		return
@@ -1013,12 +1144,13 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Strategy  string          `json:"strategy"`
-		Config    json.RawMessage `json:"config"`
-		Exchange  string          `json:"exchange"`
-		Symbol    string          `json:"symbol"`
-		StartTime string          `json:"start_time"`
-		EndTime   string          `json:"end_time"`
+		Strategy     string          `json:"strategy"`
+		Config       json.RawMessage `json:"config"`
+		Exchange     string          `json:"exchange"`
+		Symbol       string          `json:"symbol"`
+		StartTime    string          `json:"start_time"`
+		EndTime      string          `json:"end_time"`
+		FuturesConfig *FuturesConfig `json:"futuresConfig,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -1050,7 +1182,7 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 	job := &BacktestJob{
 		ID: generateID("bt"), UserID: userID, Strategy: req.Strategy, Config: req.Config,
 		Exchange: req.Exchange, Symbol: req.Symbol, StartTime: req.StartTime,
-		EndTime: req.EndTime, NeedSync: needSync,
+		EndTime: req.EndTime, NeedSync: needSync, FuturesConfig: req.FuturesConfig,
 	}
 	if err := api.btExec.Submit(job); err != nil {
 		writeError(w, http.StatusServiceUnavailable, err.Error())

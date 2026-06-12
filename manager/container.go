@@ -85,7 +85,7 @@ func (cm *ContainerManager) InstanceAPIURL(userID, mode, instanceID string) stri
 
 func (cm *ContainerManager) CreateAndStartInstance(inst *StrategyInstance) error {
 	name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
-	cm.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+	_ = cm.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 
 	hostDir := cm.store.InstanceDir(inst.UserID, inst.Mode, inst.InstanceID)
 	if err := os.MkdirAll(hostDir, 0o755); err != nil {
@@ -129,10 +129,20 @@ func (cm *ContainerManager) CreateAndStartInstance(inst *StrategyInstance) error
 	return nil
 }
 
-func (cm *ContainerManager) StopInstance(userID, mode, instanceID string) {
+// StopInstance stops and removes the container. Returns an error from docker so
+// callers that gate subsequent work on a clean stop (e.g., restart-after-edit)
+// can surface failures instead of reporting success on a still-running container.
+// Best-effort callers may discard the error.
+func (cm *ContainerManager) StopInstance(userID, mode, instanceID string) error {
 	name := cm.InstanceContainerName(userID, mode, instanceID)
-	cm.docker("stop", name, "-t", "10")
-	cm.docker("rm", "-f", name)
+	var firstErr error
+	if _, err := cm.docker("stop", name, "-t", "10"); err != nil {
+		firstErr = fmt.Errorf("docker stop %s: %w", name, err)
+	}
+	if _, err := cm.docker("rm", "-f", name); err != nil && firstErr == nil {
+		firstErr = fmt.Errorf("docker rm %s: %w", name, err)
+	}
+	return firstErr
 }
 
 func (cm *ContainerManager) IsInstanceRunning(userID, mode, instanceID string) bool {
@@ -505,7 +515,7 @@ func (cm *ContainerManager) StopAllForUser(userID string) {
 		return
 	}
 	for _, inst := range instances {
-		cm.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		_ = cm.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 	}
 }
 

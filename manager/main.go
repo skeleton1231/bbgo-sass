@@ -72,7 +72,7 @@ func main() {
 			continue
 		}
 		log.Printf("discovered orphaned container: %s/%s/%s — stopping", inst.UserID, inst.Mode, inst.InstanceID)
-		containerMgr.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		_ = containerMgr.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
 	}
 
 	// Periodic health check

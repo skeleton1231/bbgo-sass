@@ -160,7 +160,7 @@ type environmentConfig struct {
 	DisableStartupBalanceQuery bool   `yaml:"disablestartupbalancequery,omitempty"`
 }
 
-func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string, defaults DefaultsProvider) ([]byte, error) {
+func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, endTime, overrideExchange, overrideSymbol string, defaults DefaultsProvider, futuresConfig *FuturesConfig) ([]byte, error) {
 	var allParams map[string]any
 	if len(rawConfig) == 0 || string(rawConfig) == "null" {
 		allParams = map[string]any{}
@@ -171,6 +171,18 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 	if defaults != nil {
 		if tmpl := defaults.GetDefaults(strategy); tmpl != nil {
 			allParams = deepMerge(tmpl, allParams)
+		}
+	}
+
+	// FuturesConfig is the UI source of truth — mirror it into params before any
+	// downstream logic (validator-equivalent, session YAML) runs. This matches
+	// the live-instance path in api.go CreateStrategy.
+	if futuresConfig != nil {
+		if futuresConfig.Leverage > 0 {
+			allParams["leverage"] = futuresConfig.Leverage
+		}
+		if futuresConfig.MarginType != "" {
+			allParams["marginType"] = futuresConfig.MarginType
 		}
 	}
 
@@ -214,15 +226,25 @@ func buildBacktestYAML(strategy string, rawConfig json.RawMessage, startTime, en
 
 	if defaults != nil && defaults.RequiresFutures(strategy) {
 		sessionFutures = true
-		leverage := 20
-		if v, ok := allParams["leverage"].(float64); ok && v > 0 {
-			leverage = int(v)
+		// Priority: FuturesConfig > params["leverage"] (already includes registry default) > 0
+		// No silent 20x default — if user didn't pick a leverage and registry has none,
+		// session runs without symbolLeverage (exchange/paper uses its own default).
+		leverage := 0
+		if futuresConfig != nil && futuresConfig.Leverage > 0 {
+			leverage = futuresConfig.Leverage
 		}
-		sessionSymbolLeverage = map[string]int{symbol: leverage}
+		if leverage == 0 {
+			if lv := toFloat(allParams["leverage"]); lv >= 1 {
+				leverage = int(lv)
+			}
+		}
+		if leverage > 0 {
+			sessionSymbolLeverage = map[string]int{symbol: leverage}
+		}
 
-		marginType := ""
-		if v, ok := allParams["marginType"].(string); ok {
-			marginType = v
+		marginType, _ := allParams["marginType"].(string)
+		if futuresConfig != nil && futuresConfig.MarginType != "" {
+			marginType = futuresConfig.MarginType
 		}
 		if marginType == "isolated" {
 			sessionIsolatedFutures = true

@@ -150,6 +150,13 @@
     "errorLoading": "データの読み込みに失敗しました。もう一度お試しください。",
     "save": "保存",
     "saving": "保存中...",
+    "edit": "編集",
+    "leverageLabel": "レバレッジ",
+    "editLeverageTitle": "レバレッジを編集 — {strategy} {symbol}",
+    "leverageRangeError": "レバレッジは 1〜125 の範囲で指定してください",
+    "leverageUpdated": "レバレッジを {leverage}x に更新しました",
+    "leverageRestartHint": "レバレッジの変更を反映するにはコンテナの再起動が必要です。",
+    "marginTypeLabel": "マージンタイプ",
     "testnet": "テストネット",
     "noCredsForExchange": "{exchange} の API 認証情報が設定されていません。先に設定で追加してください。",
     "noCredsForRole": "{role} ({exchange}) の API 認証情報が設定されていません。",
@@ -252,6 +259,10 @@
       "liveTag": "リアルタイム",
       "snapshotTag": "スナップ",
       "spot": "現物"
+    },
+    "positionAction": {
+      "open_long": "ロング",
+      "open_short": "ショート"
     },
     "crossExchange": "クロス取引所",
     "live": {

@@ -150,6 +150,13 @@
     "errorLoading": "Failed to load data. Please try again.",
     "save": "Save",
     "saving": "Saving...",
+    "edit": "Edit",
+    "leverageLabel": "Leverage",
+    "editLeverageTitle": "Edit Leverage — {strategy} {symbol}",
+    "leverageRangeError": "Leverage must be between 1 and 125",
+    "leverageUpdated": "Leverage updated to {leverage}x",
+    "leverageRestartHint": "Changing leverage requires restarting the container to take effect.",
+    "marginTypeLabel": "Margin Type",
     "testnet": "Testnet",
     "noCredsForExchange": "No API credentials configured for {exchange}. Add them in Settings first.",
     "noCredsForRole": "No API credentials for {role} ({exchange}).",
@@ -193,6 +200,10 @@
       "liveTag": "LIVE",
       "snapshotTag": "Snapshot",
       "spot": "Spot"
+    },
+    "positionAction": {
+      "open_long": "Long",
+      "open_short": "Short"
     },
     "crossExchange": "cross-exchange",
     "live": {

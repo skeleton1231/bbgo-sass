@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchUserStrategies,
   createStrategy as apiCreateStrategy,
+  updateStrategy as apiUpdateStrategy,
   deleteStrategy as apiDeleteStrategy,
   startUser as apiStartUser,
   stopUser as apiStopUser,
@@ -96,6 +97,22 @@ export function useDeleteStrategy() {
   return useMutation({
     mutationFn: ({ userId, strategyId }: { userId: string; strategyId: string }) =>
       apiDeleteStrategy(userId, strategyId),
+    onSuccess: (_data, variables) => invalidateUserQueries(qc, variables.userId),
+  })
+}
+
+export function useUpdateStrategy() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      userId,
+      strategyId,
+      futuresConfig,
+    }: {
+      userId: string
+      strategyId: string
+      futuresConfig: { leverage?: number; marginType?: 'cross' | 'isolated' }
+    }) => apiUpdateStrategy(userId, strategyId, { futuresConfig }),
     onSuccess: (_data, variables) => invalidateUserQueries(qc, variables.userId),
   })
 }

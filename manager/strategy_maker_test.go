@@ -233,7 +233,7 @@ func TestAPICreate_Liquiditymaker_PaperBlocked(t *testing.T) {
 
 func TestBacktest_Fixedmaker_NumbersNotQuoted(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("fixedmaker", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("fixedmaker", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestBacktest_Fixedmaker_NumbersNotQuoted(t *testing.T) {
 
 func TestBacktest_Fmaker_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("fmaker", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("fmaker", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestBacktest_Fmaker_DefaultsInjected(t *testing.T) {
 
 func TestBacktest_Bollmaker_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"ETHUSDT","bidQuantity":0.01,"askQuantity":0.01}`
-	yaml, err := buildBacktestYAML("bollmaker", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("bollmaker", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

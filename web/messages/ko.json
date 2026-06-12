@@ -150,6 +150,13 @@
     "errorLoading": "데이터를 불러오지 못했습니다. 다시 시도해 주세요.",
     "save": "저장",
     "saving": "저장 중...",
+    "edit": "편집",
+    "leverageLabel": "레버리지",
+    "editLeverageTitle": "레버리지 편집 — {strategy} {symbol}",
+    "leverageRangeError": "레버리지는 1~125 사이여야 합니다",
+    "leverageUpdated": "레버리지가 {leverage}x로 업데이트되었습니다",
+    "leverageRestartHint": "레버리지 변경 사항을 적용하려면 컨테이너를 재시작해야 합니다.",
+    "marginTypeLabel": "마진 유형",
     "testnet": "테스트넷",
     "noCredsForExchange": "{exchange} API 자격 증명이 설정되지 않았습니다. 설정에서 먼저 추가하세요.",
     "noCredsForRole": "{role} ({exchange}) API 자격 증명이 설정되지 않았습니다.",
@@ -252,6 +259,10 @@
       "liveTag": "실시간",
       "snapshotTag": "스냅샷",
       "spot": "현물"
+    },
+    "positionAction": {
+      "open_long": "롱",
+      "open_short": "숏"
     },
     "crossExchange": "크로스 거래소",
     "live": {

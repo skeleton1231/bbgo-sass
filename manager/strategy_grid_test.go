@@ -110,7 +110,7 @@ func TestStrategy_Xhedgegrid_HedgeMode(t *testing.T) {
 
 func TestBacktest_Grid_FullParams(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","gridNumber":10,"upperPrice":70000,"lowerPrice":50000,"quantity":0.001,"profitSpread":50,"side":"both"}`
-	yaml, err := buildBacktestYAML("grid", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("grid", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestBacktest_Grid_FullParams(t *testing.T) {
 
 func TestBacktest_Grid2_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","gridNumber":10}`
-	yaml, err := buildBacktestYAML("grid2", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("grid2", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -384,7 +384,7 @@ func TestAPICreate_DCA2_PaperBlocked(t *testing.T) {
 
 func TestBacktest_Emacross_FullParams(t *testing.T) {
 	config := `{"symbol":"ETHUSDT","interval":"4h","fastWindow":7,"slowWindow":25,"quantity":0.01}`
-	yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +395,7 @@ func TestBacktest_Emacross_FullParams(t *testing.T) {
 
 func TestBacktest_Pivotshort_ExitsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func TestBacktest_Pivotshort_ExitsInjected(t *testing.T) {
 
 func TestBacktest_Swing_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("swing", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("swing", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestBacktest_Swing_DefaultsInjected(t *testing.T) {
 
 func TestBacktest_DCA_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("dca", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("dca", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +428,7 @@ func TestBacktest_DCA_DefaultsInjected(t *testing.T) {
 
 func TestBacktest_Techsignal_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("techsignal", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("techsignal", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ func TestBacktest_Techsignal_DefaultsInjected(t *testing.T) {
 
 func TestBacktest_EwoDgtrd_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("ewo_dgtrd", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("ewo_dgtrd", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestBacktest_EwoDgtrd_DefaultsInjected(t *testing.T) {
 
 func TestBacktest_Supertrend_DefaultsInjected(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","factor":3}`
-	yaml, err := buildBacktestYAML("supertrend", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("supertrend", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

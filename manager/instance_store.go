@@ -92,6 +92,52 @@ func (s *InstanceStore) CreateInstance(inst *StrategyInstance, hasCredentials fu
 	return nil
 }
 
+// UpdateInstanceFuturesConfig updates the FuturesConfig on an existing instance using
+// merge semantics (zero-valued fields in fc do NOT clear existing values), regenerates
+// its bbgo.yaml on disk, and upserts the row to Supabase.
+// Caller is responsible for restarting the container if it is currently running.
+func (s *InstanceStore) UpdateInstanceFuturesConfig(userID, mode, instanceID string, fc *FuturesConfig, hasCredentials func(string) bool) (*StrategyInstance, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	inst, err := s.getFromDisk(userID, mode, instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("instance %s not found: %w", instanceID, err)
+	}
+	inst.FuturesConfig = mergeFuturesConfig(inst.FuturesConfig, fc)
+
+	yamlContent, err := buildInstanceYAML(inst, hasCredentials, s.registry)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild yaml: %w", err)
+	}
+	if err := os.WriteFile(s.yamlPath(userID, mode, instanceID), yamlContent, 0o644); err != nil {
+		return nil, fmt.Errorf("write yaml: %w", err)
+	}
+
+	s.upsertToSupabase(inst)
+	return inst, nil
+}
+
+// mergeFuturesConfig applies PATCH-style merge semantics: zero-valued fields in
+// `patch` do not overwrite the corresponding fields in `base`. Returns a new
+// pointer; both inputs are left untouched. If patch is nil the result is base.
+func mergeFuturesConfig(base, patch *FuturesConfig) *FuturesConfig {
+	if patch == nil {
+		return base
+	}
+	out := &FuturesConfig{}
+	if base != nil {
+		*out = *base
+	}
+	if patch.Leverage != 0 {
+		out.Leverage = patch.Leverage
+	}
+	if patch.MarginType != "" {
+		out.MarginType = patch.MarginType
+	}
+	return out
+}
+
 // RemoveInstance removes an instance's directory, files, and Supabase row.
 func (s *InstanceStore) RemoveInstance(userID, mode, instanceID string) error {
 	s.mu.Lock()
@@ -485,10 +531,37 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 			if inst.Mode == ModePaper {
 				sc.PaperBalances = defaultPaperBalances
 			}
+			// Apply FuturesConfig (leverage + marginType) to each futures session role.
+			// Previously this branch only set Futures=true and dropped leverage,
+			// silently making cross-exchange futures strategies (xmaker, xfunding)
+			// run with exchange defaults instead of user-chosen leverage.
+			if sr.Futures && inst.FuturesConfig != nil {
+				if inst.FuturesConfig.Leverage > 0 {
+					sc.SymbolLeverage = map[string]int{symbol: inst.FuturesConfig.Leverage}
+				}
+				if inst.FuturesConfig.MarginType == "isolated" {
+					sc.IsolatedFutures = true
+					sc.IsolatedFuturesSymbol = symbol
+				}
+			}
 			sessions[sr.Name] = sc
 			if _, exists := exchanges[sr.Exchange]; !exists {
 				exchanges[sr.Exchange] = exchangeConfig{Symbol: symbol}
 			}
+		}
+		// Mirror FuturesConfig into strategy params so the strategy struct field
+		// (e.g. xmaker.Leverage) is consistent with session symbolLeverage.
+		if inst.FuturesConfig != nil {
+			if inst.FuturesConfig.Leverage > 0 {
+				params["leverage"] = inst.FuturesConfig.Leverage
+			}
+			if inst.FuturesConfig.MarginType != "" {
+				params["marginType"] = inst.FuturesConfig.MarginType
+			}
+			// Single per-instance summary log reflecting what was actually applied
+			// to futures sessions (fires once regardless of how many roles exist).
+			log.Printf("instance %s (%s/%s): cross-exchange futures applied leverage=%d marginType=%s",
+				inst.InstanceID, inst.Strategy, symbol, inst.FuturesConfig.Leverage, inst.FuturesConfig.MarginType)
 		}
 		crossStrategies = append(crossStrategies, map[string]any{
 			inst.Strategy: params,
@@ -511,23 +584,39 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 		if registry != nil && registry.RequiresFutures(inst.Strategy) {
 			sc.Futures = true
 			leverage := 0
-			if inst.FuturesConfig != nil && inst.FuturesConfig.Leverage > 0 {
-				leverage = inst.FuturesConfig.Leverage
+			marginType := ""
+			if inst.FuturesConfig != nil {
+				if inst.FuturesConfig.Leverage > 0 {
+					leverage = inst.FuturesConfig.Leverage
+				}
+				marginType = inst.FuturesConfig.MarginType
 			}
 			if leverage == 0 {
 				if lv := toFloat(params["leverage"]); lv >= 1 {
 					leverage = int(lv)
 				}
+			} else {
+				// Sync FuturesConfig.leverage into strategy params so the strategy
+				// struct field (e.g. pivotshort.Leverage) sees the same value as
+				// the session's symbolLeverage. Without this, session uses 10x
+				// while the strategy struct falls back to its own default (3x),
+				// causing mismatched position sizing and liquidation math.
+				params["leverage"] = leverage
+			}
+			if marginType == "" {
+				marginType, _ = params["marginType"].(string)
+			} else {
+				params["marginType"] = marginType
 			}
 			if leverage > 0 {
 				sc.SymbolLeverage = map[string]int{symbol: leverage}
 			}
-			if inst.FuturesConfig != nil {
-				if inst.FuturesConfig.MarginType == "isolated" {
-					sc.IsolatedFutures = true
-					sc.IsolatedFuturesSymbol = symbol
-				}
+			if marginType == "isolated" {
+				sc.IsolatedFutures = true
+				sc.IsolatedFuturesSymbol = symbol
 			}
+			log.Printf("instance %s (%s/%s): applying leverage=%d marginType=%s",
+				inst.InstanceID, inst.Strategy, symbol, leverage, marginType)
 		}
 		sessions[exchange] = sc
 

@@ -149,6 +149,13 @@
     "errorLoading": "数据加载失败，请重试。",
     "save": "保存",
     "saving": "保存中...",
+    "edit": "编辑",
+    "leverageLabel": "杠杆",
+    "editLeverageTitle": "编辑杠杆 — {strategy} {symbol}",
+    "leverageRangeError": "杠杆倍数必须在 1 到 125 之间",
+    "leverageUpdated": "杠杆已更新为 {leverage}x",
+    "leverageRestartHint": "修改杠杆需要重启容器才能生效。",
+    "marginTypeLabel": "保证金模式",
     "testnet": "测试网",
     "noCredsForExchange": "未配置 {exchange} 的 API 凭证，请先在设置中添加。",
     "noCredsForRole": "{role} ({exchange}) 未配置 API 凭证。",
@@ -254,6 +261,10 @@
       "liveTag": "实时",
       "snapshotTag": "快照",
       "spot": "现货"
+    },
+    "positionAction": {
+      "open_long": "做多",
+      "open_short": "做空"
     },
     "crossExchange": "跨交易所",
     "live": {

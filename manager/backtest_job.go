@@ -19,24 +19,25 @@ const (
 )
 
 type BacktestJob struct {
-	ID          string          `json:"id"`
-	UserID      string          `json:"user_id"`
-	Strategy    string          `json:"strategy"`
-	Config      json.RawMessage `json:"config"`
-	Exchange    string          `json:"exchange"`
-	Symbol      string          `json:"symbol"`
-	StartTime   string          `json:"start_time"`
-	EndTime     string          `json:"end_time"`
-	Status      string          `json:"status"`
-	Progress    string          `json:"progress,omitempty"`
-	Output      string          `json:"output,omitempty"`
-	Report      json.RawMessage `json:"report,omitempty"`
-	EquityCurve string          `json:"equity_curve,omitempty"`
-	Error       string          `json:"error,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	StartedAt   *time.Time      `json:"started_at,omitempty"`
-	CompletedAt *time.Time      `json:"completed_at,omitempty"`
-	NeedSync    bool            `json:"need_sync"`
+	ID            string          `json:"id"`
+	UserID        string          `json:"user_id"`
+	Strategy      string          `json:"strategy"`
+	Config        json.RawMessage `json:"config"`
+	Exchange      string          `json:"exchange"`
+	Symbol        string          `json:"symbol"`
+	StartTime     string          `json:"start_time"`
+	EndTime       string          `json:"end_time"`
+	Status        string          `json:"status"`
+	Progress      string          `json:"progress,omitempty"`
+	Output        string          `json:"output,omitempty"`
+	Report        json.RawMessage `json:"report,omitempty"`
+	EquityCurve   string          `json:"equity_curve,omitempty"`
+	Error         string          `json:"error,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
+	StartedAt     *time.Time      `json:"started_at,omitempty"`
+	CompletedAt   *time.Time      `json:"completed_at,omitempty"`
+	NeedSync      bool            `json:"need_sync"`
+	FuturesConfig *FuturesConfig  `json:"futuresConfig,omitempty"`
 }
 
 type BacktestJobStore struct {
@@ -298,7 +299,7 @@ func (ex *BacktestExecutor) execute(job *BacktestJob) {
 
 	ex.store.UpdateStatus(job.ID, JobRunning, "running backtest...")
 
-	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime, job.Exchange, job.Symbol, ex.defaults)
+	yamlContent, err := buildBacktestYAML(job.Strategy, job.Config, job.StartTime, job.EndTime, job.Exchange, job.Symbol, ex.defaults, job.FuturesConfig)
 	if err != nil {
 		ex.store.FailJob(job.ID, "config error", fmt.Sprintf("invalid config: %v", err))
 		return

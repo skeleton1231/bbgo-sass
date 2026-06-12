@@ -298,6 +298,21 @@ export function createStrategy(userId: string, data: {
   })
 }
 
+export function updateStrategy(userId: string, strategyId: string, data: {
+  futuresConfig: { leverage?: number; marginType?: 'cross' | 'isolated' }
+}) {
+  return request<{
+    instance_id: string
+    user_id: string
+    mode: string
+    status: string
+    futuresConfig: { leverage?: number; marginType?: string }
+  }>(`/users/${userId}/strategies/${strategyId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 export function deleteStrategy(userId: string, strategyId: string) {
   return request<{ status: string; instance_id: string; user_id: string; mode: string }>(`/users/${userId}/strategies/${strategyId}`, {
     method: 'DELETE',

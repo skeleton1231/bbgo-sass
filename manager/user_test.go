@@ -81,7 +81,7 @@ func TestBuildInstanceYAML_CrossExchange(t *testing.T) {
 }
 
 func TestBuildBacktestYAML(t *testing.T) {
-	yaml, err := buildBacktestYAML("grid2", rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), "2024-01-01", "2024-06-01", "", "", nil)
+	yaml, err := buildBacktestYAML("grid2", rawJSON(`{"symbol":"BTCUSDT","gridNumber":10}`), "2024-01-01", "2024-06-01", "", "", nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestBuildBacktestYAML_Table(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			yaml, err := buildBacktestYAML(tt.strategy, rawJSON(tt.config), tt.startTime, tt.endTime, tt.exchange, tt.symbol, nil)
+			yaml, err := buildBacktestYAML(tt.strategy, rawJSON(tt.config), tt.startTime, tt.endTime, tt.exchange, tt.symbol, nil, nil)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -260,7 +260,7 @@ func TestBuildBacktestYAML_AllExercises(t *testing.T) {
 		for _, st := range strategies {
 			name := st.id + "/" + ex
 			t.Run(name, func(t *testing.T) {
-				yaml, err := buildBacktestYAML(st.id, []byte(st.config), "2024-01-01", "2024-03-01", ex, "BTCUSDT", nil)
+				yaml, err := buildBacktestYAML(st.id, []byte(st.config), "2024-01-01", "2024-03-01", ex, "BTCUSDT", nil, nil)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}

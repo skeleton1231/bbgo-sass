@@ -77,7 +77,7 @@ func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.strategy, func(t *testing.T) {
-			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -94,7 +94,7 @@ func TestBacktestDefaults_InjectedWhenMissing(t *testing.T) {
 
 func TestBacktestDefaults_NotOverriddenWhenPresent(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","interval":"4h","quantity":0.1}`
-	yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestBacktestDefaults_NotOverriddenWhenPresent(t *testing.T) {
 
 func TestBacktestDefaults_BollgridProfitSpread(t *testing.T) {
 	config := `{"symbol":"BTCUSDT","gridNumber":8,"quantity":0.001}`
-	yaml, err := buildBacktestYAML("bollgrid", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("bollgrid", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func strContains(s, sub string) bool {
 
 func TestBacktestDefaults_PivotshortExits(t *testing.T) {
 	config := `{"symbol":"BTCUSDT"}`
-	yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+	yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestBacktestYAML_NumbersNotQuoted(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.strategy+"_"+tt.field, func(t *testing.T) {
-			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults)
+			yaml, err := buildBacktestYAML(tt.strategy, json.RawMessage(tt.config), "2024-01-01", "2024-06-01", "binance", "", staticDefaults, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -182,7 +182,7 @@ func TestBacktestYAML_FuturesConfig(t *testing.T) {
 
 	t.Run("includes futures and leverage when strategy requires it", func(t *testing.T) {
 		config := `{"symbol":"BTCUSDT","leverage":10}`
-		yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider)
+		yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -200,7 +200,7 @@ func TestBacktestYAML_FuturesConfig(t *testing.T) {
 
 	t.Run("no futures config when strategy does not require it", func(t *testing.T) {
 		config := `{"symbol":"BTCUSDT","quantity":0.1}`
-		yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider)
+		yaml, err := buildBacktestYAML("emacross", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -212,7 +212,7 @@ func TestBacktestYAML_FuturesConfig(t *testing.T) {
 
 	t.Run("isolated margin from marginType", func(t *testing.T) {
 		config := `{"symbol":"BTCUSDT","leverage":5,"marginType":"isolated"}`
-		yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider)
+		yaml, err := buildBacktestYAML("pivotshort", json.RawMessage(config), "2024-01-01", "2024-06-01", "binance", "", provider, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
