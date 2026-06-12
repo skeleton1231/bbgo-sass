@@ -21,6 +21,7 @@ import {
   useSupabaseTrades,
   useSupabaseClosedOrders,
   useSupabasePnLFromProfits,
+  useSupabaseLatestPositions,
   useSupabaseLatestPosition,
   useUnrealizedPnL,
   useSupabaseProfits,
@@ -50,6 +51,9 @@ import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/Candl
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
 import { TradeRow } from '@/components/user/TradeRow'
 import { PositionCard } from '@/components/user/PositionCard'
+import { LeverageEditor } from '@/components/user/LeverageEditor'
+import { useStrategyRegistry } from '@/components/providers/strategy-registry'
+import { getStrategySchema } from '@/lib/bbgo/strategies'
 import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
@@ -94,6 +98,8 @@ export default function BotDetailPage() {
   const { mode: globalMode } = useTradingMode()
 
   const { data: bot, isLoading: botLoading, isError: botError } = useBotDetail(userId, botId)
+  const registry = useStrategyRegistry()
+  const strategyRequiresFutures = bot?.strategy ? getStrategySchema(bot.strategy, registry)?.requiresFutures === true : false
 
   const mode: 'live' | 'paper' = rawMode === 'paper' ? 'paper'
     : rawMode === 'live' ? 'live'
@@ -166,6 +172,7 @@ export default function BotDetailPage() {
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
 
+  const { data: latestPositions } = useSupabaseLatestPositions(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: latestPosition } = useSupabaseLatestPosition(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: unrealized } = useUnrealizedPnL(userId, currentPrice, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   const { data: profitRows } = useSupabaseProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode, limit: 200 })
@@ -592,11 +599,21 @@ export default function BotDetailPage() {
       )}
 
       {/* Position — unified cards for spot and futures */}
+      {strategyRequiresFutures && bot && (
+        <LeverageEditor
+          instanceId={botId ?? ''}
+          strategy={bot.strategy}
+          symbol={symbol ?? ''}
+          currentLeverage={futuresRisk ? parseFloat(futuresRisk.leverage) : undefined}
+          requiresFutures
+        />
+      )}
       <PositionCard
-        spotPositions={latestPosition ? [latestPosition] : []}
+        spotPositions={latestPositions ?? []}
         futuresRisks={futuresPositions ?? []}
         spotUnrealized={unrealized}
         currentPrice={currentPrice}
+        isFutures={isFutures}
       />
 
       <Tabs defaultValue="chart" className="space-y-4">

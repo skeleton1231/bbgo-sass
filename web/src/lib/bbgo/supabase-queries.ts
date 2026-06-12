@@ -357,7 +357,25 @@ export interface LatestPosition {
   isClosed: boolean
 }
 
-export function useSupabaseLatestPosition(
+function toLatestPosition(row: PositionRow): LatestPosition {
+  const base = parseFloat(row.base)
+  return {
+    symbol: row.symbol,
+    base,
+    quote: parseFloat(row.quote),
+    averageCost: parseFloat(row.average_cost),
+    accumulatedProfit: parseFloat(row.profit ?? '0'),
+    strategy: row.strategy,
+    strategyInstanceId: row.strategy_instance_id,
+    exchange: row.exchange,
+    tradedAt: row.traded_at,
+    isLong: base > 0,
+    isShort: base < 0,
+    isClosed: base === 0,
+  }
+}
+
+export function useSupabaseLatestPositions(
   userId: string,
   opts?: {
     symbol?: string
@@ -367,27 +385,42 @@ export function useSupabaseLatestPosition(
 ) {
   const { data: positions } = useSupabasePositions(userId, opts)
 
+  return useQuery<LatestPosition[]>({
+    queryKey: ['supabase-latest-positions', userId, opts, positions],
+    queryFn: () => {
+      if (!positions || positions.length === 0) return []
+
+      // Group by (exchange, symbol), keep latest per group
+      const latestByGroup = new Map<string, PositionRow>()
+      for (const row of positions) {
+        const key = `${row.exchange}:${row.symbol}`
+        if (!latestByGroup.has(key)) {
+          latestByGroup.set(key, row)
+        }
+      }
+
+      return Array.from(latestByGroup.values())
+        .map(toLatestPosition)
+        .filter((p) => !p.isClosed)
+    },
+    enabled: !!userId && !!positions,
+    staleTime: 15_000,
+  })
+}
+
+export function useSupabaseLatestPosition(
+  userId: string,
+  opts?: {
+    symbol?: string
+    strategyInstanceId?: string
+    mode?: 'live' | 'paper'
+  }
+) {
+  const { data: positions } = useSupabaseLatestPositions(userId, opts)
+
   return useQuery<LatestPosition | null>({
     queryKey: ['supabase-latest-position', userId, opts, positions],
-    queryFn: () => {
-      if (!positions || positions.length === 0) return null
-      const latest = positions[0]!
-      const base = parseFloat(latest.base)
-      return {
-        symbol: latest.symbol,
-        base,
-        quote: parseFloat(latest.quote),
-        averageCost: parseFloat(latest.average_cost),
-        accumulatedProfit: parseFloat(latest.profit ?? '0'),
-        strategy: latest.strategy,
-        strategyInstanceId: latest.strategy_instance_id,
-        exchange: latest.exchange,
-        tradedAt: latest.traded_at,
-        isLong: base > 0,
-        isShort: base < 0,
-        isClosed: base === 0,
-      }
-    },
+    queryFn: () => positions?.[0] ?? null,
     enabled: !!userId && !!positions,
     staleTime: 15_000,
   })
@@ -404,33 +437,34 @@ export function useUnrealizedPnL(
     mode?: 'live' | 'paper'
   }
 ) {
-  const { data: position } = useSupabaseLatestPosition(userId, opts)
+  const { data: positions } = useSupabaseLatestPositions(userId, opts)
 
   return useQuery<{ unrealizedPnl: number; unrealizedPnlPct: number }>({
-    queryKey: ['unrealized-pnl', userId, opts, position, currentPrice],
+    queryKey: ['unrealized-pnl', userId, opts, positions, currentPrice],
     queryFn: () => {
-      if (!position || position.isClosed || !currentPrice || currentPrice === 0) {
+      if (!positions || positions.length === 0 || !currentPrice || currentPrice === 0) {
         return { unrealizedPnl: 0, unrealizedPnlPct: 0 }
       }
-      // Matches bbgo Position.unrealizedProfit():
-      // Long:  (price - averageCost) * |base|
-      // Short: (averageCost - price) * |base|
-      const absBase = Math.abs(position.base)
-      let unrealizedPnl: number
-      if (position.isLong) {
-        unrealizedPnl = (currentPrice - position.averageCost) * absBase
-      } else {
-        unrealizedPnl = (position.averageCost - currentPrice) * absBase
-      }
-      const cost = position.averageCost * absBase
-      const unrealizedPnlPct = cost > 0 ? (unrealizedPnl / cost) * 100 : 0
 
+      let totalPnl = 0
+      let totalCost = 0
+      for (const pos of positions) {
+        if (pos.isClosed) continue
+        const absBase = Math.abs(pos.base)
+        const pnl = pos.isLong
+          ? (currentPrice - pos.averageCost) * absBase
+          : (pos.averageCost - currentPrice) * absBase
+        totalPnl += pnl
+        totalCost += pos.averageCost * absBase
+      }
+
+      const unrealizedPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
       return {
-        unrealizedPnl: Math.round(unrealizedPnl * 1e6) / 1e6,
+        unrealizedPnl: Math.round(totalPnl * 1e6) / 1e6,
         unrealizedPnlPct: Math.round(unrealizedPnlPct * 100) / 100,
       }
     },
-    enabled: !!userId && !!position,
+    enabled: !!userId && !!positions,
     staleTime: 15_000,
   })
 }

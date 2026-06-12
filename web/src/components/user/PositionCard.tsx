@@ -13,6 +13,7 @@ interface PositionCardProps {
   futuresRisks?: FuturesPositionRisk[]
   spotUnrealized?: { unrealizedPnl: number; unrealizedPnlPct: number } | null
   currentPrice?: number
+  isFutures?: boolean
 }
 
 function num(s: string | undefined | null): number {
@@ -29,9 +30,9 @@ function pnlSign(v: number) {
   return v >= 0 ? '+' : ''
 }
 
-export function PositionCard({ spotPositions, futuresRisks, spotUnrealized, currentPrice }: PositionCardProps) {
-  const openSpot = (spotPositions ?? []).filter((p) => !p.isClosed && p.base !== 0)
-  const openFutures = (futuresRisks ?? []).filter((r) => Math.abs(num(r.position_amount)) > 0)
+export function PositionCard({ spotPositions, futuresRisks, spotUnrealized, currentPrice, isFutures }: PositionCardProps) {
+  const openSpot = isFutures ? [] : (spotPositions ?? []).filter((p) => !p.isClosed && p.base !== 0)
+  const openFutures = isFutures ? (futuresRisks ?? []).filter((r) => Math.abs(num(r.position_amount)) > 0) : []
 
   if (openSpot.length === 0 && openFutures.length === 0) return null
 
@@ -75,7 +76,7 @@ function SpotPositionCard({
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">{t('pnl.currentPosition')}</CardTitle>
           <span className="rounded-md border border-muted-foreground/30 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {t('pnl.spot')}
+            {position.exchange ? `${position.exchange} · ${t('pnl.spot')}` : t('pnl.spot')}
           </span>
         </div>
       </CardHeader>
