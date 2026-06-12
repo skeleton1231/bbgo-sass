@@ -28,6 +28,8 @@ import {
   useSupabaseOpenOrders,
   useSupabaseBalances,
   useSupabaseFuturesPositions,
+  tradeKey,
+  orderKey,
 } from '@/lib/bbgo/supabase-queries'
 import { useRealtimeTable } from '@/lib/supabase/use-realtime'
 import { useUserId } from '@/components/providers/user-id'
@@ -695,7 +697,7 @@ export default function BotDetailPage() {
             {openOrders.length > 0 ? (
               <div className="divide-y">
                 {openOrders.map((order: BBGoOrder) => (
-                  <OrderRow key={order.orderID} order={order} />
+                  <OrderRow key={orderKey(order)} order={order} />
                 ))}
               </div>
             ) : (
@@ -712,7 +714,7 @@ export default function BotDetailPage() {
               <ScrollArea className="max-h-[400px]">
                 <div className="divide-y">
                   {closedOrders.map((order: BBGoOrder) => (
-                    <OrderRow key={order.orderID} order={order} showStatus showTime />
+                    <OrderRow key={orderKey(order)} order={order} showStatus showTime />
                   ))}
                 </div>
               </ScrollArea>
@@ -731,7 +733,7 @@ export default function BotDetailPage() {
                 <div className="divide-y">
                   {trades.map((trade: BBGoTrade) => (
                     <TradeRow
-                      key={trade.id}
+                      key={tradeKey(trade)}
                       trade={trade}
                       netPosition={trade.netPosition ?? 0}
                       isFutures={isFutures}

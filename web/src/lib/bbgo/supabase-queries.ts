@@ -5,7 +5,7 @@ import type { BBGoTrade, BBGoOrder, BBGoBalance, PnLReport, DailyPnl, PnlCurvePo
 import { FifoQueue } from './fifo-pnl'
 import { tableName, tradeRowToBBGo, orderRowToBBGo } from './supabase-adapters'
 
-export { tableName, tradeRowToBBGo, orderRowToBBGo } from './supabase-adapters'
+export { tableName, tradeRowToBBGo, orderRowToBBGo, tradeKey, orderKey } from './supabase-adapters'
 
 type Tables = Database['public']['Tables']
 type OrderRow = Tables['orders']['Row']

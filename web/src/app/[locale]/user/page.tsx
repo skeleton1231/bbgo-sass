@@ -8,7 +8,7 @@ import {
   type BBGoTrade,
   type BBGoAsset,
 } from '@/lib/bbgo/queries'
-import { useSupabaseTrades, useSupabasePnL, useSupabaseTradingVolume, useSupabaseBalances } from '@/lib/bbgo/supabase-queries'
+import { useSupabaseTrades, useSupabasePnL, useSupabaseTradingVolume, useSupabaseBalances, tradeKey } from '@/lib/bbgo/supabase-queries'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -271,7 +271,7 @@ export default function DashboardPage() {
           </CardHeader>
           <div className="divide-y">
             {trades.slice(0, 10).map((trade: BBGoTrade) => (
-              <div key={trade.id} className="flex items-center justify-between px-6 py-3">
+              <div key={tradeKey(trade)} className="flex items-center justify-between px-6 py-3">
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(

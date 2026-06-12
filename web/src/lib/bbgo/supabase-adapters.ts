@@ -4,6 +4,19 @@ export function tableName(base: string, mode?: 'live' | 'paper'): string {
   return mode === 'paper' ? `paper_${base}` : base
 }
 
+// trade.id / order.orderID are derived via parseInt on uint64 IDs that can
+// exceed Number.MAX_SAFE_INTEGER (2^53-1), so distinct rows can collapse to
+// the same number. gid (the per-result-set row index from the adapter) is
+// always unique within a query, so compositing id+gid yields a stable React
+// key without changing BBGoTrade/BBGoOrder field types.
+export function tradeKey(trade: BBGoTrade): string {
+  return `${trade.id}-${trade.gid}`
+}
+
+export function orderKey(order: BBGoOrder): string {
+  return order.uuid ?? `${order.orderID}-${order.gid}`
+}
+
 export function tradeRowToBBGo(row: Record<string, unknown>, idx: number): BBGoTrade {
   const strategyInstanceId = (row.strategy_instance_id as string) || undefined
   return {
