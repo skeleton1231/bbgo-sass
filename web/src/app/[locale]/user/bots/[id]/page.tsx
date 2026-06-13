@@ -136,7 +136,7 @@ export default function BotDetailPage() {
   const { data: tradesData } = useSupabaseTrades(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
 
   // Balances: Supabase-native (works when container is down)
-  const { data: supabaseBalances } = useSupabaseBalances(userId, { mode })
+  const { data: supabaseBalances } = useSupabaseBalances(userId, { mode, strategyInstanceId: botId })
   const balancesData = { balances: supabaseBalances ?? {} }
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning, botId)
   const { data: pingData } = useBotPing(userId, mode, isRunning, botId)

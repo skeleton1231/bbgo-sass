@@ -138,6 +138,27 @@ func mergeFuturesConfig(base, patch *FuturesConfig) *FuturesConfig {
 	return out
 }
 
+// alignConfigLeverage mirrors FuturesConfig.Leverage into the strategy params
+// JSON so the stored config matches what the runtime actually applies. Without
+// this, the DB row keeps the user's pre-sync value (e.g. leverage=1) while
+// the session runs at FuturesConfig.Leverage (e.g. 3), making the stored
+// config misleading and triggering leverage_mismatch warnings.
+func alignConfigLeverage(inst *StrategyInstance) {
+	if inst.FuturesConfig == nil || inst.FuturesConfig.Leverage <= 0 {
+		return
+	}
+	var params map[string]any
+	if len(inst.Config) == 0 || string(inst.Config) == "null" {
+		params = map[string]any{}
+	} else if err := json.Unmarshal(inst.Config, &params); err != nil {
+		return
+	}
+	params["leverage"] = inst.FuturesConfig.Leverage
+	if b, err := json.Marshal(params); err == nil {
+		inst.Config = b
+	}
+}
+
 // RemoveInstance removes an instance's directory, files, and Supabase row.
 func (s *InstanceStore) RemoveInstance(userID, mode, instanceID string) error {
 	s.mu.Lock()
@@ -292,6 +313,7 @@ func (s *InstanceStore) upsertToSupabase(inst *StrategyInstance) {
 	if s.sb == nil {
 		return
 	}
+	alignConfigLeverage(inst)
 	config := json.RawMessage(`{}`)
 	if len(inst.Config) > 0 && string(inst.Config) != "null" {
 		config = inst.Config
@@ -340,6 +362,45 @@ func (s *InstanceStore) deleteFromSupabase(userID, mode, instanceID string) {
 		Execute()
 	if err != nil {
 		log.Printf("delete instance %s from supabase: %v\n", instanceID, err)
+	}
+
+	// Cascade-delete orphaned trade data so a future bot reusing the same
+	// deterministic instance_id (e.g. delete + recreate with same strategy/
+	// symbol/interval) does not inherit the deleted bot's positions via
+	// RestoreFromDB. Paper mode cleans paper_* tables; live mode cleans the
+	// shared bbgo tables.
+	tables := []string{
+		"orders", "trades", "positions", "profits",
+		"futures_position_risks",
+		"margin_loans", "margin_repays", "margin_interests", "margin_liquidations",
+		"nav_history_details", "rewards", "deposits", "withdraws",
+	}
+	prefix := ""
+	if mode == ModePaper {
+		prefix = "paper_"
+	}
+	for _, base := range tables {
+		t := prefix + base
+		_, _, derr := s.sb.client.From(t).
+			Delete("", "").
+			Eq("user_id", userID).
+			Eq("strategy_instance_id", instanceID).
+			Execute()
+		if derr != nil {
+			log.Printf("delete instance %s cascade from %s: %v\n", instanceID, t, derr)
+		}
+	}
+	// paper_balances is keyed by user_id + strategy_instance_id + currency;
+	// clear rows for this instance so the next bot starts from seed balances.
+	if mode == ModePaper {
+		_, _, derr := s.sb.client.From("paper_balances").
+			Delete("", "").
+			Eq("user_id", userID).
+			Eq("strategy_instance_id", instanceID).
+			Execute()
+		if derr != nil {
+			log.Printf("delete instance %s cascade from paper_balances: %v\n", instanceID, derr)
+		}
 	}
 }
 
@@ -641,9 +702,10 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 		Exchange:   exchanges,
 		Sync: &syncConfig{
 			UserDataStream: &syncUserDataStreamConfig{
-				Trades:       true,
-				FilledOrders:    true,
-				FuturesPosition: anyFutures,
+				Trades:                      true,
+				FilledOrders:                true,
+				FuturesPosition:             anyFutures,
+				FuturesPositionSyncInterval: "30s",
 			},
 		},
 		ExchangeStrategies:      exchangeStrategies,

@@ -120,9 +120,10 @@ type databaseConfig struct {
 }
 
 type syncUserDataStreamConfig struct {
-	Trades          bool `yaml:"trades"`
-	FilledOrders    bool `yaml:"filledOrders"`
-	FuturesPosition bool `yaml:"futuresPosition,omitempty"`
+	Trades                      bool   `yaml:"trades"`
+	FilledOrders                bool   `yaml:"filledOrders"`
+	FuturesPosition             bool   `yaml:"futuresPosition,omitempty"`
+	FuturesPositionSyncInterval string `yaml:"futuresPositionSyncInterval,omitempty"`
 }
 
 type syncConfig struct {

@@ -28,6 +28,12 @@ export function useSupabaseTrades(
     strategyInstanceId?: string
     mode?: 'live' | 'paper'
     limit?: number
+    // 'desc' (default) is for display — newest first.
+    // 'asc' is for FIFO PnL computation — needs earliest trades to anchor cost basis.
+    order?: 'asc' | 'desc'
+    // ISO timestamp; when set, filters `traded_at >= since`. Used to bound PnL
+    // computation to a recent window when full history would exceed limit.
+    since?: string
   }
 ) {
   return useQuery<BBGoTrade[]>({
@@ -39,12 +45,13 @@ export function useSupabaseTrades(
         .from(tbl)
         .select('*')
         .eq('user_id', userId)
-        .order('traded_at', { ascending: false })
+        .order('traded_at', { ascending: opts?.order !== 'asc' ? false : true })
         .limit(opts?.limit ?? 200)
 
       if (opts?.exchange) q = q.eq('exchange', opts.exchange)
       if (opts?.symbol) q = q.eq('symbol', opts.symbol)
       if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
+      if (opts?.since) q = q.gte('traded_at', opts.since)
 
       const { data, error } = await q
       if (error) throw error
@@ -127,7 +134,7 @@ export function useSupabaseOpenOrders(
 
 export function useSupabaseBalances(
   userId: string,
-  opts?: { mode?: 'live' | 'paper' }
+  opts?: { mode?: 'live' | 'paper'; strategyInstanceId?: string }
 ) {
   return useQuery<Record<string, BBGoBalance>>({
     queryKey: ['supabase-balances', userId, opts],
@@ -136,20 +143,35 @@ export function useSupabaseBalances(
       // Only paper_balances table exists in Supabase; live balances come from exchange.
       if (opts?.mode !== 'paper') return {}
 
-      const { data, error } = await sb
+      let q = sb
         .from('paper_balances')
         .select('*')
         .eq('user_id', userId)
+
+      // When filtering by bot, only that bot's row is returned.
+      // When unset (dashboard view), all bots' rows are returned and
+      // aggregated below — summing available/locked per currency.
+      if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
+
+      const { data, error } = await q
 
       if (error) throw error
 
       type BalanceRow = { currency: string; available: string; locked: string }
       const balances: Record<string, BBGoBalance> = {}
       for (const row of (data ?? []) as BalanceRow[]) {
-        balances[row.currency] = {
-          currency: row.currency,
-          available: row.available ?? '0',
-          locked: row.locked ?? '0',
+        const avail = parseFloat(row.available ?? '0') || 0
+        const locked = parseFloat(row.locked ?? '0') || 0
+        const existing = balances[row.currency]
+        if (existing) {
+          existing.available = String((parseFloat(existing.available) || 0) + avail)
+          existing.locked = String((parseFloat(existing.locked) || 0) + locked)
+        } else {
+          balances[row.currency] = {
+            currency: row.currency,
+            available: String(avail),
+            locked: String(locked),
+          }
         }
       }
       return balances
@@ -176,6 +198,7 @@ export function useSupabasePositions(
         .select('*')
         .eq('user_id', userId)
         .order('traded_at', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (opts?.symbol) q = q.eq('symbol', opts.symbol)
       if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
@@ -487,9 +510,13 @@ export function useSupabasePnL(
     mode?: 'live' | 'paper'
   }
 ) {
+  // ASC order is critical: FIFO cost basis needs the earliest buys to be
+  // matched against later sells. DESC would compute PnL against only the
+  // most recent 5000 trades' internal matching, hiding long-held positions.
   const { data: trades } = useSupabaseTrades(userId, {
     ...opts,
-    limit: 1000,
+    limit: 5000,
+    order: 'asc',
   })
 
   return useQuery<PnLReport>({
@@ -673,7 +700,11 @@ export function useSupabaseTradingVolume(
   userId: string,
   opts?: { mode?: 'live' | 'paper'; period?: string }
 ) {
-  const { data: trades } = useSupabaseTrades(userId, { mode: opts?.mode, limit: 1000 })
+  // Volume is additive — order doesn't matter, but we cap at 5000 to bound
+  // transfer size. For high-frequency bots running >5000 trades in the
+  // selected period, volume will be underreported. Server-side aggregation
+  // (Supabase RPC summing quote_quantity) is the long-term fix.
+  const { data: trades } = useSupabaseTrades(userId, { mode: opts?.mode, limit: 5000 })
 
   return useQuery<{ tradingVolumes: TradingVolumeEntry[] }>({
     queryKey: ['supabase-trading-volume', userId, opts, trades],
@@ -723,6 +754,13 @@ export function useSupabaseFuturesPositions(
         .select('*')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
+        // Cap transfer size. The table is append-only (migration 00036), so without
+        // a LIMIT this query pulls the full historical snapshot set on every refetch.
+        // Dedup below keeps only the latest per (symbol, side, strategy_instance_id),
+        // so 500 is plenty for typical portfolios. The 30s sync throttle (set by
+        // manager/instance_store.go) bounds future growth; existing pre-throttle
+        // data may exceed this and should be cleaned up via a retention job.
+        .limit(500)
 
       if (opts?.exchange) q = q.eq('exchange', opts.exchange)
       if (opts?.symbol) q = q.eq('symbol', opts.symbol)
