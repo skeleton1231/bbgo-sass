@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -37,10 +38,21 @@ func NewWSTicketStore() *WSTicketStore {
 		tickets: make(map[string]*wsTicket),
 		done:    make(chan struct{}),
 	}
+	go ts.startCleanup()
 	return ts
 }
 
 func (ts *WSTicketStore) startCleanup() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ts.done:
+			return
+		case <-ticker.C:
+			ts.purgeExpired()
+		}
+	}
 }
 
 func (ts *WSTicketStore) Close() {
@@ -62,15 +74,16 @@ func (ts *WSTicketStore) purgeExpired() {
 	}
 }
 
-func (ts *WSTicketStore) Issue(userID string) string {
-	ts.purgeExpired()
+func (ts *WSTicketStore) Issue(userID string) (string, error) {
 	b := make([]byte, 24)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("ws ticket entropy: %w", err)
+	}
 	ticket := hex.EncodeToString(b)
 	ts.mu.Lock()
 	ts.tickets[ticket] = &wsTicket{userID: userID, expiresAt: time.Now().Add(30 * time.Second)}
 	ts.mu.Unlock()
-	return ticket
+	return ticket, nil
 }
 
 func (ts *WSTicketStore) Redeem(ticket string) (string, bool) {
@@ -90,7 +103,11 @@ func (api *API) IssueWSTicket(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-	ticket := api.wsTickets.Issue(userID)
+	ticket, err := api.wsTickets.Issue(userID)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "failed to issue ticket")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"ticket": ticket})
 }
 

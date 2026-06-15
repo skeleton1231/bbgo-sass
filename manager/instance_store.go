@@ -138,6 +138,74 @@ func mergeFuturesConfig(base, patch *FuturesConfig) *FuturesConfig {
 	return out
 }
 
+// UpdateInstanceRiskConfig updates the universal RiskConfig on an existing
+// instance using merge semantics (zero-valued fields in patch do NOT clear
+// existing values), regenerates its bbgo.yaml on disk, and upserts the row
+// to Supabase. Caller is responsible for restarting the container if it is
+// currently running.
+func (s *InstanceStore) UpdateInstanceRiskConfig(userID, mode, instanceID string, rc *RiskConfig, hasCredentials func(string) bool) (*StrategyInstance, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	inst, err := s.getFromDisk(userID, mode, instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("instance %s not found: %w", instanceID, err)
+	}
+	inst.RiskConfig = mergeRiskConfig(inst.RiskConfig, rc)
+
+	yamlContent, err := buildInstanceYAML(inst, hasCredentials, s.registry)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild yaml: %w", err)
+	}
+	if err := os.WriteFile(s.yamlPath(userID, mode, instanceID), yamlContent, 0o644); err != nil {
+		return nil, fmt.Errorf("write yaml: %w", err)
+	}
+
+	s.upsertToSupabase(inst)
+	return inst, nil
+}
+
+// mergeRiskConfig applies PATCH-style merge semantics: zero-valued fields in
+// `patch` do NOT overwrite corresponding fields in `base`. Returns a new
+// pointer; inputs are untouched. To clear a field, send 0 explicitly via
+// the dedicated clear endpoint (TBD). If patch is nil the result is base.
+// If both are nil/empty the result is nil (so EnvArgs returns nothing and
+// bbgo's UniversalRiskController stays disabled).
+func mergeRiskConfig(base, patch *RiskConfig) *RiskConfig {
+	if patch == nil {
+		return base
+	}
+	out := &RiskConfig{}
+	if base != nil {
+		*out = *base
+	}
+	if patch.StopLossPrice != 0 {
+		out.StopLossPrice = patch.StopLossPrice
+	}
+	if patch.TakeProfitPrice != 0 {
+		out.TakeProfitPrice = patch.TakeProfitPrice
+	}
+	if patch.RoiStopLoss != 0 {
+		out.RoiStopLoss = patch.RoiStopLoss
+	}
+	if patch.RoiTakeProfit != 0 {
+		out.RoiTakeProfit = patch.RoiTakeProfit
+	}
+	if patch.TrailingActivation != 0 {
+		out.TrailingActivation = patch.TrailingActivation
+	}
+	if patch.TrailingCallback != 0 {
+		out.TrailingCallback = patch.TrailingCallback
+	}
+	if patch.MaxPositionQty != 0 {
+		out.MaxPositionQty = patch.MaxPositionQty
+	}
+	if !out.HasAny() {
+		return nil
+	}
+	return out
+}
+
 // alignConfigLeverage mirrors FuturesConfig.Leverage into the strategy params
 // JSON so the stored config matches what the runtime actually applies. Without
 // this, the DB row keeps the user's pre-sync value (e.g. leverage=1) while
@@ -344,6 +412,10 @@ func (s *InstanceStore) upsertToSupabase(inst *StrategyInstance) {
 		b, _ := json.Marshal(inst.FuturesConfig)
 		row.FuturesConfig = json.RawMessage(b)
 	}
+	if inst.RiskConfig != nil && inst.RiskConfig.HasAny() {
+		b, _ := json.Marshal(inst.RiskConfig)
+		row.RiskConfig = json.RawMessage(b)
+	}
 	_, _, err := s.sb.client.From("strategy_instances").Upsert(row, "user_id,mode,instance_id", "", "").Execute()
 	if err != nil {
 		log.Printf("upsert instance %s to supabase: %v\n", inst.InstanceID, err)
@@ -458,6 +530,11 @@ func rowToInstance(r PublicStrategyInstancesSelect) StrategyInstance {
 		b, _ := json.Marshal(r.FuturesConfig)
 		json.Unmarshal(b, &futuresConfig)
 	}
+	var riskConfig *RiskConfig
+	if r.RiskConfig != nil {
+		b, _ := json.Marshal(r.RiskConfig)
+		json.Unmarshal(b, &riskConfig)
+	}
 	return StrategyInstance{
 		InstanceID:    r.InstanceId,
 		UserID:        r.UserId,
@@ -470,6 +547,7 @@ func rowToInstance(r PublicStrategyInstancesSelect) StrategyInstance {
 		CrossExchange: r.CrossExchange,
 		Sessions:      sessions,
 		FuturesConfig: futuresConfig,
+		RiskConfig:    riskConfig,
 	}
 }
 

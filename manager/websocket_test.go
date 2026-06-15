@@ -47,7 +47,10 @@ func TestExtractSessionNames_Deduplicates(t *testing.T) {
 
 func TestWSTicket_IssueRedeem(t *testing.T) {
 	ts := NewWSTicketStore()
-	ticket := ts.Issue("user-1")
+	ticket, err := ts.Issue("user-1")
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
 	if ticket == "" {
 		t.Fatal("expected non-empty ticket")
 	}

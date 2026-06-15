@@ -132,7 +132,7 @@ func TestUpdateStrategy_RejectsInvalidLeverage(t *testing.T) {
 		{
 			name:   "nil futuresConfig",
 			body:   map[string]any{},
-			errMsg: "futuresConfig is required",
+			errMsg: "futuresConfig or riskConfig is required",
 		},
 		{
 			name:   "invalid marginType",

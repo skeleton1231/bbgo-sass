@@ -519,6 +519,7 @@ type PublicStrategyInstancesSelect struct {
   InstanceId    string      `json:"instance_id"`
   Mode          string      `json:"mode"`
   Name          string      `json:"name"`
+  RiskConfig    interface{} `json:"risk_config"`
   Sessions      interface{} `json:"sessions"`
   Strategy      string      `json:"strategy"`
   Symbol        string      `json:"symbol"`
@@ -535,6 +536,7 @@ type PublicStrategyInstancesInsert struct {
   InstanceId    string      `json:"instance_id"`
   Mode          string      `json:"mode"`
   Name          *string     `json:"name,omitempty"`
+  RiskConfig    interface{} `json:"risk_config"`
   Sessions      interface{} `json:"sessions"`
   Strategy      string      `json:"strategy"`
   Symbol        *string     `json:"symbol,omitempty"`
@@ -551,6 +553,7 @@ type PublicStrategyInstancesUpdate struct {
   InstanceId    *string     `json:"instance_id,omitempty"`
   Mode          *string     `json:"mode,omitempty"`
   Name          *string     `json:"name,omitempty"`
+  RiskConfig    interface{} `json:"risk_config"`
   Sessions      interface{} `json:"sessions"`
   Strategy      *string     `json:"strategy,omitempty"`
   Symbol        *string     `json:"symbol,omitempty"`

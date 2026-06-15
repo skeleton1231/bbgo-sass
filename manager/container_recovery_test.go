@@ -136,12 +136,10 @@ func TestCleanupStopped_RemovesExitedAndDead(t *testing.T) {
 	cm.dockerFn = func(args ...string) (string, error) {
 		cmd := strings.Join(args, " ")
 		switch {
-		case strings.Contains(cmd, "status=exited"):
-			return "bbgo-user-sto-live-grid2-btcusdt\nbbgo-user-res-live-grid2-btcusdt", nil
-		case strings.Contains(cmd, "status=dead"):
-			return "bbgo-user-dea-live-grid2-btcusdt", nil
+		case strings.Contains(cmd, "status=exited") && strings.Contains(cmd, "status=dead"):
+			return "bbgo-user-sto-live-grid2-btcusdt\nbbgo-user-res-live-grid2-btcusdt\nbbgo-user-dea-live-grid2-btcusdt", nil
 		case args[0] == "rm":
-			removed.Add(1)
+			removed.Add(int32(len(args) - 1))
 			return "", nil
 		}
 		return "", nil
@@ -164,11 +162,8 @@ func TestCleanupStopped_SkipsRunningContainers(t *testing.T) {
 	cm := testContainerManager(t)
 	cm.dockerFn = func(args ...string) (string, error) {
 		cmd := strings.Join(args, " ")
-		if strings.Contains(cmd, "status=exited") {
+		if strings.Contains(cmd, "status=exited") && strings.Contains(cmd, "status=dead") {
 			return "bbgo-user-1-live-grid2-btcusdt", nil
-		}
-		if strings.Contains(cmd, "status=dead") {
-			return "", nil
 		}
 		if args[0] == "rm" {
 			t.Error("should not remove container still tracked as running")

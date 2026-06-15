@@ -53,10 +53,11 @@ func SharedSecretAuth(sharedSecret string) func(http.Handler) http.Handler {
 }
 
 type userRateLimiter struct {
-	mu       sync.Mutex
-	visitors map[string]*visitor
-	rate     time.Duration
-	maxBurst int
+	mu        sync.Mutex
+	visitors  map[string]*visitor
+	rate      time.Duration
+	maxBurst  int
+	lastPurge time.Time
 }
 
 type visitor struct {
@@ -64,11 +65,16 @@ type visitor struct {
 	lastSeen time.Time
 }
 
+// purgeInterval caps how often the full O(N) sweep runs. Without it, every
+// state-changing request would scan every visitor while holding the lock.
+const purgeInterval = time.Minute
+
 func UserRateLimit(rate time.Duration, maxBurst int) func(http.Handler) http.Handler {
 	rl := &userRateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     rate,
-		maxBurst: maxBurst,
+		visitors:  make(map[string]*visitor),
+		rate:      rate,
+		maxBurst:  maxBurst,
+		lastPurge: time.Now(),
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -78,8 +84,6 @@ func UserRateLimit(rate time.Duration, maxBurst int) func(http.Handler) http.Han
 				next.ServeHTTP(w, r)
 				return
 			}
-
-			rl.purgeExpired()
 
 			if !rl.allow(userID) {
 				writeError(w, http.StatusTooManyRequests, "rate limited — try again later")
@@ -96,6 +100,17 @@ func (rl *userRateLimiter) allow(userID string) bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
+
+	if now.Sub(rl.lastPurge) >= purgeInterval {
+		threshold := now.Add(-1 * time.Hour)
+		for id, v := range rl.visitors {
+			if v.lastSeen.Before(threshold) {
+				delete(rl.visitors, id)
+			}
+		}
+		rl.lastPurge = now
+	}
+
 	v, ok := rl.visitors[userID]
 	if !ok {
 		rl.visitors[userID] = &visitor{tokens: rl.maxBurst - 1, lastSeen: now}
@@ -115,15 +130,4 @@ func (rl *userRateLimiter) allow(userID string) bool {
 	}
 	v.tokens--
 	return true
-}
-
-func (rl *userRateLimiter) purgeExpired() {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	threshold := time.Now().Add(-1 * time.Hour)
-	for id, v := range rl.visitors {
-		if v.lastSeen.Before(threshold) {
-			delete(rl.visitors, id)
-		}
-	}
 }

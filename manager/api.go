@@ -211,11 +211,13 @@ func (api *API) bbgoClientForInstance(inst *StrategyInstance, ctx context.Contex
 
 func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
 	users := api.store.ScanUsers()
+	runningSet := api.container.ListAllRunningInstanceContainers()
 	running := 0
 	for _, um := range users {
 		instances, _ := api.store.ListInstances(um.UserID, um.Mode)
 		for i := range instances {
-			if api.isInstanceRunning(instances[i].UserID, instances[i].Mode, instances[i].InstanceID) {
+			name := api.container.InstanceContainerName(instances[i].UserID, instances[i].Mode, instances[i].InstanceID)
+			if runningSet[name] {
 				running++
 			}
 		}
@@ -240,6 +242,7 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		CrossExchange bool                `json:"crossExchange"`
 		Sessions      []SessionRoleConfig `json:"sessions"`
 		FuturesConfig *FuturesConfig      `json:"futuresConfig,omitempty"`
+		RiskConfig    *RiskConfig         `json:"riskConfig,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -327,11 +330,19 @@ func (api *API) CreateStrategy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.RiskConfig != nil {
+		if err := req.RiskConfig.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	inst := &StrategyInstance{
 		UserID: userID, Mode: req.Mode, Strategy: normalizedStrategy,
 		Exchange: req.Exchange, Config: req.Config, Name: req.Name,
 		CrossExchange: req.CrossExchange, Sessions: req.Sessions,
 		FuturesConfig: req.FuturesConfig,
+		RiskConfig:    req.RiskConfig,
 	}
 
 	symbol := extractSymbolFromConfig(req.Config)
@@ -401,6 +412,7 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	runningSet := api.container.ListRunningInstanceContainers(userID)
 	instances := make([]instanceInfo, 0)
 	for _, mode := range []string{ModeLive, ModePaper} {
 		insts, _ := api.store.ListInstances(userID, mode)
@@ -412,7 +424,7 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 			}
 			if api.isInstanceStarting(inst.InstanceID) {
 				info.Status = StatusStarting
-			} else if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+			} else if runningSet[api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] {
 				info.Status = StatusRunning
 			}
 			instances = append(instances, info)
@@ -421,10 +433,12 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user_id": userID, "instances": instances})
 }
 
-// UpdateStrategy handles PATCH requests to update an existing instance's FuturesConfig.
-// Supports updating leverage and marginType using merge semantics (zero-valued fields
-// in the request body do not clear existing values). Triggers a container restart if
-// the instance is currently running so the new YAML takes effect immediately.
+// UpdateStrategy handles PATCH requests to update an existing instance's FuturesConfig
+// and/or RiskConfig. Both are optional but at least one must be present. Supports merge
+// semantics (zero-valued fields in the request body do not clear existing values, with
+// the exception that an all-zero RiskConfig clears risk controls entirely). Triggers a
+// container restart if the instance is currently running so the new YAML/env vars take
+// effect immediately.
 //
 // Restarts are serialized via api.starting: we explicitly clear any stale flag from a
 // prior in-flight start BEFORE stopping the container, then unconditionally spawn a
@@ -441,23 +455,32 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		FuturesConfig *FuturesConfig `json:"futuresConfig"`
+		RiskConfig    *RiskConfig    `json:"riskConfig"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.FuturesConfig == nil {
-		writeError(w, http.StatusBadRequest, "futuresConfig is required")
+	if req.FuturesConfig == nil && req.RiskConfig == nil {
+		writeError(w, http.StatusBadRequest, "futuresConfig or riskConfig is required")
 		return
 	}
 	const maxLeverage = 125
-	if req.FuturesConfig.Leverage < 0 || req.FuturesConfig.Leverage > maxLeverage {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("leverage must be between 1 and %d", maxLeverage))
-		return
+	if req.FuturesConfig != nil {
+		if req.FuturesConfig.Leverage < 0 || req.FuturesConfig.Leverage > maxLeverage {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("leverage must be between 1 and %d", maxLeverage))
+			return
+		}
+		if mt := req.FuturesConfig.MarginType; mt != "" && mt != "cross" && mt != "isolated" {
+			writeError(w, http.StatusBadRequest, "marginType must be 'cross' or 'isolated'")
+			return
+		}
 	}
-	if mt := req.FuturesConfig.MarginType; mt != "" && mt != "cross" && mt != "isolated" {
-		writeError(w, http.StatusBadRequest, "marginType must be 'cross' or 'isolated'")
-		return
+	if req.RiskConfig != nil {
+		if err := req.RiskConfig.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	existing, err := api.store.GetInstance(userID, mode, instanceID)
@@ -468,8 +491,9 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 
 	// L1: leverage/marginType only affect futures strategies. Reject early so users
 	// don't see a misleading "leverage updated" toast on a spot strategy that
-	// silently ignores the change.
-	if api.store.Defaults() != nil && !api.store.Defaults().RequiresFutures(existing.Strategy) {
+	// silently ignores the change. RiskConfig applies to any strategy and is not
+	// gated by this check.
+	if req.FuturesConfig != nil && api.store.Defaults() != nil && !api.store.Defaults().RequiresFutures(existing.Strategy) {
 		writeError(w, http.StatusBadRequest, "strategy does not support futures config")
 		return
 	}
@@ -498,14 +522,25 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 		return err == nil
 	}
 
-	inst, err := api.store.UpdateInstanceFuturesConfig(userID, existing.Mode, instanceID, req.FuturesConfig, hasCredFn)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+	inst := existing
+	if req.FuturesConfig != nil {
+		inst, err = api.store.UpdateInstanceFuturesConfig(userID, existing.Mode, instanceID, req.FuturesConfig, hasCredFn)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	if req.RiskConfig != nil {
+		inst, err = api.store.UpdateInstanceRiskConfig(userID, existing.Mode, instanceID, req.RiskConfig, hasCredFn)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	// M2: store applies merge semantics — inst.FuturesConfig may differ from req.FuturesConfig.
 	merged := inst.FuturesConfig
+	mergedRisk := inst.RiskConfig
 
 	if wasRunning {
 		// We already cleared the flag above and stopped the container. Spawn a fresh
@@ -522,10 +557,12 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 		Mode          string         `json:"mode"`
 		Status        string         `json:"status"`
 		FuturesConfig *FuturesConfig `json:"futuresConfig"`
+		RiskConfig    *RiskConfig    `json:"riskConfig"`
 	}{
 		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 		Status:        map[bool]string{true: StatusStarting, false: StatusStopped}[wasRunning],
 		FuturesConfig: merged,
+		RiskConfig:    mergedRisk,
 	})
 }
 
@@ -565,8 +602,12 @@ func (api *API) ClearAllStrategies(w http.ResponseWriter, r *http.Request) {
 	}
 	mode := modeFromQuery(r)
 	instances, _ := api.store.ListInstances(userID, mode)
+	names := make([]string, 0, len(instances))
 	for _, inst := range instances {
-		_ = api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		names = append(names, api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID))
+	}
+	_ = api.container.StopInstanceNames(names)
+	for _, inst := range instances {
 		api.store.RemoveInstance(inst.UserID, inst.Mode, inst.InstanceID)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
@@ -667,6 +708,7 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	runningSet := api.container.ListRunningInstanceContainers(userID)
 	var infos []instanceInfo
 	for i := range instances {
 		inst := &instances[i]
@@ -674,7 +716,7 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Name: inst.Name,
 		}
-		if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+		if runningSet[api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] {
 			info.Status = StatusRunning
 		} else if api.isInstanceStarting(inst.InstanceID) {
 			info.Status = StatusStarting
@@ -696,10 +738,12 @@ func (api *API) StopUser(w http.ResponseWriter, r *http.Request) {
 	}
 	mode := modeFromQuery(r)
 	instances, _ := api.store.ListInstances(userID, mode)
+	names := make([]string, 0, len(instances))
 	for _, inst := range instances {
-		_ = api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID)
+		names = append(names, api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID))
 		api.starting.Delete(inst.InstanceID)
 	}
+	_ = api.container.StopInstanceNames(names)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "user_id": userID, "mode": mode})
 }
 
@@ -708,6 +752,7 @@ func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	runningSet := api.container.ListRunningInstanceContainers(userID)
 	var instances []instanceInfo
 	for _, mode := range []string{ModeLive, ModePaper} {
 		insts, _ := api.store.ListInstances(userID, mode)
@@ -719,7 +764,7 @@ func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
 			}
 			if api.isInstanceStarting(inst.InstanceID) {
 				info.Status = StatusStarting
-			} else if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+			} else if runningSet[api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] {
 				info.Status = StatusRunning
 			}
 			instances = append(instances, info)
@@ -1677,6 +1722,7 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 	} else {
 		modes = []string{ModeLive, ModePaper}
 	}
+	runningSet := api.container.ListRunningInstanceContainers(userID)
 	var bots []Bot
 	for _, m := range modes {
 		instances, _ := api.store.ListInstances(userID, m)
@@ -1684,11 +1730,14 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 			bot := Bot{ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name}
 			if api.isInstanceStarting(inst.InstanceID) {
 				bot.ContainerStatus = StatusStarting
-			} else if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
-				bot.ContainerStatus = StatusRunning
-				bot.ContainerName = api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
 			} else {
-				bot.ContainerStatus = StatusStopped
+				name := api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+				if runningSet[name] {
+					bot.ContainerStatus = StatusRunning
+					bot.ContainerName = name
+				} else {
+					bot.ContainerStatus = StatusStopped
+				}
 			}
 			bots = append(bots, bot)
 		}

@@ -705,10 +705,14 @@ func TestAPI_ListStrategies_WithData(t *testing.T) {
 	store, _ := newTestStore(t)
 	api.store = store
 	api.container.store = store
-	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
 
-	createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	createTestInstance(t, store, testUUID, "paper", "grid2", "ETHUSDT", nil)
+	inst1 := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", nil)
+	inst2 := createTestInstance(t, store, testUUID, "paper", "grid2", "ETHUSDT", nil)
+	name1 := api.container.InstanceContainerName(inst1.UserID, inst1.Mode, inst1.InstanceID)
+	name2 := api.container.InstanceContainerName(inst2.UserID, inst2.Mode, inst2.InstanceID)
+	api.container.listRunningFn = func(string) map[string]bool {
+		return map[string]bool{name1: true, name2: true}
+	}
 
 	w := doRequest(r, "GET", "/api/users/"+testUUID+"/strategies", nil)
 	if w.Code != http.StatusOK {

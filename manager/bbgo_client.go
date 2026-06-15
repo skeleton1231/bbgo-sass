@@ -10,6 +10,14 @@ import (
 	"time"
 )
 
+var bbgoClientTransport = &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	MaxIdleConns:          1000,
+	MaxIdleConnsPerHost:   100,
+	IdleConnTimeout:       90 * time.Second,
+	ResponseHeaderTimeout: 10 * time.Second,
+}
+
 type BBGoClient struct {
 	baseURL string
 	client  *http.Client
@@ -19,8 +27,11 @@ type BBGoClient struct {
 func NewBBGoClient(baseURL string) *BBGoClient {
 	return &BBGoClient{
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 15 * time.Second},
-		ctx:     context.Background(),
+		client: &http.Client{
+			Timeout:   15 * time.Second,
+			Transport: bbgoClientTransport,
+		},
+		ctx: context.Background(),
 	}
 }
 

@@ -19,9 +19,12 @@ type BotProxy struct {
 
 func NewBotProxy(cm *ContainerManager) *BotProxy {
 	transport := &http.Transport{
-		DialContext:           (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
-		Proxy:                 func(_ *http.Request) (*url.URL, error) { return nil, nil },
-		ResponseHeaderTimeout: 15 * time.Second,
+		DialContext:            (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+		Proxy:                  func(_ *http.Request) (*url.URL, error) { return nil, nil },
+		ResponseHeaderTimeout:  15 * time.Second,
+		MaxIdleConns:           1000,
+		MaxIdleConnsPerHost:    100,
+		IdleConnTimeout:        90 * time.Second,
 	}
 	return &BotProxy{
 		cm: cm,

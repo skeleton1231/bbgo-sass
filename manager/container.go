@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/saas/manager/pool"
@@ -33,8 +35,13 @@ type ContainerManager struct {
 	syncBacktestFn func(userID, exchange, symbol, start, end string) (string, error)
 	logsFn         func(containerName string) (string, error)
 	apiURLFn       func(containerName string) string
-	checkRunningFn func(containerName string) (bool, error)
-	dockerFn       func(args ...string) (string, error)
+	checkRunningFn   func(containerName string) (bool, error)
+	dockerFn         func(args ...string) (string, error)
+	listRunningFn    func(userID string) map[string]bool
+	listAllRunningFn func() map[string]bool
+
+	proxyEnvFileOnce sync.Once
+	proxyEnvFilePath string
 }
 
 func NewContainerManager(cfg *Config, creds *CredentialStore, p *pool.Pool, store *InstanceStore) *ContainerManager {
@@ -145,6 +152,38 @@ func (cm *ContainerManager) StopInstance(userID, mode, instanceID string) error 
 	return firstErr
 }
 
+// StopInstanceNames stops and removes the named containers in two batched
+// docker calls (stop + rm) instead of 2N sequential spawns. Per-name fallback
+// on batch failure so partial errors still get logged. Used by StopUser and
+// ClearAllStrategies to avoid 2N docker CLI spawns over N instances.
+func (cm *ContainerManager) StopInstanceNames(names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	var firstErr error
+	stopArgs := append([]string{"stop", "-t", "10"}, names...)
+	if _, err := cm.docker(stopArgs...); err != nil {
+		firstErr = fmt.Errorf("docker stop batch: %w", err)
+		for _, name := range names {
+			if _, err := cm.docker("stop", name, "-t", "10"); err != nil {
+				log.Printf("stop %s: %v", name, err)
+			}
+		}
+	}
+	rmArgs := append([]string{"rm", "-f"}, names...)
+	if _, err := cm.docker(rmArgs...); err != nil {
+		if firstErr == nil {
+			firstErr = fmt.Errorf("docker rm batch: %w", err)
+		}
+		for _, name := range names {
+			if _, err := cm.docker("rm", "-f", name); err != nil {
+				log.Printf("rm %s: %v", name, err)
+			}
+		}
+	}
+	return firstErr
+}
+
 func (cm *ContainerManager) IsInstanceRunning(userID, mode, instanceID string) bool {
 	running, _ := cm.CheckInstanceRunning(userID, mode, instanceID)
 	return running
@@ -162,6 +201,45 @@ func (cm *ContainerManager) CheckInstanceRunning(userID, mode, instanceID string
 	return out == "true", nil
 }
 
+// ListRunningInstanceContainers returns the set of currently-running container
+// names for the given user. One docker ps call instead of N per-instance
+// docker inspect calls — used by ListBots to avoid an N+1 over the docker CLI.
+func (cm *ContainerManager) ListRunningInstanceContainers(userID string) map[string]bool {
+	if cm.listRunningFn != nil {
+		return cm.listRunningFn(userID)
+	}
+	shortUser := userID
+	if len(shortUser) > 8 {
+		shortUser = shortUser[:8]
+	}
+	return cm.listRunningByPrefix("bbgo-" + shortUser + "-")
+}
+
+// ListAllRunningInstanceContainers returns all currently-running bbgo container
+// names across all users. One docker ps call regardless of user/instance count.
+// Used by Health for global stats — single call vs N×M docker inspect spawns.
+func (cm *ContainerManager) ListAllRunningInstanceContainers() map[string]bool {
+	if cm.listAllRunningFn != nil {
+		return cm.listAllRunningFn()
+	}
+	return cm.listRunningByPrefix("bbgo-")
+}
+
+func (cm *ContainerManager) listRunningByPrefix(prefix string) map[string]bool {
+	out, err := cm.docker("ps", "--filter", "name=^"+prefix, "--format", "{{.Names}}")
+	if err != nil {
+		return map[string]bool{}
+	}
+	set := map[string]bool{}
+	for _, name := range strings.Split(strings.TrimSpace(out), "\n") {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			set[name] = true
+		}
+	}
+	return set
+}
+
 func (cm *ContainerManager) InstanceLogs(userID, mode, instanceID, tail string) (string, error) {
 	if cm.logsFn != nil {
 		return cm.logsFn(cm.InstanceContainerName(userID, mode, instanceID))
@@ -176,6 +254,90 @@ func (cm *ContainerManager) InstanceLogs(userID, mode, instanceID, tail string) 
 
 func (cm *ContainerManager) InstanceGRPCAddr(userID, mode, instanceID string) string {
 	return fmt.Sprintf("%s:%d", cm.InstanceContainerName(userID, mode, instanceID), cm.cfg.BBGOGRPCPort)
+}
+
+// rewriteLoopbackHost rewrites 127.0.0.1/localhost in the HOST portion of a URL
+// to host.docker.internal so bridge-mode containers can reach the host's proxy.
+// Uses url.Parse so paths/queries containing the literal "127.0.0.1" are not
+// touched. Returns the input unchanged if parsing fails or the URL has no host.
+func rewriteLoopbackHost(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return rawURL
+	}
+	host := u.Hostname()
+	if host == "127.0.0.1" || host == "localhost" {
+		u.Host = strings.Replace(u.Host, host, "host.docker.internal", 1)
+		return u.String()
+	}
+	return rawURL
+}
+
+// collectedProxyEnv returns KEY=VAL lines for the manager's proxy env vars,
+// with loopback hosts rewritten to host.docker.internal. Empty if no proxy
+// env is configured. NO_PROXY passes through unchanged.
+func collectedProxyEnv() []string {
+	var lines []string
+	for _, k := range []string{
+		"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+		"http_proxy", "https_proxy", "all_proxy",
+		"NO_PROXY", "no_proxy",
+	} {
+		v := os.Getenv(k)
+		if v == "" {
+			continue
+		}
+		if !strings.EqualFold(k, "NO_PROXY") {
+			v = rewriteLoopbackHost(v)
+		}
+		lines = append(lines, k+"="+v)
+	}
+	return lines
+}
+
+// proxyEnvArgs returns docker args that propagate the manager's proxy env vars
+// into spawned containers. Prefers a mode-0600 --env-file so proxy URLs (which
+// may contain embedded credentials) are not exposed via docker inspect / ps /
+// process accounting logs. Falls back to -e KEY=VAL args if env-file creation
+// fails. Returns nil when no proxy env is configured.
+//
+// The env-file is created lazily on first call and reused for the ContainerManager's
+// lifetime. Proxy env is read once; restart the manager to pick up changes.
+func (cm *ContainerManager) proxyEnvArgs() []string {
+	cm.proxyEnvFileOnce.Do(func() {
+		lines := collectedProxyEnv()
+		if len(lines) == 0 {
+			return
+		}
+		dir := ""
+		if cm.cfg != nil {
+			dir = cm.cfg.DataDir
+		}
+		f, err := os.CreateTemp(dir, ".bbgo-proxy-env-*")
+		if err != nil {
+			log.Printf("proxy env file: %v — using -e args (proxy URLs visible via docker inspect)", err)
+			return
+		}
+		for _, line := range lines {
+			if _, err := fmt.Fprintln(f, line); err != nil {
+				log.Printf("proxy env file write: %v — using -e args", err)
+				f.Close()
+				os.Remove(f.Name())
+				return
+			}
+		}
+		f.Chmod(0o600)
+		f.Close()
+		cm.proxyEnvFilePath = f.Name()
+	})
+	if cm.proxyEnvFilePath != "" {
+		return []string{"--env-file", cm.proxyEnvFilePath}
+	}
+	var args []string
+	for _, line := range collectedProxyEnv() {
+		args = append(args, "-e", line)
+	}
+	return args
 }
 
 func (cm *ContainerManager) instanceEnvArgs(inst *StrategyInstance) []string {
@@ -229,6 +391,9 @@ func (cm *ContainerManager) instanceEnvArgs(inst *StrategyInstance) []string {
 			injected[ex] = true
 		}
 	}
+	args = append(args, inst.RiskConfig.EnvArgs()...)
+
+	args = append(args, cm.proxyEnvArgs()...)
 
 	return args
 }
@@ -339,6 +504,7 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
+	args = append(args, cm.proxyEnvArgs()...)
 	args = append(args,
 		cm.cfg.BBGOImage,
 		"backtest",
@@ -424,6 +590,7 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)
 	}
+	args = append(args, cm.proxyEnvArgs()...)
 
 	syncFrom := startTime
 	if t, err := time.Parse(time.RFC3339, startTime); err == nil {

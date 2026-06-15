@@ -209,8 +209,11 @@ func TestAPI_DownloadCSV_UnsupportedFileType(t *testing.T) {
 
 func TestAPI_Health_WithRunningInstance(t *testing.T) {
 	api, r := setupHandlerAPI(t)
-	createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
-	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
+	inst := createTestInstance(t, api.store, testUUID, "live", "grid2", "BTCUSDT", nil)
+	name := api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+	api.container.listAllRunningFn = func() map[string]bool {
+		return map[string]bool{name: true}
+	}
 
 	w := doRequest(r, "GET", "/api/health", nil)
 	if w.Code != http.StatusOK {

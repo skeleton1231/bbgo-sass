@@ -174,12 +174,15 @@ func (cm *ContainerManager) CleanupStopped(trackedInstances []StrategyInstance) 
 	}
 
 	var names []string
-	for _, status := range []string{"exited", "dead"} {
-		out, err := cm.docker("ps", "-a", "--filter", "name="+containerPrefix, "--filter", "status="+status, "--format", "{{.Names}}")
-		if err != nil {
-			log.Printf("cleanup stopped (%s): %v", status, err)
-			continue
-		}
+	out, err := cm.docker("ps", "-a",
+		"--filter", "name="+containerPrefix,
+		"--filter", "status=exited",
+		"--filter", "status=dead",
+		"--format", "{{.Names}}",
+	)
+	if err != nil {
+		log.Printf("cleanup stopped: %v", err)
+	} else {
 		for _, n := range strings.Split(out, "\n") {
 			if n = strings.TrimSpace(n); n != "" {
 				names = append(names, n)
@@ -187,7 +190,7 @@ func (cm *ContainerManager) CleanupStopped(trackedInstances []StrategyInstance) 
 		}
 	}
 
-	var cleaned int
+	var toRemove []string
 	for _, name := range names {
 		name = strings.TrimSpace(name)
 		if name == "" || !strings.HasPrefix(name, containerPrefix) {
@@ -196,12 +199,26 @@ func (cm *ContainerManager) CleanupStopped(trackedInstances []StrategyInstance) 
 		if trackedNames[name] {
 			continue
 		}
-		if _, err := cm.docker("rm", name); err != nil {
-			log.Printf("cleanup stopped: failed to remove %s: %v", name, err)
-		} else {
-			log.Printf("cleanup stopped: removed container %s", name)
-			cleaned++
-		}
+		toRemove = append(toRemove, name)
 	}
-	return cleaned
+	if len(toRemove) == 0 {
+		return 0
+	}
+	rmArgs := append([]string{"rm"}, toRemove...)
+	if _, err := cm.docker(rmArgs...); err != nil {
+		log.Printf("cleanup stopped: batch rm failed (%v), falling back to per-container", err)
+		cleaned := 0
+		for _, name := range toRemove {
+			if _, err := cm.docker("rm", name); err != nil {
+				log.Printf("cleanup stopped: failed to remove %s: %v", name, err)
+			} else {
+				cleaned++
+			}
+		}
+		return cleaned
+	}
+	for _, name := range toRemove {
+		log.Printf("cleanup stopped: removed container %s", name)
+	}
+	return len(toRemove)
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -84,6 +86,90 @@ type FuturesConfig struct {
 	MarginType string `json:"marginType,omitempty"`
 }
 
+// RiskConfig carries universal risk parameters that bbgo's
+// UniversalRiskController (auto-bound by GeneralOrderExecutor.Bind when
+// BBGO_UNIVERSAL_RISK_* env vars are present) enforces on any strategy.
+// All fields use value-zero = unset semantics so they merge cleanly with
+// PATCH semantics (zero is also how bbgo treats "disabled").
+type RiskConfig struct {
+	StopLossPrice      float64 `json:"stopLossPrice,omitempty"`
+	TakeProfitPrice    float64 `json:"takeProfitPrice,omitempty"`
+	RoiStopLoss        float64 `json:"roiStopLoss,omitempty"`
+	RoiTakeProfit      float64 `json:"roiTakeProfit,omitempty"`
+	TrailingActivation float64 `json:"trailingActivation,omitempty"`
+	TrailingCallback   float64 `json:"trailingCallback,omitempty"`
+	MaxPositionQty     float64 `json:"maxPositionQty,omitempty"`
+}
+
+// HasAny reports whether the config carries at least one positive threshold.
+// Zero-valued fields are treated as "unset" by bbgo and skipped at emission.
+func (rc *RiskConfig) HasAny() bool {
+	if rc == nil {
+		return false
+	}
+	return rc.StopLossPrice > 0 ||
+		rc.TakeProfitPrice > 0 ||
+		rc.RoiStopLoss > 0 ||
+		rc.RoiTakeProfit > 0 ||
+		rc.TrailingActivation > 0 ||
+		rc.TrailingCallback > 0 ||
+		rc.MaxPositionQty > 0
+}
+
+// EnvArgs returns the `-e KEY=VAL` Docker args for the BBGO_UNIVERSAL_RISK_*
+// env vars. Returns nil when the config is empty/unset so the controller
+// stays disabled.
+func (rc *RiskConfig) EnvArgs() []string {
+	if !rc.HasAny() {
+		return nil
+	}
+	var args []string
+	add := func(name string, v float64) {
+		if v > 0 {
+			args = append(args, "-e", name+"="+strconv.FormatFloat(v, 'f', -1, 64))
+		}
+	}
+	add("BBGO_UNIVERSAL_RISK_STOP_LOSS_PRICE", rc.StopLossPrice)
+	add("BBGO_UNIVERSAL_RISK_TAKE_PROFIT_PRICE", rc.TakeProfitPrice)
+	add("BBGO_UNIVERSAL_RISK_ROI_STOP_LOSS", rc.RoiStopLoss)
+	add("BBGO_UNIVERSAL_RISK_ROI_TAKE_PROFIT", rc.RoiTakeProfit)
+	add("BBGO_UNIVERSAL_RISK_TRAILING_ACTIVATION", rc.TrailingActivation)
+	add("BBGO_UNIVERSAL_RISK_TRAILING_CALLBACK", rc.TrailingCallback)
+	add("BBGO_UNIVERSAL_RISK_MAX_POSITION_QTY", rc.MaxPositionQty)
+	return args
+}
+
+// Validate returns an error if any risk field has an invalid (non-positive) value.
+// Empty / zero-valued fields are valid (treated as "unset").
+func (rc *RiskConfig) Validate() error {
+	if rc == nil {
+		return nil
+	}
+	check := func(name string, v float64) error {
+		if v < 0 {
+			return fmt.Errorf("%s must be >= 0", name)
+		}
+		return nil
+	}
+	for _, c := range []struct {
+		name string
+		v    float64
+	}{
+		{"stopLossPrice", rc.StopLossPrice},
+		{"takeProfitPrice", rc.TakeProfitPrice},
+		{"roiStopLoss", rc.RoiStopLoss},
+		{"roiTakeProfit", rc.RoiTakeProfit},
+		{"trailingActivation", rc.TrailingActivation},
+		{"trailingCallback", rc.TrailingCallback},
+		{"maxPositionQty", rc.MaxPositionQty},
+	} {
+		if err := check(c.name, c.v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type SessionRoleConfig struct {
 	Name         string `json:"name"`
 	Exchange     string `json:"exchange"`
@@ -100,6 +186,7 @@ type StrategyEntry struct {
 	CrossExchange bool                `json:"crossExchange"`
 	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
 	FuturesConfig *FuturesConfig      `json:"futuresConfig,omitempty"`
+	RiskConfig    *RiskConfig         `json:"riskConfig,omitempty"`
 }
 
 type UserMode struct {

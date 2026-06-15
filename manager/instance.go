@@ -21,6 +21,7 @@ type StrategyInstance struct {
 	CrossExchange bool                `json:"crossExchange"`
 	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
 	FuturesConfig *FuturesConfig      `json:"futuresConfig,omitempty"`
+	RiskConfig    *RiskConfig         `json:"riskConfig,omitempty"`
 }
 
 // computeInstanceID delegates to the shared instanceid package for bbgo-canonical IDs.
