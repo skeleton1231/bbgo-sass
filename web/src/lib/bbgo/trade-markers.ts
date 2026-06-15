@@ -1,5 +1,6 @@
 import type { BBGoOrder, BBGoTrade, TradeMarkersResponse } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
+import { computePositionTags, computeFuturesPositionTags } from './position-tags'
 
 type TradeMarkerAction = TradeMarker['positionAction']
 
@@ -18,7 +19,7 @@ export function buildTradeMarkers(
   trades: BBGoTrade[] | null | undefined,
   _closedOrders: BBGoOrder[] | null | undefined,
   symbol: string,
-  _isFutures?: boolean
+  isFutures?: boolean
 ): TradeMarker[] {
   const markers: TradeMarker[] = []
 
@@ -37,18 +38,18 @@ export function buildTradeMarkers(
     )
   }
 
-  return markers.sort((a, b) => (a.time as number) - (b.time as number))
-}
+  const sorted = markers.sort((a, b) => (a.time as number) - (b.time as number))
 
-export function buildTradeMarkersFromServer(data: TradeMarkersResponse | undefined): TradeMarker[] {
-  if (!data?.markers?.length) return null as unknown as TradeMarker[]
-  return data.markers.map((m) => ({
-    time: m.time as TradeMarker['time'],
-    side: m.side as 'BUY' | 'SELL',
-    price: m.price,
-    quantity: m.quantity,
-    positionAction: (m.positionAction || 'trade') as TradeMarker['positionAction'],
-  }))
+  const hasServerPa = sorted.some((m) => m.positionAction && m.positionAction !== 'trade')
+  if (!hasServerPa && sorted.length > 0) {
+    const input = sorted.map((m) => ({ side: m.side, quantity: String(m.quantity), tradedAt: String(m.time) }))
+    const tags = isFutures ? computeFuturesPositionTags(input) : computePositionTags(input)
+    for (let i = 0; i < sorted.length; i++) {
+      sorted[i]!.positionAction = tags[i]!.tag ?? 'trade'
+    }
+  }
+
+  return sorted
 }
 
 export function buildOrderLevels(

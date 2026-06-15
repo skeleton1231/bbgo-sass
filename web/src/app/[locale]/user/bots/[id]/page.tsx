@@ -22,9 +22,7 @@ import {
   useSupabaseClosedOrders,
   useSupabasePnLFromProfits,
   useSupabaseLatestPositions,
-  useSupabaseLatestPosition,
   useUnrealizedPnL,
-  useSupabaseProfits,
   useSupabasePnL,
   useSupabaseOpenOrders,
   useSupabaseBalances,
@@ -57,6 +55,7 @@ import { useStrategyRegistry } from '@/components/providers/strategy-registry'
 import { getStrategySchema } from '@/lib/bbgo/strategies'
 import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
+import { computePositionTags, computeFuturesPositionTags } from '@/lib/bbgo/position-tags'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 
 import {
@@ -111,6 +110,7 @@ export default function BotDetailPage() {
   const symbol = bot?.symbol || (bot?.config?.symbol as string) || ''
 
   const [selectedSession, setSelectedSession] = useState('')
+  const [activeTab, setActiveTab] = useState('chart')
   const [klineInterval, setKlineInterval] = useState('1h')
   const [indicators, setIndicators] = useState<IndicatorConfig[]>(DEFAULT_INDICATORS)
 
@@ -140,21 +140,34 @@ export default function BotDetailPage() {
   const balancesData = { balances: supabaseBalances ?? {} }
   const { data: strategyStatesData } = useBotStrategiesState(userId, mode, isRunning, botId)
   const { data: pingData } = useBotPing(userId, mode, isRunning, botId)
-  const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning)
+  // Defer container logs fetch until user opens the Logs tab — avoids a 15s
+  // refetch cycle on a payload-heavy endpoint that only one tab consumes.
+  const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning && activeTab === 'logs')
 
   // Supabase Realtime: invalidate queries on INSERT instead of polling
   const rtOpts = useMemo(() => ({ mode, enabled: isRunning }), [mode, isRunning])
   useRealtimeTable('trades', userId, [['supabase-trades', userId]], rtOpts)
   useRealtimeTable('orders', userId, [['supabase-closed-orders', userId], ['supabase-open-orders', userId]], rtOpts)
-  useRealtimeTable('positions', userId, [['supabase-positions', userId], ['supabase-latest-position', userId]], rtOpts)
+  useRealtimeTable('positions', userId, [['supabase-positions', userId], ['supabase-latest-positions', userId]], rtOpts)
   useRealtimeTable('profits', userId, [['supabase-profits', userId], ['supabase-pnl-profits', userId]], rtOpts)
   // Balance realtime: invalidate on balance changes (for paper_balances table)
   useRealtimeTable('balances', userId, [['supabase-balances', userId]], rtOpts)
 
   // Primary PnL from profits table (bbgo average-cost method)
-  const { data: pnlAgg } = useSupabasePnLFromProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
-  // Fallback PnL from trades (FIFO) when profits table is empty
-  const { data: pnlFallback } = useSupabasePnL(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  // Also exposes the underlying profit rows so the close-history tab can
+  // reuse them instead of issuing a second useSupabaseProfits query.
+  const { data: pnlAgg, profitRows } = useSupabasePnLFromProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  // Fallback PnL from trades (FIFO) — only fetched when profits table has
+  // resolved AND is empty. Saves a 5000-trade ASC query on every bot that
+  // already has profits data.
+  const profitsResolved = !!pnlAgg
+  const profitsEmpty = (pnlAgg?.totalTrades ?? 0) === 0
+  const { data: pnlFallback } = useSupabasePnL(userId, {
+    symbol: symbol || undefined,
+    strategyInstanceId: botId,
+    mode,
+    enabled: profitsResolved && profitsEmpty,
+  })
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
   const activeExchangeRef = useRef(activeExchange)
@@ -174,9 +187,8 @@ export default function BotDetailPage() {
   const currentPrice = candles.length > 0 ? candles[candles.length - 1]?.close : undefined
 
   const { data: latestPositions } = useSupabaseLatestPositions(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
-  const { data: latestPosition } = useSupabaseLatestPosition(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  const latestPosition = latestPositions?.[0] ?? null
   const { data: unrealized } = useUnrealizedPnL(userId, currentPrice, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
-  const { data: profitRows } = useSupabaseProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode, limit: 200 })
   const { data: futuresPositions } = useSupabaseFuturesPositions(userId, { mode, symbol: symbol || undefined, strategyInstanceId: botId })
 
   const openFuturesPositions = (futuresPositions ?? []).filter(
@@ -349,7 +361,7 @@ export default function BotDetailPage() {
         for (const b of msg.data.balances) {
           record[b.currency] = { currency: b.currency, available: b.available, locked: b.locked }
         }
-        setWsBalances(record)
+        setWsBalances((prev) => ({ ...(prev ?? {}), ...record }))
       }
       if (msg.data.channel === 'ORDER' && msg.data.orders) {
         setWsOpenOrders(msg.data.orders.map((o) => ({
@@ -380,7 +392,18 @@ export default function BotDetailPage() {
   const startInstance = useStartInstance()
   const stopInstance = useStopInstance()
 
-  const trades = useMemo(() => tradesData ?? [], [tradesData])
+  // Inject running net position into each trade. position-tags.ts walks the
+  // sequence chronologically (tradedAt ASC, same-timestamp reversed to match
+  // gid DESC insertion order) and returns netPos per index aligned to the
+  // input array — so the desc-ordered tradesData stays in display order.
+  const trades = useMemo(() => {
+    const raw = tradesData ?? []
+    if (raw.length === 0) return raw
+    const tags = isFutures
+      ? computeFuturesPositionTags(raw)
+      : computePositionTags(raw)
+    return raw.map((t, i) => ({ ...t, netPosition: tags[i]?.netPos ?? 0 }))
+  }, [tradesData, isFutures])
   // Derived PnL values for display
   const netProfit = pnl?.totalNetProfit ?? pnlLegacy?.totalRealizedPnl ?? 0
   const unrealizedPnl = futuresUnrealized ?? unrealized?.unrealizedPnl ?? pnlLegacy?.totalUnrealizedPnl ?? 0
@@ -633,7 +656,7 @@ export default function BotDetailPage() {
         isFutures={isFutures}
       />
 
-      <Tabs defaultValue="chart" className="space-y-4">
+      <Tabs defaultValue="chart" className="space-y-4" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-muted/50 p-1 rounded-lg w-full overflow-x-auto">
           <TabsTrigger value="chart" className="rounded-md text-xs">{t('chart')}</TabsTrigger>
           <TabsTrigger value="depth" className="rounded-md text-xs">{t('depth')}</TabsTrigger>
@@ -871,7 +894,7 @@ export default function BotDetailPage() {
                 ))}
               </div>
             ) : (
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">{t('noStrategiesTab')}</CardContent>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">{isRunning ? t('noStrategiesTab') : t('startToSeeData')}</CardContent>
             )}
           </Card>
         </TabsContent>

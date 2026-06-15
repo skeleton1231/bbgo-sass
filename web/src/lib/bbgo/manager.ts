@@ -292,6 +292,7 @@ export function createStrategy(userId: string, data: {
   crossExchange?: boolean
   sessions?: SessionRoleConfig[]
   futuresConfig?: { leverage?: number; marginType?: string }
+  riskConfig?: RiskConfigPayload
 }) {
   return request<InstanceInfo>(`/users/${userId}/strategies`, {
     method: 'POST',
@@ -299,15 +300,27 @@ export function createStrategy(userId: string, data: {
   })
 }
 
+export interface RiskConfigPayload {
+  stopLossPrice?: number
+  takeProfitPrice?: number
+  roiStopLoss?: number
+  roiTakeProfit?: number
+  trailingActivation?: number
+  trailingCallback?: number
+  maxPositionQty?: number
+}
+
 export function updateStrategy(userId: string, strategyId: string, data: {
-  futuresConfig: { leverage?: number; marginType?: 'cross' | 'isolated' }
+  futuresConfig?: { leverage?: number; marginType?: 'cross' | 'isolated' }
+  riskConfig?: RiskConfigPayload
 }) {
   return request<{
     instance_id: string
     user_id: string
     mode: string
     status: string
-    futuresConfig: { leverage?: number; marginType?: string }
+    futuresConfig?: { leverage?: number; marginType?: string }
+    riskConfig?: RiskConfigPayload
   }>(`/users/${userId}/strategies/${strategyId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -341,10 +354,6 @@ export function startUser(userId: string, mode: 'live' | 'paper' = 'live') {
 
 export function stopUser(userId: string, mode: 'live' | 'paper' = 'live') {
   return request<{ status: string; user_id: string; mode: string }>(`/users/${userId}/stop?mode=${mode}`, { method: 'POST' })
-}
-
-export function fetchUserStatus(userId: string) {
-  return request<InstanceListResponse>(`/users/${userId}/status`)
 }
 
 // --- Instance start/stop ---
@@ -417,10 +426,6 @@ export function fetchBotSessions(userId: string, mode?: 'live' | 'paper', strate
   return request<{ sessions: BBGoSession[] }>(`/users/${userId}/bbgo/sessions?${params}`)
 }
 
-export function fetchBotSessionDetail(userId: string, session: string, mode?: 'live' | 'paper') {
-  return request<{ session: BBGoSession }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}?mode=${mode ?? 'live'}`)
-}
-
 export function fetchBotSessionTrades(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
   const qs = buildSessionQS(mode, strategyInstanceID)
   return request<{ trades: BBGoTrade[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/trades?${qs}`)
@@ -431,19 +436,9 @@ export function fetchBotOpenOrders(userId: string, session: string, mode?: 'live
   return request<{ orders: BBGoOrder[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/open-orders?${qs}`)
 }
 
-export function fetchBotSessionAccount(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
-  const qs = buildSessionQS(mode, strategyInstanceID)
-  return request<{ account: unknown }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/account?${qs}`)
-}
-
 export function fetchBotSessionBalances(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
   const qs = buildSessionQS(mode, strategyInstanceID)
   return request<{ balances: Record<string, BBGoBalance> }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/balances?${qs}`)
-}
-
-export function fetchBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {
-  const qs = buildSessionQS(mode, strategyInstanceID)
-  return request<{ symbols: string[] }>(`/users/${userId}/bbgo/session/${encodeURIComponent(session)}/symbols?${qs}`)
 }
 
 export function fetchBotAssets(userId: string, mode?: 'live' | 'paper', strategyInstanceID?: string) {

@@ -537,5 +537,23 @@
       "cross": "교차 마진",
       "isolated": "격리 마진"
     }
+  },
+  "Risk": {
+    "title": "리스크 관리",
+    "overview": "모든 전략에 적용되는 범용 리스크 제어. 빈 칸은 비활성화.",
+    "stopLossPrice": "스탑로스 가격",
+    "stopLossHint": "절대 가격; 롱은 가격이 하락하면 청산.",
+    "takeProfitPrice": "테이크프로핏 가격",
+    "takeProfitHint": "절대 가격; 롱은 가격이 상승하면 청산.",
+    "roiStopLoss": "ROI 스탑로스 (비율)",
+    "roiStopLossHint": "예: 0.05 = ROI가 -5% 도달 시 청산.",
+    "roiTakeProfit": "ROI 테이크프로핏 (비율)",
+    "roiTakeProfitHint": "예: 0.10 = ROI가 +10% 도달 시 청산.",
+    "trailingActivation": "트레일링 활성화 (비율)",
+    "trailingActivationHint": "예: 0.05 = ROI +5% 도달 시 트레일링 스탑 활성화.",
+    "trailingCallback": "트레일링 콜백 (비율)",
+    "trailingCallbackHint": "예: 0.02 = 활성화 후 피크에서 2% 하락 시 청산.",
+    "maxPositionQty": "최대 포지션 수량",
+    "maxPositionQtyHint": "기축 통화 절대 수량의 하드 리미트; 초과 시 즉시 청산."
   }
 }

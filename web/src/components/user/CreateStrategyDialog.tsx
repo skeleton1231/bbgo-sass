@@ -4,11 +4,12 @@ import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useCreateStrategy, useCredentials } from '@/lib/bbgo/queries'
 import { useStrategyRegistry } from '@/components/providers/strategy-registry'
-import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, nestConfig, type SessionRole, type FuturesConfig } from '@/lib/bbgo/strategies'
+import { getStrategySchema, getStrategyDefaults, getStrategiesByCategory, ensureTypes, nestConfig, type SessionRole, type FuturesConfig, type RiskConfig } from '@/lib/bbgo/strategies'
 import { EXCHANGES } from '@/lib/bbgo/constants'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { StrategyConfigForm } from './StrategyConfigForm'
 import { FuturesConfigFields } from './FuturesConfigFields'
+import { RiskConfigFields } from './RiskConfigFields'
 import { toast } from 'sonner'
 
 const ENV_PREFIXES: Record<string, string> = {
@@ -38,6 +39,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
   const [mode, setMode] = useState<'live' | 'paper'>(globalMode)
   const [config, setConfig] = useState<Record<string, unknown>>(getStrategyDefaults('grid2', registry))
   const [futuresConfig, setFuturesConfig] = useState<FuturesConfig>({ leverage: 1, marginType: 'cross' })
+  const [riskConfig, setRiskConfig] = useState<RiskConfig>({})
   const [sessionExchanges, setSessionExchanges] = useState<Record<string, string>>({})
 
   const handleStrategyChange = useCallback((newStrategy: string) => {
@@ -95,10 +97,13 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
 
     const numericConfig = nestConfig(ensureTypes(schema, config))
 
-    // Sync strategy config leverage to futuresConfig for futures strategies
-    const effectiveFuturesConfig = schema?.requiresFutures
-      ? { ...futuresConfig, leverage: typeof numericConfig.leverage === 'number' ? numericConfig.leverage : futuresConfig.leverage }
-      : futuresConfig
+    // Strip undefined / zero fields from riskConfig so the manager doesn't see
+    // stale empty values; if every field is empty, omit riskConfig entirely.
+    const cleanedRisk: RiskConfig = {}
+    for (const [k, v] of Object.entries(riskConfig)) {
+      if (typeof v === 'number' && v > 0) (cleanedRisk as Record<string, number>)[k] = v
+    }
+    const hasRisk = Object.keys(cleanedRisk).length > 0
 
     const onError = (err: Error) => {
       toast.error(err.message)
@@ -136,6 +141,7 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           mode,
           crossExchange: true,
           sessions,
+          ...(hasRisk ? { riskConfig: cleanedRisk } : {}),
         },
         { onSuccess, onError }
       )
@@ -148,7 +154,8 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
           strategy,
           config: numericConfig,
           mode,
-          ...(schema?.requiresFutures ? { futuresConfig: effectiveFuturesConfig } : {}),
+          ...(schema?.requiresFutures ? { futuresConfig } : {}),
+          ...(hasRisk ? { riskConfig: cleanedRisk } : {}),
         },
         { onSuccess, onError }
       )
@@ -285,6 +292,12 @@ export function CreateStrategyDialog({ userId, onClose }: { userId: string; onCl
             symbol={config.symbol as string | undefined}
           />
         )}
+
+        <RiskConfigFields
+          value={riskConfig}
+          onChange={setRiskConfig}
+          symbol={config.symbol as string | undefined}
+        />
 
         {createStrategy.isError && (
           <p className="text-sm text-destructive">

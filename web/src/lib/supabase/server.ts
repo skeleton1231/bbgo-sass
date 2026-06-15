@@ -49,11 +49,3 @@ export const getUserRole = cache(async (): Promise<string | null> => {
 
   return (data as Pick<UserProfileRow, 'role'> | null)?.role ?? null
 })
-
-export async function requireAuth() {
-  const user = await getCurrentUser()
-  if (!user) {
-    throw new Error('Unauthorized')
-  }
-  return user
-}

@@ -574,5 +574,23 @@
     "side": "方向",
     "price": "价格",
     "quantity": "数量"
+  },
+  "Risk": {
+    "title": "风险管理",
+    "overview": "通用风险控制,适用于任意策略。留空表示禁用。",
+    "stopLossPrice": "止损价",
+    "stopLossHint": "绝对价格;做多时价格跌破即平仓。",
+    "takeProfitPrice": "止盈价",
+    "takeProfitHint": "绝对价格;做多时价格涨破即平仓。",
+    "roiStopLoss": "ROI 止损 (比例)",
+    "roiStopLossHint": "如 0.05 = 仓位 ROI 跌至 -5% 时平仓。",
+    "roiTakeProfit": "ROI 止盈 (比例)",
+    "roiTakeProfitHint": "如 0.10 = 仓位 ROI 达到 +10% 时平仓。",
+    "trailingActivation": "移动止损激活 (比例)",
+    "trailingActivationHint": "如 0.05 = 仓位 ROI 达 +5% 时激活移动止损。",
+    "trailingCallback": "移动止损回调 (比例)",
+    "trailingCallbackHint": "如 0.02 = 激活后从峰值回撤 2% 即平仓。",
+    "maxPositionQty": "最大持仓量",
+    "maxPositionQtyHint": "基础货币绝对数量硬性上限;超过立即平仓。"
   }
 }

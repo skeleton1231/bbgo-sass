@@ -537,5 +537,23 @@
       "cross": "クロスマージン",
       "isolated": "分離マージン"
     }
+  },
+  "Risk": {
+    "title": "リスク管理",
+    "overview": "任意の戦略に適用される汎用リスク制御。空白で無効化。",
+    "stopLossPrice": "ストップロス価格",
+    "stopLossHint": "絶対価格;ロングは価格が下落したら決済。",
+    "takeProfitPrice": "テイクプロフィット価格",
+    "takeProfitHint": "絶対価格;ロングは価格が上昇したら決済。",
+    "roiStopLoss": "ROI ストップロス (比率)",
+    "roiStopLossHint": "例: 0.05 = ROI が -5% になったら決済。",
+    "roiTakeProfit": "ROI テイクプロフィット (比率)",
+    "roiTakeProfitHint": "例: 0.10 = ROI が +10% に到達したら決済。",
+    "trailingActivation": "トレーリング有効化 (比率)",
+    "trailingActivationHint": "例: 0.05 = ROI が +5% でトレーリングを有効化。",
+    "trailingCallback": "トレーリング コールバック (比率)",
+    "trailingCallbackHint": "例: 0.02 = 有効化後、ピークから 2% 下落で決済。",
+    "maxPositionQty": "最大ポジション数量",
+    "maxPositionQtyHint": "基軸通貨の絶対数量のハードリミット;超過時に即時決済。"
   }
 }

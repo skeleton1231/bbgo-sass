@@ -536,5 +536,23 @@
       "cross": "全倉保證金",
       "isolated": "逐倉保證金"
     }
+  },
+  "Risk": {
+    "title": "風險管理",
+    "overview": "通用風險控制,適用於任意策略。留空表示停用。",
+    "stopLossPrice": "停損價",
+    "stopLossHint": "絕對價格;做多時價格跌破即平倉。",
+    "takeProfitPrice": "停利價",
+    "takeProfitHint": "絕對價格;做多時價格漲破即平倉。",
+    "roiStopLoss": "ROI 停損 (比例)",
+    "roiStopLossHint": "如 0.05 = 倉位 ROI 跌至 -5% 時平倉。",
+    "roiTakeProfit": "ROI 停利 (比例)",
+    "roiTakeProfitHint": "如 0.10 = 倉位 ROI 達到 +10% 時平倉。",
+    "trailingActivation": "移動停損激活 (比例)",
+    "trailingActivationHint": "如 0.05 = 倉位 ROI 達 +5% 時激活移動停損。",
+    "trailingCallback": "移動停損回調 (比例)",
+    "trailingCallbackHint": "如 0.02 = 激活後從峰值回撤 2% 即平倉。",
+    "maxPositionQty": "最大持倉量",
+    "maxPositionQtyHint": "基礎貨幣絕對數量硬性上限;超過立即平倉。"
   }
 }

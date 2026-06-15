@@ -20,7 +20,6 @@ import {
   fetchBotSessionTrades,
   fetchBotOpenOrders,
   fetchBotSessionBalances,
-  fetchBotSessionSymbols,
   fetchBotTrades,
   fetchBotClosedOrders,
   fetchBotTradingVolume,
@@ -108,11 +107,18 @@ export function useUpdateStrategy() {
       userId,
       strategyId,
       futuresConfig,
+      riskConfig,
     }: {
       userId: string
       strategyId: string
-      futuresConfig: { leverage?: number; marginType?: 'cross' | 'isolated' }
-    }) => apiUpdateStrategy(userId, strategyId, { futuresConfig }),
+      futuresConfig?: { leverage?: number; marginType?: 'cross' | 'isolated' }
+      riskConfig?: import('./manager').RiskConfigPayload
+    }) => {
+      const payload: Parameters<typeof apiUpdateStrategy>[2] = {}
+      if (futuresConfig) payload.futuresConfig = futuresConfig
+      if (riskConfig) payload.riskConfig = riskConfig
+      return apiUpdateStrategy(userId, strategyId, payload)
+    },
     onSuccess: (_data, variables) => invalidateUserQueries(qc, variables.userId),
   })
 }
@@ -263,15 +269,6 @@ export function useBotSessionBalances(userId: string, session: string, mode?: 'l
     enabled: !!userId && !!session && (containerRunning ?? false),
     staleTime: 20_000,
     refetchInterval: 20_000,
-  })
-}
-
-export function useBotSessionSymbols(userId: string, session: string, mode?: 'live' | 'paper', containerRunning?: boolean) {
-  return useQuery<{ symbols: string[] }>({
-    queryKey: ['bot-symbols', userId, session, mode],
-    queryFn: () => fetchBotSessionSymbols(userId, session, mode),
-    enabled: !!userId && !!session && (containerRunning ?? false),
-    refetchInterval: 30_000,
   })
 }
 

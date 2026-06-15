@@ -357,17 +357,23 @@ export function useSupabasePnLFromProfits(
     mode?: 'live' | 'paper'
   }
 ) {
-  const { data: profitRows } = useSupabaseProfits(userId, {
+  const profitsQuery = useSupabaseProfits(userId, {
     ...opts,
     limit: 2000,
   })
+  const profitRows = profitsQuery.data
 
-  return useQuery<ProfitAggregation>({
+  const aggregation = useQuery<ProfitAggregation>({
     queryKey: ['supabase-pnl-profits', userId, opts, profitRows],
     queryFn: () => aggregateProfits(profitRows ?? []),
     enabled: !!userId && !!profitRows,
     staleTime: 30_000,
   })
+
+  // Expose the underlying profit rows so consumers (e.g. close-history tab)
+  // don't need to fire a second useSupabaseProfits query that overlaps with
+  // this one. Different limit → different cache key → duplicate fetch.
+  return { ...aggregation, profitRows }
 }
 
 // --- Latest position from positions table ---
@@ -422,10 +428,23 @@ export function useSupabaseLatestPositions(
 
       // Group by (exchange, symbol, strategy_instance_id), keep latest per group.
       // strategy_instance_id is necessary so multiple bots on the same symbol don't collapse.
+      //
+      // Paper engine can emit a zero-base snapshot at the same traded_at as a
+      // non-zero one (e.g., liquidation writes both). If we pick the zero row
+      // the position looks closed even though it isn't. Guard: when the latest
+      // row has base=0 but a sibling row at the same traded_at has non-zero
+      // base, prefer the non-zero sibling.
       const latestByGroup = new Map<string, PositionRow>()
       for (const row of positions) {
         const key = `${row.exchange}:${row.symbol}:${row.strategy_instance_id}`
-        if (!latestByGroup.has(key)) {
+        const current = latestByGroup.get(key)
+        if (!current) {
+          latestByGroup.set(key, row)
+          continue
+        }
+        const currentBase = parseFloat(current.base ?? '0') || 0
+        const rowBase = parseFloat(row.base ?? '0') || 0
+        if (currentBase === 0 && rowBase !== 0 && row.traded_at === current.traded_at) {
           latestByGroup.set(key, row)
         }
       }
@@ -434,24 +453,6 @@ export function useSupabaseLatestPositions(
         .map(toLatestPosition)
         .filter((p) => !p.isClosed)
     },
-    enabled: !!userId && !!positions,
-    staleTime: 15_000,
-  })
-}
-
-export function useSupabaseLatestPosition(
-  userId: string,
-  opts?: {
-    symbol?: string
-    strategyInstanceId?: string
-    mode?: 'live' | 'paper'
-  }
-) {
-  const { data: positions } = useSupabaseLatestPositions(userId, opts)
-
-  return useQuery<LatestPosition | null>({
-    queryKey: ['supabase-latest-position', userId, opts, positions],
-    queryFn: () => positions?.[0] ?? null,
     enabled: !!userId && !!positions,
     staleTime: 15_000,
   })
@@ -508,11 +509,13 @@ export function useSupabasePnL(
     symbol?: string
     strategyInstanceId?: string
     mode?: 'live' | 'paper'
+    enabled?: boolean
   }
 ) {
   // ASC order is critical: FIFO cost basis needs the earliest buys to be
   // matched against later sells. DESC would compute PnL against only the
   // most recent 5000 trades' internal matching, hiding long-held positions.
+  const enabled = opts?.enabled !== false
   const { data: trades } = useSupabaseTrades(userId, {
     ...opts,
     limit: 5000,
@@ -522,7 +525,7 @@ export function useSupabasePnL(
   return useQuery<PnLReport>({
     queryKey: ['supabase-pnl', userId, opts, trades],
     queryFn: () => computePnLFromTrades(trades ?? []),
-    enabled: !!userId && !!trades,
+    enabled: !!userId && !!trades && enabled,
     staleTime: 30_000,
   })
 }
@@ -667,33 +670,6 @@ function computePnLFromTrades(trades: BBGoTrade[]): PnLReport {
     dailyBreakdown,
     pnlCurve,
   }
-}
-
-export function useSupabaseTradeCount(
-  userId: string,
-  opts?: {
-    symbol?: string
-    mode?: 'live' | 'paper'
-  }
-) {
-  return useQuery<number>({
-    queryKey: ['supabase-trade-count', userId, opts],
-    queryFn: async () => {
-      const sb = createClient()
-      let q = sb
-        .from(tableName('trades', opts?.mode))
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-
-      if (opts?.symbol) q = q.eq('symbol', opts.symbol)
-
-      const { count, error } = await q
-      if (error) throw error
-      return count ?? 0
-    },
-    enabled: !!userId,
-    staleTime: 30_000,
-  })
 }
 
 export function useSupabaseTradingVolume(

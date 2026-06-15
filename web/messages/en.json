@@ -575,5 +575,23 @@
     "side": "Side",
     "price": "Price",
     "quantity": "Quantity"
+  },
+  "Risk": {
+    "title": "Risk Management",
+    "overview": "Universal risk controls applied to any strategy. Leave blank to disable.",
+    "stopLossPrice": "Stop Loss Price",
+    "stopLossHint": "Absolute price; long closes when price drops to this level.",
+    "takeProfitPrice": "Take Profit Price",
+    "takeProfitHint": "Absolute price; long closes when price rises to this level.",
+    "roiStopLoss": "ROI Stop Loss (ratio)",
+    "roiStopLossHint": "e.g. 0.05 = close when position ROI drops to -5%.",
+    "roiTakeProfit": "ROI Take Profit (ratio)",
+    "roiTakeProfitHint": "e.g. 0.10 = close when position ROI reaches +10%.",
+    "trailingActivation": "Trailing Activation (ratio)",
+    "trailingActivationHint": "e.g. 0.05 = arm trailing stop when position ROI reaches +5%.",
+    "trailingCallback": "Trailing Callback (ratio)",
+    "trailingCallbackHint": "e.g. 0.02 = close when price retraces 2% from peak after activation.",
+    "maxPositionQty": "Max Position Qty",
+    "maxPositionQtyHint": "Hard cap on absolute base quantity; closes immediately if exceeded."
   }
 }

@@ -25,6 +25,23 @@ export interface FuturesConfig {
   marginType?: 'cross' | 'isolated'
 }
 
+/**
+ * Universal risk parameters enforced by bbgo's UniversalRiskController
+ * (auto-bound by GeneralOrderExecutor.Bind when BBGO_UNIVERSAL_RISK_* env
+ * vars are present). Applies to ANY strategy — not gated by futures flag.
+ *
+ * All fields are optional; zero/undefined means "unset" (skipped at emission).
+ */
+export interface RiskConfig {
+  stopLossPrice?: number
+  takeProfitPrice?: number
+  roiStopLoss?: number
+  roiTakeProfit?: number
+  trailingActivation?: number
+  trailingCallback?: number
+  maxPositionQty?: number
+}
+
 export interface StrategySchema {
   id: string
   label: string

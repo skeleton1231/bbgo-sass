@@ -43,7 +43,9 @@ export default function DashboardPage() {
   const anyActive = allInstances.some((i) => i.status === 'running')
   const strategyCount = activeInstances.length
 
-  const { data: tradesData } = useSupabaseTrades(userId, { mode: globalMode })
+  // Same opts as useSupabaseTradingVolume's internal call — RQ dedupes by queryKey,
+  // so this shares the 5000-row fetch instead of issuing a separate 200-row one.
+  const { data: tradesData } = useSupabaseTrades(userId, { mode: globalMode, limit: 5000 })
   const { data: balancesData } = useSupabaseBalances(userId, { mode: globalMode })
   const { data: volumeData } = useSupabaseTradingVolume(userId, { mode: globalMode })
   const { data: pnlData } = useSupabasePnL(userId, { mode: globalMode })
