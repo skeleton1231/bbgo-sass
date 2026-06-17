@@ -35,7 +35,11 @@ func userIDFromRequest(r *http.Request) (string, bool) {
 func SharedSecretAuth(sharedSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/api/health" || r.URL.Path == "/api/ws" {
+			// Public probe paths — Docker healthchecks and internal metrics
+			// scrapers run without a manager token. Listing these inline keeps
+			// the exemption obvious; any new public endpoint must be added here.
+			switch r.URL.Path {
+			case "/api/health", "/api/ws", "/livez", "/readyz", "/metrics":
 				next.ServeHTTP(w, r)
 				return
 			}
