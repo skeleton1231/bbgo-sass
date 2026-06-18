@@ -22,6 +22,8 @@ type instanceInfo struct {
 	Exchange   string `json:"exchange"`
 	Name       string `json:"name"`
 	Status     string `json:"status"`
+	LastError  string `json:"last_error,omitempty"`
+	LastErrorAt string `json:"last_error_at,omitempty"`
 }
 
 type strategyCreatedResponse struct {
@@ -166,6 +168,8 @@ type Bot struct {
 	ContainerStatus string          `json:"container_status"`
 	ContainerName   string          `json:"container_name,omitempty"`
 	Mode            string          `json:"mode"`
+	LastError       string          `json:"last_error,omitempty"`
+	LastErrorAt     string          `json:"last_error_at,omitempty"`
 }
 
 // --- Bots list response ---

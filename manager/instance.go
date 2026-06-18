@@ -22,6 +22,8 @@ type StrategyInstance struct {
 	Sessions      []SessionRoleConfig `json:"sessions,omitempty"`
 	FuturesConfig *FuturesConfig      `json:"futuresConfig,omitempty"`
 	RiskConfig    *RiskConfig         `json:"riskConfig,omitempty"`
+	LastError     string              `json:"lastError,omitempty"`
+	LastErrorAt   string              `json:"lastErrorAt,omitempty"`
 }
 
 // computeInstanceID delegates to the shared instanceid package for bbgo-canonical IDs.

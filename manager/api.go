@@ -36,6 +36,8 @@ type API struct {
 	btJobs     *BacktestJobStore
 	btSyncSem  chan struct{}
 	storage    *StorageClient
+	metrics    *Metrics
+	health     *cachedHealth
 
 	stopCtx    context.Context
 	stopCancel context.CancelFunc
@@ -49,15 +51,27 @@ type API struct {
 
 func NewAPI(cfg *Config, store *InstanceStore, cm *ContainerManager, proxy *BotProxy, creds *CredentialStore, enc *Encryptor, syncer *Syncer, hub *MarketDataHub, testnetHub *MarketDataHub, notifier *Notifier, btExec *BacktestExecutor, btJobs *BacktestJobStore, storage *StorageClient) *API {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &API{
+	api := &API{
 		cfg: cfg, store: store, container: cm, proxy: proxy,
 		creds: creds, encryptor: enc, syncer: syncer,
 		hub: hub, testnetHub: testnetHub, notifier: notifier,
 		wsTickets: NewWSTicketStore(), btExec: btExec, btJobs: btJobs,
 		btSyncSem: make(chan struct{}, 2), storage: storage,
+		metrics: NewMetrics(),
 		newBBGoClient: NewBBGoClient,
 		stopCtx: ctx, stopCancel: cancel,
 	}
+	api.health = newCachedHealth(api.refreshHealth, 15*time.Second)
+	return api
+}
+
+// WithMetrics overrides the default Metrics instance — used by main.go to share
+// a single Metrics across the API, container recovery loop, and WS ticket store.
+func (api *API) WithMetrics(m *Metrics) *API {
+	if m != nil {
+		api.metrics = m
+	}
+	return api
 }
 
 func (api *API) Close() {
@@ -81,6 +95,9 @@ func (api *API) RegisterRoutes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Timeout(60 * time.Second))
 		r.Get("/api/health", api.Health)
+		r.Get("/livez", api.LivezHandler)
+		r.Get("/readyz", api.ReadyzHandler)
+		r.Get("/metrics", api.MetricsHandler)
 		r.Get("/api/markets/{exchange}/symbols", api.MarketSymbols)
 		r.Get("/api/markets/{exchange}/ticker", api.MarketTicker)
 		r.Get("/api/markets/{exchange}/klines", api.MarketKlines)
@@ -173,6 +190,33 @@ func (api *API) isInstanceRunning(userID, mode, instanceID string) bool {
 	return api.container.IsInstanceRunning(userID, mode, instanceID)
 }
 
+// instanceEffectiveStatus classifies an instance's actual liveness, accounting
+// for the crashloop window where Docker reports running=true between restart
+// cycles of a --restart=unless-stopped container. Returns one of
+// StatusRunning/StatusError/StatusStopped plus the captured reason (if any).
+//
+// isInstanceRunning (Docker .State.Running only) is unsafe for restart
+// decisions — a crashlooping bbgo whose process exits non-zero on startup
+// still appears running for the brief moment between Docker's restart cycles,
+// which makes StartInstance treat the click as a no-op while the container
+// silently keeps failing. This helper is what those callers should use.
+func (api *API) instanceEffectiveStatus(userID, mode, instanceID string) (status, reason string) {
+	if api.isInstanceStarting(instanceID) {
+		return StatusStarting, ""
+	}
+	if !api.container.IsInstanceRunning(userID, mode, instanceID) {
+		return StatusStopped, ""
+	}
+	health, err := api.container.CheckInstanceHealth(userID, mode, instanceID)
+	if err != nil || health.Status == HealthStatusStopped {
+		return StatusStopped, health.Reason
+	}
+	if health.Status == HealthStatusError {
+		return StatusError, health.Reason
+	}
+	return StatusRunning, ""
+}
+
 func (api *API) resolveInstanceForRequest(w http.ResponseWriter, r *http.Request) (*StrategyInstance, bool) {
 	userID, ok := api.resolveUserID(w, r)
 	if !ok {
@@ -209,20 +253,12 @@ func (api *API) bbgoClientForInstance(inst *StrategyInstance, ctx context.Contex
 
 // --- Health ---
 
-func (api *API) Health(w http.ResponseWriter, _ *http.Request) {
-	users := api.store.ScanUsers()
-	runningSet := api.container.ListAllRunningInstanceContainers()
-	running := 0
-	for _, um := range users {
-		instances, _ := api.store.ListInstances(um.UserID, um.Mode)
-		for i := range instances {
-			name := api.container.InstanceContainerName(instances[i].UserID, instances[i].Mode, instances[i].InstanceID)
-			if runningSet[name] {
-				running++
-			}
-		}
+func (api *API) Health(w http.ResponseWriter, r *http.Request) {
+	if api.health != nil {
+		writeJSON(w, http.StatusOK, api.health.Get(r.Context()))
+		return
 	}
-	writeJSON(w, http.StatusOK, healthResponse{Status: "ok", Users: len(users), Running: running})
+	writeJSON(w, http.StatusOK, HealthSnapshot{Status: "ok"})
 }
 
 // --- Strategy CRUD ---
@@ -433,12 +469,19 @@ func (api *API) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user_id": userID, "instances": instances})
 }
 
-// UpdateStrategy handles PATCH requests to update an existing instance's FuturesConfig
-// and/or RiskConfig. Both are optional but at least one must be present. Supports merge
-// semantics (zero-valued fields in the request body do not clear existing values, with
-// the exception that an all-zero RiskConfig clears risk controls entirely). Triggers a
-// container restart if the instance is currently running so the new YAML/env vars take
-// effect immediately.
+// UpdateStrategy handles PATCH requests to update an existing instance's strategy
+// params (config), FuturesConfig, and/or RiskConfig. All three are optional but at
+// least one must be present. Config uses deep-merge semantics (nested maps recurse,
+// scalars in the patch overwrite); FuturesConfig and RiskConfig use field-level
+// merge semantics (zero-valued fields in the patch do not clear existing values,
+// with the exception that an all-zero RiskConfig clears risk controls entirely).
+// Triggers a container restart if the instance is currently running so the new
+// YAML/env vars take effect immediately.
+//
+// Symbol and strategy cannot be changed via the config patch: the deterministic
+// instance ID is computed from those fields (see pkg/instanceid), so mutating
+// them would orphan historical trades/orders under the old ID. Callers wanting
+// a different symbol or strategy must delete and recreate the instance.
 //
 // Restarts are serialized via api.starting: we explicitly clear any stale flag from a
 // prior in-flight start BEFORE stopping the container, then unconditionally spawn a
@@ -454,6 +497,7 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 	mode := modeFromQuery(r)
 
 	var req struct {
+		Config        map[string]any `json:"config"`
 		FuturesConfig *FuturesConfig `json:"futuresConfig"`
 		RiskConfig    *RiskConfig    `json:"riskConfig"`
 	}
@@ -461,8 +505,8 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.FuturesConfig == nil && req.RiskConfig == nil {
-		writeError(w, http.StatusBadRequest, "futuresConfig or riskConfig is required")
+	if len(req.Config) == 0 && req.FuturesConfig == nil && req.RiskConfig == nil {
+		writeError(w, http.StatusBadRequest, "config, futuresConfig, or riskConfig is required")
 		return
 	}
 	const maxLeverage = 125
@@ -523,6 +567,13 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inst := existing
+	if len(req.Config) > 0 {
+		inst, err = api.store.UpdateInstanceConfig(userID, existing.Mode, instanceID, req.Config, hasCredFn)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	if req.FuturesConfig != nil {
 		inst, err = api.store.UpdateInstanceFuturesConfig(userID, existing.Mode, instanceID, req.FuturesConfig, hasCredFn)
 		if err != nil {
@@ -541,6 +592,7 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 	// M2: store applies merge semantics — inst.FuturesConfig may differ from req.FuturesConfig.
 	merged := inst.FuturesConfig
 	mergedRisk := inst.RiskConfig
+	mergedConfig := inst.Config
 
 	if wasRunning {
 		// We already cleared the flag above and stopped the container. Spawn a fresh
@@ -552,15 +604,17 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, struct {
-		InstanceID    string         `json:"instance_id"`
-		UserID        string         `json:"user_id"`
-		Mode          string         `json:"mode"`
-		Status        string         `json:"status"`
-		FuturesConfig *FuturesConfig `json:"futuresConfig"`
-		RiskConfig    *RiskConfig    `json:"riskConfig"`
+		InstanceID    string          `json:"instance_id"`
+		UserID        string          `json:"user_id"`
+		Mode          string          `json:"mode"`
+		Status        string          `json:"status"`
+		Config        json.RawMessage `json:"config"`
+		FuturesConfig *FuturesConfig  `json:"futuresConfig"`
+		RiskConfig    *RiskConfig     `json:"riskConfig"`
 	}{
 		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 		Status:        map[bool]string{true: StatusStarting, false: StatusStopped}[wasRunning],
+		Config:        mergedConfig,
 		FuturesConfig: merged,
 		RiskConfig:    mergedRisk,
 	})
@@ -626,7 +680,8 @@ func (api *API) StartInstance(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "instance not found")
 		return
 	}
-	if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
+	status, reason := api.instanceEffectiveStatus(inst.UserID, inst.Mode, inst.InstanceID)
+	if status == StatusRunning {
 		writeJSON(w, http.StatusOK, instanceInfo{
 			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
@@ -634,13 +689,31 @@ func (api *API) StartInstance(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if api.isInstanceStarting(inst.InstanceID) {
+	if status == StatusStarting {
 		writeJSON(w, http.StatusAccepted, instanceInfo{
 			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
 			Name: inst.Name, Status: StatusStarting,
 		})
 		return
+	}
+	// StatusError or StatusStopped: force-stop the container so the start
+	// goroutine gets a clean slate. For StatusError (crashloop), Docker is
+	// still restarting the failed container in a tight loop — without this
+	// stop, CreateAndStartInstance's own StopInstance races against Docker's
+	// restart and the new container can fail to bind the name. For
+	// StatusStopped this is a cheap no-op.
+	if status == StatusError {
+		log.Printf("instance %s in error state, forcing restart (reason: %s)", inst.InstanceID, reason)
+		if err := api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID); err != nil {
+			log.Printf("force-stop errored instance %s: %v", inst.InstanceID, err)
+		}
+		// Clear stale error so the UI shows "starting" instead of lingering red
+		// while the new container comes up. captureAndMarkInstanceError will
+		// re-populate if the new container also fails.
+		if api.store != nil {
+			api.store.ClearInstanceError(inst.UserID, inst.Mode, inst.InstanceID)
+		}
 	}
 	writeJSON(w, http.StatusAccepted, instanceInfo{
 		InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
@@ -708,7 +781,6 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	runningSet := api.container.ListRunningInstanceContainers(userID)
 	var infos []instanceInfo
 	for i := range instances {
 		inst := &instances[i]
@@ -716,11 +788,27 @@ func (api *API) StartUser(w http.ResponseWriter, r *http.Request) {
 			InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 			Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Name: inst.Name,
 		}
-		if runningSet[api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] {
+		status, reason := api.instanceEffectiveStatus(inst.UserID, inst.Mode, inst.InstanceID)
+		switch status {
+		case StatusRunning:
 			info.Status = StatusRunning
-		} else if api.isInstanceStarting(inst.InstanceID) {
+		case StatusStarting:
 			info.Status = StatusStarting
-		} else {
+		case StatusError:
+			// Force-stop the crashlooping container so CreateAndStartInstance
+			// doesn't race with Docker's --restart=unless-stopped retry loop.
+			log.Printf("instance %s in error state during StartAll, forcing restart (reason: %s)", inst.InstanceID, reason)
+			if err := api.container.StopInstance(inst.UserID, inst.Mode, inst.InstanceID); err != nil {
+				log.Printf("force-stop errored instance %s: %v", inst.InstanceID, err)
+			}
+			if api.store != nil {
+				api.store.ClearInstanceError(inst.UserID, inst.Mode, inst.InstanceID)
+			}
+			info.Status = StatusStarting
+			if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
+				go api.startInstanceContainer(inst)
+			}
+		default:
 			info.Status = StatusStarting
 			if _, loaded := api.starting.LoadOrStore(inst.InstanceID, true); !loaded {
 				go api.startInstanceContainer(inst)
@@ -761,11 +849,20 @@ func (api *API) UserStatus(w http.ResponseWriter, r *http.Request) {
 				InstanceID: inst.InstanceID, UserID: inst.UserID, Mode: inst.Mode,
 				Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange,
 				Name: inst.Name, Status: StatusStopped,
+				LastError: inst.LastError, LastErrorAt: inst.LastErrorAt,
 			}
 			if api.isInstanceStarting(inst.InstanceID) {
 				info.Status = StatusStarting
 			} else if runningSet[api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] {
-				info.Status = StatusRunning
+				// Cheap crashloop check — see ListBots for the rationale.
+				if health, err := api.container.CheckInstanceHealth(inst.UserID, inst.Mode, inst.InstanceID); err == nil && health.Status == HealthStatusError {
+					info.Status = StatusError
+					if info.LastError == "" {
+						info.LastError = health.Reason
+					}
+				} else {
+					info.Status = StatusRunning
+				}
 			}
 			instances = append(instances, info)
 		}
@@ -778,6 +875,7 @@ func (api *API) startInstanceContainer(inst *StrategyInstance) {
 
 	if err := api.container.CreateAndStartInstance(inst); err != nil {
 		log.Printf("start instance %s for user %s failed: %v", inst.InstanceID, inst.UserID, err)
+		api.captureAndMarkInstanceError(inst, fmt.Sprintf("docker run failed: %v", err))
 		return
 	}
 
@@ -801,9 +899,16 @@ func (api *API) startInstanceContainer(inst *StrategyInstance) {
 	}
 	if !reachable {
 		log.Printf("instance %s container started but health check failed", inst.InstanceID)
+		api.captureAndMarkInstanceError(inst, "container started but bbgo /ping unreachable after 30s")
 		return
 	}
 	log.Printf("instance %s container started and healthy", inst.InstanceID)
+
+	// Container is healthy — clear any stale error from a previous crashloop
+	// so the frontend stops showing the old failure message.
+	if api.store != nil {
+		api.store.ClearInstanceError(inst.UserID, inst.Mode, inst.InstanceID)
+	}
 
 	if api.syncer != nil && inst.Mode != ModePaper {
 		go api.syncer.MarkCredentialsVerified(inst.UserID, inst.Mode, []StrategyEntry{{
@@ -829,6 +934,27 @@ func (api *API) startInstanceContainer(inst *StrategyInstance) {
 			time.Sleep(time.Second)
 		}
 	}()
+}
+
+// captureAndMarkInstanceError grabs the container's last N log lines, extracts
+// the logrus level=fatal / level=error line, and persists it to
+// strategy_instances.last_error so the frontend can show *why* the container
+// is failing. `fallback` is used when docker logs are unavailable (e.g.
+// `docker run` itself errored before any container existed).
+//
+// Strategy-agnostic: whatever made bbgo crash (grid2 spread-too-small,
+// bollmaker missing indicator, panic in any strategy, OOM, credential
+// failure) shows up as a logrus level=fatal line — we don't hardcode
+// strategy-specific keywords.
+func (api *API) captureAndMarkInstanceError(inst *StrategyInstance, fallback string) {
+	if api.store == nil {
+		return
+	}
+	captured := api.container.CaptureContainerError(inst.UserID, inst.Mode, inst.InstanceID)
+	if captured == "" {
+		captured = fallback
+	}
+	api.store.MarkInstanceError(inst.UserID, inst.Mode, inst.InstanceID, captured)
 }
 
 // --- Bot data endpoints ---
@@ -1727,16 +1853,33 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 	for _, m := range modes {
 		instances, _ := api.store.ListInstances(userID, m)
 		for _, inst := range instances {
-			bot := Bot{ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name}
+			bot := Bot{
+				ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol,
+				Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name,
+				LastError: inst.LastError, LastErrorAt: inst.LastErrorAt,
+			}
 			if api.isInstanceStarting(inst.InstanceID) {
 				bot.ContainerStatus = StatusStarting
 			} else {
 				name := api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
-				if runningSet[name] {
-					bot.ContainerStatus = StatusRunning
-					bot.ContainerName = name
-				} else {
+				if !runningSet[name] {
 					bot.ContainerStatus = StatusStopped
+				} else {
+					// Docker reports the container as running, but with
+					// --restart=unless-stopped a crashlooping bbgo process
+					// still shows up in `docker ps`. Cheap second check via
+					// docker inspect detects crashloop (high RestartCount +
+					// non-zero ExitCode) so we can mark it as error instead
+					// of reporting a phantom-active container.
+					bot.ContainerName = name
+					if health, err := api.container.CheckInstanceHealth(inst.UserID, inst.Mode, inst.InstanceID); err == nil && health.Status == HealthStatusError {
+						bot.ContainerStatus = StatusError
+						if bot.LastError == "" {
+							bot.LastError = health.Reason
+						}
+					} else {
+						bot.ContainerStatus = StatusRunning
+					}
 				}
 			}
 			bots = append(bots, bot)
@@ -1757,12 +1900,16 @@ func (api *API) GetBot(w http.ResponseWriter, r *http.Request) {
 	for _, mode := range []string{ModeLive, ModePaper} {
 		inst, err := api.store.GetInstance(userID, mode, botID)
 		if err == nil {
-			bot := Bot{ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol, Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name}
-			if api.isInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID) {
-				bot.ContainerStatus = StatusRunning
-				bot.ContainerName = api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
-			} else {
-				bot.ContainerStatus = StatusStopped
+			bot := Bot{
+				ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol,
+				Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name,
+				LastError: inst.LastError, LastErrorAt: inst.LastErrorAt,
+			}
+			status, reason := api.instanceEffectiveStatus(inst.UserID, inst.Mode, inst.InstanceID)
+			bot.ContainerStatus = status
+			bot.ContainerName = api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			if status == StatusError && bot.LastError == "" && reason != "" {
+				bot.LastError = reason
 			}
 			writeJSON(w, http.StatusOK, bot)
 			return

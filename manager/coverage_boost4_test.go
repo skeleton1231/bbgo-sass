@@ -214,6 +214,9 @@ func TestAPI_StartInstance_AlreadyRunning(t *testing.T) {
 	api.store = store
 	api.container.store = store
 	api.container.checkRunningFn = func(string) (bool, error) { return true, nil }
+	api.container.checkHealthFn = func(string) (ContainerHealth, error) {
+		return ContainerHealth{Status: HealthStatusRunning, Running: true}, nil
+	}
 
 	inst := createTestInstance(t, store, testUUID, "live", "grid2", "BTCUSDT", map[string]any{"gridNumber": 5})
 

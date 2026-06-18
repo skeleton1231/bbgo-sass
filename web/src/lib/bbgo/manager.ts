@@ -78,6 +78,8 @@ export interface Bot {
   container_status: 'running' | 'stopped' | 'error' | 'starting'
   container_name?: string
   mode: 'live' | 'paper'
+  last_error?: string
+  last_error_at?: string
 }
 
 export interface BotListResponse {
@@ -311,6 +313,7 @@ export interface RiskConfigPayload {
 }
 
 export function updateStrategy(userId: string, strategyId: string, data: {
+  config?: Record<string, unknown>
   futuresConfig?: { leverage?: number; marginType?: 'cross' | 'isolated' }
   riskConfig?: RiskConfigPayload
 }) {
@@ -319,6 +322,7 @@ export function updateStrategy(userId: string, strategyId: string, data: {
     user_id: string
     mode: string
     status: string
+    config?: Record<string, unknown> | null
     futuresConfig?: { leverage?: number; marginType?: string }
     riskConfig?: RiskConfigPayload
   }>(`/users/${userId}/strategies/${strategyId}`, {

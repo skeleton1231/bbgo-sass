@@ -5,13 +5,22 @@ import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Play, Square, Trash2, Bot as BotIcon } from 'lucide-react'
+import { Plus, Play, Square, Trash2, Bot as BotIcon, AlertCircle } from 'lucide-react'
 import { useUserId } from '@/components/providers/user-id'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { useBotList, useStartInstance, useStopInstance, useDeleteStrategy } from '@/lib/bbgo/queries'
+import type { Bot } from '@/lib/bbgo/manager'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { CreateStrategyDialog } from '@/components/user/CreateStrategyDialog'
 
 export default function BotsPage() {
@@ -89,6 +98,7 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
   const { data: botsResp, isLoading, isError } = useBotList(userId, mode)
   const startInstance = useStartInstance()
   const stopInstance = useStopInstance()
+  const [errorDialogBot, setErrorDialogBot] = useState<Bot | null>(null)
 
   if (isError) {
     return (
@@ -133,23 +143,37 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
         const isRunning = status === 'running'
         const symbol = bot.symbol || (bot.config?.symbol as string) || ''
         const exchange = bot.exchange
+        const title = bot.name?.trim() || bot.strategy
+        const errorMsg = bot.last_error?.trim() || ''
 
         return (
           <div key={bot.id} className="flex items-center justify-between rounded-lg border bg-card p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
                 <BotIcon className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">{bot.strategy}</p>
-                  <Badge variant="outline" className="rounded-full text-[10px]">
+                  <p className="font-medium truncate" title={title}>{title}</p>
+                  <Badge variant="outline" className="rounded-full text-[10px] shrink-0">
                     {t(`mode.${bot.mode}`)}
                   </Badge>
+                  <span className="text-[10px] font-mono text-muted-foreground/70 shrink-0">{bot.strategy}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {exchange}{symbol ? ` · ${symbol}` : ''} · {bot.strategy}
+                <p className="text-sm text-muted-foreground truncate">
+                  {exchange}{symbol ? ` · ${symbol}` : ''}{bot.name?.trim() ? ` · ${bot.strategy}` : ''}
                 </p>
+                {status === 'error' && errorMsg && (
+                  <button
+                    type="button"
+                    onClick={() => setErrorDialogBot(bot)}
+                    className="mt-1 inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-0.5 text-xs text-destructive hover:bg-destructive/20"
+                  >
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span className="truncate max-w-[280px]">{errorMsg}</span>
+                    <span className="shrink-0 underline-offset-2 hover:underline">{t('errorDetails')}</span>
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -209,6 +233,24 @@ function BotListView({ userId, mode, onDelete, deleteDisabled }: {
           </div>
         )
       })}
+      <Dialog open={!!errorDialogBot} onOpenChange={(open) => !open && setErrorDialogBot(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              {t('errorDialogTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('errorDialogDescription', { name: errorDialogBot?.name?.trim() || errorDialogBot?.strategy || errorDialogBot?.id || '' })}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] rounded-md border bg-muted/30 p-3">
+            <pre className="whitespace-pre-wrap break-all font-mono text-xs text-destructive">
+              {errorDialogBot?.last_error}
+            </pre>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -100,6 +100,9 @@
     "maker": "Maker",
     "locked": "{amount} locked",
     "errorBanner": "Container encountered an error. Try restarting it.",
+    "errorDetails": "View Details",
+    "errorDialogTitle": "Container Error",
+    "errorDialogDescription": "Last captured failure for {name}",
     "stoppedBanner": "Container is stopped. Start it to see live trading data.",
     "noBalances": "No non-zero balances",
     "startToSeeData": "Start the container to see live data",
@@ -378,7 +381,13 @@
   },
   "Common": {
     "pageNotFound": "This page could not be found.",
-    "goHome": "Go Home"
+    "goHome": "Go Home",
+    "pagination": {
+      "range": "{from}-{to} of {total}",
+      "prev": "Previous",
+      "next": "Next",
+      "page": "page"
+    }
   },
   "Categories": {
     "grid": "Grid",

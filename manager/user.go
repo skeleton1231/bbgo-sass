@@ -217,6 +217,14 @@ type syncConfig struct {
 	UserDataStream *syncUserDataStreamConfig `yaml:"userDataStream"`
 }
 
+type persistenceConfig struct {
+	Json *jsonPersistenceConfig `yaml:"json,omitempty"`
+}
+
+type jsonPersistenceConfig struct {
+	Directory string `yaml:"directory"`
+}
+
 type bbgoConfig struct {
 	InstanceID              string                    `yaml:"instanceId,omitempty"`
 	Database                *databaseConfig           `yaml:"database,omitempty"`
@@ -224,6 +232,7 @@ type bbgoConfig struct {
 	Exchange                map[string]exchangeConfig `yaml:"exchange"`
 	Environment             *environmentConfig        `yaml:"environment,omitempty"`
 	Sync                    *syncConfig               `yaml:"sync,omitempty"`
+	Persistence             *persistenceConfig        `yaml:"persistence,omitempty"`
 	ExchangeStrategies      []map[string]any          `yaml:"exchangeStrategies,omitempty"`
 	CrossExchangeStrategies []map[string]any          `yaml:"crossExchangeStrategies,omitempty"`
 }

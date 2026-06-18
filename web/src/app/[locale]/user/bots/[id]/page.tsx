@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -20,6 +20,9 @@ import {
 import {
   useSupabaseTrades,
   useSupabaseClosedOrders,
+  useSupabaseClosedOrdersPaged,
+  useSupabaseTradesPaged,
+  useSupabaseProfitsPaged,
   useSupabasePnLFromProfits,
   useSupabaseLatestPositions,
   useUnrealizedPnL,
@@ -36,6 +39,7 @@ import { useUserId } from '@/components/providers/user-id'
 import { OrderRow } from '@/components/user/OrderRow'
 import { useMarketData } from '@/lib/bbgo/useWebSocket'
 import { useKlineData } from '@/hooks/useKlineData'
+import { usePagination } from '@/hooks/usePagination'
 import { useTradingMode } from '@/components/providers/trading-mode'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -45,7 +49,16 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PaginationControls } from '@/components/ui/pagination'
 import type { TradeMarker, OrderLevel, GridLine } from '@/components/chart/CandlestickChart'
 import { BotChartPanel } from '@/components/chart/BotChartPanel'
 import { TradeRow } from '@/components/user/TradeRow'
@@ -53,9 +66,8 @@ import { PositionCard } from '@/components/user/PositionCard'
 import { LeverageEditor } from '@/components/user/LeverageEditor'
 import { useStrategyRegistry } from '@/components/providers/strategy-registry'
 import { getStrategySchema } from '@/lib/bbgo/strategies'
-import { extractGridLines, extractStrategyDetails } from '@/lib/bbgo/strategy-state'
+import { extractGridLines } from '@/lib/bbgo/strategy-state'
 import { buildTradeMarkers, buildOrderLevels } from '@/lib/bbgo/trade-markers'
-import { computePositionTags, computeFuturesPositionTags } from '@/lib/bbgo/position-tags'
 import { computeSMA, computeEMA, computeBollingerBands, DEFAULT_INDICATORS, type IndicatorConfig } from '@/lib/bbgo/indicators'
 
 import {
@@ -135,6 +147,38 @@ export default function BotDetailPage() {
   const { data: closedOrdersData } = useSupabaseClosedOrders(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
   const { data: tradesData } = useSupabaseTrades(userId, { symbol: symbol || undefined, mode, strategyInstanceId: botId })
 
+  // Pagination state for the three list tabs. Each tab owns its own pager so
+  // switching tabs doesn't reset another tab's position. The pager owns total
+  // internally and is fed by the query result via setTotal in the effects below.
+  const closedOrdersPager = usePagination({ initialPageSize: 50 })
+  const tradesPager = usePagination({ initialPageSize: 50 })
+  const profitsPager = usePagination({ initialPageSize: 50 })
+
+  // Paginated rows for the list tabs. The non-paged hooks above still feed
+  // chart markers and the tradeOrderIds filter — they intentionally keep a
+  // small limit because charts don't benefit from 50k markers.
+  const closedOrdersPaged = useSupabaseClosedOrdersPaged(userId, {
+    symbol: symbol || undefined, mode, strategyInstanceId: botId,
+    page: closedOrdersPager.page, pageSize: closedOrdersPager.pageSize,
+  })
+  const tradesPaged = useSupabaseTradesPaged(userId, {
+    symbol: symbol || undefined, mode, strategyInstanceId: botId,
+    page: tradesPager.page, pageSize: tradesPager.pageSize,
+  })
+  const profitsPaged = useSupabaseProfitsPaged(userId, {
+    symbol: symbol || undefined, mode, strategyInstanceId: botId,
+    page: profitsPager.page, pageSize: profitsPager.pageSize,
+  })
+
+  // Push server counts into the pagers so totalPages + Next/Prev stay accurate.
+  const { setTotal: setClosedOrdersTotal } = closedOrdersPager
+  const { setTotal: setTradesTotal } = tradesPager
+  const { setTotal: setProfitsTotal } = profitsPager
+  useEffect(() => { setClosedOrdersTotal(closedOrdersPaged.data?.total ?? 0) }, [closedOrdersPaged.data?.total, setClosedOrdersTotal])
+  useEffect(() => { setTradesTotal(tradesPaged.data?.total ?? 0) }, [tradesPaged.data?.total, setTradesTotal])
+  useEffect(() => { setProfitsTotal(profitsPaged.data?.total ?? 0) }, [profitsPaged.data?.total, setProfitsTotal])
+
+
   // Balances: Supabase-native (works when container is down)
   const { data: supabaseBalances } = useSupabaseBalances(userId, { mode, strategyInstanceId: botId })
   const balancesData = { balances: supabaseBalances ?? {} }
@@ -144,19 +188,21 @@ export default function BotDetailPage() {
   // refetch cycle on a payload-heavy endpoint that only one tab consumes.
   const { data: logsData } = useContainerLogs(userId, '100', mode, isRunning && activeTab === 'logs')
 
-  // Supabase Realtime: invalidate queries on INSERT instead of polling
+  // Supabase Realtime: invalidate queries on INSERT instead of polling.
+  // The paged variants are invalidated alongside their non-paged siblings so
+  // new rows show up on the active page and `total` stays fresh.
   const rtOpts = useMemo(() => ({ mode, enabled: isRunning }), [mode, isRunning])
-  useRealtimeTable('trades', userId, [['supabase-trades', userId]], rtOpts)
-  useRealtimeTable('orders', userId, [['supabase-closed-orders', userId], ['supabase-open-orders', userId]], rtOpts)
+  useRealtimeTable('trades', userId, [['supabase-trades', userId], ['supabase-trades-paged', userId]], rtOpts)
+  useRealtimeTable('orders', userId, [['supabase-closed-orders', userId], ['supabase-closed-orders-paged', userId], ['supabase-open-orders', userId]], rtOpts)
   useRealtimeTable('positions', userId, [['supabase-positions', userId], ['supabase-latest-positions', userId]], rtOpts)
-  useRealtimeTable('profits', userId, [['supabase-profits', userId], ['supabase-pnl-profits', userId]], rtOpts)
+  useRealtimeTable('profits', userId, [['supabase-profits', userId], ['supabase-pnl-profits', userId], ['supabase-profits-paged', userId]], rtOpts)
   // Balance realtime: invalidate on balance changes (for paper_balances table)
   useRealtimeTable('balances', userId, [['supabase-balances', userId]], rtOpts)
 
-  // Primary PnL from profits table (bbgo average-cost method)
-  // Also exposes the underlying profit rows so the close-history tab can
-  // reuse them instead of issuing a second useSupabaseProfits query.
-  const { data: pnlAgg, profitRows } = useSupabasePnLFromProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
+  // Primary PnL from profits table (bbgo average-cost method).
+  // Close-history tab uses its own paginated query (profitsPaged) for display,
+  // so we don't need the underlying profitRows here.
+  const { data: pnlAgg } = useSupabasePnLFromProfits(userId, { symbol: symbol || undefined, strategyInstanceId: botId, mode })
   // Fallback PnL from trades (FIFO) — only fetched when profits table has
   // resolved AND is empty. Saves a 5000-trade ASC query on every bot that
   // already has profits data.
@@ -171,9 +217,11 @@ export default function BotDetailPage() {
 
   const activeExchange = sessions.find((s) => s.name === activeSession)?.exchange ?? exchange
   const activeExchangeRef = useRef(activeExchange)
-  activeExchangeRef.current = activeExchange
   const exchangeRef = useRef(exchange)
-  exchangeRef.current = exchange
+  useEffect(() => {
+    activeExchangeRef.current = activeExchange
+    exchangeRef.current = exchange
+  }, [activeExchange, exchange])
 
   const { candles, isLoading: klinesLoading, loadEarlierKlines } = useKlineData({
     userId,
@@ -219,7 +267,7 @@ export default function BotDetailPage() {
 
   const strategyMatch = useCallback(
     (strategyInstanceId: string | undefined) => !!bot && strategyInstanceId === bot.id,
-    [bot?.id]
+    [bot]
   )
 
   const tradeOrderIds = useMemo(() => {
@@ -269,7 +317,7 @@ export default function BotDetailPage() {
       const inner = s[strategy] as Record<string, unknown> | undefined
       return inner?.symbol === symbol || (!symbol && inner?.symbol)
     })
-  }, [bot?.strategy, bot?.config?.lowerPrice, bot?.config?.upperPrice, symbol])
+  }, [bot, symbol])
 
   const gridLines: GridLine[] = useMemo(() => {
     if (!strategyStatesData?.strategies) return []
@@ -330,13 +378,6 @@ export default function BotDetailPage() {
     }
   }, [pnl?.pnlCurve, pnlLegacy?.pnlCurve, t])
 
-  const strategyStats = useMemo(() => {
-    if (!strategyStatesData?.strategies) return null
-    const matching = findMatchingStrategy(strategyStatesData.strategies as Record<string, unknown>[])
-    if (!matching) return null
-    return extractStrategyDetails(matching as Record<string, unknown>)
-  }, [strategyStatesData, findMatchingStrategy])
-
   interface DepthMessage {
     type: string
     data: {
@@ -392,18 +433,6 @@ export default function BotDetailPage() {
   const startInstance = useStartInstance()
   const stopInstance = useStopInstance()
 
-  // Inject running net position into each trade. position-tags.ts walks the
-  // sequence chronologically (tradedAt ASC, same-timestamp reversed to match
-  // gid DESC insertion order) and returns netPos per index aligned to the
-  // input array — so the desc-ordered tradesData stays in display order.
-  const trades = useMemo(() => {
-    const raw = tradesData ?? []
-    if (raw.length === 0) return raw
-    const tags = isFutures
-      ? computeFuturesPositionTags(raw)
-      : computePositionTags(raw)
-    return raw.map((t, i) => ({ ...t, netPosition: tags[i]?.netPos ?? 0 }))
-  }, [tradesData, isFutures])
   // Derived PnL values for display
   const netProfit = pnl?.totalNetProfit ?? pnlLegacy?.totalRealizedPnl ?? 0
   const unrealizedPnl = futuresUnrealized ?? unrealized?.unrealizedPnl ?? pnlLegacy?.totalUnrealizedPnl ?? 0
@@ -456,10 +485,40 @@ export default function BotDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             {t('backToBots')}
           </button>
-          <h1 className="text-2xl font-semibold tracking-tight truncate">{bot.strategy}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight truncate">{bot.name?.trim() || bot.strategy}</h1>
           <p className="text-sm text-muted-foreground">
             {exchange}{symbol ? ` · ${symbol}` : ''} · {bot.strategy} · {t(`mode.${mode}`)}
           </p>
+          {bot.container_status === 'error' && bot.last_error?.trim() && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="mt-2 inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-1 text-sm text-destructive hover:bg-destructive/20"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span className="truncate max-w-[400px]">{bot.last_error}</span>
+                  <span className="shrink-0 underline-offset-2 hover:underline">{t('errorDetails')}</span>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-destructive">
+                    <AlertCircle className="h-5 w-5" />
+                    {t('errorDialogTitle')}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t('errorDialogDescription', { name: bot.name?.trim() || bot.strategy })}
+                  </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh] rounded-md border bg-muted/30 p-3">
+                  <pre className="whitespace-pre-wrap break-all font-mono text-xs text-destructive">
+                    {bot.last_error}
+                  </pre>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -662,10 +721,10 @@ export default function BotDetailPage() {
           <TabsTrigger value="depth" className="rounded-md text-xs">{t('depth')}</TabsTrigger>
           <TabsTrigger value="balances" className="rounded-md text-xs">{t('balances')}</TabsTrigger>
           <TabsTrigger value="open-orders" className="rounded-md text-xs">{t('openOrders')} ({openOrders.length})</TabsTrigger>
-          <TabsTrigger value="closed-orders" className="rounded-md text-xs">{t('closedOrders')} ({closedOrders.length})</TabsTrigger>
-          <TabsTrigger value="trades" className="rounded-md text-xs">{t('recentTrades')}</TabsTrigger>
-          {(profitRows?.length ?? 0) > 0 && (
-            <TabsTrigger value="close-history" className="rounded-md text-xs">{t('pnl.closeHistory')}</TabsTrigger>
+          <TabsTrigger value="closed-orders" className="rounded-md text-xs">{t('closedOrders')} ({closedOrdersPager.total})</TabsTrigger>
+          <TabsTrigger value="trades" className="rounded-md text-xs">{t('recentTrades')} ({tradesPager.total})</TabsTrigger>
+          {profitsPager.total > 0 && (
+            <TabsTrigger value="close-history" className="rounded-md text-xs">{t('pnl.closeHistory')} ({profitsPager.total})</TabsTrigger>
           )}
           <TabsTrigger value="strategies" className="rounded-md text-xs">{t('strategies')}</TabsTrigger>
           {isRunning && <TabsTrigger value="logs" className="rounded-md text-xs">{t('containerLogs')}</TabsTrigger>}
@@ -684,7 +743,6 @@ export default function BotDetailPage() {
             pnlLine={pnlLine}
             klinesLoading={klinesLoading}
             loadEarlierKlines={loadEarlierKlines}
-            strategyStats={strategyStats}
             currentPrice={currentPrice}
             unrealizedPnlFromReport={unrealizedPnl}
             noSymbolText={t('noSymbolForChart')}
@@ -705,7 +763,6 @@ export default function BotDetailPage() {
                 direction: parseFloat(futuresRisk.position_amount) > 0 ? 'long' as const : parseFloat(futuresRisk.position_amount) < 0 ? 'short' as const : 'flat' as const,
               } : {}),
             } : undefined}
-            unrealizedPnlPct={unrealized?.unrealizedPnlPct}
           />
         </TabsContent>
 
@@ -767,17 +824,30 @@ export default function BotDetailPage() {
 
         <TabsContent value="closed-orders">
           <Card className="rounded-xl">
-            {closedOrders.length > 0 ? (
-              <ScrollArea className="max-h-[400px]">
-                <div className="divide-y">
-                  {closedOrders.map((order: BBGoOrder) => (
-                    <OrderRow key={orderKey(order)} order={order} showStatus showTime />
-                  ))}
-                </div>
-              </ScrollArea>
+            {(closedOrdersPaged.data?.rows?.length ?? 0) > 0 ? (
+              <>
+                <ScrollArea className="max-h-[400px]">
+                  <div className="divide-y">
+                    {closedOrdersPaged.data!.rows.map((order: BBGoOrder) => (
+                      <OrderRow key={orderKey(order)} order={order} showStatus showTime />
+                    ))}
+                  </div>
+                </ScrollArea>
+                <PaginationControls
+                  page={closedOrdersPager.page}
+                  pageSize={closedOrdersPager.pageSize}
+                  total={closedOrdersPager.total}
+                  totalPages={closedOrdersPager.totalPages}
+                  onPageChange={closedOrdersPager.setPage}
+                  onPageSizeChange={closedOrdersPager.setPageSize}
+                  loading={closedOrdersPaged.isFetching}
+                />
+              </>
             ) : (
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                {isRunning ? t('noClosedOrders') : t('startToSeeData')}
+                {closedOrdersPaged.isLoading
+                  ? t('loading')
+                  : (isRunning ? t('noClosedOrders') : t('startToSeeData'))}
               </CardContent>
             )}
           </Card>
@@ -785,71 +855,95 @@ export default function BotDetailPage() {
 
         <TabsContent value="trades">
           <Card className="rounded-xl">
-            {trades.length > 0 ? (
-              <ScrollArea className="max-h-[400px]">
-                <div className="divide-y">
-                  {trades.map((trade: BBGoTrade) => (
-                    <TradeRow
-                      key={tradeKey(trade)}
-                      trade={trade}
-                      netPosition={trade.netPosition ?? 0}
-                      isFutures={isFutures}
-                    />
-                  ))}
-                </div>
-              </ScrollArea>
+            {(tradesPaged.data?.rows?.length ?? 0) > 0 ? (
+              <>
+                <ScrollArea className="max-h-[400px]">
+                  <div className="divide-y">
+                    {tradesPaged.data!.rows.map((trade: BBGoTrade) => (
+                      <TradeRow
+                        key={tradeKey(trade)}
+                        trade={trade}
+                        netPosition={trade.netPosition ?? 0}
+                        isFutures={isFutures}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+                <PaginationControls
+                  page={tradesPager.page}
+                  pageSize={tradesPager.pageSize}
+                  total={tradesPager.total}
+                  totalPages={tradesPager.totalPages}
+                  onPageChange={tradesPager.setPage}
+                  onPageSizeChange={tradesPager.setPageSize}
+                  loading={tradesPaged.isFetching}
+                />
+              </>
             ) : (
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                {isRunning ? t('noTrades') : t('startToSeeData')}
+                {tradesPaged.isLoading
+                  ? t('loading')
+                  : (isRunning ? t('noTrades') : t('startToSeeData'))}
               </CardContent>
             )}
           </Card>
         </TabsContent>
 
-        {/* Close History — from profits table (bbgo pre-computed) */}
+        {/* Close History — paginated from profits table (bbgo pre-computed) */}
         <TabsContent value="close-history">
           <Card className="rounded-xl">
-            {(profitRows?.length ?? 0) > 0 ? (
-              <ScrollArea className="max-h-[400px]">
-                <div className="divide-y">
-                  {profitRows!.map((row) => {
-                    const profit = parseFloat(row.profit ?? '0')
-                    const netProfitVal = parseFloat(row.net_profit ?? '0')
-                    const profitMargin = parseFloat(row.profit_margin ?? '0')
-                    return (
-                      <div key={row.id} className="flex items-center justify-between px-6 py-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={cn(
-                            'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
-                            netProfitVal >= 0 ? 'bg-trade-up/10 text-trade-up' : 'bg-trade-down/10 text-trade-down'
-                          )}>
-                            {netProfitVal >= 0 ? 'W' : 'L'}
-                          </div>
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">{row.symbol}</span>
-                              <span className="text-xs text-muted-foreground">{row.strategy}</span>
+            {(profitsPaged.data?.rows?.length ?? 0) > 0 ? (
+              <>
+                <ScrollArea className="max-h-[400px]">
+                  <div className="divide-y">
+                    {profitsPaged.data!.rows.map((row) => {
+                      const profit = parseFloat(row.profit ?? '0')
+                      const netProfitVal = parseFloat(row.net_profit ?? '0')
+                      const profitMargin = parseFloat(row.profit_margin ?? '0')
+                      return (
+                        <div key={row.id} className="flex items-center justify-between px-6 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={cn(
+                              'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
+                              netProfitVal >= 0 ? 'bg-trade-up/10 text-trade-up' : 'bg-trade-down/10 text-trade-down'
+                            )}>
+                              {netProfitVal >= 0 ? 'W' : 'L'}
                             </div>
-                            <span className="text-xs text-muted-foreground tabular-nums">{row.traded_at ? new Date(row.traded_at).toLocaleString() : ''}</span>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{row.symbol}</span>
+                                <span className="text-xs text-muted-foreground">{row.strategy}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground tabular-nums">{row.traded_at ? new Date(row.traded_at).toLocaleString() : ''}</span>
+                            </div>
+                          </div>
+                          <div className="text-right space-y-0.5 shrink-0">
+                            <p className={cn('text-sm font-mono font-medium', pnlColor(netProfitVal))}>
+                              {pnlSign(netProfitVal)}{netProfitVal.toFixed(4)}
+                            </p>
+                            <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
+                              <span>{t('pnl.profitMargin')}: {profitMargin.toFixed(2)}%</span>
+                              <span>{t('pnl.realized')}: {pnlSign(profit)}{profit.toFixed(4)}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right space-y-0.5 shrink-0">
-                          <p className={cn('text-sm font-mono font-medium', pnlColor(netProfitVal))}>
-                            {pnlSign(netProfitVal)}{netProfitVal.toFixed(4)}
-                          </p>
-                          <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-                            <span>{t('pnl.profitMargin')}: {profitMargin.toFixed(2)}%</span>
-                            <span>{t('pnl.realized')}: {pnlSign(profit)}{profit.toFixed(4)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </ScrollArea>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+                <PaginationControls
+                  page={profitsPager.page}
+                  pageSize={profitsPager.pageSize}
+                  total={profitsPager.total}
+                  totalPages={profitsPager.totalPages}
+                  onPageChange={profitsPager.setPage}
+                  onPageSizeChange={profitsPager.setPageSize}
+                  loading={profitsPaged.isFetching}
+                />
+              </>
             ) : (
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                {t('pnl.noData')}
+                {profitsPaged.isLoading ? t('loading') : t('pnl.noData')}
               </CardContent>
             )}
           </Card>

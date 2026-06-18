@@ -106,16 +106,24 @@ func (s *InstanceStore) UpdateInstanceFuturesConfig(userID, mode, instanceID str
 	}
 	inst.FuturesConfig = mergeFuturesConfig(inst.FuturesConfig, fc)
 
+	if err := s.writeInstanceYAML(inst, hasCredentials); err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// writeInstanceYAML regenerates bbgo.yaml from inst and upserts the row to
+// Supabase. Callers hold s.mu and have already mutated inst in place.
+func (s *InstanceStore) writeInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool) error {
 	yamlContent, err := buildInstanceYAML(inst, hasCredentials, s.registry)
 	if err != nil {
-		return nil, fmt.Errorf("rebuild yaml: %w", err)
+		return fmt.Errorf("rebuild yaml: %w", err)
 	}
-	if err := os.WriteFile(s.yamlPath(userID, mode, instanceID), yamlContent, 0o644); err != nil {
-		return nil, fmt.Errorf("write yaml: %w", err)
+	if err := os.WriteFile(s.yamlPath(inst.UserID, inst.Mode, inst.InstanceID), yamlContent, 0o644); err != nil {
+		return fmt.Errorf("write yaml: %w", err)
 	}
-
 	s.upsertToSupabase(inst)
-	return inst, nil
+	return nil
 }
 
 // mergeFuturesConfig applies PATCH-style merge semantics: zero-valued fields in
@@ -153,15 +161,9 @@ func (s *InstanceStore) UpdateInstanceRiskConfig(userID, mode, instanceID string
 	}
 	inst.RiskConfig = mergeRiskConfig(inst.RiskConfig, rc)
 
-	yamlContent, err := buildInstanceYAML(inst, hasCredentials, s.registry)
-	if err != nil {
-		return nil, fmt.Errorf("rebuild yaml: %w", err)
+	if err := s.writeInstanceYAML(inst, hasCredentials); err != nil {
+		return nil, err
 	}
-	if err := os.WriteFile(s.yamlPath(userID, mode, instanceID), yamlContent, 0o644); err != nil {
-		return nil, fmt.Errorf("write yaml: %w", err)
-	}
-
-	s.upsertToSupabase(inst)
 	return inst, nil
 }
 
@@ -206,6 +208,54 @@ func mergeRiskConfig(base, patch *RiskConfig) *RiskConfig {
 	return out
 }
 
+// UpdateInstanceConfig deep-merges a patch over the instance's strategy params
+// JSON, regenerates bbgo.yaml on disk, and upserts the row to Supabase.
+// Caller is responsible for restarting the container if it is currently
+// running.
+//
+// Symbol and strategy cannot be changed via this path: the deterministic
+// instance ID is computed from those fields (see pkg/instanceid), so mutating
+// them would orphan historical trades/orders under the old ID and break data
+// isolation. Callers wanting a different symbol or strategy must delete and
+// recreate the instance.
+func (s *InstanceStore) UpdateInstanceConfig(userID, mode, instanceID string, patch map[string]any, hasCredentials func(string) bool) (*StrategyInstance, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	inst, err := s.getFromDisk(userID, mode, instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("instance %s not found: %w", instanceID, err)
+	}
+
+	if v, ok := patch["symbol"].(string); ok && v != "" && v != inst.Symbol {
+		return nil, fmt.Errorf("cannot change symbol via patch (got %q, have %q): delete and recreate the instance", v, inst.Symbol)
+	}
+	if v, ok := patch["strategy"].(string); ok && v != "" && v != inst.Strategy {
+		return nil, fmt.Errorf("cannot change strategy via patch (got %q, have %q): delete and recreate the instance", v, inst.Strategy)
+	}
+
+	var base map[string]any
+	if len(inst.Config) > 0 && string(inst.Config) != "null" {
+		if err := json.Unmarshal(inst.Config, &base); err != nil {
+			return nil, fmt.Errorf("parse existing config: %w", err)
+		}
+	}
+	if base == nil {
+		base = map[string]any{}
+	}
+	merged := deepMerge(base, patch)
+	b, err := json.Marshal(merged)
+	if err != nil {
+		return nil, fmt.Errorf("encode merged config: %w", err)
+	}
+	inst.Config = b
+
+	if err := s.writeInstanceYAML(inst, hasCredentials); err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
 // alignConfigLeverage mirrors FuturesConfig.Leverage into the strategy params
 // JSON so the stored config matches what the runtime actually applies. Without
 // this, the DB row keeps the user's pre-sync value (e.g. leverage=1) while
@@ -237,6 +287,54 @@ func (s *InstanceStore) RemoveInstance(userID, mode, instanceID string) error {
 
 	s.deleteFromSupabase(userID, mode, instanceID)
 	return err
+}
+
+// MarkInstanceError records the captured error message and timestamp on the
+// strategy_instances row so the frontend can surface why a container is
+// crashlooping instead of reporting a phantom-active container. No-op when
+// Supabase is unavailable — the captured error is best-effort, not critical.
+func (s *InstanceStore) MarkInstanceError(userID, mode, instanceID, errMsg string) {
+	if s.sb == nil {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	update := map[string]string{
+		"last_error":    errMsg,
+		"last_error_at": now,
+		"updated_at":    now,
+	}
+	_, _, err := s.sb.client.From("strategy_instances").
+		Update(update, "", "").
+		Eq("user_id", userID).
+		Eq("mode", mode).
+		Eq("instance_id", instanceID).
+		Execute()
+	if err != nil {
+		log.Printf("mark instance %s error to supabase: %v\n", instanceID, err)
+	}
+}
+
+// ClearInstanceError nulls out last_error / last_error_at after a successful
+// start so a previously-crashlooping instance is shown as healthy again.
+func (s *InstanceStore) ClearInstanceError(userID, mode, instanceID string) {
+	if s.sb == nil {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	update := map[string]string{
+		"last_error":    "",
+		"last_error_at": "",
+		"updated_at":    now,
+	}
+	_, _, err := s.sb.client.From("strategy_instances").
+		Update(update, "", "").
+		Eq("user_id", userID).
+		Eq("mode", mode).
+		Eq("instance_id", instanceID).
+		Execute()
+	if err != nil {
+		log.Printf("clear instance %s error in supabase: %v\n", instanceID, err)
+	}
 }
 
 // GetInstance returns a single instance. Prefers Supabase when available.
@@ -548,7 +646,16 @@ func rowToInstance(r PublicStrategyInstancesSelect) StrategyInstance {
 		Sessions:      sessions,
 		FuturesConfig: futuresConfig,
 		RiskConfig:    riskConfig,
+		LastError:     derefStr(r.LastError),
+		LastErrorAt:   derefStr(r.LastErrorAt),
 	}
+}
+
+func derefStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // parseInstanceYAML extracts a StrategyInstance from a single-strategy bbgo.yaml.
@@ -784,6 +891,11 @@ func buildInstanceYAML(inst *StrategyInstance, hasCredentials func(string) bool,
 				FilledOrders:                true,
 				FuturesPosition:             anyFutures,
 				FuturesPositionSyncInterval: "30s",
+			},
+		},
+		Persistence: &persistenceConfig{
+			Json: &jsonPersistenceConfig{
+				Directory: filepath.Join(ContainerDir(inst.UserID, inst.Mode, inst.InstanceID), "persistence"),
 			},
 		},
 		ExchangeStrategies:      exchangeStrategies,

@@ -39,6 +39,8 @@ type ContainerManager struct {
 	dockerFn         func(args ...string) (string, error)
 	listRunningFn    func(userID string) map[string]bool
 	listAllRunningFn func() map[string]bool
+	checkHealthFn    func(containerName string) (ContainerHealth, error)
+	captureErrorFn   func(containerName string) string
 
 	proxyEnvFileOnce sync.Once
 	proxyEnvFilePath string
@@ -359,6 +361,7 @@ func (cm *ContainerManager) instanceEnvArgs(inst *StrategyInstance) []string {
 		args = append(args, "-e", "SUPABASE_TABLE_PREFIX=paper_")
 	}
 	args = append(args, "-e", "KLINE_DB_PATH=/data/backtest-shared/backtest.db")
+	args = append(args, "-e", "BBGO_HEARTBEAT_FILE="+filepath.Join(ContainerDir(inst.UserID, inst.Mode, inst.InstanceID), "heartbeat"))
 
 	if cm.cfg.MarketDataAddr != "" {
 		args = append(args, "-e", "MARKET_DATA_SERVICE_URL="+cm.cfg.MarketDataAddr)

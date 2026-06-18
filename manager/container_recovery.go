@@ -24,6 +24,14 @@ type RecoveryResult struct {
 
 // CheckAndRecover checks all running instance containers in parallel and restarts
 // any that have died. Uses a goroutine pool (max 5) for parallel docker inspect.
+//
+// Crashloop backoff: if CheckInstanceHealth detects the container is in a
+// visible crashloop (restarting state, or restart_count >= threshold with
+// non-zero exit), we do NOT try to recover it. Recreating a container whose
+// bbgo process crashes on startup would just produce another crashloop and
+// burn CPU on a docker-level infinite loop. The captured error is already in
+// strategy_instances.last_error via startInstanceContainer or the recovery
+// capture below; user must fix the underlying config and re-start.
 func (cm *ContainerManager) CheckAndRecover(instances []StrategyInstance) []HealthCheckResult {
 	results := make([]HealthCheckResult, len(instances))
 	var mu sync.Mutex
@@ -31,8 +39,9 @@ func (cm *ContainerManager) CheckAndRecover(instances []StrategyInstance) []Heal
 	for i, inst := range instances {
 		idx, inst := i, inst
 		if err := cm.pool.Submit(func() {
+			name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
 			running, _ := cm.CheckInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID)
-			if running {
+			if running && !cm.isCrashLooping(&inst) {
 				mu.Lock()
 				results[idx] = HealthCheckResult{
 					UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID, Alive: true,
@@ -41,8 +50,31 @@ func (cm *ContainerManager) CheckAndRecover(instances []StrategyInstance) []Heal
 				return
 			}
 
-			name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			if running {
+				log.Printf("health check: instance container %s is crashlooping (running between cycles), capturing error", name)
+				cm.captureErrorIfNeeded(&inst)
+				mu.Lock()
+				results[idx] = HealthCheckResult{
+					UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID,
+					Alive: false, Error: "crashloop detected — recovery skipped",
+				}
+				mu.Unlock()
+				return
+			}
+
 			log.Printf("health check: instance container %s died, attempting recovery", name)
+
+			if cm.isCrashLooping(&inst) {
+				log.Printf("health check: instance container %s is crashlooping, skipping recovery (user must fix config and restart)", name)
+				cm.captureErrorIfNeeded(&inst)
+				mu.Lock()
+				results[idx] = HealthCheckResult{
+					UserID: inst.UserID, Mode: inst.Mode, InstanceID: inst.InstanceID,
+					Alive: false, Error: "crashloop detected — recovery skipped",
+				}
+				mu.Unlock()
+				return
+			}
 
 			if cm.tryRecoverViaDockerStart(&inst) {
 				mu.Lock()
@@ -81,6 +113,36 @@ func (cm *ContainerManager) CheckAndRecover(instances []StrategyInstance) []Heal
 	return results
 }
 
+// isCrashLooping returns true when the container shows visible crashloop
+// signals — either Docker reports status=restarting, or the container has
+// accumulated >= crashLoopRestartThreshold restarts with a non-zero exit
+// code. We treat high restart count + non-zero exit as crashloop even when
+// Docker momentarily reports running=true, because the next crash is
+// imminent.
+func (cm *ContainerManager) isCrashLooping(inst *StrategyInstance) bool {
+	health, err := cm.CheckInstanceHealth(inst.UserID, inst.Mode, inst.InstanceID)
+	if err != nil {
+		return false
+	}
+	return health.Status == HealthStatusError
+}
+
+// captureErrorIfNeeded grabs the container's last log lines and stores them
+// on the strategy_instances row. Called from recovery when a crashloop is
+// detected so the user can see *why* — without this, the row's last_error
+// would stay empty if the initial startInstanceContainer captured the error
+// before the crashloop fully developed.
+func (cm *ContainerManager) captureErrorIfNeeded(inst *StrategyInstance) {
+	if cm.store == nil {
+		return
+	}
+	captured := cm.CaptureContainerError(inst.UserID, inst.Mode, inst.InstanceID)
+	if captured == "" {
+		return
+	}
+	cm.store.MarkInstanceError(inst.UserID, inst.Mode, inst.InstanceID, captured)
+}
+
 // RecoverUsers discovers all instances for tracked users and recovers their containers.
 func (cm *ContainerManager) RecoverUsers(users []UserMode) []RecoveryResult {
 	var allInstances []StrategyInstance
@@ -100,7 +162,7 @@ func (cm *ContainerManager) RecoverUsers(users []UserMode) []RecoveryResult {
 		if err := cm.pool.Submit(func() {
 			name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
 			running, _ := cm.CheckInstanceRunning(inst.UserID, inst.Mode, inst.InstanceID)
-			if running {
+			if running && !cm.isCrashLooping(&inst) {
 				log.Printf("recovered instance container %s (running)", name)
 				mu.Lock()
 				results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusRunning}
@@ -108,7 +170,25 @@ func (cm *ContainerManager) RecoverUsers(users []UserMode) []RecoveryResult {
 				return
 			}
 
+			if running {
+				log.Printf("recover: instance container %s is crashlooping (running between cycles), capturing error", name)
+				cm.captureErrorIfNeeded(&inst)
+				mu.Lock()
+				results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusError}
+				mu.Unlock()
+				return
+			}
+
 			log.Printf("recovering instance container %s", name)
+
+			if cm.isCrashLooping(&inst) {
+				log.Printf("recover: instance container %s is crashlooping, skipping (user must fix config)", name)
+				cm.captureErrorIfNeeded(&inst)
+				mu.Lock()
+				results[idx] = RecoveryResult{UserID: inst.UserID, Mode: inst.Mode, Status: StatusError}
+				mu.Unlock()
+				return
+			}
 
 			if cm.tryRecoverViaDockerStart(&inst) {
 				mu.Lock()

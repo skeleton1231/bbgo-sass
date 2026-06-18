@@ -132,7 +132,7 @@ func TestUpdateStrategy_RejectsInvalidLeverage(t *testing.T) {
 		{
 			name:   "nil futuresConfig",
 			body:   map[string]any{},
-			errMsg: "futuresConfig or riskConfig is required",
+			errMsg: "config, futuresConfig, or riskConfig is required",
 		},
 		{
 			name:   "invalid marginType",
@@ -256,5 +256,66 @@ func TestUpdateStrategy_RestartsRunningInstance(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Status != StatusStarting {
 		t.Errorf("status: got %q, want %q (wasRunning=true)", resp.Status, StatusStarting)
+	}
+}
+
+// TestUpdateStrategy_ConfigPatch covers the general config-patch path added
+// when abstracting UpdateStrategy to accept arbitrary strategy params (e.g.
+// fixing a "spread too small" grid2 config without delete+recreate).
+func TestUpdateStrategy_ConfigPatch(t *testing.T) {
+	_, r, store := setupUpdateStrategyAPI(t, false)
+	instanceID := firstInstanceID(t, store, grid2TestUUID, ModePaper, "grid2")
+	path := "/api/users/" + grid2TestUUID + "/strategies/" + instanceID + "?mode=paper"
+
+	body := map[string]any{
+		"config": map[string]any{
+			"gridNumber":  3,
+			"upperPrice":  80000,
+			"lowerPrice":  60000,
+			"quantity":    0.01,
+			"nested":      map[string]any{"deep": map[string]any{"value": 7}},
+		},
+	}
+	w := doRequest(r, "PATCH", path, body)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Config map[string]any `json:"config"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if v, ok := resp.Config["gridNumber"].(float64); !ok || v != 3 {
+		t.Errorf("config.gridNumber: got %v, want 3", resp.Config["gridNumber"])
+	}
+	if v, ok := resp.Config["symbol"].(string); !ok || v != "BTCUSDT" {
+		t.Errorf("config.symbol (preserved): got %v, want BTCUSDT", resp.Config["symbol"])
+	}
+	nested, ok := resp.Config["nested"].(map[string]any)
+	if !ok {
+		t.Errorf("config.nested should be an object, got %T", resp.Config["nested"])
+	} else if deep, ok := nested["deep"].(map[string]any); !ok || deep["value"].(float64) != 7 {
+		t.Errorf("config.nested.deep.value missing or wrong: %v", nested["deep"])
+	}
+}
+
+// TestUpdateStrategy_ConfigPatch_RejectsSymbolChange verifies the
+// instance-ID-stability invariant: changing symbol via patch must be rejected
+// because the deterministic instance ID is derived from (strategy, symbol,
+// config) and rewriting it would orphan historical trades under the old ID.
+func TestUpdateStrategy_ConfigPatch_RejectsSymbolChange(t *testing.T) {
+	_, r, store := setupUpdateStrategyAPI(t, false)
+	instanceID := firstInstanceID(t, store, grid2TestUUID, ModePaper, "grid2")
+	path := "/api/users/" + grid2TestUUID + "/strategies/" + instanceID + "?mode=paper"
+
+	body := map[string]any{"config": map[string]any{"symbol": "ETHUSDT"}}
+	w := doRequest(r, "PATCH", path, body)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status: got %d, want 400. body: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "cannot change symbol") {
+		t.Errorf("body: got %q, want substring 'cannot change symbol'", w.Body.String())
 	}
 }

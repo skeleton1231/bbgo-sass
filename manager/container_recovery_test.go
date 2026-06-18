@@ -252,6 +252,96 @@ func TestCheckAndRecover_DeadThenRestarted(t *testing.T) {
 	}
 }
 
+// TestCheckAndRecover_CrashLoop_SkipsRecovery verifies that when the container
+// is in a crashloop, CheckAndRecover does NOT call docker start or recreate —
+// it just marks the result as failed so the user can fix the underlying
+// config. This is the abstract fix for the phantom-active problem: any
+// strategy that crashes inside the container (validation, panic, missing
+// data, etc.) is detected via Docker's RestartCount/ExitCode rather than
+// silently retried forever.
+func TestCheckAndRecover_CrashLoop_SkipsRecovery(t *testing.T) {
+	cm := testContainerManager(t)
+	store, _ := newTestStore(t)
+	cm.store = store
+	var calls []string
+	cm.dockerFn = func(args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		if args[0] == "inspect" && len(args) >= 3 {
+			tpl := args[2]
+			switch tpl {
+			case "{{.State.Running}}":
+				// Docker reports not-running here because we're between crash cycles
+				// or docker is mid-restart.
+				return "false", nil
+			case "{{.State.Status}}":
+				return "exited", nil
+			default:
+				// Composed-template inspect from CheckInstanceHealth returns crashloop signal.
+				return "restarting|false|5|1", nil
+			}
+		}
+		if args[0] == "logs" {
+			return `time="2026-06-17T14:40:10Z" level=fatal msg="cannot execute command" error="spread is too small"`, nil
+		}
+		return "", nil
+	}
+
+	createTestInstance(t, store, "u1", "live", "grid2", "BTCUSDT", nil)
+	instances := []StrategyInstance{
+		{UserID: "u1", Mode: ModeLive, InstanceID: "grid2-BTCUSDT"},
+	}
+	results := cm.CheckAndRecover(instances)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Alive {
+		t.Error("expected Alive=false for crashlooping container")
+	}
+	if results[0].Error == "" {
+		t.Error("expected non-empty Error for crashlooping container")
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "start ") || strings.HasPrefix(c, "run ") {
+			t.Errorf("recovery must not start/run a crashlooping container, got call: %s", c)
+		}
+	}
+}
+
+func TestRecoverUsers_CrashLoop_MarksError(t *testing.T) {
+	cm := testContainerManager(t)
+	store, _ := newTestStore(t)
+	cm.store = store
+	cm.dockerFn = func(args ...string) (string, error) {
+		// args[0]=inspect args[1]=-f args[2]=<template> args[3]=<name>
+		if args[0] == "inspect" && len(args) >= 3 {
+			tpl := args[2]
+			switch tpl {
+			case "{{.State.Running}}":
+				return "false", nil
+			case "{{.State.Status}}":
+				return "exited", nil
+			default:
+				// Composed template from CheckInstanceHealth.
+				return "running|true|7|1", nil
+			}
+		}
+		if args[0] == "logs" {
+			return `time="2026-06-17T14:40:10Z" level=fatal msg="cannot execute command" error="bollmaker bandWidth must be > 0"`, nil
+		}
+		return "", nil
+	}
+
+	createTestInstance(t, store, "u1", "live", "bollmaker", "BTCUSDT", nil)
+	users := []UserMode{{UserID: "u1", Mode: ModeLive}}
+	results := cm.RecoverUsers(users)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusError {
+		t.Errorf("expected status=%q for crashlooping container, got %q", StatusError, results[0].Status)
+	}
+}
+
 func TestRecoverUsers_AllRunning(t *testing.T) {
 	cm := testContainerManager(t)
 	store, _ := newTestStore(t)
