@@ -12,11 +12,6 @@ type OrderRow = Tables['orders']['Row']
 type TradeRow = Tables['trades']['Row']
 type PositionRow = Tables['positions']['Row']
 type ProfitRow = Tables['profits']['Row']
-type FuturesPositionRiskRow = Tables['futures_position_risks']['Row']
-type MarginLoanRow = Tables['margin_loans']['Row']
-type MarginRepayRow = Tables['margin_repays']['Row']
-type MarginInterestRow = Tables['margin_interests']['Row']
-type MarginLiquidationRow = Tables['margin_liquidations']['Row']
 
 // --- Supabase hooks returning BBGo types ---
 

@@ -76,42 +76,6 @@ function parseLegacyOutput(output: string): ParsedBacktest {
   return { equityCurve, symbolReport: null, report: null }
 }
 
-function parseKlineTSV(tsv: string): KlineCandle[] {
-  const lines = tsv.trim().split('\n')
-  if (lines.length < 2) return []
-  const header = lines[0]!.split('\t').map((h) => h.trim().toLowerCase())
-  const startIdx = header.indexOf('starttime')
-  const openIdx = header.indexOf('open')
-  const highIdx = header.indexOf('high')
-  const lowIdx = header.indexOf('low')
-  const closeIdx = header.indexOf('close')
-  const volIdx = header.indexOf('volume')
-  if (startIdx === -1 || openIdx === -1 || highIdx === -1 || lowIdx === -1 || closeIdx === -1) return []
-
-  const maxIdx = Math.max(startIdx, openIdx, highIdx, lowIdx, closeIdx)
-  const candles: KlineCandle[] = []
-  for (let i = 1; i < lines.length; i++) {
-    const parts = lines[i]!.split('\t')
-    if (parts.length <= maxIdx) continue
-    const time = Number(parts[startIdx])
-    const open = Number(parts[openIdx])
-    const high = Number(parts[highIdx])
-    const low = Number(parts[lowIdx])
-    const close = Number(parts[closeIdx])
-    const volume = volIdx !== -1 ? Number(parts[volIdx]) : 0
-    if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) continue
-    candles.push({
-      time: time as Time,
-      open,
-      high,
-      low,
-      close,
-      volume: isNaN(volume) ? 0 : volume,
-    })
-  }
-  return candles
-}
-
 function splitRecord(line: string, delimiter: string): string[] {
   if (delimiter === '\t') return line.split('\t')
   const parts: string[] = []

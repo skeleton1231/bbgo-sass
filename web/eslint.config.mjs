@@ -1,7 +1,7 @@
 import nextConfig from "eslint-config-next";
 
 /** @type {import("eslint").Linter.Config[]} */
-export default [
+const config = [
   ...nextConfig,
   {
     files: ["**/*.{ts,tsx}"],
@@ -13,3 +13,5 @@ export default [
     },
   },
 ];
+
+export default config;

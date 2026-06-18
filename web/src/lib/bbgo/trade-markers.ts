@@ -1,4 +1,4 @@
-import type { BBGoOrder, BBGoTrade, TradeMarkersResponse } from './queries'
+import type { BBGoOrder, BBGoTrade } from './queries'
 import type { TradeMarker, OrderLevel } from '@/components/chart/CandlestickChart'
 import { computePositionTags, computeFuturesPositionTags } from './position-tags'
 

@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import type { BBGoOrder, PositionAction } from '@/lib/bbgo/queries'
+import type { BBGoOrder } from '@/lib/bbgo/queries'
 
 interface OrderRowProps {
   order: BBGoOrder

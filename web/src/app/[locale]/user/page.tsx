@@ -39,7 +39,6 @@ export default function DashboardPage() {
   const { data: instancesResp } = useUserStrategies(userId)
   const allInstances = instancesResp?.instances ?? []
   const activeInstances = allInstances.filter((i) => i.mode === globalMode)
-  const isActive = activeInstances.some((i) => i.status === 'running')
   const anyActive = allInstances.some((i) => i.status === 'running')
   const strategyCount = activeInstances.length
 
