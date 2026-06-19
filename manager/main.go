@@ -19,6 +19,8 @@ import (
 func main() {
 	_ = godotenv.Load()
 
+	logger := SetupLogging()
+
 	cfg, err := LoadConfig()
 	if err != nil {
 		log.Fatalf("config error: %v", err)
@@ -146,7 +148,8 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
+	r.Use(requestMetricsMiddleware(api.metrics))
+	r.Use(structuredLoggerMiddleware(logger))
 	r.Use(middleware.Recoverer)
 	r.Use(maxBodySize(2 << 20)) // 2MB max request body
 
@@ -155,12 +158,18 @@ func main() {
 	api.RegisterRoutes(r)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	srv := &http.Server{Addr: addr, Handler: r}
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 
 	go func() {
-		log.Printf("Manager starting on %s (docker network: %s, image: %s)", addr, cfg.DockerNetwork, cfg.BBGOImage)
+		logger.Info("manager starting", "addr", addr, "docker_network", cfg.DockerNetwork, "image", cfg.BBGOImage, "version", BuildVersion)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			logger.Error("server error", "err", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -168,13 +177,14 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("shutting down...")
+	logger.Info("shutdown signal received")
+	api.metrics.MarkNotReady()
 	close(done)
 	api.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("shutdown error: %v", err)
+		logger.Error("shutdown error", "err", err)
 	}
 	if hub != nil {
 		hub.Close()
@@ -182,7 +192,7 @@ func main() {
 	if testnetHub != nil {
 		testnetHub.Close()
 	}
-	log.Println("server stopped")
+	logger.Info("server stopped")
 }
 
 func maxBodySize(n int64) func(http.Handler) http.Handler {

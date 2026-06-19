@@ -1,21 +1,72 @@
+{
+	# Global options — production defaults
+	email {$ACME_EMAIL:}
+}
+
 {$DOMAIN:localhost} {
+	# WebSocket routes need unlimited buffering and long timeouts.
 	handle /api/ws* {
-		reverse_proxy manager:8090
+		reverse_proxy manager:8090 {
+			transport http {
+				read_timeout 24h
+				write_timeout 24h
+				dial_timeout 5s
+			}
+			flush_interval -1
+		}
 	}
 
-	reverse_proxy web:3000
+	# Internal-only manager probes — never expose externally.
+	@internal {
+		path /metrics /livez /readyz
+	}
+	respond @internal "not found" 404
 
-	encode gzip
+	# Public manager API (authenticated via X-Manager-Token).
+	handle /api/* {
+		reverse_proxy manager:8090 {
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Next.js app + static assets.
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	encode zstd gzip
 
 	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy camera=(), microphone=(), geolocation=()
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' {$SUPABASE_URL} wss: ws:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		# Production CSP. Next.js standalone injects an inline hydration script,
+		# so 'unsafe-inline' is kept for script-src. 'unsafe-eval' is dev-only
+		# and removed here. Upgrade to nonce-based CSP by enabling
+		# next.config.ts experimental.strictNextHead once stable.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' {$SUPABASE_URL:} wss: ws:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+		?Cache-Control "no-cache"
+		-Server
 	}
+
+	@static {
+		path /_next/static/* /favicon.svg /robots.txt /security.txt
+	}
+	header @static Cache-Control "public, max-age=31536000, immutable"
 
 	handle_errors {
 		respond "{http.error.status_code} {http.error.status_text}"
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
 	}
 }

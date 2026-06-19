@@ -4,6 +4,7 @@
 manager/manager
 manager/manager.exe
 manager/cover.out
+manager/coverage.out
 manager/*~
 manager/data/
 web/node_modules/

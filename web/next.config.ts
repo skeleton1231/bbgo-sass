@@ -9,7 +9,9 @@ const withNextIntl = createNextIntlPlugin({
 })
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   turbopack: {},
+  poweredByHeader: false,
   experimental: {
     staleTimes: {
       dynamic: 30,

@@ -1,0 +1,5 @@
+Contact: mailto:security@your-domain.com
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en, zh
+Canonical: https://bbgo.your-domain.com/security.txt
+Policy: https://bbgo.your-domain.com/docs/security

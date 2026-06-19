@@ -1,9 +1,14 @@
-# Manager image with Docker CLI for container orchestration
-# Build: built via docker-compose from bbgo repo root (context: ..)
-#        docker build -f saas/docker/Dockerfile.manager ..
-FROM golang:1.26-bookworm AS builder
+# Manager image with Docker CLI for container orchestration.
+# Build via docker-compose from bbgo repo root:
+#   docker compose -f saas/docker/docker-compose.prod.yml build manager
+ARG GOPROXY_URL=https://proxy.golang.org,direct
+ARG BUILD_VERSION=dev
+ARG GO_VERSION=1.26-bookworm
 
-ENV GOPROXY=https://goproxy.cn,direct
+FROM golang:${GO_VERSION} AS builder
+
+ARG GOPROXY_URL
+ENV GOPROXY=${GOPROXY_URL}
 
 WORKDIR /src/manager
 COPY saas/manager/go.mod saas/manager/go.sum ./
@@ -14,16 +19,25 @@ RUN go mod download
 
 COPY saas/manager/ .
 RUN sed -i 's|=> ../../|=> /src/bbgo|' go.mod
-RUN CGO_ENABLED=0 go build -o /usr/local/bin/manager .
+
+ARG BUILD_VERSION
+RUN CGO_ENABLED=0 go build \
+        -trimpath \
+        -ldflags "-s -w -X main.BuildVersion=${BUILD_VERSION}" \
+        -o /usr/local/bin/manager .
 
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y \
-    ca-certificates curl tzdata \
+ARG BUILD_VERSION
+ENV BUILD_VERSION=${BUILD_VERSION}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl tzdata \
     && rm -rf /var/lib/apt/lists/* \
+    && install -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \
-    && apt-get update && apt-get install -y docker-ce-cli \
+    && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/manager /usr/local/bin/manager

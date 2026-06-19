@@ -1,25 +1,47 @@
-# bbgo base image — uses local source from build context
-# Build: docker build -f saas/docker/Dockerfile.bbgo-base -t bbgo-base:latest .
+# bbgo base image — runs as non-root, honours build-arg for Go proxy.
+#
+# Build:
+#   docker build \
+#     --build-arg GOPROXY_URL=https://proxy.golang.org,direct \
+#     --build-arg BUILD_VERSION=prod-$(git rev-parse --short HEAD) \
+#     -f saas/docker/Dockerfile.bbgo-base -t bbgo-base:latest .
+#
 # NOTE: The bbgo repo must contain the rockhopper replace directive in go.mod
 #       before building this image, otherwise SQLite backtests will fail.
-FROM golang:1.26-bookworm AS builder
+ARG GOPROXY_URL=https://proxy.golang.org,direct
+ARG BUILD_VERSION=dev
+ARG GO_VERSION=1.26-bookworm
 
-ENV GOPROXY=https://goproxy.cn,direct
-RUN apt-get update && apt-get install -y gcc libc6-dev git && rm -rf /var/lib/apt/lists/*
+FROM golang:${GO_VERSION} AS builder
+
+ARG GOPROXY_URL
+ENV GOPROXY=${GOPROXY_URL}
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev git ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY . /src
 WORKDIR /src
 
 RUN go mod download && \
-    CGO_ENABLED=1 go build -tags release -o /usr/local/bin/bbgo ./cmd/bbgo
+    CGO_ENABLED=1 go build -tags release \
+        -trimpath \
+        -ldflags "-s -w" \
+        -o /usr/local/bin/bbgo ./cmd/bbgo
 
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y ca-certificates curl tzdata && rm -rf /var/lib/apt/lists/*
+ARG BUILD_VERSION
+ENV BUILD_VERSION=${BUILD_VERSION}
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tzdata && rm -rf /var/lib/apt/lists/* \
+    && addgroup --system --gid 10001 bbgo \
+    && adduser  --system --uid 10001 --ingroup bbgo --home /data bbgo \
+    && mkdir -p /data \
+    && chown -R bbgo:bbgo /data
 
 COPY --from=builder /usr/local/bin/bbgo /usr/local/bin/bbgo
 
-RUN mkdir -p /data
+USER bbgo
 WORKDIR /data
 
 EXPOSE 8080 9090
