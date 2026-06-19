@@ -809,6 +809,136 @@ export function computeFuturesRealtime(
   }
 }
 
+export interface PagedResult<T> {
+  rows: T[]
+  total: number
+}
+
+export interface PagedQueryOpts {
+  exchange?: string
+  symbol?: string
+  strategyInstanceId?: string
+  mode?: 'live' | 'paper'
+  page: number
+  pageSize: number
+}
+
+/**
+ * Paginated variant of useSupabaseClosedOrders for the bot detail "Closed Orders" tab.
+ * Uses Supabase `.range(from, to)` + `count: 'exact'` so the UI can show
+ * total rows and Prev/Next without a second round-trip.
+ */
+export function useSupabaseClosedOrdersPaged(
+  userId: string,
+  opts: PagedQueryOpts
+) {
+  return useQuery<PagedResult<BBGoOrder>>({
+    queryKey: ['supabase-closed-orders-paged', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      const from = (opts.page - 1) * opts.pageSize
+      const to = from + opts.pageSize - 1
+      let q = sb
+        .from(tableName('orders', opts?.mode))
+        .select('*', { count: 'exact', head: false })
+        .eq('user_id', userId)
+        .neq('status', 'NEW')
+        .neq('status', 'PARTIALLY_FILLED')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (opts?.exchange) q = q.eq('exchange', opts.exchange)
+      if (opts?.symbol) q = q.eq('symbol', opts.symbol)
+      if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
+
+      const { data, error, count } = await q
+      if (error) throw error
+      return {
+        rows: (data ?? []).map((row, i) => orderRowToBBGo(row as OrderRow, from + i)),
+        total: count ?? 0,
+      }
+    },
+    enabled: !!userId,
+    staleTime: 15_000,
+  })
+}
+
+/**
+ * Paginated variant of useSupabaseTrades for the bot detail "Recent Trades" tab.
+ * Keeps DESC order (newest first) for display — the chart-marker pipeline
+ * still uses the non-paged useSupabaseTrades.
+ */
+export function useSupabaseTradesPaged(
+  userId: string,
+  opts: PagedQueryOpts
+) {
+  return useQuery<PagedResult<BBGoTrade>>({
+    queryKey: ['supabase-trades-paged', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      const tbl = tableName('trades', opts?.mode)
+      const from = (opts.page - 1) * opts.pageSize
+      const to = from + opts.pageSize - 1
+      let q = sb
+        .from(tbl)
+        .select('*', { count: 'exact', head: false })
+        .eq('user_id', userId)
+        .order('traded_at', { ascending: false })
+        .range(from, to)
+
+      if (opts?.exchange) q = q.eq('exchange', opts.exchange)
+      if (opts?.symbol) q = q.eq('symbol', opts.symbol)
+      if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
+
+      const { data, error, count } = await q
+      if (error) throw error
+      return {
+        rows: (data ?? []).map((row, i) => tradeRowToBBGo(row as TradeRow, from + i)),
+        total: count ?? 0,
+      }
+    },
+    enabled: !!userId,
+    staleTime: 15_000,
+  })
+}
+
+/**
+ * Paginated variant of useSupabaseProfits for the bot detail "Close History" tab.
+ * `traded_at DESC` mirrors the aggregation order so the latest close shows first.
+ */
+export function useSupabaseProfitsPaged(
+  userId: string,
+  opts: PagedQueryOpts
+) {
+  return useQuery<PagedResult<ProfitRow>>({
+    queryKey: ['supabase-profits-paged', userId, opts],
+    queryFn: async () => {
+      const sb = createClient()
+      const from = (opts.page - 1) * opts.pageSize
+      const to = from + opts.pageSize - 1
+      let q = sb
+        .from(tableName('profits', opts?.mode))
+        .select('*', { count: 'exact', head: false })
+        .eq('user_id', userId)
+        .order('traded_at', { ascending: false })
+        .range(from, to)
+
+      if (opts?.exchange) q = q.eq('exchange', opts.exchange)
+      if (opts?.symbol) q = q.eq('symbol', opts.symbol)
+      if (opts?.strategyInstanceId) q = q.eq('strategy_instance_id', opts.strategyInstanceId)
+
+      const { data, error, count } = await q
+      if (error) throw error
+      return {
+        rows: (data ?? []) as ProfitRow[],
+        total: count ?? 0,
+      }
+    },
+    enabled: !!userId,
+    staleTime: 15_000,
+  })
+}
+
 export function useSupabaseMarginHistory(
   userId: string,
   opts?: { mode?: 'live' | 'paper' }

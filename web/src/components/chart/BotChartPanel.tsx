@@ -9,9 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { OhlcvLegend } from '@/components/chart/OhlcvLegend'
 import type { TradeMarker, OrderLevel, GridLine, IndicatorLine, KlineCandle } from '@/components/chart/CandlestickChart'
 import type { IndicatorConfig } from '@/lib/bbgo/indicators'
-import type { StrategyDetails } from '@/lib/bbgo/strategy-state'
 import { extractBaseCurrency } from '@/lib/bbgo/fifo-pnl'
-import { StrategySidePanel } from './strategy-panel'
 
 const CandlestickChart = dynamic(
   () => import('@/components/chart/CandlestickChart').then((m) => ({ default: m.CandlestickChart })),
@@ -39,7 +37,6 @@ interface BotChartPanelProps {
   pnlLine: IndicatorLine | null
   klinesLoading: boolean
   loadEarlierKlines?: () => void
-  strategyStats: StrategyDetails | null
   currentPrice?: number
   unrealizedPnlFromReport?: number
   noSymbolText: string
@@ -58,7 +55,6 @@ interface BotChartPanelProps {
     liquidationPrice?: number
     direction?: 'long' | 'short' | 'flat'
   }
-  unrealizedPnlPct?: number
 }
 
 export function BotChartPanel({
@@ -73,7 +69,6 @@ export function BotChartPanel({
   pnlLine,
   klinesLoading,
   loadEarlierKlines,
-  strategyStats,
   currentPrice,
   unrealizedPnlFromReport,
   noSymbolText,
@@ -83,7 +78,6 @@ export function BotChartPanel({
   indicatorConfigs = [],
   onToggleIndicator,
   supabasePosition,
-  unrealizedPnlPct,
 }: BotChartPanelProps) {
   const t = useTranslations('Bots')
   const sp = useTranslations('Bots.chartSidePanel')
@@ -197,37 +191,32 @@ export function BotChartPanel({
               {botReachable ? noSymbolText : startToSeeDataText}
             </div>
           ) : (
-            <div className="flex gap-4">
-              <div className="flex-1 min-w-0">
-                <OhlcvLegend
-                  data={ohlcvData}
-                  symbol={symbol}
-                  previousClose={candles.length > 1 ? candles[candles.length - 2]?.close : undefined}
-                />
-                <CandlestickChart
-                  candles={candles}
-                  tradeMarkers={tradeMarkers}
-                  orderLevels={orderLevels}
-                  gridLines={gridLines}
-                  indicatorLines={allIndicators}
-                  height={520}
-                  isLoading={klinesLoading}
-                  dataKey={`${exchange}-${symbol}-${klineInterval}`}
-                  onVisibleTimeRangeChange={(range) => {
-                    if (!range || candles.length === 0 || !candles[0]) return
-                    const earliest = candles[0].time as number
-                    const visibleSpan = range.to - range.from
-                    if (range.from < earliest + visibleSpan * 0.5) {
-                      loadEarlierKlines?.()
-                    }
-                  }}
-                  onCandleHover={setOhlcvData}
-                  liquidationPrice={supabasePosition?.liquidationPrice}
-                />
-              </div>
-              {strategyStats && (
-                <StrategySidePanel details={strategyStats} currentPrice={currentPrice} gridLines={gridLines} unrealizedPnlFromReport={unrealizedPnlFromReport} supabasePosition={supabasePosition} unrealizedPnlPct={unrealizedPnlPct} />
-              )}
+            <div className="min-w-0">
+              <OhlcvLegend
+                data={ohlcvData}
+                symbol={symbol}
+                previousClose={candles.length > 1 ? candles[candles.length - 2]?.close : undefined}
+              />
+              <CandlestickChart
+                candles={candles}
+                tradeMarkers={tradeMarkers}
+                orderLevels={orderLevels}
+                gridLines={gridLines}
+                indicatorLines={allIndicators}
+                height={520}
+                isLoading={klinesLoading}
+                dataKey={`${exchange}-${symbol}-${klineInterval}`}
+                onVisibleTimeRangeChange={(range) => {
+                  if (!range || candles.length === 0 || !candles[0]) return
+                  const earliest = candles[0].time as number
+                  const visibleSpan = range.to - range.from
+                  if (range.from < earliest + visibleSpan * 0.5) {
+                    loadEarlierKlines?.()
+                  }
+                }}
+                onCandleHover={setOhlcvData}
+                liquidationPrice={supabasePosition?.liquidationPrice}
+              />
             </div>
           )}
         </CardContent>

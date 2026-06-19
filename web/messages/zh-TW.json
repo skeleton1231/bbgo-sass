@@ -363,7 +363,13 @@
   },
   "Common": {
     "pageNotFound": "找不到此頁面。",
-    "goHome": "返回首頁"
+    "goHome": "返回首頁",
+    "pagination": {
+      "range": "第 {from}-{to} 筆 / 共 {total} 筆",
+      "prev": "上一頁",
+      "next": "下一頁",
+      "page": "筆/頁"
+    }
   },
   "Categories": {
     "grid": "網格",

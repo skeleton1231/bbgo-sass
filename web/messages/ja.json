@@ -364,7 +364,13 @@
   },
   "Common": {
     "pageNotFound": "このページは見つかりませんでした。",
-    "goHome": "ホームへ"
+    "goHome": "ホームへ",
+    "pagination": {
+      "range": "{total} 件中 {from}-{to} 件",
+      "prev": "前へ",
+      "next": "次へ",
+      "page": "件/ページ"
+    }
   },
   "Categories": {
     "grid": "グリッド",
