@@ -517,6 +517,8 @@ type PublicStrategyInstancesSelect struct {
   Exchange      string      `json:"exchange"`
   FuturesConfig interface{} `json:"futures_config"`
   InstanceId    string      `json:"instance_id"`
+  LastError     *string     `json:"last_error,omitempty"`
+  LastErrorAt   *string     `json:"last_error_at,omitempty"`
   Mode          string      `json:"mode"`
   Name          string      `json:"name"`
   RiskConfig    interface{} `json:"risk_config"`
@@ -534,6 +536,8 @@ type PublicStrategyInstancesInsert struct {
   Exchange      *string     `json:"exchange,omitempty"`
   FuturesConfig interface{} `json:"futures_config"`
   InstanceId    string      `json:"instance_id"`
+  LastError     *string     `json:"last_error,omitempty"`
+  LastErrorAt   *string     `json:"last_error_at,omitempty"`
   Mode          string      `json:"mode"`
   Name          *string     `json:"name,omitempty"`
   RiskConfig    interface{} `json:"risk_config"`
@@ -551,6 +555,8 @@ type PublicStrategyInstancesUpdate struct {
   Exchange      *string     `json:"exchange,omitempty"`
   FuturesConfig interface{} `json:"futures_config"`
   InstanceId    *string     `json:"instance_id,omitempty"`
+  LastError     *string     `json:"last_error,omitempty"`
+  LastErrorAt   *string     `json:"last_error_at,omitempty"`
   Mode          *string     `json:"mode,omitempty"`
   Name          *string     `json:"name,omitempty"`
   RiskConfig    interface{} `json:"risk_config"`
