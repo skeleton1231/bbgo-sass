@@ -31,10 +31,10 @@ type ContainerManager struct {
 	store *InstanceStore
 
 	// test hooks
-	runBacktestFn  func(userID string, jobID string, yamlContent []byte) ([]byte, error)
-	syncBacktestFn func(userID, exchange, symbol, start, end string) (string, error)
-	logsFn         func(containerName string) (string, error)
-	apiURLFn       func(containerName string) string
+	runBacktestFn    func(userID string, jobID string, yamlContent []byte) ([]byte, error)
+	syncBacktestFn   func(userID, exchange, symbol, start, end string) (string, error)
+	logsFn           func(containerName string) (string, error)
+	apiURLFn         func(containerName string) string
 	checkRunningFn   func(containerName string) (bool, error)
 	dockerFn         func(args ...string) (string, error)
 	listRunningFn    func(userID string) map[string]bool

@@ -71,9 +71,9 @@ func NewAPI(cfg *Config, store *InstanceStore, cm *ContainerManager, proxy *BotP
 		hub: hub, testnetHub: testnetHub, notifier: notifier,
 		wsTickets: NewWSTicketStore(), btExec: btExec, btJobs: btJobs,
 		btSyncSem: make(chan struct{}, 2), storage: storage,
-		metrics: NewMetrics(),
+		metrics:       NewMetrics(),
 		newBBGoClient: NewBBGoClient,
-		stopCtx: ctx, stopCancel: cancel,
+		stopCtx:       ctx, stopCancel: cancel,
 	}
 	api.health = newCachedHealth(api.refreshHealth, 15*time.Second)
 	return api
@@ -158,7 +158,7 @@ func (api *API) RegisterRoutes(r chi.Router) {
 // --- Helpers ---
 
 func (api *API) resolveUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
-	urlID := chiParam(r,"userID")
+	urlID := chiParam(r, "userID")
 	if urlID != "" {
 		if !isValidUUID(urlID) {
 			writeError(w, http.StatusBadRequest, "invalid user ID format")
@@ -507,7 +507,7 @@ func (api *API) UpdateStrategy(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	instanceID := chiParam(r,"strategyID")
+	instanceID := chiParam(r, "strategyID")
 	mode := modeFromQuery(r)
 
 	var req struct {
@@ -639,7 +639,7 @@ func (api *API) DeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	instanceID := chiParam(r,"strategyID")
+	instanceID := chiParam(r, "strategyID")
 	mode := modeFromQuery(r)
 
 	inst, err := api.store.GetInstance(userID, mode, instanceID)
@@ -688,7 +688,7 @@ func (api *API) StartInstance(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	instanceID := chiParam(r,"instanceID")
+	instanceID := chiParam(r, "instanceID")
 	inst, err := api.store.GetInstance(userID, "", instanceID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "instance not found")
@@ -744,7 +744,7 @@ func (api *API) StopInstance(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	instanceID := chiParam(r,"instanceID")
+	instanceID := chiParam(r, "instanceID")
 	inst, err := api.store.GetInstance(userID, "", instanceID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "instance not found")
@@ -1018,7 +1018,6 @@ func (api *API) ContainerLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, logsResponse{Logs: strings.Join(allLogs, "\n")})
 }
 
-
 func (api *API) bbgoClientForUser(w http.ResponseWriter, r *http.Request) (*BBGoClient, string, bool) {
 	inst, ok := api.resolveInstanceForRequest(w, r)
 	if !ok {
@@ -1061,7 +1060,7 @@ func (api *API) BBGoSessionDetail(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	session := chiParam(r,"session")
+	session := chiParam(r, "session")
 	detail, err := client.GetSession(session)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -1075,7 +1074,7 @@ func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	session := chiParam(r,"session")
+	session := chiParam(r, "session")
 	symbols, err := client.GetSessionSymbols(session)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -1085,7 +1084,7 @@ func (api *API) BBGoSessionSymbols(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
-	exchange := chiParam(r,"exchange")
+	exchange := chiParam(r, "exchange")
 	if exchange == "" {
 		writeError(w, http.StatusBadRequest, "exchange is required")
 		return
@@ -1100,7 +1099,7 @@ func (api *API) MarketSymbols(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
-	exchange := chiParam(r,"exchange")
+	exchange := chiParam(r, "exchange")
 	symbol := r.URL.Query().Get("symbol")
 	if exchange == "" || symbol == "" {
 		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
@@ -1141,7 +1140,7 @@ func (api *API) MarketTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
-	exchange := chiParam(r,"exchange")
+	exchange := chiParam(r, "exchange")
 	symbol := r.URL.Query().Get("symbol")
 	if exchange == "" || symbol == "" {
 		writeError(w, http.StatusBadRequest, "exchange and symbol are required")
@@ -1199,7 +1198,6 @@ func (api *API) MarketKlines(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, klinesResponse{Klines: klines})
 }
 
-
 func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
 	client, _, ok := api.bbgoClientForUser(w, r)
 	if !ok {
@@ -1213,10 +1211,6 @@ func (api *API) BBGoStrategies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, bbgoStrategiesResponse{Strategies: strategies})
 }
 
-
-
-
-
 func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(r)
 	if !ok {
@@ -1224,12 +1218,12 @@ func (api *API) RunBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Strategy     string          `json:"strategy"`
-		Config       json.RawMessage `json:"config"`
-		Exchange     string          `json:"exchange"`
-		StartTime    string          `json:"start_time"`
-		EndTime      string          `json:"end_time"`
-		FuturesConfig *FuturesConfig `json:"futuresConfig,omitempty"`
+		Strategy      string          `json:"strategy"`
+		Config        json.RawMessage `json:"config"`
+		Exchange      string          `json:"exchange"`
+		StartTime     string          `json:"start_time"`
+		EndTime       string          `json:"end_time"`
+		FuturesConfig *FuturesConfig  `json:"futuresConfig,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -1329,13 +1323,13 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Strategy     string          `json:"strategy"`
-		Config       json.RawMessage `json:"config"`
-		Exchange     string          `json:"exchange"`
-		Symbol       string          `json:"symbol"`
-		StartTime    string          `json:"start_time"`
-		EndTime      string          `json:"end_time"`
-		FuturesConfig *FuturesConfig `json:"futuresConfig,omitempty"`
+		Strategy      string          `json:"strategy"`
+		Config        json.RawMessage `json:"config"`
+		Exchange      string          `json:"exchange"`
+		Symbol        string          `json:"symbol"`
+		StartTime     string          `json:"start_time"`
+		EndTime       string          `json:"end_time"`
+		FuturesConfig *FuturesConfig  `json:"futuresConfig,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -1349,7 +1343,9 @@ func (api *API) SubmitBacktest(w http.ResponseWriter, r *http.Request) {
 		req.Exchange = "binance"
 	}
 	if req.Symbol == "" {
-		var sym struct{ Symbol string `json:"symbol"` }
+		var sym struct {
+			Symbol string `json:"symbol"`
+		}
 		if err := json.Unmarshal(req.Config, &sym); err == nil && sym.Symbol != "" {
 			req.Symbol = sym.Symbol
 		}
@@ -1387,7 +1383,7 @@ func (api *API) GetBacktestJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-	jobID := chiParam(r,"jobID")
+	jobID := chiParam(r, "jobID")
 	job, found := api.btJobs.Get(jobID)
 	if !found {
 		writeError(w, http.StatusNotFound, "job not found")
@@ -1429,7 +1425,7 @@ func (api *API) DownloadBacktestReport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-	jobID := chiParam(r,"jobID")
+	jobID := chiParam(r, "jobID")
 	job, found := api.btJobs.Get(jobID)
 	if !found {
 		writeError(w, http.StatusNotFound, "job not found")
@@ -1708,7 +1704,7 @@ func (api *API) DeleteCredential(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-	id := chiParam(r,"id")
+	id := chiParam(r, "id")
 	creds, _ := api.creds.List(userID)
 	var exchange string
 	var isTestnet bool
@@ -1822,7 +1818,7 @@ func (api *API) DeleteNotificationConfig(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
-	if err := api.notifier.Delete(userID, chiParam(r,"id")); err != nil {
+	if err := api.notifier.Delete(userID, chiParam(r, "id")); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
@@ -1910,7 +1906,7 @@ func (api *API) GetBot(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	botID := chiParam(r,"botID")
+	botID := chiParam(r, "botID")
 	for _, mode := range []string{ModeLive, ModePaper} {
 		inst, err := api.store.GetInstance(userID, mode, botID)
 		if err == nil {
@@ -1950,4 +1946,3 @@ func credModeError(mode, ex string) string {
 	}
 	return "paper mode requires Binance API credentials (live keys) — add them in Settings first"
 }
-

@@ -26,62 +26,62 @@ type ContainerResources struct {
 }
 
 type Config struct {
-	Port                int
-	DataDir             string
-	DataVolume          string
-	SupabaseURL         string
-	SupabaseKey         string
-	SupabaseDBURL       string
-	EncryptionKey       string
-	DockerNetwork       string
-	BBGOImage           string
-	BBGOPort            int
-	BBGOGRPCPort        int
-	BBGOUID             int
-	BBGOGID             int
-	ManagerToken        string
-	WSAllowedOrigins    []string
+	Port                      int
+	DataDir                   string
+	DataVolume                string
+	SupabaseURL               string
+	SupabaseKey               string
+	SupabaseDBURL             string
+	EncryptionKey             string
+	DockerNetwork             string
+	BBGOImage                 string
+	BBGOPort                  int
+	BBGOGRPCPort              int
+	BBGOUID                   int
+	BBGOGID                   int
+	ManagerToken              string
+	WSAllowedOrigins          []string
 	MarketDataAddr            string
 	MarketDataRESTAddr        string
 	MarketDataTestnetAddr     string
 	MarketDataTestnetRESTAddr string
-	MarketSubscriptions []MarketSub
-	BacktestSymbols     []string
-	BacktestExchanges   []string
-	BacktestStartTime   string
-	BacktestEndTime     string
-	BacktestSharedDir   string
-	InstanceResources   ContainerResources
-	BacktestResources   ContainerResources
+	MarketSubscriptions       []MarketSub
+	BacktestSymbols           []string
+	BacktestExchanges         []string
+	BacktestStartTime         string
+	BacktestEndTime           string
+	BacktestSharedDir         string
+	InstanceResources         ContainerResources
+	BacktestResources         ContainerResources
 }
 
 func LoadConfig() (*Config, error) {
 	cfg := &Config{
-		Port:                getEnvInt("MANAGER_PORT", 8090),
-		DataDir:             getEnv("DATA_DIR", "./data"),
-		DataVolume:          getEnv("DATA_VOLUME", "bbgo-data"),
-		SupabaseURL:         getEnv("SUPABASE_URL", ""),
-		SupabaseKey:         getEnv("SUPABASE_SERVICE_KEY", ""),
-		SupabaseDBURL:       getEnv("SUPABASE_DB_URL", ""),
-		EncryptionKey:       getEnv("ENCRYPTION_KEY", ""),
-		DockerNetwork:       getEnv("DOCKER_NETWORK", "bbgo-net"),
-		BBGOImage:           getEnv("BBGO_IMAGE", "bbgo-base:latest"),
-		BBGOPort:            getEnvInt("BBGO_PORT", 8080),
-		BBGOGRPCPort:        getEnvInt("BBGO_GRPC_PORT", 9090),
-		BBGOUID:             getEnvInt("BBGO_UID", 10001),
-		BBGOGID:             getEnvInt("BBGO_GID", 10001),
-		ManagerToken:        getEnv("MANAGER_TOKEN", ""),
-		WSAllowedOrigins:    getEnvSlice("WS_ALLOWED_ORIGINS", nil),
+		Port:                      getEnvInt("MANAGER_PORT", 8090),
+		DataDir:                   getEnv("DATA_DIR", "./data"),
+		DataVolume:                getEnv("DATA_VOLUME", "bbgo-data"),
+		SupabaseURL:               getEnv("SUPABASE_URL", ""),
+		SupabaseKey:               getEnv("SUPABASE_SERVICE_KEY", ""),
+		SupabaseDBURL:             getEnv("SUPABASE_DB_URL", ""),
+		EncryptionKey:             getEnv("ENCRYPTION_KEY", ""),
+		DockerNetwork:             getEnv("DOCKER_NETWORK", "bbgo-net"),
+		BBGOImage:                 getEnv("BBGO_IMAGE", "bbgo-base:latest"),
+		BBGOPort:                  getEnvInt("BBGO_PORT", 8080),
+		BBGOGRPCPort:              getEnvInt("BBGO_GRPC_PORT", 9090),
+		BBGOUID:                   getEnvInt("BBGO_UID", 10001),
+		BBGOGID:                   getEnvInt("BBGO_GID", 10001),
+		ManagerToken:              getEnv("MANAGER_TOKEN", ""),
+		WSAllowedOrigins:          getEnvSlice("WS_ALLOWED_ORIGINS", nil),
 		MarketDataAddr:            getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),
 		MarketDataRESTAddr:        getEnv("MARKETDATA_REST_ADDR", "bbgo-marketdata:8080"),
 		MarketDataTestnetAddr:     getEnv("MARKETDATA_TESTNET_ADDR", ""),
 		MarketDataTestnetRESTAddr: getEnv("MARKETDATA_TESTNET_REST_ADDR", ""),
-		MarketSubscriptions: parseMarketSubs(getEnvSlice("MARKET_SUBSCRIPTIONS", nil)),
-		BacktestSymbols:     getEnvSlice("BACKTEST_SYMBOLS", []string{"BTCUSDT", "ETHUSDT"}),
-		BacktestExchanges:   getEnvSlice("BACKTEST_EXCHANGES", []string{"binance"}),
-		BacktestStartTime:   getEnv("BACKTEST_START_TIME", "2023-12-01"),
-		BacktestEndTime:     getEnv("BACKTEST_END_TIME", "2025-12-31"),
-		BacktestSharedDir:   getEnv("BACKTEST_SHARED_DIR", ""),
+		MarketSubscriptions:       parseMarketSubs(getEnvSlice("MARKET_SUBSCRIPTIONS", nil)),
+		BacktestSymbols:           getEnvSlice("BACKTEST_SYMBOLS", []string{"BTCUSDT", "ETHUSDT"}),
+		BacktestExchanges:         getEnvSlice("BACKTEST_EXCHANGES", []string{"binance"}),
+		BacktestStartTime:         getEnv("BACKTEST_START_TIME", "2023-12-01"),
+		BacktestEndTime:           getEnv("BACKTEST_END_TIME", "2025-12-31"),
+		BacktestSharedDir:         getEnv("BACKTEST_SHARED_DIR", ""),
 		InstanceResources: ContainerResources{
 			Memory:     getEnv("CONTAINER_MEMORY", "256m"),
 			MemorySwap: getEnv("CONTAINER_MEMORY_SWAP", "512m"),
