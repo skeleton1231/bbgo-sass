@@ -37,6 +37,8 @@ type Config struct {
 	BBGOImage           string
 	BBGOPort            int
 	BBGOGRPCPort        int
+	BBGOUID             int
+	BBGOGID             int
 	ManagerToken        string
 	WSAllowedOrigins    []string
 	MarketDataAddr            string
@@ -66,6 +68,8 @@ func LoadConfig() (*Config, error) {
 		BBGOImage:           getEnv("BBGO_IMAGE", "bbgo-base:latest"),
 		BBGOPort:            getEnvInt("BBGO_PORT", 8080),
 		BBGOGRPCPort:        getEnvInt("BBGO_GRPC_PORT", 9090),
+		BBGOUID:             getEnvInt("BBGO_UID", 10001),
+		BBGOGID:             getEnvInt("BBGO_GID", 10001),
 		ManagerToken:        getEnv("MANAGER_TOKEN", ""),
 		WSAllowedOrigins:    getEnvSlice("WS_ALLOWED_ORIGINS", nil),
 		MarketDataAddr:            getEnv("MARKETDATA_ADDR", "bbgo-marketdata:9090"),

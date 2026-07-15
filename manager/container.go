@@ -103,7 +103,22 @@ func (cm *ContainerManager) CreateAndStartInstance(inst *StrategyInstance) error
 
 	yamlPath := filepath.Join(hostDir, "bbgo.yaml")
 	if _, err := os.Stat(yamlPath); err != nil {
-		return fmt.Errorf("bbgo.yaml not found for instance %s: %w", inst.InstanceID, err)
+		// Self-heal orphan instances: the Supabase row + config exist but the
+		// on-disk bbgo.yaml was lost (volume cleanup, partially failed create,
+		// etc.). Regenerate from the stored config so both start and the
+		// container_recovery loop recover instead of failing forever on
+		// "bbgo.yaml not found".
+		log.Printf("instance %s missing bbgo.yaml, regenerating from stored config", inst.InstanceID)
+		hasCredFn := func(exchange string) bool {
+			if cm.creds == nil {
+				return false
+			}
+			_, _, _, e := cm.creds.GetDecryptedByMode(inst.UserID, exchange, false)
+			return e == nil
+		}
+		if yerr := cm.store.writeInstanceYAML(inst, hasCredFn); yerr != nil {
+			return fmt.Errorf("regenerate bbgo.yaml for instance %s: %w", inst.InstanceID, yerr)
+		}
 	}
 
 	containerDir := ContainerDir(inst.UserID, inst.Mode, inst.InstanceID)
@@ -452,6 +467,38 @@ func backtestContainerDir(userID, jobID string) string {
 	return fmt.Sprintf("/data/backtest/%s/%s", userID, jobID)
 }
 
+// backtestSharedDirName is the directory (relative to DataDir) shared by sync
+// and backtest containers for the kline cache DB (KLINE_DB_PATH) and the sync
+// DB (DB_DSN). It must match the hardcoded "/data/backtest-shared" used in the
+// docker -e flags below.
+const backtestSharedDirName = "backtest-shared"
+
+// ensureBacktestSharedDir creates the shared backtest directory used by sync and
+// backtest containers. The directory is never created by bbgo itself (SQLite does
+// not mkdir its parent), so the manager must create it up front.
+func (cm *ContainerManager) ensureBacktestSharedDir() error {
+	dir := filepath.Join(cm.cfg.DataDir, backtestSharedDirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create backtest shared dir: %w", err)
+	}
+	cm.chownToBBGO(dir)
+	return nil
+}
+
+// chownToBBGO best-effort transfers ownership of path to the bbgo container
+// user (UID/GID from config, default 10001). The manager runs as root and
+// creates directories root-owned, but bbgo containers run non-root and cannot
+// write SQLite databases into root-owned directories — which surfaces as
+// "unable to open database file". No-op when UID is 0 or the manager is not root.
+func (cm *ContainerManager) chownToBBGO(path string) {
+	if cm.cfg.BBGOUID == 0 && cm.cfg.BBGOGID == 0 {
+		return
+	}
+	if err := os.Chown(path, cm.cfg.BBGOUID, cm.cfg.BBGOGID); err != nil {
+		log.Printf("warning: chown %s to %d:%d failed: %v", path, cm.cfg.BBGOUID, cm.cfg.BBGOGID, err)
+	}
+}
+
 func (cm *ContainerManager) backtestResourceArgs() []string {
 	r := cm.cfg.BacktestResources
 	var args []string
@@ -483,10 +530,15 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backtest dir: %w", err)
 	}
+	cm.chownToBBGO(hostDir)
 
 	configPath := filepath.Join(hostDir, "bbgo.yaml")
 	if err := os.WriteFile(configPath, yamlContent, 0o644); err != nil {
 		return nil, fmt.Errorf("write backtest config: %w", err)
+	}
+
+	if err := cm.ensureBacktestSharedDir(); err != nil {
+		return nil, err
 	}
 
 	cDir := backtestContainerDir(userID, jobID)
@@ -575,6 +627,10 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		return "", fmt.Errorf("write config: %w", err)
 	}
 
+	if err := cm.ensureBacktestSharedDir(); err != nil {
+		return "", err
+	}
+
 	cDir := backtestContainerDir(userID, syncID)
 	args := []string{
 		"run", "--rm",
@@ -611,7 +667,7 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 
 	out, err := cm.dockerLong(args...)
 	if err != nil {
-		return out, fmt.Errorf("sync failed: %w", err)
+		return out, fmt.Errorf("sync failed: %s: %w", out, err)
 	}
 	return out, nil
 }
