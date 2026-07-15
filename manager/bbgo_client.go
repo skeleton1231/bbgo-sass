@@ -11,7 +11,11 @@ import (
 )
 
 var bbgoClientTransport = &http.Transport{
-	Proxy:                 http.ProxyFromEnvironment,
+	// Strategy containers live on the docker bridge network and are reached by
+	// dynamic container name (bbgo-<user>-<instance>). Never route this through
+	// an HTTP proxy: NO_PROXY cannot wildcard those names and the host proxy
+	// cannot resolve them. Keep direct, matching BotProxy in proxy.go.
+	Proxy:                 func(_ *http.Request) (*url.URL, error) { return nil, nil },
 	MaxIdleConns:          1000,
 	MaxIdleConnsPerHost:   100,
 	IdleConnTimeout:       90 * time.Second,

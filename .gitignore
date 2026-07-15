@@ -25,3 +25,6 @@ web/supabase/.temp/
 # Playwright MCP artifacts
 .playwright-mcp/
 *.png
+
+# Local docker compose override (machine-specific proxy, not for commit)
+docker-compose.override.yml
