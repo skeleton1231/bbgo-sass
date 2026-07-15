@@ -127,12 +127,17 @@ func (cm *ContainerManager) CreateAndStartInstance(inst *StrategyInstance) error
 		"--name", name,
 		"--network", cm.cfg.DockerNetwork,
 		"--network-alias", name,
+		// Make host.docker.internal reachable so the propagated proxy URL
+		// (collectedProxyEnv rewrites 127.0.0.1 -> host.docker.internal) resolves.
+		// No-op on Docker Desktop (already resolved); required on Linux hosts.
+		"--add-host", "host.docker.internal:host-gateway",
 		"-v", cm.cfg.DataVolume + ":/data",
 		"--workdir", containerDir,
 		"--restart", "unless-stopped",
 	}
 	args = append(args, cm.instanceResourceArgs()...)
 	args = append(args, cm.instanceEnvArgs(inst)...)
+	args = append(args, cm.proxyEnvArgs()...)
 	args = append(args,
 		cm.cfg.BBGOImage,
 		"run",
