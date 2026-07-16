@@ -72,6 +72,18 @@ func (cm *ContainerManager) dockerLong(args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// removeContainerIfExists force-removes a container by name (stopped or
+// running). Used before `docker run --name <fixed>` to recover from a prior
+// run that exited without --rm cleanup or hung (e.g. an infinite exchange-REST
+// retry behind the GFW), which would otherwise leave the name in use and block
+// every subsequent sync with a name conflict.
+func (cm *ContainerManager) removeContainerIfExists(name string) {
+	out, err := cm.docker("rm", "-f", name)
+	if err != nil && !strings.Contains(out, "No such container") {
+		log.Printf("remove stale container %s: %v (%s)", name, err, out)
+	}
+}
+
 func (cm *ContainerManager) EnsureNetwork() error {
 	out, err := cm.docker("network", "create", cm.cfg.DockerNetwork)
 	if err != nil && !strings.Contains(out, "already exists") {
@@ -552,6 +564,10 @@ func (cm *ContainerManager) RunBacktest(userID string, jobID string, yamlContent
 		"--name", "bt-" + jobID,
 		"--network", cm.cfg.DockerNetwork,
 		"-v", cm.cfg.DataVolume + ":/data",
+		// Make host.docker.internal resolve so the propagated proxy env
+		// (proxyEnvArgs) works — lets bbgo fetch klines directly from the
+		// exchange when marketdata lacks them (e.g. 1m behind the GFW).
+		"--add-host", "host.docker.internal:host-gateway",
 	}
 	args = append(args, cm.backtestResourceArgs()...)
 	args = append(args,
@@ -642,6 +658,7 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		"--name", "bt-" + syncID,
 		"--network", cm.cfg.DockerNetwork,
 		"-v", cm.cfg.DataVolume + ":/data",
+		"--add-host", "host.docker.internal:host-gateway",
 	}
 	args = append(args, cm.backtestResourceArgs()...)
 	args = append(args,
@@ -669,6 +686,11 @@ func (cm *ContainerManager) SyncBacktest(userID, exchange, symbol, startTime, en
 		"--sync-from", syncFrom,
 		"--config", cDir+"/sync.yaml",
 	)
+
+	// bt-<syncID> is a fixed name reused for every sync of this exchange;
+	// clear any stale/hung leftover so it does not block this run with a
+	// name conflict.
+	cm.removeContainerIfExists("bt-" + syncID)
 
 	out, err := cm.dockerLong(args...)
 	if err != nil {

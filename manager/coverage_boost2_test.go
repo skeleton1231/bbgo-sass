@@ -253,7 +253,7 @@ func TestCreateAndStartInstance_MockDocker(t *testing.T) {
 	}
 }
 
-func TestCreateAndStartInstance_NoYAML(t *testing.T) {
+func TestCreateAndStartInstance_RegeneratesMissingYAML(t *testing.T) {
 	dir := t.TempDir()
 	store := NewInstanceStore(dir, nil)
 	inst := &StrategyInstance{
@@ -261,19 +261,27 @@ func TestCreateAndStartInstance_NoYAML(t *testing.T) {
 		Strategy: "grid2", Exchange: "binance", Symbol: "BTCUSDT",
 	}
 
+	yamlPath := store.yamlPath(inst.UserID, inst.Mode, inst.InstanceID)
+	if _, err := os.Stat(yamlPath); err == nil {
+		t.Fatalf("precondition: bbgo.yaml should not exist yet")
+	}
+
 	cm := &ContainerManager{
 		cfg:   &Config{DockerNetwork: "test-net", DataVolume: "test-vol", BBGOImage: "bbgo:test", BBGOPort: 8080, BBGOGRPCPort: 9090},
 		store: store,
 		dockerFn: func(args ...string) (string, error) {
-			return "", nil
+			return "container-id-123", nil
 		},
 	}
-	err := cm.CreateAndStartInstance(inst)
-	if err == nil {
-		t.Fatal("expected error with no yaml")
+
+	// Self-heal: a missing on-disk bbgo.yaml is regenerated from the stored
+	// instance config and the instance starts, instead of failing forever on
+	// "bbgo.yaml not found" (volume cleanup / partially failed create).
+	if err := cm.CreateAndStartInstance(inst); err != nil {
+		t.Fatalf("expected self-heal to regenerate bbgo.yaml, got error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "bbgo.yaml not found") {
-		t.Errorf("error = %v", err)
+	if _, err := os.Stat(yamlPath); err != nil {
+		t.Errorf("bbgo.yaml should have been regenerated: %v", err)
 	}
 }
 
