@@ -1859,41 +1859,53 @@ func (api *API) ListBots(w http.ResponseWriter, r *http.Request) {
 		modes = []string{ModeLive, ModePaper}
 	}
 	runningSet := api.container.ListRunningInstanceContainers(userID)
-	var bots []Bot
+
+	// Gather instances across the requested mode(s). Mode order is preserved so
+	// the response stays grouped (live before paper) as before.
+	var allInsts []StrategyInstance
 	for _, m := range modes {
 		instances, _ := api.store.ListInstances(userID, m)
-		for _, inst := range instances {
-			bot := Bot{
-				ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol,
-				Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name,
-				LastError: inst.LastError, LastErrorAt: inst.LastErrorAt,
-			}
-			if api.isInstanceStarting(inst.InstanceID) {
-				bot.ContainerStatus = StatusStarting
+		allInsts = append(allInsts, instances...)
+	}
+	// Pre-compute container health CONCURRENTLY. Calling CheckInstanceHealth
+	// serially inside the loop below (one `docker inspect` per running
+	// container) made ListBots take 20s+ with ~40 paper containers, which
+	// tripped the Next.js proxy's fetch timeout (ECONNRESET → HTTP 500) and
+	// made the bots page unusable. Batched it is ~2s.
+	healthMap := api.container.CheckInstanceHealthBatch(allInsts, runningSet)
+
+	var bots []Bot
+	for _, inst := range allInsts {
+		bot := Bot{
+			ID: inst.InstanceID, Strategy: inst.Strategy, Symbol: inst.Symbol,
+			Exchange: inst.Exchange, Mode: inst.Mode, Name: inst.Name,
+			LastError: inst.LastError, LastErrorAt: inst.LastErrorAt,
+		}
+		if api.isInstanceStarting(inst.InstanceID) {
+			bot.ContainerStatus = StatusStarting
+		} else {
+			name := api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			if !runningSet[name] {
+				bot.ContainerStatus = StatusStopped
 			} else {
-				name := api.container.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
-				if !runningSet[name] {
-					bot.ContainerStatus = StatusStopped
-				} else {
-					// Docker reports the container as running, but with
-					// --restart=unless-stopped a crashlooping bbgo process
-					// still shows up in `docker ps`. Cheap second check via
-					// docker inspect detects crashloop (high RestartCount +
-					// non-zero ExitCode) so we can mark it as error instead
-					// of reporting a phantom-active container.
-					bot.ContainerName = name
-					if health, err := api.container.CheckInstanceHealth(inst.UserID, inst.Mode, inst.InstanceID); err == nil && health.Status == HealthStatusError {
-						bot.ContainerStatus = StatusError
-						if bot.LastError == "" {
-							bot.LastError = health.Reason
-						}
-					} else {
-						bot.ContainerStatus = StatusRunning
+				// Docker reports the container as running, but with
+				// --restart=unless-stopped a crashlooping bbgo process
+				// still shows up in `docker ps`. Cheap second check via
+				// docker inspect detects crashloop (high RestartCount +
+				// non-zero ExitCode) so we can mark it as error instead
+				// of reporting a phantom-active container.
+				bot.ContainerName = name
+				if health, ok := healthMap[name]; ok && health.Status == HealthStatusError {
+					bot.ContainerStatus = StatusError
+					if bot.LastError == "" {
+						bot.LastError = health.Reason
 					}
+				} else {
+					bot.ContainerStatus = StatusRunning
 				}
 			}
-			bots = append(bots, bot)
 		}
+		bots = append(bots, bot)
 	}
 	if bots == nil {
 		bots = []Bot{}

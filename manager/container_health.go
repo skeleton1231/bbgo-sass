@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -71,6 +72,46 @@ func (cm *ContainerManager) CheckInstanceHealth(userID, mode, instanceID string)
 		h.Reason = hb
 	}
 	return h, nil
+}
+
+// CheckInstanceHealthBatch runs CheckInstanceHealth concurrently for the running
+// instances among `instances` and returns a map keyed by container name. Use this
+// instead of calling CheckInstanceHealth serially per instance: one docker inspect
+// per container adds up — at 40+ paper containers ListBots took ~20s serial
+// (tripping the Next.js proxy fetch timeout → ECONNRESET/HTTP 500); batched it is
+// ~2s. Concurrency is bounded to 8 so the docker daemon isn't overwhelmed.
+func (cm *ContainerManager) CheckInstanceHealthBatch(instances []StrategyInstance, runningSet map[string]bool) map[string]ContainerHealth {
+	result := make(map[string]ContainerHealth)
+	if len(instances) == 0 || len(runningSet) == 0 {
+		return result
+	}
+	var running []StrategyInstance
+	for _, inst := range instances {
+		if runningSet[cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)] {
+			running = append(running, inst)
+		}
+	}
+	if len(running) == 0 {
+		return result
+	}
+	var mu sync.Mutex
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	for _, inst := range running {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(inst StrategyInstance) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			name := cm.InstanceContainerName(inst.UserID, inst.Mode, inst.InstanceID)
+			h, _ := cm.CheckInstanceHealth(inst.UserID, inst.Mode, inst.InstanceID)
+			mu.Lock()
+			result[name] = h
+			mu.Unlock()
+		}(inst)
+	}
+	wg.Wait()
+	return result
 }
 
 // checkHeartbeat returns a non-empty reason string when the heartbeat file

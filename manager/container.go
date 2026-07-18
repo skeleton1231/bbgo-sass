@@ -112,6 +112,12 @@ func (cm *ContainerManager) CreateAndStartInstance(inst *StrategyInstance) error
 	if err := os.MkdirAll(hostDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
+	// Instance dir must be writable by the bbgo container user (uid 10001), which
+	// mkdirs {hostDir}/persistence/... at runtime. The manager runs as root, so
+	// without this chown every strategy that uses persistence crashes on startup
+	// with "mkdir .../persistence: permission denied". Backtest paths already do
+	// this; live/paper instances were missing it.
+	cm.chownToBBGO(hostDir)
 
 	yamlPath := filepath.Join(hostDir, "bbgo.yaml")
 	if _, err := os.Stat(yamlPath); err != nil {
