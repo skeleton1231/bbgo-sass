@@ -350,20 +350,6 @@ func TestAPICreate_Supertrend_PaperBlocked(t *testing.T) {
 	}
 }
 
-func TestAPICreate_Drift_PaperBlocked(t *testing.T) {
-	api, r := setupHandlerAPI(t)
-	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }
-
-	w := doRequest(r, "POST", "/api/users/"+testUUID+"/strategies", map[string]any{
-		"strategy": "drift", "name": "Drift Bot", "exchange": "binance",
-		"mode": "paper", "symbol": "BTCUSDT",
-		"config": map[string]any{"window": 20},
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("drift in paper mode should be blocked (liveOnly), got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestAPICreate_DCA2_PaperBlocked(t *testing.T) {
 	api, r := setupHandlerAPI(t)
 	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }

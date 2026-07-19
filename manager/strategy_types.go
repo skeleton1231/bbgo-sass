@@ -490,7 +490,7 @@ var StrategyRegistry = map[string]StrategyMeta{
 		Description:       "Market making with Bollinger Band neutral zone and trend-following exposure control",
 		Category:          "maker",
 		SupportedExchanges: []string{"binance", "okex", "bybit", "bitget", "kucoin"},
-		LiveOnly:          true,
+		LiveOnly:          false,
 		CrossExchange:     false,
 	},
 	"linregmaker": {
@@ -499,7 +499,7 @@ var StrategyRegistry = map[string]StrategyMeta{
 		Description:       "Market making with linear regression trend indicators for dynamic spread and exposure",
 		Category:          "maker",
 		SupportedExchanges: []string{"binance", "okex", "bybit", "bitget", "kucoin"},
-		LiveOnly:          true,
+		LiveOnly:          false,
 		CrossExchange:     false,
 	},
 	"rsmaker": {
@@ -508,7 +508,7 @@ var StrategyRegistry = map[string]StrategyMeta{
 		Description:       "Market making with Relative Strength indicator for trend-aware order placement",
 		Category:          "maker",
 		SupportedExchanges: []string{"binance", "okex", "bybit", "bitget", "kucoin"},
-		LiveOnly:          true,
+		LiveOnly:          false,
 		CrossExchange:     false,
 	},
 	"fixedmaker": {
@@ -679,7 +679,7 @@ var StrategyRegistry = map[string]StrategyMeta{
 		Description:       "Order flow based market making with per-trade order management",
 		Category:          "maker",
 		SupportedExchanges: []string{"binance", "okex", "bybit", "bitget", "kucoin"},
-		LiveOnly:          true,
+		LiveOnly:          false,
 		CrossExchange:     false,
 	},
 	"liquiditymaker": {
@@ -706,7 +706,7 @@ var StrategyRegistry = map[string]StrategyMeta{
 		Description:       "Drift MA strategy with linear regression prediction, ATR stop-loss and trailing exits",
 		Category:          "trend",
 		SupportedExchanges: []string{"binance", "okex", "bybit", "bitget", "kucoin"},
-		LiveOnly:          true,
+		LiveOnly:          false,
 		CrossExchange:     false,
 	},
 	"elliottwave": {
@@ -715,7 +715,7 @@ var StrategyRegistry = map[string]StrategyMeta{
 		Description:       "Elliott Wave oscillator with ATR stop-loss, Heikin-Ashi and trailing exits",
 		Category:          "trend",
 		SupportedExchanges: []string{"binance", "okex", "bybit", "bitget", "kucoin"},
-		LiveOnly:          true,
+		LiveOnly:          false,
 		CrossExchange:     false,
 	},
 	"factorzoo": {

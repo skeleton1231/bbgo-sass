@@ -199,17 +199,17 @@ func TestStrategy_Liquiditymaker_Layered(t *testing.T) {
 // LiveOnly enforcement for market makers
 // ============================================================
 
-func TestAPICreate_Bollmaker_PaperBlocked(t *testing.T) {
+func TestAPICreate_Scmaker_PaperBlocked(t *testing.T) {
 	api, r := setupHandlerAPI(t)
 	api.container.checkRunningFn = func(string) (bool, error) { return false, nil }
 
 	w := doRequest(r, "POST", "/api/users/"+testUUID+"/strategies", map[string]any{
-		"strategy": "bollmaker", "name": "Boll Maker", "exchange": "binance",
+		"strategy": "scmaker", "name": "SC Maker", "exchange": "binance",
 		"mode": "paper", "symbol": "BTCUSDT",
-		"config": map[string]any{"bidQuantity": 0.01, "askQuantity": 0.01},
+		"config": map[string]any{"numOfLiquidityLayers": 5},
 	})
 	if w.Code != http.StatusBadRequest {
-		t.Errorf("bollmaker in paper mode should be blocked (liveOnly), got %d: %s", w.Code, w.Body.String())
+		t.Errorf("scmaker in paper mode should be blocked (liveOnly), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
